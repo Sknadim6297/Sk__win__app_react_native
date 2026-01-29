@@ -305,7 +305,7 @@ const WalletScreen = ({ navigation }) => {
       
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <SKWinLogo size={70} />
+          <SKWinLogo size={110} />
           <View style={styles.headerText}>
             <Text style={styles.headerTitle}>Wallet</Text>
             <Text style={styles.headerSubtitle}>Manage your funds</Text>

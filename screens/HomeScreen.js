@@ -88,7 +88,7 @@ const HomeScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <SKWinLogo size={80} />
+          <SKWinLogo size={120} />
           <View>
             <Text style={styles.welcomeText}>Welcome back!</Text>
             <Text style={styles.usernameText}>
@@ -128,7 +128,10 @@ const HomeScreen = ({ navigation }) => {
         {/* Announcements */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📢 Announcements</Text>
+            <View style={styles.sectionTitleRow}>
+              <MaterialCommunityIcons name="bullhorn-outline" size={20} color={COLORS.accent} />
+              <Text style={styles.sectionTitle}>Announcements</Text>
+            </View>
             <TouchableOpacity>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
@@ -154,7 +157,10 @@ const HomeScreen = ({ navigation }) => {
         {/* Featured Matches */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🔥 Featured Matches</Text>
+            <View style={styles.sectionTitleRow}>
+              <MaterialCommunityIcons name="fire" size={20} color={COLORS.accent} />
+              <Text style={styles.sectionTitle}>Featured Matches</Text>
+            </View>
             <TouchableOpacity>
               <Text style={styles.seeAllText}>Watch All</Text>
             </TouchableOpacity>
@@ -195,7 +201,10 @@ const HomeScreen = ({ navigation }) => {
         {/* Upcoming Tournaments */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🏆 Upcoming Tournaments</Text>
+            <View style={styles.sectionTitleRow}>
+              <MaterialCommunityIcons name="trophy-outline" size={20} color={COLORS.accent} />
+              <Text style={styles.sectionTitle}>Upcoming Tournaments</Text>
+            </View>
             <TouchableOpacity onPress={() => navigation.navigate('Tournaments')}>
               <Text style={styles.seeAllText}>See All</Text>
             </TouchableOpacity>
@@ -248,7 +257,10 @@ const HomeScreen = ({ navigation }) => {
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⚡ Quick Actions</Text>
+          <View style={styles.sectionTitleRow}>
+            <MaterialCommunityIcons name="lightning-bolt" size={20} color={COLORS.accent} />
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+          </View>
           <View style={styles.quickActions}>
             <TouchableOpacity 
               style={styles.actionButton}
@@ -362,6 +374,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   emptyCard: {
     backgroundColor: COLORS.lightGray,

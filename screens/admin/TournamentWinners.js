@@ -243,9 +243,18 @@ const TournamentWinners = ({ navigation }) => {
                     Prize Pool: ${tournament.prizePool}
                   </Text>
                   <View style={styles.prizeBreakdown}>
-                    <Text style={styles.prizeText}>🥇 ${tournament.prizes?.first}</Text>
-                    <Text style={styles.prizeText}>🥈 ${tournament.prizes?.second}</Text>
-                    <Text style={styles.prizeText}>🥉 ${tournament.prizes?.third}</Text>
+                    <View style={styles.prizeRow}>
+                      <MaterialCommunityIcons name="medal" size={16} style={[styles.prizeIcon, styles.prizeIconFirst]} />
+                      <Text style={styles.prizeText}>${tournament.prizes?.first}</Text>
+                    </View>
+                    <View style={styles.prizeRow}>
+                      <MaterialCommunityIcons name="medal" size={16} style={[styles.prizeIcon, styles.prizeIconSecond]} />
+                      <Text style={styles.prizeText}>${tournament.prizes?.second}</Text>
+                    </View>
+                    <View style={styles.prizeRow}>
+                      <MaterialCommunityIcons name="medal" size={16} style={[styles.prizeIcon, styles.prizeIconThird]} />
+                      <Text style={styles.prizeText}>${tournament.prizes?.third}</Text>
+                    </View>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -289,7 +298,10 @@ const TournamentWinners = ({ navigation }) => {
           </View>
 
           {/* Winner Selection Cards */}
-          <Text style={styles.sectionTitle}>🏆 SELECT WINNERS</Text>
+          <View style={styles.sectionTitleRow}>
+            <MaterialCommunityIcons name="trophy-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>Select Winners</Text>
+          </View>
 
           {/* 1st Place */}
           <TouchableOpacity
@@ -297,7 +309,10 @@ const TournamentWinners = ({ navigation }) => {
             onPress={() => openWinnerSelector('first')}
           >
             <View style={styles.winnerHeader}>
-              <Text style={styles.winnerBadge}>🥇 1st Place</Text>
+              <View style={styles.winnerBadgeRow}>
+                <MaterialCommunityIcons name="medal" size={16} style={[styles.winnerBadgeIcon, styles.prizeIconFirst]} />
+                <Text style={styles.winnerBadge}>1st Place</Text>
+              </View>
               <Text style={styles.prizeAmount}>${selectedTournament.prizes?.first}</Text>
             </View>
             {winners.first ? (
@@ -319,7 +334,10 @@ const TournamentWinners = ({ navigation }) => {
             onPress={() => openWinnerSelector('second')}
           >
             <View style={styles.winnerHeader}>
-              <Text style={styles.winnerBadge}>🥈 2nd Place</Text>
+              <View style={styles.winnerBadgeRow}>
+                <MaterialCommunityIcons name="medal" size={16} style={[styles.winnerBadgeIcon, styles.prizeIconSecond]} />
+                <Text style={styles.winnerBadge}>2nd Place</Text>
+              </View>
               <Text style={styles.prizeAmount}>${selectedTournament.prizes?.second}</Text>
             </View>
             {winners.second ? (
@@ -341,7 +359,10 @@ const TournamentWinners = ({ navigation }) => {
             onPress={() => openWinnerSelector('third')}
           >
             <View style={styles.winnerHeader}>
-              <Text style={styles.winnerBadge}>🥉 3rd Place</Text>
+              <View style={styles.winnerBadgeRow}>
+                <MaterialCommunityIcons name="medal" size={16} style={[styles.winnerBadgeIcon, styles.prizeIconThird]} />
+                <Text style={styles.winnerBadge}>3rd Place</Text>
+              </View>
               <Text style={styles.prizeAmount}>${selectedTournament.prizes?.third}</Text>
             </View>
             {winners.third ? (
@@ -544,6 +565,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 8,
   },
+  prizeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  prizeIcon: {
+    color: COLORS.primary,
+  },
+  prizeIconFirst: {
+    color: '#FFD700',
+  },
+  prizeIconSecond: {
+    color: '#C0C0C0',
+  },
+  prizeIconThird: {
+    color: '#CD7F32',
+  },
   prizeText: {
     fontSize: 12,
     fontWeight: '600',
@@ -579,6 +617,12 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: 12,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
   winnerCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -600,6 +644,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+  },
+  winnerBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  winnerBadgeIcon: {
+    color: COLORS.primary,
   },
   winnerBadge: {
     fontSize: 14,

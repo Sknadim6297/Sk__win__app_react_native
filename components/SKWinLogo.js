@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { COLORS } from '../styles/theme';
 
-const SKWinLogo = ({ size = 100, style }) => {
+const SKWinLogo = ({ size = 140, style }) => {
   return (
     <View style={[styles.logoContainer(size), style]}>
       <Image

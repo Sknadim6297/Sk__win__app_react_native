@@ -7,61 +7,76 @@ import {
   Animated,
   StatusBar,
   Easing,
-  ScrollView,
+  Dimensions,
 } from 'react-native';
-import { MaterialCommunityIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
-import { COLORS, globalStyles } from '../styles/theme';
+import { COLORS } from '../styles/theme';
 import SKWinLogo from '../components/SKWinLogo';
+
+const { width, height } = Dimensions.get('window');
 
 const LandingScreen = ({ navigation }) => {
   const { isAuthenticated } = useContext(AuthContext);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const slideUpAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const float1 = useRef(new Animated.Value(0)).current;
+  const float2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Check if user is already logged in
     if (isAuthenticated) {
       navigation.replace('MainApp');
     } else {
-      // Start animations sequence
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 600,
-            easing: Easing.elastic(1.2),
-            useNativeDriver: true,
-          }),
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.timing(slideAnim, {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideUpAnim, {
           toValue: 0,
-          duration: 600,
+          duration: 700,
           easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
           useNativeDriver: true,
         }),
       ]).start();
 
-      // Continuous pulse animation for logo
+      // Floating animations for background elements
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.1,
-            duration: 1500,
+          Animated.timing(float1, {
+            toValue: 1,
+            duration: 3000,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
-          Animated.timing(pulseAnim, {
+          Animated.timing(float1, {
+            toValue: 0,
+            duration: 3000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(float2, {
             toValue: 1,
-            duration: 1500,
+            duration: 4000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(float2, {
+            toValue: 0,
+            duration: 4000,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
@@ -74,87 +89,122 @@ const LandingScreen = ({ navigation }) => {
     navigation.navigate('Auth');
   };
 
+  const float1Interpolate = float1.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-20, 20],
+  });
+
+  const float2Interpolate = float2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [20, -20],
+  });
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
-      {/* Top Gradient Background */}
-      <View style={styles.topDecoration}>
-        <View style={styles.glowCircle} />
-      </View>
+      {/* Animated Background Elements */}
+      <Animated.View 
+        style={[
+          styles.floatingCircle1,
+          { transform: [{ translateY: float1Interpolate }] }
+        ]} 
+      />
+      <Animated.View 
+        style={[
+          styles.floatingCircle2,
+          { transform: [{ translateY: float2Interpolate }] }
+        ]} 
+      />
 
       <View style={styles.content}>
         {/* Logo Section */}
         <Animated.View
           style={[
-            styles.logoSection,
+            styles.logoContainer,
             {
-              transform: [{ 
-                scale: Animated.multiply(scaleAnim, pulseAnim)
-              }],
-            }
+              opacity: fadeAnim,
+              transform: [
+                { scale: scaleAnim },
+                { translateY: slideUpAnim }
+              ],
+            },
           ]}
         >
-          <View style={styles.logoBg}>
-            <SKWinLogo size={90} />
+          <SKWinLogo size={width * 0.42} />
+        </Animated.View>
+
+        {/* Title Section */}
+        <Animated.View
+          style={[
+            styles.titleContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideUpAnim }],
+            },
+          ]}
+        >
+          <Text style={styles.title}>SK Win</Text>
+          <Text style={styles.subtitle}>Free Fire Tournaments</Text>
+          <View style={styles.divider} />
+          <Text style={styles.tagline}>Compete. Conquer. Win Big.</Text>
+        </Animated.View>
+
+        {/* Features */}
+        <Animated.View
+          style={[
+            styles.featuresContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: Animated.multiply(slideUpAnim, 1.5) }],
+            },
+          ]}
+        >
+          <View style={styles.featureRow}>
+            <View style={styles.featureItem}>
+              <MaterialCommunityIcons name="trophy-variant" size={24} color={COLORS.accent} />
+              <Text style={styles.featureText}>Live Tournaments</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <MaterialCommunityIcons name="cash-multiple" size={24} color={COLORS.success} />
+              <Text style={styles.featureText}>Real Prizes</Text>
+            </View>
+          </View>
+          <View style={styles.featureRow}>
+            <View style={styles.featureItem}>
+              <MaterialCommunityIcons name="shield-check" size={24} color={COLORS.primary} />
+              <Text style={styles.featureText}>Secure Payments</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <MaterialCommunityIcons name="account-group" size={24} color={COLORS.accent} />
+              <Text style={styles.featureText}>Pro Players</Text>
+            </View>
           </View>
         </Animated.View>
 
-        {/* Main Title */}
-        <Animated.Text 
-          style={[
-            styles.mainTitle,
-            { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }
-          ]}
-        >
-          SK Win
-        </Animated.Text>
-
-        <Animated.Text 
-          style={[
-            styles.subtitle,
-            { opacity: fadeAnim }
-          ]}
-        >
-          Free Fire Tournaments
-        </Animated.Text>
-
-  c
-
-        {/* Tagline */}
-        <Animated.Text 
-          style={[
-            styles.tagline,
-            { opacity: fadeAnim }
-          ]}
-        >
-          Join. Play. Win.
-        </Animated.Text>
-
         {/* Get Started Button */}
-        <Animated.View 
+        <Animated.View
           style={[
             styles.buttonContainer,
-            { 
+            {
               opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
+              transform: [{ translateY: Animated.multiply(slideUpAnim, 2) }],
+            },
           ]}
         >
           <TouchableOpacity
             style={styles.getStartedButton}
             onPress={handleGetStarted}
-            activeOpacity={0.85}
+            activeOpacity={0.9}
           >
             <Text style={styles.buttonText}>Get Started</Text>
-            <Ionicons name="arrow-forward" size={18} color={COLORS.white} style={{ marginLeft: 8 }} />
+            <MaterialCommunityIcons name="arrow-right" size={22} color={COLORS.black} />
           </TouchableOpacity>
-        </Animated.View>
-      </View>
 
-      {/* Bottom Decoration */}
-      <View style={styles.bottomDecoration}>
-        <View style={styles.glowCircle2} />
+          <Text style={styles.footerText}>
+            Join thousands of players worldwide
+          </Text>
+        </Animated.View>
       </View>
     </View>
   );
@@ -165,135 +215,116 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  scrollView: {
-    flex: 1,
+  floatingCircle1: {
+    position: 'absolute',
+    top: height * 0.1,
+    right: -width * 0.2,
+    width: width * 0.6,
+    height: width * 0.6,
+    borderRadius: width * 0.3,
+    backgroundColor: `${COLORS.primary}15`,
+    opacity: 0.5,
+  },
+  floatingCircle2: {
+    position: 'absolute',
+    bottom: height * 0.15,
+    left: -width * 0.25,
+    width: width * 0.7,
+    height: width * 0.7,
+    borderRadius: width * 0.35,
+    backgroundColor: `${COLORS.accent}12`,
+    opacity: 0.4,
   },
   content: {
-    minHeight: '100%',
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    alignItems: 'center',
-  },
-  topDecoration: {
-    position: 'absolute',
-    top: -50,
-    right: -50,
-    width: 200,
-    height: 200,
-    opacity: 0.1,
-  },
-  glowCircle: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 100,
-    backgroundColor: COLORS.primary,
-  },
-  glowCircle2: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 100,
-    backgroundColor: COLORS.accent,
-  },
-  bottomDecoration: {
-    position: 'absolute',
-    bottom: -80,
-    left: -80,
-    width: 200,
-    height: 200,
-    opacity: 0.08,
-  },
-  logoSection: {
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  logoBg: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(208, 94, 0, 0.15)',
+    flex: 1,
+    paddingHorizontal: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: `${COLORS.primary}40`,
+    paddingTop: height * 0.08,
+    paddingBottom: height * 0.06,
   },
-  mainTitle: {
-    fontSize: 52,
-    fontWeight: 'bold',
+  logoContainer: {
+    marginBottom: height * 0.04,
+  },
+  titleContainer: {
+    alignItems: 'center',
+    marginBottom: height * 0.05,
+  },
+  title: {
+    fontSize: width * 0.14,
+    fontWeight: '800',
     color: COLORS.white,
+    letterSpacing: 2,
     marginBottom: 8,
-    letterSpacing: 3,
-    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: width * 0.045,
     color: COLORS.gray,
-    marginBottom: 40,
-    textAlign: 'center',
     fontWeight: '500',
+    marginBottom: 16,
+  },
+  divider: {
+    width: 60,
+    height: 3,
+    backgroundColor: COLORS.accent,
+    borderRadius: 2,
+    marginBottom: 16,
+  },
+  tagline: {
+    fontSize: width * 0.042,
+    color: COLORS.white,
+    fontWeight: '600',
+    opacity: 0.9,
   },
   featuresContainer: {
     width: '100%',
-    marginBottom: 30,
+    marginBottom: height * 0.05,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
     gap: 12,
   },
-  featureCard: {
-    backgroundColor: `${COLORS.lightGray}99`,
+  featureItem: {
+    flex: 1,
+    backgroundColor: `${COLORS.lightGray}`,
     borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}40`,
     alignItems: 'center',
-    marginBottom: 10,
+    gap: 8,
   },
-  featureIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: `${COLORS.primary}20`,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  featureTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  featureText: {
+    fontSize: width * 0.032,
     color: COLORS.white,
-    marginBottom: 4,
-  },
-  featureDesc: {
-    fontSize: 13,
-    color: COLORS.gray,
+    fontWeight: '600',
     textAlign: 'center',
-  },
-  tagline: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.accent,
-    marginBottom: 30,
-    textAlign: 'center',
-    letterSpacing: 1,
   },
   buttonContainer: {
     width: '100%',
-    marginBottom: 40,
+    alignItems: 'center',
   },
   getStartedButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 30,
-    borderRadius: 20,
+    backgroundColor: COLORS.accent,
+    width: '100%',
+    paddingVertical: 18,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 56,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
+    gap: 8,
+    marginBottom: 16,
   },
   buttonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 1,
+    color: COLORS.black,
+    fontSize: width * 0.045,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  footerText: {
+    fontSize: width * 0.032,
+    color: COLORS.gray,
+    fontWeight: '500',
   },
 });
 
