@@ -70,145 +70,183 @@ const AdminDashboard = ({ navigation }) => {
       <ScrollView 
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+        style={styles.scrollView}
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
+          <View style={styles.headerContent}>
             <View style={styles.adminBadge}>
-              <MaterialCommunityIcons name="shield-crown" size={24} color={COLORS.accent} />
+              <MaterialCommunityIcons name="shield-crown" size={28} color={COLORS.accent} />
             </View>
             <View>
-              <Text style={styles.headerTitle}>ADMIN PANEL</Text>
-              <Text style={styles.headerSubtitle}>@{user?.username}</Text>
+              <Text style={styles.headerTitle}>SK ADMIN</Text>
+              <Text style={styles.headerSubtitle}>@{user?.username || 'Admin'}</Text>
             </View>
           </View>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Stats */}
-        <Text style={styles.sectionTitle}>📊 QUICK STATS</Text>
-        <View style={styles.statsGrid}>
-          <View style={[styles.statCard, styles.primaryCard]}>
-            <Ionicons name="people" size={32} color={COLORS.white} />
-            <Text style={styles.statValue}>{stats?.totalUsers || 0}</Text>
-            <Text style={styles.statLabel}>Total Users</Text>
-          </View>
-
-          <View style={[styles.statCard, styles.infoCard]}>
-            <Ionicons name="checkmark-circle" size={32} color={COLORS.white} />
-            <Text style={styles.statValue}>{stats?.verifiedUsers || 0}</Text>
-            <Text style={styles.statLabel}>Verified</Text>
-          </View>
-
-          <View style={[styles.statCard, styles.successCard]}>
-            <MaterialCommunityIcons name="shield-check" size={32} color={COLORS.white} />
-            <Text style={styles.statValue}>{stats?.kycVerifiedUsers || 0}</Text>
-            <Text style={styles.statLabel}>KYC Done</Text>
-          </View>
-
-          <View style={[styles.statCard, styles.warningCard]}>
-            <FontAwesome5 name="ban" size={28} color={COLORS.white} />
-            <Text style={styles.statValue}>{(stats?.suspendedUsers || 0) + (stats?.bannedUsers || 0)}</Text>
-            <Text style={styles.statLabel}>Blocked</Text>
-          </View>
-        </View>
-
-        {/* Wallet Stats */}
-        <View style={styles.walletCard}>
-          <MaterialCommunityIcons name="wallet" size={32} color={COLORS.accent} />
-          <View style={styles.walletContent}>
-            <Text style={styles.walletLabel}>Total Wallet Balance</Text>
-            <Text style={styles.walletAmount}>₹{stats?.totalWalletBalance?.toLocaleString() || 0}</Text>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <Text style={styles.sectionTitle}>⚡ QUICK ACTIONS</Text>
-        <View style={styles.actionsContainer}>
           <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigateTo('UserManagement')}
+            onPress={handleLogout} 
+            style={[styles.logoutButton, { backgroundColor: `${COLORS.error}30` }]}
           >
-            <View style={styles.actionIcon}>
-              <Ionicons name="people" size={28} color={COLORS.accent} />
-            </View>
-            <Text style={styles.actionTitle}>User Management</Text>
-            <Text style={styles.actionSubtitle}>Manage all users</Text>
-            <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigateTo('TournamentHistory')}
-          >
-            <View style={styles.actionIcon}>
-              <MaterialCommunityIcons name="history" size={28} color={COLORS.accent} />
-            </View>
-            <Text style={styles.actionTitle}>Tournament History</Text>
-            <Text style={styles.actionSubtitle}>View all tournaments</Text>
-            <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigateTo('PaymentManagement')}
-          >
-            <View style={styles.actionIcon}>
-              <MaterialCommunityIcons name="cash-multiple" size={28} color={COLORS.accent} />
-            </View>
-            <Text style={styles.actionTitle}>Payment Management</Text>
-            <Text style={styles.actionSubtitle}>{stats.pendingPayments} pending</Text>
-            <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigateTo('ReportedIssues')}
-          >
-            <View style={styles.actionIcon}>
-              <Ionicons name="warning" size={28} color={COLORS.error} />
-            </View>
-            <Text style={styles.actionTitle}>Reported Issues</Text>
-            <Text style={styles.actionSubtitle}>{stats.reportedIssues} new reports</Text>
-            <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+            <Ionicons name="log-out" size={22} color={COLORS.error} />
           </TouchableOpacity>
         </View>
 
-        {/* Recent Activity */}
-        <Text style={styles.sectionTitle}>🔔 RECENT ACTIVITY</Text>
-        <View style={styles.activityContainer}>
-          <View style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <Ionicons name="person-add" size={20} color={COLORS.success} />
+        <View style={styles.content}>
+          {/* Key Metrics */}
+          <Text style={styles.sectionTitle}>KEY METRICS</Text>
+          <View style={styles.metricsGrid}>
+            <View style={[styles.metricCard, { borderLeftColor: COLORS.primary }]}>
+              <View style={[styles.metricIcon, { backgroundColor: `${COLORS.primary}20` }]}>
+                <Ionicons name="people" size={28} color={COLORS.primary} />
+              </View>
+              <View style={styles.metricContent}>
+                <Text style={styles.metricValue}>{stats?.totalUsers || 0}</Text>
+                <Text style={styles.metricLabel}>Total Users</Text>
+              </View>
             </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>New user registered</Text>
-              <Text style={styles.activityTime}>2 minutes ago</Text>
+
+            <View style={[styles.metricCard, { borderLeftColor: COLORS.success }]}>
+              <View style={[styles.metricIcon, { backgroundColor: `${COLORS.success}20` }]}>
+                <Ionicons name="checkmark-circle" size={28} color={COLORS.success} />
+              </View>
+              <View style={styles.metricContent}>
+                <Text style={styles.metricValue}>{stats?.verifiedUsers || 0}</Text>
+                <Text style={styles.metricLabel}>Verified</Text>
+              </View>
+            </View>
+
+            <View style={[styles.metricCard, { borderLeftColor: COLORS.accent }]}>
+              <View style={[styles.metricIcon, { backgroundColor: `${COLORS.accent}20` }]}>
+                <MaterialCommunityIcons name="shield-check" size={28} color={COLORS.accent} />
+              </View>
+              <View style={styles.metricContent}>
+                <Text style={styles.metricValue}>{stats?.kycVerifiedUsers || 0}</Text>
+                <Text style={styles.metricLabel}>KYC Verified</Text>
+              </View>
+            </View>
+
+            <View style={[styles.metricCard, { borderLeftColor: COLORS.error }]}>
+              <View style={[styles.metricIcon, { backgroundColor: `${COLORS.error}20` }]}>
+                <Ionicons name="ban" size={28} color={COLORS.error} />
+              </View>
+              <View style={styles.metricContent}>
+                <Text style={styles.metricValue}>{(stats?.suspendedUsers || 0) + (stats?.bannedUsers || 0)}</Text>
+                <Text style={styles.metricLabel}>Blocked</Text>
+              </View>
             </View>
           </View>
 
-          <View style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <MaterialCommunityIcons name="trophy" size={20} color={COLORS.accent} />
+          {/* Wallet Summary */}
+          <View style={styles.walletCard}>
+            <View style={styles.walletIcon}>
+              <MaterialCommunityIcons name="wallet" size={32} color={COLORS.accent} />
             </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Tournament "Squad Battle" completed</Text>
-              <Text style={styles.activityTime}>15 minutes ago</Text>
+            <View style={styles.walletContent}>
+              <Text style={styles.walletLabel}>Total Wallet Balance</Text>
+              <Text style={styles.walletAmount}>₹{stats?.totalWalletBalance?.toLocaleString() || 0}</Text>
             </View>
           </View>
 
-          <View style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <FontAwesome5 name="money-bill-wave" size={18} color={COLORS.primary} />
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>Payment received - ₹5,000</Text>
-              <Text style={styles.activityTime}>1 hour ago</Text>
-            </View>
+          {/* Main Actions */}
+          <Text style={styles.sectionTitle}>MANAGEMENT</Text>
+          <View style={styles.actionsGrid}>
+            <TouchableOpacity 
+              style={styles.actionCardWide}
+              onPress={() => navigateTo('UserManagement')}
+            >
+              <View style={[styles.actionGradient, { backgroundColor: `${COLORS.primary}15` }]}>
+                <View style={styles.actionCardContent}>
+                  <View style={[styles.actionCardIcon, { backgroundColor: `${COLORS.primary}30` }]}>
+                    <Ionicons name="people" size={32} color={COLORS.primary} />
+                  </View>
+                  <View style={styles.actionCardText}>
+                    <Text style={styles.actionCardTitle}>User Management</Text>
+                    <Text style={styles.actionCardSubtitle}>Manage {stats?.totalUsers || 0} users</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color={COLORS.primary} />
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionCardWide}
+              onPress={() => navigateTo('TournamentManagement')}
+            >
+              <View style={[styles.actionGradient, { backgroundColor: `${COLORS.accent}15` }]}>
+                <View style={styles.actionCardContent}>
+                  <View style={[styles.actionCardIcon, { backgroundColor: `${COLORS.accent}30` }]}>
+                    <MaterialCommunityIcons name="tournament" size={32} color={COLORS.accent} />
+                  </View>
+                  <View style={styles.actionCardText}>
+                    <Text style={styles.actionCardTitle}>Tournament Management</Text>
+                    <Text style={styles.actionCardSubtitle}>Create & manage tournaments</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color={COLORS.accent} />
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionCardWide}
+              onPress={() => navigateTo('TournamentHistory')}
+            >
+              <View style={[styles.actionGradient, { backgroundColor: `#FF980015` }]}>
+                <View style={styles.actionCardContent}>
+                  <View style={[styles.actionCardIcon, { backgroundColor: `#FF980030` }]}>
+                    <MaterialCommunityIcons name="history" size={32} color="#FF9800" />
+                  </View>
+                  <View style={styles.actionCardText}>
+                    <Text style={styles.actionCardTitle}>Tournament History</Text>
+                    <Text style={styles.actionCardSubtitle}>View all tournaments</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#FF9800" />
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Secondary Actions */}
+          <Text style={styles.sectionTitle}>OTHER</Text>
+          <View style={styles.secondaryActions}>
+            <TouchableOpacity 
+              style={[styles.secondaryBtn, { borderLeftColor: COLORS.primary }]}
+              onPress={() => navigateTo('PaymentManagement')}
+            >
+              <MaterialCommunityIcons name="cash-multiple" size={24} color={COLORS.primary} style={styles.secondaryIcon} />
+              <View style={styles.secondaryContent}>
+                <Text style={styles.secondaryTitle}>Payment Management</Text>
+                <Text style={styles.secondarySubtitle}>Manage transactions</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.secondaryBtn, { borderLeftColor: COLORS.error }]}
+              onPress={() => navigateTo('ReportedIssues')}
+            >
+              <Ionicons name="warning" size={24} color={COLORS.error} style={styles.secondaryIcon} />
+              <View style={styles.secondaryContent}>
+                <Text style={styles.secondaryTitle}>Reported Issues</Text>
+                <Text style={styles.secondarySubtitle}>View user reports</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.secondaryBtn, { borderLeftColor: COLORS.accent }]}
+              onPress={() => navigateTo('Analytics')}
+            >
+              <MaterialCommunityIcons name="chart-line" size={24} color={COLORS.accent} style={styles.secondaryIcon} />
+              <View style={styles.secondaryContent}>
+                <Text style={styles.secondaryTitle}>Analytics</Text>
+                <Text style={styles.secondarySubtitle}>View statistics</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+            </TouchableOpacity>
           </View>
         </View>
+
+        <View style={{ height: 30 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -219,164 +257,200 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  scrollView: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 2,
-    borderBottomColor: COLORS.primary,
-    backgroundColor: COLORS.lightGray,
+    paddingVertical: 20,
+    paddingTop: 15,
+    backgroundColor: COLORS.primary,
   },
-  headerLeft: {
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   adminBadge: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: COLORS.darkGray,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: `${COLORS.darkGray}60`,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.accent,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: COLORS.white,
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: COLORS.gray,
+    color: `${COLORS.white}80`,
+    marginTop: 2,
   },
   logoutButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: COLORS.darkGray,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
-    flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingTop: 20,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: COLORS.white,
-    marginTop: 25,
-    marginBottom: 15,
-    letterSpacing: 1,
+    marginTop: 24,
+    marginBottom: 14,
+    letterSpacing: 0.5,
   },
-  statsGrid: {
+  metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-  },
-  statCard: {
-    width: '48%',
-    padding: 20,
-    borderRadius: 15,
-    marginBottom: 15,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
-  primaryCard: {
-    backgroundColor: COLORS.primary,
-  },
-  successCard: {
-    backgroundColor: COLORS.success,
-  },
-  infoCard: {
-    backgroundColor: COLORS.secondary,
-  },
-  warningCard: {
-    backgroundColor: COLORS.darkBlue,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginTop: 10,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.white,
-    marginTop: 5,
-    textAlign: 'center',
-  },
-  actionsContainer: {
+    gap: 10,
     marginBottom: 20,
   },
-  actionButton: {
+  metricCard: {
+    width: '48%',
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 14,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.lightGray,
-    padding: 15,
-    borderRadius: 15,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderLeftWidth: 4,
   },
-  actionIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: COLORS.darkGray,
+  metricIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 10,
   },
-  actionTitle: {
+  metricContent: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: 'bold',
+  },
+  metricValue: {
+    fontSize: 18,
+    fontWeight: '700',
     color: COLORS.white,
   },
-  actionSubtitle: {
-    fontSize: 12,
+  metricLabel: {
+    fontSize: 11,
     color: COLORS.gray,
-    position: 'absolute',
-    left: 80,
-    bottom: 15,
+    marginTop: 2,
   },
-  activityContainer: {
-    marginBottom: 30,
+  walletCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 24,
+    alignItems: 'center',
+    borderLeftWidth: 5,
+    borderLeftColor: COLORS.accent,
   },
-  activityItem: {
+  walletIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: `${COLORS.accent}30`,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  walletContent: {
+    flex: 1,
+  },
+  walletLabel: {
+    color: COLORS.gray,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  walletAmount: {
+    color: COLORS.accent,
+    fontSize: 26,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  actionsGrid: {
+    marginBottom: 24,
+  },
+  actionCardWide: {
+    marginBottom: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  actionGradient: {
+    padding: 0,
+  },
+  actionCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.lightGray,
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
   },
-  activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.darkGray,
+  actionCardIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  activityContent: {
+  actionCardText: {
     flex: 1,
   },
-  activityTitle: {
-    fontSize: 14,
+  actionCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
     color: COLORS.white,
-    marginBottom: 4,
   },
-  activityTime: {
+  actionCardSubtitle: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginTop: 2,
+  },
+  secondaryActions: {
+    marginBottom: 20,
+  },
+  secondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.lightGray,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+  },
+  secondaryIcon: {
+    marginRight: 12,
+  },
+  secondaryContent: {
+    flex: 1,
+  },
+  secondaryTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  secondarySubtitle: {
     fontSize: 11,
     color: COLORS.gray,
+    marginTop: 2,
   },
   loadingContainer: {
     flex: 1,
@@ -387,31 +461,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     marginTop: 10,
     fontSize: 14,
-  },
-  walletCard: {
-    flexDirection: 'row',
-    backgroundColor: `${COLORS.primary}20`,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}40`,
-    alignItems: 'center',
-  },
-  walletContent: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  walletLabel: {
-    color: COLORS.gray,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  walletAmount: {
-    color: COLORS.accent,
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 4,
   },
 });
 

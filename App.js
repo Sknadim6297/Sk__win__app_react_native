@@ -8,11 +8,13 @@ import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
 import HomeScreen from './screens/HomeScreen';
 import TournamentScreen from './screens/TournamentScreen';
+import TournamentDetailsScreen from './screens/TournamentDetailsScreen';
 import WalletScreen from './screens/WalletScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import AdminDashboard from './screens/admin/AdminDashboard';
 import UserManagement from './screens/admin/UserManagement';
 import TournamentHistory from './screens/admin/TournamentHistory';
+import TournamentManagement from './screens/admin/TournamentManagement';
 import { COLORS } from './styles/theme';
 
 const Stack = createStackNavigator();
@@ -108,6 +110,8 @@ export default function App() {
           <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
           <Stack.Screen name="UserManagement" component={UserManagement} />
           <Stack.Screen name="TournamentHistory" component={TournamentHistory} />
+          <Stack.Screen name="TournamentManagement" component={TournamentManagement} />
+          <Stack.Screen name="TournamentDetails" component={TournamentDetailsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </AuthProvider>

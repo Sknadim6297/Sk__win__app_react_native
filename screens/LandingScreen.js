@@ -119,28 +119,7 @@ const LandingScreen = ({ navigation }) => {
           Free Fire Tournaments
         </Animated.Text>
 
-        {/* Features Section - Compact */}
-        <Animated.View 
-          style={[
-            styles.featuresContainer,
-            { opacity: fadeAnim }
-          ]}
-        >
-          <View style={styles.featureCard}>
-            <MaterialCommunityIcons name="trophy" size={20} color={COLORS.accent} />
-            <Text style={styles.featureTitle}>Tournaments</Text>
-          </View>
-
-          <View style={styles.featureCard}>
-            <MaterialCommunityIcons name="cash-multiple" size={20} color={COLORS.accent} />
-            <Text style={styles.featureTitle}>Rewards</Text>
-          </View>
-
-          <View style={styles.featureCard}>
-            <Ionicons name="people" size={20} color={COLORS.accent} />
-            <Text style={styles.featureTitle}>Community</Text>
-          </View>
-        </Animated.View>
+  c
 
         {/* Tagline */}
         <Animated.Text 

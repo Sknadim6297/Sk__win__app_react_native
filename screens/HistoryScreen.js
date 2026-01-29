@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -8,94 +8,62 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import TrophyIcon from 'react-native-heroicons/outline/TrophyIcon';
+import StarIcon from 'react-native-heroicons/outline/StarIcon';
+import CheckCircleIcon from 'react-native-heroicons/outline/CheckCircleIcon';
+import ChevronDownIcon from 'react-native-heroicons/outline/ChevronDownIcon';
+import CalendarIcon from 'react-native-heroicons/outline/CalendarIcon';
+import ClockIcon from 'react-native-heroicons/outline/ClockIcon';
+import CurrencyDollarIcon from 'react-native-heroicons/outline/CurrencyDollarIcon';
+import PuzzlePieceIcon from 'react-native-heroicons/outline/PuzzlePieceIcon';
+import CreditCardIcon from 'react-native-heroicons/outline/CreditCardIcon';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../styles/theme';
 import SKWinLogo from '../components/SKWinLogo';
+import { tournamentService } from '../services/api';
 
 const HistoryScreen = ({ navigation }) => {
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [matchHistory, setMatchHistory] = useState([]);
 
-  // Mock match history data
-  const matchHistory = [
-    {
-      id: 1,
-      tournamentName: 'Elite Battle Royale',
-      gameMode: 'Battle Royale',
-      date: '2025-10-29',
-      time: '14:30',
-      rank: 1,
-      totalPlayers: 100,
-      killCount: 12,
-      prize: 500,
-      status: 'won',
-      duration: '25:30',
-    },
-    {
-      id: 2,
-      tournamentName: 'Free Fire Champions League',
-      gameMode: 'Battle Royale',
-      date: '2025-10-28',
-      time: '16:15',
-      rank: 15,
-      totalPlayers: 100,
-      killCount: 8,
-      prize: 0,
-      status: 'lost',
-      duration: '18:45',
-    },
-    {
-      id: 3,
-      tournamentName: 'Quick Clash Tournament',
-      gameMode: 'Clash Squad',
-      date: '2025-10-26',
-      time: '20:00',
-      rank: 3,
-      totalPlayers: 50,
-      killCount: 15,
-      prize: 150,
-      status: 'won',
-      duration: '12:20',
-    },
-    {
-      id: 4,
-      tournamentName: 'Sunday Special Tournament',
-      gameMode: 'Battle Royale',
-      date: '2025-10-25',
-      time: '19:30',
-      rank: 7,
-      totalPlayers: 80,
-      killCount: 6,
-      prize: 50,
-      status: 'won',
-      duration: '22:10',
-    },
-    {
-      id: 5,
-      tournamentName: 'Speed Run Challenge',
-      gameMode: 'Clash Squad',
-      date: '2025-10-24',
-      time: '21:45',
-      rank: 25,
-      totalPlayers: 50,
-      killCount: 4,
-      prize: 0,
-      status: 'lost',
-      duration: '8:30',
-    },
-    {
-      id: 6,
-      tournamentName: 'Weekend Warriors Championship',
-      gameMode: 'Battle Royale',
-      date: '2025-10-22',
-      time: '15:00',
-      rank: 12,
-      totalPlayers: 100,
-      killCount: 9,
-      prize: 0,
-      status: 'lost',
-      duration: '19:15',
-    },
-  ];
+  const loadHistory = useCallback(async () => {
+    try {
+      const history = await tournamentService.getHistory();
+      const normalized = Array.isArray(history)
+        ? history.map((item) => {
+            const tournament = item.tournament || item.tournamentId || {};
+            const status = item.status === 'winner'
+              ? 'won'
+              : item.status === 'disqualified'
+              ? 'lost'
+              : 'joined';
+
+            return {
+              id: item._id,
+              tournamentName: tournament.name || 'Tournament',
+              gameMode: tournament.gameType || tournament.game || 'Tournament',
+              joinedAt: item.joinedAt || item.createdAt,
+              status,
+              rank: item.rank,
+              prize: item.prizeAmount || 0,
+              entryFee: tournament.entryFee || 0,
+              totalPlayers: tournament.maxPlayers || 0,
+            };
+          })
+        : [];
+
+      setMatchHistory(normalized);
+    } catch (error) {
+      console.error('Failed to load history:', error);
+      setMatchHistory([]);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadHistory();
+    }, [loadHistory])
+  );
 
   const filteredMatches = matchHistory.filter(match => {
     if (selectedFilter === 'all') return true;
@@ -105,23 +73,44 @@ const HistoryScreen = ({ navigation }) => {
   });
 
   const getRankColor = (rank, totalPlayers) => {
+    if (!rank || !totalPlayers) return COLORS.gray;
     const percentage = (rank / totalPlayers) * 100;
-    if (percentage <= 10) return '#FFD700'; // Gold
-    if (percentage <= 25) return '#C0C0C0'; // Silver
-    if (percentage <= 50) return '#CD7F32'; // Bronze
+    if (percentage <= 10) return '#FFD700';
+    if (percentage <= 25) return '#C0C0C0';
+    if (percentage <= 50) return '#CD7F32';
     return COLORS.gray;
   };
 
   const getRankIcon = (rank, totalPlayers) => {
+    if (!rank || !totalPlayers) return ChevronDownIcon;
     const percentage = (rank / totalPlayers) * 100;
-    if (percentage <= 10) return 'trophy';
-    if (percentage <= 25) return 'medal';
-    if (percentage <= 50) return 'ribbon';
-    return 'chevron-down';
+    if (percentage <= 10) return TrophyIcon;
+    if (percentage <= 25) return StarIcon;
+    if (percentage <= 50) return CheckCircleIcon;
+    return ChevronDownIcon;
   };
 
   const getStatusColor = (status) => {
-    return status === 'won' ? COLORS.success : COLORS.error;
+    if (status === 'won') return COLORS.success;
+    if (status === 'lost') return COLORS.error;
+    return COLORS.accent;
+  };
+
+  const getStatusIcon = (status) => {
+    if (status === 'won') return TrophyIcon;
+    if (status === 'lost') return StarIcon;
+    return CheckCircleIcon;
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return { date: '-', time: '-' };
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return { date: '-', time: '-' };
+
+    return {
+      date: date.toLocaleDateString(),
+      time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
   };
 
   const MatchCard = ({ match }) => (
@@ -134,40 +123,43 @@ const HistoryScreen = ({ navigation }) => {
           </View>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(match.status) }]}>
+          {(() => {
+            const StatusIcon = getStatusIcon(match.status);
+            return <StatusIcon size={12} color={COLORS.white} />;
+          })()}
           <Text style={styles.statusText}>{match.status.toUpperCase()}</Text>
         </View>
       </View>
 
       <View style={styles.matchStats}>
         <View style={styles.rankSection}>
-          <MaterialCommunityIcons 
-            name={getRankIcon(match.rank, match.totalPlayers)} 
-            size={32} 
-            color={getRankColor(match.rank, match.totalPlayers)} 
-          />
+          {(() => {
+            const RankIcon = getRankIcon(match.rank, match.totalPlayers);
+            return <RankIcon size={32} color={getRankColor(match.rank, match.totalPlayers)} />;
+          })()}
           <View style={styles.rankInfo}>
             <Text style={[styles.rankText, { color: getRankColor(match.rank, match.totalPlayers) }]}>
-              #{match.rank}
+              {match.rank ? `#${match.rank}` : '—'}
             </Text>
-            <Text style={styles.totalPlayersText}>of {match.totalPlayers}</Text>
+            <Text style={styles.totalPlayersText}>of {match.totalPlayers || '-'}</Text>
           </View>
         </View>
 
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
-            <MaterialCommunityIcons name="target" size={18} color={COLORS.accent} />
-            <Text style={styles.statValue}>{match.killCount}</Text>
-            <Text style={styles.statLabel}>Kills</Text>
+            <CurrencyDollarIcon size={18} color={COLORS.accent} />
+            <Text style={styles.statValue}>₹{match.entryFee}</Text>
+            <Text style={styles.statLabel}>Entry Fee</Text>
           </View>
           
           <View style={styles.statItem}>
-            <Ionicons name="time" size={18} color={COLORS.accent} />
-            <Text style={styles.statValue}>{match.duration}</Text>
-            <Text style={styles.statLabel}>Duration</Text>
+            <TrophyIcon size={18} color={COLORS.accent} />
+            <Text style={styles.statValue}>#{match.rank || '-'}</Text>
+            <Text style={styles.statLabel}>Rank</Text>
           </View>
           
           <View style={styles.statItem}>
-            <MaterialCommunityIcons name="currency-inr" size={18} color={COLORS.accent} />
+            <CurrencyDollarIcon size={18} color={COLORS.accent} />
             <Text style={[styles.statValue, { color: match.prize > 0 ? COLORS.success : COLORS.gray }]}>
               ₹{match.prize}
             </Text>
@@ -178,10 +170,12 @@ const HistoryScreen = ({ navigation }) => {
 
       <View style={styles.matchFooter}>
         <View style={styles.dateTimeInfo}>
-          <Ionicons name="calendar" size={14} color={COLORS.gray} />
-          <Text style={styles.dateText}>{match.date}</Text>
-          <Ionicons name="time" size={14} color={COLORS.gray} style={{ marginLeft: 12 }} />
-          <Text style={styles.timeText}>{match.time}</Text>
+          <CalendarIcon size={14} color={COLORS.gray} />
+          <Text style={styles.dateText}>{formatDateTime(match.joinedAt).date}</Text>
+          <View style={{ marginLeft: 12 }}>
+            <ClockIcon size={14} color={COLORS.gray} />
+          </View>
+          <Text style={styles.timeText}>{formatDateTime(match.joinedAt).time}</Text>
         </View>
       </View>
     </View>
@@ -190,10 +184,10 @@ const HistoryScreen = ({ navigation }) => {
   const getFilteredStats = () => {
     const wonMatches = matchHistory.filter(m => m.status === 'won').length;
     const totalMatches = matchHistory.length;
-    const totalKills = matchHistory.reduce((sum, match) => sum + match.killCount, 0);
-    const totalPrize = matchHistory.reduce((sum, match) => sum + match.prize, 0);
+    const totalSpent = matchHistory.reduce((sum, match) => sum + (match.entryFee || 0), 0);
+    const totalPrize = matchHistory.reduce((sum, match) => sum + (match.prize || 0), 0);
     
-    return { wonMatches, totalMatches, totalKills, totalPrize };
+    return { wonMatches, totalMatches, totalSpent, totalPrize };
   };
 
   const stats = getFilteredStats();
@@ -215,25 +209,25 @@ const HistoryScreen = ({ navigation }) => {
       {/* Stats Overview */}
       <View style={styles.statsOverview}>
         <View style={styles.overviewCard}>
-          <MaterialCommunityIcons name="trophy-variant" size={24} color="#FFD700" />
+          <TrophyIcon size={24} color="#FFD700" />
           <Text style={styles.overviewValue}>{stats.wonMatches}</Text>
           <Text style={styles.overviewLabel}>Wins</Text>
         </View>
         
         <View style={styles.overviewCard}>
-          <MaterialCommunityIcons name="controller-classic" size={24} color={COLORS.accent} />
+          <PuzzlePieceIcon size={24} color={COLORS.accent} />
           <Text style={styles.overviewValue}>{stats.totalMatches}</Text>
           <Text style={styles.overviewLabel}>Total Matches</Text>
         </View>
         
         <View style={styles.overviewCard}>
-          <MaterialCommunityIcons name="target" size={24} color={COLORS.error} />
-          <Text style={styles.overviewValue}>{stats.totalKills}</Text>
-          <Text style={styles.overviewLabel}>Total Kills</Text>
+          <CreditCardIcon size={24} color={COLORS.error} />
+          <Text style={styles.overviewValue}>₹{stats.totalSpent}</Text>
+          <Text style={styles.overviewLabel}>Total Spent</Text>
         </View>
         
         <View style={styles.overviewCard}>
-          <MaterialCommunityIcons name="currency-inr" size={24} color={COLORS.success} />
+          <CurrencyDollarIcon size={24} color={COLORS.success} />
           <Text style={styles.overviewValue}>₹{stats.totalPrize}</Text>
           <Text style={styles.overviewLabel}>Total Prize</Text>
         </View>
@@ -271,7 +265,7 @@ const HistoryScreen = ({ navigation }) => {
           ))
         ) : (
           <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="trophy-broken" size={64} color={COLORS.gray} />
+            <TrophyIcon size={64} color={COLORS.gray} />
             <Text style={styles.emptyStateText}>No matches found</Text>
             <Text style={styles.emptyStateSubtext}>
               {selectedFilter === 'won' 
@@ -421,6 +415,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     marginLeft: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   statusText: {
     fontSize: 10,

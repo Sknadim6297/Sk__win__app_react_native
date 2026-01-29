@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -9,130 +9,169 @@ import {
   Alert,
   TextInput,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../styles/theme';
 import SKWinLogo from '../components/SKWinLogo';
+import { userService, walletService } from '../services/api';
 
 const WalletScreen = ({ navigation }) => {
-  const [balance, setBalance] = useState(1250);
+  const [balance, setBalance] = useState(0);
+  const [totals, setTotals] = useState({ totalDeposited: 0, totalWithdrawn: 0 });
+  const [stats, setStats] = useState({ totalWinnings: 0, tournamentsJoined: 0, tournamentsWon: 0 });
+  const [transactions, setTransactions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [amount, setAmount] = useState('');
+  const [depositAmount, setDepositAmount] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
 
-  // Mock transaction history
-  const transactions = [
-    {
-      id: 1,
-      type: 'win',
-      amount: 500,
-      description: 'Tournament Win - Elite Battle Royale',
-      date: '2025-10-29',
-      time: '14:30',
-      status: 'completed',
-    },
-    {
-      id: 2,
-      type: 'deposit',
-      amount: 1000,
-      description: 'Wallet Deposit via UPI',
-      date: '2025-10-28',
-      time: '10:15',
-      status: 'completed',
-    },
-    {
-      id: 3,
-      type: 'entry',
-      amount: -50,
-      description: 'Tournament Entry - Free Fire Champions',
-      date: '2025-10-28',
-      time: '09:45',
-      status: 'completed',
-    },
-    {
-      id: 4,
-      type: 'withdraw',
-      amount: -200,
-      description: 'Withdrawal to Bank Account',
-      date: '2025-10-27',
-      time: '16:20',
-      status: 'completed',
-    },
-    {
-      id: 5,
-      type: 'win',
-      amount: 150,
-      description: 'Tournament Win - Quick Clash',
-      date: '2025-10-26',
-      time: '20:00',
-      status: 'completed',
-    },
-  ];
+  const loadWalletData = useCallback(async (silent = false) => {
+    try {
+      if (!silent) {
+        setIsLoading(true);
+      }
 
-  const handleDeposit = () => {
-    const depositAmount = parseFloat(amount);
-    if (!amount || isNaN(depositAmount) || depositAmount <= 0) {
+      const [balanceData, historyData, profileData] = await Promise.all([
+        walletService.getBalance(),
+        walletService.getHistory(),
+        userService.getProfile(),
+      ]);
+
+      setBalance(balanceData?.balance ?? 0);
+      setTotals({
+        totalDeposited: balanceData?.totalDeposited ?? 0,
+        totalWithdrawn: balanceData?.totalWithdrawn ?? 0,
+      });
+
+      const tournamentStats = profileData?.tournament || {};
+      setStats({
+        totalWinnings: tournamentStats.earnings ?? 0,
+        tournamentsJoined: tournamentStats.participatedCount ?? 0,
+        tournamentsWon: tournamentStats.wins ?? 0,
+      });
+
+      setTransactions(Array.isArray(historyData) ? historyData : []);
+    } catch (error) {
+      Alert.alert('Wallet Error', error.message || 'Failed to load wallet data');
+    } finally {
+      if (!silent) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadWalletData();
+    }, [loadWalletData])
+  );
+
+  const handleDeposit = async () => {
+    const parsedAmount = parseFloat(depositAmount);
+    if (!depositAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount');
       return;
     }
-    if (depositAmount < 10) {
+    if (parsedAmount < 10) {
       Alert.alert('Minimum Deposit', 'Minimum deposit amount is ₹10');
       return;
     }
-    if (depositAmount > 10000) {
+    if (parsedAmount > 10000) {
       Alert.alert('Maximum Deposit', 'Maximum deposit amount is ₹10,000 per transaction');
       return;
     }
 
-    setBalance(prev => prev + depositAmount);
-    setAmount('');
-    setShowDepositModal(false);
-    Alert.alert('Success!', `₹${depositAmount} has been added to your wallet`);
+    try {
+      setIsSubmitting(true);
+      const transactionId = `MANUAL-${Date.now()}`;
+      await walletService.topup(parsedAmount, 'manual', transactionId);
+      setShowDepositModal(false);
+      setDepositAmount('');
+      await loadWalletData(true);
+      Alert.alert('Success!', `₹${parsedAmount} has been added to your wallet`);
+    } catch (error) {
+      Alert.alert('Deposit Failed', error.message || 'Unable to add money right now');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleWithdraw = () => {
-    const withdrawAmount = parseFloat(amount);
-    if (!amount || isNaN(withdrawAmount) || withdrawAmount <= 0) {
+  const handleWithdraw = async () => {
+    const parsedAmount = parseFloat(withdrawAmount);
+    if (!withdrawAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount');
       return;
     }
-    if (withdrawAmount > balance) {
+    if (parsedAmount > balance) {
       Alert.alert('Insufficient Balance', 'You cannot withdraw more than your current balance');
       return;
     }
-    if (withdrawAmount < 50) {
+    if (parsedAmount < 50) {
       Alert.alert('Minimum Withdrawal', 'Minimum withdrawal amount is ₹50');
       return;
     }
 
-    setBalance(prev => prev - withdrawAmount);
-    setAmount('');
-    setShowWithdrawModal(false);
-    Alert.alert('Success!', `₹${withdrawAmount} withdrawal request has been submitted`);
+    try {
+      setIsSubmitting(true);
+      await walletService.withdraw(parsedAmount, {});
+      setShowWithdrawModal(false);
+      setWithdrawAmount('');
+      await loadWalletData(true);
+      Alert.alert('Success!', `₹${parsedAmount} withdrawal request has been submitted`);
+    } catch (error) {
+      Alert.alert('Withdrawal Failed', error.message || 'Unable to withdraw right now');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getTransactionIcon = (type) => {
     switch (type) {
-      case 'win': return 'trophy';
+      case 'tournament_reward': return 'trophy';
       case 'deposit': return 'add-circle';
-      case 'entry': return 'game-controller';
+      case 'tournament_entry': return 'game-controller';
       case 'withdraw': return 'remove-circle';
+      case 'refund': return 'refresh-circle';
       default: return 'cash';
     }
   };
 
   const getTransactionColor = (type) => {
     switch (type) {
-      case 'win': return '#FFD700';
+      case 'tournament_reward': return '#FFD700';
       case 'deposit': return COLORS.success;
-      case 'entry': return COLORS.error;
+      case 'tournament_entry': return COLORS.error;
       case 'withdraw': return COLORS.error;
+      case 'refund': return COLORS.accent;
       default: return COLORS.gray;
     }
   };
 
-  const TransactionItem = ({ transaction }) => (
+  const isCreditTransaction = (type) => {
+    return ['deposit', 'tournament_reward', 'refund'].includes(type);
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const dateText = date.toLocaleDateString();
+    const timeText = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${dateText} • ${timeText}`;
+  };
+
+  const TransactionItem = ({ transaction }) => {
+    const signedAmount = isCreditTransaction(transaction.type)
+      ? transaction.amount
+      : -transaction.amount;
+
+    return (
     <View style={styles.transactionItem}>
       <View style={styles.transactionLeft}>
         <View style={[styles.transactionIcon, { backgroundColor: getTransactionColor(transaction.type) + '20' }]}>
@@ -143,21 +182,26 @@ const WalletScreen = ({ navigation }) => {
           />
         </View>
         <View style={styles.transactionDetails}>
-          <Text style={styles.transactionDescription}>{transaction.description}</Text>
-          <Text style={styles.transactionDate}>{transaction.date} • {transaction.time}</Text>
+          <Text style={styles.transactionDescription}>
+            {transaction.description || 'Wallet transaction'}
+          </Text>
+          <Text style={styles.transactionDate}>{formatDateTime(transaction.createdAt)}</Text>
         </View>
       </View>
       <View style={styles.transactionRight}>
         <Text style={[
           styles.transactionAmount,
-          { color: transaction.amount > 0 ? COLORS.success : COLORS.error }
+          { color: signedAmount >= 0 ? COLORS.success : COLORS.error }
         ]}>
-          {transaction.amount > 0 ? '+' : ''}₹{Math.abs(transaction.amount)}
+          {signedAmount >= 0 ? '+' : ''}₹{Math.abs(signedAmount)}
         </Text>
-        <Text style={styles.transactionStatus}>Completed</Text>
+        <Text style={styles.transactionStatus}>
+          {(transaction.status || 'completed').toUpperCase()}
+        </Text>
       </View>
     </View>
-  );
+    );
+  };
 
   const DepositModal = () => (
     <Modal
@@ -181,8 +225,8 @@ const WalletScreen = ({ navigation }) => {
               style={styles.input}
               placeholder="₹0"
               placeholderTextColor={COLORS.gray}
-              value={amount}
-              onChangeText={setAmount}
+              value={depositAmount}
+              onChangeText={setDepositAmount}
               keyboardType="numeric"
             />
           </View>
@@ -192,14 +236,18 @@ const WalletScreen = ({ navigation }) => {
               <TouchableOpacity
                 key={quickAmount}
                 style={styles.quickAmountButton}
-                onPress={() => setAmount(quickAmount.toString())}
+                onPress={() => setDepositAmount(quickAmount.toString())}
               >
                 <Text style={styles.quickAmountText}>₹{quickAmount}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <TouchableOpacity style={styles.depositButton} onPress={handleDeposit}>
+          <TouchableOpacity
+            style={[styles.depositButton, isSubmitting && { opacity: 0.7 }]}
+            onPress={handleDeposit}
+            disabled={isSubmitting}
+          >
             <Text style={styles.depositButtonText}>Add Money</Text>
           </TouchableOpacity>
         </View>
@@ -233,13 +281,17 @@ const WalletScreen = ({ navigation }) => {
               style={styles.input}
               placeholder="₹0"
               placeholderTextColor={COLORS.gray}
-              value={amount}
-              onChangeText={setAmount}
+              value={withdrawAmount}
+              onChangeText={setWithdrawAmount}
               keyboardType="numeric"
             />
           </View>
 
-          <TouchableOpacity style={styles.withdrawButton} onPress={handleWithdraw}>
+          <TouchableOpacity
+            style={[styles.withdrawButton, isSubmitting && { opacity: 0.7 }]}
+            onPress={handleWithdraw}
+            disabled={isSubmitting}
+          >
             <Text style={styles.withdrawButtonText}>Withdraw</Text>
           </TouchableOpacity>
         </View>
@@ -265,6 +317,13 @@ const WalletScreen = ({ navigation }) => {
         style={styles.scrollView} 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={() => loadWalletData()}
+            tintColor={COLORS.primary}
+          />
+        }
       >
         {/* Balance Card */}
         <View style={styles.balanceCard}>
@@ -277,7 +336,10 @@ const WalletScreen = ({ navigation }) => {
           <View style={styles.actionButtons}>
             <TouchableOpacity 
               style={styles.depositActionButton}
-              onPress={() => setShowDepositModal(true)}
+              onPress={() => {
+                setDepositAmount('');
+                setShowDepositModal(true);
+              }}
             >
               <Ionicons name="add" size={20} color={COLORS.white} />
               <Text style={styles.actionButtonText}>Deposit</Text>
@@ -285,7 +347,10 @@ const WalletScreen = ({ navigation }) => {
             
             <TouchableOpacity 
               style={styles.withdrawActionButton}
-              onPress={() => setShowWithdrawModal(true)}
+              onPress={() => {
+                setWithdrawAmount('');
+                setShowWithdrawModal(true);
+              }}
             >
               <Ionicons name="remove" size={20} color={COLORS.white} />
               <Text style={styles.actionButtonText}>Withdraw</Text>
@@ -297,17 +362,17 @@ const WalletScreen = ({ navigation }) => {
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="trending-up" size={24} color={COLORS.success} />
-            <Text style={styles.statValue}>₹650</Text>
+            <Text style={styles.statValue}>₹{stats.totalWinnings.toLocaleString()}</Text>
             <Text style={styles.statLabel}>Total Winnings</Text>
           </View>
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="tournament" size={24} color={COLORS.accent} />
-            <Text style={styles.statValue}>5</Text>
+            <Text style={styles.statValue}>{stats.tournamentsJoined}</Text>
             <Text style={styles.statLabel}>Tournaments Joined</Text>
           </View>
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="trophy-award" size={24} color="#FFD700" />
-            <Text style={styles.statValue}>2</Text>
+            <Text style={styles.statValue}>{stats.tournamentsWon}</Text>
             <Text style={styles.statLabel}>Tournaments Won</Text>
           </View>
         </View>
@@ -315,10 +380,15 @@ const WalletScreen = ({ navigation }) => {
         {/* Transaction History */}
         <View style={styles.historySection}>
           <Text style={styles.historyTitle}>Transaction History</Text>
-          
-          {transactions.map((transaction) => (
-            <TransactionItem key={transaction.id} transaction={transaction} />
-          ))}
+          {transactions.length === 0 ? (
+            <View style={styles.emptyHistory}>
+              <Text style={styles.emptyHistoryText}>No transactions yet</Text>
+            </View>
+          ) : (
+            transactions.map((transaction) => (
+              <TransactionItem key={transaction._id || transaction.id} transaction={transaction} />
+            ))
+          )}
         </View>
       </ScrollView>
 
@@ -450,6 +520,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.white,
     marginBottom: 16,
+  },
+  emptyHistory: {
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 12,
+    paddingVertical: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.darkGray,
+  },
+  emptyHistoryText: {
+    color: COLORS.gray,
+    fontSize: 13,
   },
   transactionItem: {
     flexDirection: 'row',

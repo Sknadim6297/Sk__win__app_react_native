@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useCallback, useContext, useState } from 'react';
 import {
   View,
   Text,
@@ -8,76 +8,78 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
-import { COLORS, globalStyles } from '../styles/theme';
+import { COLORS } from '../styles/theme';
 import SKWinLogo from '../components/SKWinLogo';
+import { tournamentService, userService, walletService } from '../services/api';
 
 const HomeScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [tournamentStats, setTournamentStats] = useState({ joined: 0, won: 0 });
+  const [upcomingTournaments, setUpcomingTournaments] = useState([]);
 
   const handleLogout = async () => {
     await logout();
     navigation.replace('Landing');
   };
 
-  // Mock data for upcoming tournaments
-  const upcomingTournaments = [
-    {
-      id: 1,
-      title: 'Elite Battle Royale',
-      startTime: '2 hours',
-      entryFee: 100,
-      prizePool: 5000,
-      participants: 45,
-      maxParticipants: 100,
-    },
-    {
-      id: 2,
-      title: 'Sunday Special',
-      startTime: '6 hours',
-      entryFee: 30,
-      prizePool: 1200,
-      participants: 23,
-      maxParticipants: 80,
-    },
-  ];
+  const announcements = [];
+  const featuredMatches = [];
 
-  // Mock data for featured matches
-  const featuredMatches = [
-    {
-      id: 1,
-      title: 'Pro Players Championship',
-      status: 'Live',
-      viewers: 2500,
-      prize: '₹25,000',
-    },
-    {
-      id: 2,
-      title: 'Rising Stars Tournament',
-      status: 'Starting Soon',
-      viewers: 850,
-      prize: '₹8,000',
-    },
-  ];
+  const getTimeRemaining = (startDate) => {
+    const now = new Date();
+    const start = new Date(startDate);
+    const diff = start - now;
 
-  // Mock announcements
-  const announcements = [
-    {
-      id: 1,
-      title: '🎉 New Tournament Format Available!',
-      message: 'Try our new Clash Squad tournaments with faster gameplay and bigger rewards.',
-      time: '2 hours ago',
-      type: 'update',
-    },
-    {
-      id: 2,
-      title: '💰 Bonus Weekend Event',
-      message: 'Double prize pools for all tournaments this weekend. Don\'t miss out!',
-      time: '1 day ago',
-      type: 'event',
-    },
-  ];
+    if (diff <= 0) return 'Live';
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    const minutes = Math.floor((diff / 1000 / 60) % 60);
+
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  };
+
+  const loadHomeData = useCallback(async () => {
+    try {
+      
+      const [balanceData, profileData, tournamentData] = await Promise.all([
+        walletService.getBalance(),
+        userService.getProfile(),
+        tournamentService.getList(),
+      ]);
+
+      setWalletBalance(balanceData?.balance ?? 0);
+
+      const tournament = profileData?.tournament || {};
+      setTournamentStats({
+        joined: tournament.participatedCount ?? 0,
+        won: tournament.wins ?? 0,
+      });
+
+      const upcoming = Array.isArray(tournamentData)
+        ? tournamentData
+            .filter((tournament) => tournament.status === 'upcoming')
+            .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+            .slice(0, 2)
+        : [];
+
+      setUpcomingTournaments(upcoming);
+    } catch (error) {
+      console.error('Failed to load home data:', error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadHomeData();
+    }, [loadHomeData])
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -108,18 +110,18 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <MaterialCommunityIcons name="wallet" size={24} color={COLORS.success} />
-            <Text style={styles.statValue}>₹1,250</Text>
+            <Text style={styles.statValue}>₹{walletBalance.toLocaleString()}</Text>
             <Text style={styles.statLabel}>Wallet Balance</Text>
           </View>
           <View style={styles.statCard}>
             <MaterialCommunityIcons name="trophy-variant" size={24} color="#FFD700" />
-            <Text style={styles.statValue}>3</Text>
+            <Text style={styles.statValue}>{tournamentStats.won}</Text>
             <Text style={styles.statLabel}>Tournaments Won</Text>
           </View>
           <View style={styles.statCard}>
             <MaterialCommunityIcons name="target" size={24} color={COLORS.error} />
-            <Text style={styles.statValue}>127</Text>
-            <Text style={styles.statLabel}>Total Kills</Text>
+            <Text style={styles.statValue}>{tournamentStats.joined}</Text>
+            <Text style={styles.statLabel}>Tournaments Joined</Text>
           </View>
         </View>
 
@@ -132,15 +134,21 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           
-          {announcements.map((announcement) => (
-            <View key={announcement.id} style={styles.announcementCard}>
-              <View style={styles.announcementHeader}>
-                <Text style={styles.announcementTitle}>{announcement.title}</Text>
-                <Text style={styles.announcementTime}>{announcement.time}</Text>
-              </View>
-              <Text style={styles.announcementMessage}>{announcement.message}</Text>
+          {announcements.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No announcements yet</Text>
             </View>
-          ))}
+          ) : (
+            announcements.map((announcement) => (
+              <View key={announcement.id} style={styles.announcementCard}>
+                <View style={styles.announcementHeader}>
+                  <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                  <Text style={styles.announcementTime}>{announcement.time}</Text>
+                </View>
+                <Text style={styles.announcementMessage}>{announcement.message}</Text>
+              </View>
+            ))
+          )}
         </View>
 
         {/* Featured Matches */}
@@ -152,30 +160,36 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           
-          {featuredMatches.map((match) => (
-            <TouchableOpacity key={match.id} style={styles.featuredMatchCard}>
-              <View style={styles.matchInfo}>
-                <Text style={styles.matchTitle}>{match.title}</Text>
-                <View style={styles.matchDetails}>
-                  <View style={styles.matchStatus}>
-                    <View style={[
-                      styles.statusDot, 
-                      { backgroundColor: match.status === 'Live' ? COLORS.error : COLORS.accent }
-                    ]} />
-                    <Text style={styles.statusText}>{match.status}</Text>
-                  </View>
-                  <View style={styles.viewerCount}>
-                    <Ionicons name="eye" size={14} color={COLORS.gray} />
-                    <Text style={styles.viewerText}>{match.viewers} watching</Text>
+          {featuredMatches.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No featured matches right now</Text>
+            </View>
+          ) : (
+            featuredMatches.map((match) => (
+              <TouchableOpacity key={match.id} style={styles.featuredMatchCard}>
+                <View style={styles.matchInfo}>
+                  <Text style={styles.matchTitle}>{match.title}</Text>
+                  <View style={styles.matchDetails}>
+                    <View style={styles.matchStatus}>
+                      <View style={[
+                        styles.statusDot, 
+                        { backgroundColor: match.status === 'Live' ? COLORS.error : COLORS.accent }
+                      ]} />
+                      <Text style={styles.statusText}>{match.status}</Text>
+                    </View>
+                    <View style={styles.viewerCount}>
+                      <Ionicons name="eye" size={14} color={COLORS.gray} />
+                      <Text style={styles.viewerText}>{match.viewers} watching</Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-              <View style={styles.matchPrize}>
-                <Text style={styles.prizeText}>{match.prize}</Text>
-                <Ionicons name="play-circle" size={32} color={COLORS.accent} />
-              </View>
-            </TouchableOpacity>
-          ))}
+                <View style={styles.matchPrize}>
+                  <Text style={styles.prizeText}>{match.prize}</Text>
+                  <Ionicons name="play-circle" size={32} color={COLORS.accent} />
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         {/* Upcoming Tournaments */}
@@ -187,41 +201,49 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           
-          {upcomingTournaments.map((tournament) => (
-            <TouchableOpacity 
-              key={tournament.id} 
-              style={styles.tournamentCard}
-              onPress={() => navigation.navigate('Tournaments')}
-            >
-              <View style={styles.tournamentHeader}>
-                <Text style={styles.tournamentTitle}>{tournament.title}</Text>
-                <View style={styles.timeTag}>
-                  <Ionicons name="time" size={12} color={COLORS.white} />
-                  <Text style={styles.timeText}>{tournament.startTime}</Text>
+          {upcomingTournaments.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No upcoming tournaments</Text>
+            </View>
+          ) : (
+            upcomingTournaments.map((tournament) => (
+              <TouchableOpacity 
+                key={tournament._id} 
+                style={styles.tournamentCard}
+                onPress={() => navigation.navigate('Tournaments')}
+              >
+                <View style={styles.tournamentHeader}>
+                  <Text style={styles.tournamentTitle}>{tournament.name}</Text>
+                  <View style={styles.timeTag}>
+                    <Ionicons name="time" size={12} color={COLORS.white} />
+                    <Text style={styles.timeText}>{getTimeRemaining(tournament.startDate)}</Text>
+                  </View>
                 </View>
-              </View>
-              
-              <View style={styles.tournamentDetails}>
-                <View style={styles.detailItem}>
-                  <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
-                  <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
+                
+                <View style={styles.tournamentDetails}>
+                  <View style={styles.detailItem}>
+                    <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
+                    <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
+                    <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Ionicons name="people" size={16} color={COLORS.accent} />
+                    <Text style={styles.detailText}>
+                      {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxPlayers}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.detailItem}>
-                  <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                  <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <Ionicons name="people" size={16} color={COLORS.accent} />
-                  <Text style={styles.detailText}>{tournament.participants}/{tournament.maxParticipants}</Text>
-                </View>
-              </View>
-              
-              <TouchableOpacity style={styles.joinButton}>
-                <Text style={styles.joinButtonText}>Join Now</Text>
-                <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
+                
+                <TouchableOpacity style={styles.joinButton}>
+                  <Text style={styles.joinButtonText}>Join Now</Text>
+                  <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
+                </TouchableOpacity>
               </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
+            ))
+          )}
         </View>
 
         {/* Quick Actions */}
@@ -340,6 +362,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  emptyCard: {
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 12,
+    paddingVertical: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.darkGray,
+  },
+  emptyText: {
+    color: COLORS.gray,
+    fontSize: 13,
   },
   sectionTitle: {
     fontSize: 20,
