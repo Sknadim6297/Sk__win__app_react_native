@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   Animated,
   Easing,
 } from 'react-native';
@@ -17,6 +16,7 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5, AntDesign } from '@expo
 import { AuthContext } from '../context/AuthContext';
 import { COLORS, globalStyles } from '../styles/theme';
 import SKWinLogo from '../components/SKWinLogo';
+import Toast from '../components/Toast';
 
 const AuthScreen = ({ navigation }) => {
   const { login, register } = useContext(AuthContext);
@@ -25,6 +25,7 @@ const AuthScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -52,43 +53,71 @@ const AuthScreen = ({ navigation }) => {
     ]).start();
   }, []);
 
+  const showToast = (message, type = 'error') => {
+    setToast({ visible: true, message, type });
+  };
+
+  const hideToast = () => {
+    setToast({ visible: false, message: '', type: 'error' });
+  };
+
   const handleEmailAuth = async () => {
     if (isLogin) {
       // Email Login
       if (!email || !password) {
-        Alert.alert('⚠️ Missing Fields', 'Please enter email and password');
+        showToast('Please enter email and password', 'warning');
+        return;
+      }
+
+      if (!email.includes('@')) {
+        showToast('Please enter a valid email address', 'warning');
         return;
       }
       
       const result = await login(email, password);
       if (result.success) {
-        // Redirect to admin panel if admin, otherwise home
-      navigation.replace(result.isAdmin ? 'AdminDashboard' : 'MainApp');
+        showToast('Login successful! Welcome back 🎮', 'success');
+        setTimeout(() => {
+          navigation.replace(result.user?.role === 'admin' ? 'AdminDashboard' : 'MainApp');
+        }, 500);
       } else {
-        Alert.alert('❌ Login Failed', 'Invalid credentials');
+        showToast(result.error || 'Invalid email or password', 'error');
       }
     } else {
       // Email Register
       if (!username || !email || !password || !confirmPassword) {
-        Alert.alert('⚠️ Missing Fields', 'Please fill in all fields');
+        showToast('Please fill in all fields', 'warning');
         return;
       }
 
-      if (password !== confirmPassword) {
-        Alert.alert('⚠️ Password Mismatch', 'Passwords do not match');
+      if (username.length < 3) {
+        showToast('Username must be at least 3 characters', 'warning');
+        return;
+      }
+
+      if (!email.includes('@')) {
+        showToast('Please enter a valid email address', 'warning');
         return;
       }
 
       if (password.length < 6) {
-        Alert.alert('⚠️ Weak Password', 'Password must be at least 6 characters');
+        showToast('Password must be at least 6 characters', 'warning');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        showToast('Passwords do not match', 'warning');
         return;
       }
 
       const result = await register(username, email, password);
       if (result.success) {
-        navigation.replace('MainApp');
+        showToast('Registration successful! Welcome to SK Win 🎮', 'success');
+        setTimeout(() => {
+          navigation.replace('MainApp');
+        }, 500);
       } else {
-        Alert.alert('❌ Registration Failed', result.error);
+        showToast(result.error || 'Registration failed. Please try again', 'error');
       }
     }
   };
@@ -120,6 +149,15 @@ const AuthScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
+      
+      {/* Toast Notification */}
+      <Toast 
+        visible={toast.visible} 
+        message={toast.message} 
+        type={toast.type}
+        onHide={hideToast}
+      />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
