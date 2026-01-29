@@ -9,10 +9,11 @@ import {
   Alert,
   TextInput,
   Modal,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS } from '../styles/theme';
+import SKWinLogo from '../components/SKWinLogo';
 
 const WalletScreen = ({ navigation }) => {
   const [balance, setBalance] = useState(1250);
@@ -251,8 +252,13 @@ const WalletScreen = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>💰 Wallet</Text>
-        <Text style={styles.headerSubtitle}>Manage your tournament funds</Text>
+        <View style={styles.headerContent}>
+          <SKWinLogo size={70} />
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Wallet</Text>
+            <Text style={styles.headerSubtitle}>Manage your funds</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView 
@@ -334,14 +340,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.darkGray,
   },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerText: {
+    marginLeft: 12,
+    flex: 1,
+  },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '700',
     color: COLORS.white,
-    marginBottom: 5,
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: COLORS.gray,
   },
   scrollView: {
@@ -548,7 +562,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: COLORS.accent,
+    borderColor: COLORS.darkGray,
   },
   quickAmountText: {
     color: COLORS.accent,

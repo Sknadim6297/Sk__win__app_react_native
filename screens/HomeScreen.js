@@ -5,12 +5,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  SafeAreaView,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS, globalStyles } from '../styles/theme';
+import SKWinLogo from '../components/SKWinLogo';
 
 const HomeScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
@@ -85,9 +86,7 @@ const HomeScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.logoSmall}>
-            <MaterialCommunityIcons name="trophy" size={28} color={COLORS.white} />
-          </View>
+          <SKWinLogo size={80} />
           <View>
             <Text style={styles.welcomeText}>Welcome back!</Text>
             <Text style={styles.usernameText}>

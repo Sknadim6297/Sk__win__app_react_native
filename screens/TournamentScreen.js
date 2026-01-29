@@ -7,10 +7,11 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../styles/theme';
+import SKWinLogo from '../components/SKWinLogo';
 
 const TournamentScreen = ({ navigation }) => {
   const [selectedTab, setSelectedTab] = useState('upcoming');
@@ -225,8 +226,13 @@ const TournamentScreen = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🏆 Tournaments</Text>
-        <Text style={styles.headerSubtitle}>Join and compete for amazing prizes</Text>
+        <View style={styles.headerContent}>
+          <SKWinLogo size={70} />
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Tournaments</Text>
+            <Text style={styles.headerSubtitle}>Join and compete for amazing prizes</Text>
+          </View>
+        </View>
       </View>
 
       {/* Tab Navigation */}
@@ -269,6 +275,24 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.darkGray,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 2,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: COLORS.gray,
   },
   headerTitle: {
     fontSize: 28,

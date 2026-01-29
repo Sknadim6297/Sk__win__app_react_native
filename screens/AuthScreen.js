@@ -16,6 +16,7 @@ import {
 import { Ionicons, MaterialCommunityIcons, FontAwesome5, AntDesign } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS, globalStyles } from '../styles/theme';
+import SKWinLogo from '../components/SKWinLogo';
 
 const AuthScreen = ({ navigation }) => {
   const { login, register } = useContext(AuthContext);
@@ -51,16 +52,6 @@ const AuthScreen = ({ navigation }) => {
     ]).start();
   }, []);
 
-  const handleGoogleAuth = async () => {
-    // Mock Google auth - in production, integrate with Google OAuth
-    const result = await login('google_user', 'google_auth');
-    if (result.success) {
-      navigation.replace(result.isAdmin ? 'AdminDashboard' : 'Home');
-    } else {
-      Alert.alert('Authentication Failed', 'Please try again');
-    }
-  };
-
   const handleEmailAuth = async () => {
     if (isLogin) {
       // Email Login
@@ -72,7 +63,7 @@ const AuthScreen = ({ navigation }) => {
       const result = await login(email, password);
       if (result.success) {
         // Redirect to admin panel if admin, otherwise home
-        navigation.replace(result.isAdmin ? 'AdminDashboard' : 'Home');
+      navigation.replace(result.isAdmin ? 'AdminDashboard' : 'MainApp');
       } else {
         Alert.alert('❌ Login Failed', 'Invalid credentials');
       }
@@ -95,7 +86,7 @@ const AuthScreen = ({ navigation }) => {
 
       const result = await register(username, email, password);
       if (result.success) {
-        navigation.replace('Home');
+        navigation.replace('MainApp');
       } else {
         Alert.alert('❌ Registration Failed', result.error);
       }
@@ -148,9 +139,7 @@ const AuthScreen = ({ navigation }) => {
           ]}
         >
           {/* Logo */}
-          <View style={[styles.logoContainer, styles.logoGlow]}>
-            <Text style={styles.logoText}>SK</Text>
-          </View>
+          <SKWinLogo size={120} />
 
           {/* Title */}
           <View style={styles.titleContainer}>
@@ -212,26 +201,6 @@ const AuthScreen = ({ navigation }) => {
               { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
             ]}
           >
-            {/* Google Sign In Button - Available for both Login and Register */}
-            <TouchableOpacity
-              style={[styles.googleButton, styles.glowButton]}
-              onPress={handleGoogleAuth}
-              activeOpacity={0.8}
-            >
-              <View style={styles.googleIconContainer}>
-                <AntDesign name="google" size={20} color={COLORS.white} />
-              </View>
-              <Text style={styles.googleButtonText}>
-                {isLogin ? 'Sign in with Google' : 'Register with Google'}
-              </Text>
-            </TouchableOpacity>
-            
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
             {/* Email/Password Form */}
             <View style={styles.gameCard}>
               {!isLogin && (
@@ -387,11 +356,6 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
   },
   logoText: {
     fontSize: 28,
@@ -411,9 +375,6 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    textShadowColor: COLORS.primary,
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
   },
   subtitle: {
     fontSize: 14,
@@ -443,11 +404,6 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     backgroundColor: COLORS.primary,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 8,
   },
   tabText: {
     color: COLORS.gray,
@@ -566,7 +522,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 10,
     borderWidth: 2,
-    borderColor: COLORS.accent,
+    borderColor: COLORS.primary,
   },
   authButtonText: {
     color: COLORS.white,
@@ -575,11 +531,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   glowButton: {
-    shadowColor: COLORS.lightBlue,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    elevation: 8,
   },
   switchButton: {
     marginTop: 25,
@@ -617,10 +568,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   logoGlow: {
-    shadowColor: COLORS.lightBlue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 25,
   },
 });
 

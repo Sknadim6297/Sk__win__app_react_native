@@ -35,7 +35,7 @@ function MainTabNavigator() {
           } else if (route.name === 'Wallet') {
             iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'History') {
-            iconName = focused ? 'time' : 'time-outline';
+            iconName = focused ? 'timer' : 'timer-outline';
           }
 
           return <IconComponent name={iconName} size={size} color={color} />;
@@ -104,7 +104,7 @@ export default function App() {
         >
           <Stack.Screen name="Landing" component={LandingScreen} />
           <Stack.Screen name="Auth" component={AuthScreen} />
-          <Stack.Screen name="Home" component={MainTabNavigator} />
+          <Stack.Screen name="MainApp" component={MainTabNavigator} />
           <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
           <Stack.Screen name="UserManagement" component={UserManagement} />
           <Stack.Screen name="TournamentHistory" component={TournamentHistory} />

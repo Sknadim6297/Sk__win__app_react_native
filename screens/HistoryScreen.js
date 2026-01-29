@@ -6,10 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../styles/theme';
+import SKWinLogo from '../components/SKWinLogo';
 
 const HistoryScreen = ({ navigation }) => {
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -202,8 +203,13 @@ const HistoryScreen = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>📜 Match History</Text>
-        <Text style={styles.headerSubtitle}>Track your tournament performance</Text>
+        <View style={styles.headerContent}>
+          <SKWinLogo size={70} />
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>Match History</Text>
+            <Text style={styles.headerSubtitle}>Your performance</Text>
+          </View>
+        </View>
       </View>
 
       {/* Stats Overview */}
@@ -294,14 +300,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.darkGray,
   },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerText: {
+    marginLeft: 12,
+    flex: 1,
+  },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '700',
     color: COLORS.white,
-    marginBottom: 5,
+    marginBottom: 2,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: COLORS.gray,
   },
   statsOverview: {

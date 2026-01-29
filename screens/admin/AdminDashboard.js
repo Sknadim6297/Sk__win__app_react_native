@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 10,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.accent,
+    borderLeftColor: COLORS.primary,
   },
   activityIcon: {
     width: 40,
