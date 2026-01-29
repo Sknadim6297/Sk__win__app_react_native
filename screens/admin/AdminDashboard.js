@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,22 +7,41 @@ import {
   StyleSheet,
   StatusBar,
   SafeAreaView,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
+import { adminService } from '../../services/api';
 import { COLORS } from '../../styles/theme';
 
 const AdminDashboard = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState(null);
 
-  const [stats] = useState({
-    totalUsers: 1247,
-    activeTournaments: 8,
-    completedTournaments: 156,
-    totalRevenue: '₹2,45,000',
-    pendingPayments: 12,
-    reportedIssues: 3,
-  });
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      setLoading(true);
+      const data = await adminService.getStats();
+      setStats(data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchStats();
+    setRefreshing(false);
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -33,52 +52,75 @@ const AdminDashboard = ({ navigation }) => {
     navigation.navigate(screen);
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading Admin Dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.adminBadge}>
-            <MaterialCommunityIcons name="shield-crown" size={24} color={COLORS.accent} />
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={styles.adminBadge}>
+              <MaterialCommunityIcons name="shield-crown" size={24} color={COLORS.accent} />
+            </View>
+            <View>
+              <Text style={styles.headerTitle}>ADMIN PANEL</Text>
+              <Text style={styles.headerSubtitle}>@{user?.username}</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.headerTitle}>ADMIN PANEL</Text>
-            <Text style={styles.headerSubtitle}>@{user?.username}</Text>
-          </View>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
-        </TouchableOpacity>
-      </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Quick Stats */}
         <Text style={styles.sectionTitle}>📊 QUICK STATS</Text>
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, styles.primaryCard]}>
             <Ionicons name="people" size={32} color={COLORS.white} />
-            <Text style={styles.statValue}>{stats.totalUsers}</Text>
+            <Text style={styles.statValue}>{stats?.totalUsers || 0}</Text>
             <Text style={styles.statLabel}>Total Users</Text>
           </View>
 
-          <View style={[styles.statCard, styles.successCard]}>
-            <MaterialCommunityIcons name="tournament" size={32} color={COLORS.white} />
-            <Text style={styles.statValue}>{stats.activeTournaments}</Text>
-            <Text style={styles.statLabel}>Active Tournaments</Text>
+          <View style={[styles.statCard, styles.infoCard]}>
+            <Ionicons name="checkmark-circle" size={32} color={COLORS.white} />
+            <Text style={styles.statValue}>{stats?.verifiedUsers || 0}</Text>
+            <Text style={styles.statLabel}>Verified</Text>
           </View>
 
-          <View style={[styles.statCard, styles.infoCard]}>
-            <MaterialCommunityIcons name="trophy-award" size={32} color={COLORS.white} />
-            <Text style={styles.statValue}>{stats.completedTournaments}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
+          <View style={[styles.statCard, styles.successCard]}>
+            <MaterialCommunityIcons name="shield-check" size={32} color={COLORS.white} />
+            <Text style={styles.statValue}>{stats?.kycVerifiedUsers || 0}</Text>
+            <Text style={styles.statLabel}>KYC Done</Text>
           </View>
 
           <View style={[styles.statCard, styles.warningCard]}>
-            <FontAwesome5 name="rupee-sign" size={28} color={COLORS.white} />
-            <Text style={styles.statValue}>{stats.totalRevenue}</Text>
-            <Text style={styles.statLabel}>Total Revenue</Text>
+            <FontAwesome5 name="ban" size={28} color={COLORS.white} />
+            <Text style={styles.statValue}>{(stats?.suspendedUsers || 0) + (stats?.bannedUsers || 0)}</Text>
+            <Text style={styles.statLabel}>Blocked</Text>
+          </View>
+        </View>
+
+        {/* Wallet Stats */}
+        <View style={styles.walletCard}>
+          <MaterialCommunityIcons name="wallet" size={32} color={COLORS.accent} />
+          <View style={styles.walletContent}>
+            <Text style={styles.walletLabel}>Total Wallet Balance</Text>
+            <Text style={styles.walletAmount}>₹{stats?.totalWalletBalance?.toLocaleString() || 0}</Text>
           </View>
         </View>
 
@@ -335,6 +377,41 @@ const styles = StyleSheet.create({
   activityTime: {
     fontSize: 11,
     color: COLORS.gray,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: COLORS.white,
+    marginTop: 10,
+    fontSize: 14,
+  },
+  walletCard: {
+    flexDirection: 'row',
+    backgroundColor: `${COLORS.primary}20`,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: `${COLORS.primary}40`,
+    alignItems: 'center',
+  },
+  walletContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  walletLabel: {
+    color: COLORS.gray,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  walletAmount: {
+    color: COLORS.accent,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 4,
   },
 });
 
