@@ -10,13 +10,15 @@ import {
   Platform,
   ScrollView,
   Animated,
-  Easing,
+  Dimensions,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5, AntDesign } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
-import { COLORS, globalStyles } from '../styles/theme';
+import { COLORS } from '../styles/theme';
 import SKWinLogo from '../components/SKWinLogo';
 import Toast from '../components/Toast';
+
+const { width, height } = Dimensions.get('window');
 
 const AuthScreen = ({ navigation }) => {
   const { login, register } = useContext(AuthContext);
@@ -25,11 +27,11 @@ const AuthScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -41,13 +43,6 @@ const AuthScreen = ({ navigation }) => {
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 600,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 40,
         useNativeDriver: true,
       }),
     ]).start();
@@ -61,32 +56,30 @@ const AuthScreen = ({ navigation }) => {
     setToast({ visible: false, message: '', type: 'error' });
   };
 
-  const handleEmailAuth = async () => {
+  const handleAuth = async () => {
     if (isLogin) {
-      // Email Login
       if (!email || !password) {
         showToast('Please enter email and password', 'warning');
         return;
       }
 
       if (!email.includes('@')) {
-        showToast('Please enter a valid email address', 'warning');
+        showToast('Please enter a valid email', 'warning');
         return;
       }
       
       const result = await login(email, password);
       if (result.success) {
-        showToast('Login successful! Welcome back 🎮', 'success');
+        showToast('Welcome back!', 'success');
         setTimeout(() => {
           navigation.replace(result.user?.role === 'admin' ? 'AdminDashboard' : 'MainApp');
         }, 500);
       } else {
-        showToast(result.error || 'Invalid email or password', 'error');
+        showToast(result.error || 'Invalid credentials', 'error');
       }
     } else {
-      // Email Register
       if (!username || !email || !password || !confirmPassword) {
-        showToast('Please fill in all fields', 'warning');
+        showToast('Please fill all fields', 'warning');
         return;
       }
 
@@ -96,7 +89,7 @@ const AuthScreen = ({ navigation }) => {
       }
 
       if (!email.includes('@')) {
-        showToast('Please enter a valid email address', 'warning');
+        showToast('Please enter a valid email', 'warning');
         return;
       }
 
@@ -112,12 +105,12 @@ const AuthScreen = ({ navigation }) => {
 
       const result = await register(username, email, password);
       if (result.success) {
-        showToast('Registration successful! Welcome to SK Win 🎮', 'success');
+        showToast('Account created successfully!', 'success');
         setTimeout(() => {
           navigation.replace('MainApp');
         }, 500);
       } else {
-        showToast(result.error || 'Registration failed. Please try again', 'error');
+        showToast(result.error || 'Registration failed', 'error');
       }
     }
   };
@@ -128,130 +121,57 @@ const AuthScreen = ({ navigation }) => {
     setEmail('');
     setPassword('');
     setConfirmPassword('');
-    
-    // Re-trigger animation
-    fadeAnim.setValue(0);
-    slideAnim.setValue(30);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-    ]).start();
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
-      {/* Toast Notification */}
-      <Toast 
-        visible={toast.visible} 
-        message={toast.message} 
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
         type={toast.type}
         onHide={hideToast}
       />
 
       <KeyboardAvoidingView
+        style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-        <Animated.View 
-          style={[
-            styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }, { scale: scaleAnim }],
-            }
-          ]}
-        >
-          {/* Logo */}
-          <SKWinLogo size={120} />
-
-          {/* Title */}
-          <View style={styles.titleContainer}>
-            {isLogin ? (
-              <Ionicons name="game-controller" size={40} color={COLORS.accent} />
-            ) : (
-              <MaterialCommunityIcons name="trophy" size={40} color={COLORS.accent} />
-            )}
-            <Text style={styles.title}>
-              {isLogin ? 'ENTER ARENA' : 'JOIN TOURNAMENT'}
-            </Text>
-          </View>
-          <Text style={styles.subtitle}>
-            {isLogin
-              ? 'Login to start your winning streak'
-              : 'Register and dominate the battlefield'}
-          </Text>
-
-          {/* Tab Buttons */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, isLogin && styles.activeTab]}
-              onPress={() => setIsLogin(true)}
-            >
-              <Ionicons 
-                name="log-in" 
-                size={18} 
-                color={isLogin ? COLORS.white : COLORS.gray} 
-                style={{ marginRight: 6 }}
-              />
-              <Text
-                style={[styles.tabText, isLogin && styles.activeTabText]}
-              >
-                LOGIN
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, !isLogin && styles.activeTab]}
-              onPress={() => setIsLogin(false)}
-            >
-              <MaterialCommunityIcons 
-                name="account-plus" 
-                size={18} 
-                color={!isLogin ? COLORS.white : COLORS.gray} 
-                style={{ marginRight: 6 }}
-              />
-              <Text
-                style={[styles.tabText, !isLogin && styles.activeTabText]}
-              >
-                REGISTER
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Form */}
-          <Animated.View 
+          <Animated.View
             style={[
-              styles.form,
-              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
             ]}
           >
-            {/* Email/Password Form */}
-            <View style={styles.gameCard}>
+            {/* Logo */}
+            <View style={styles.logoContainer}>
+              <SKWinLogo size={width * 0.39} />
+            </View>
+
+            {/* Title */}
+            <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Create Account'}</Text>
+            <Text style={styles.subtitle}>
+              {isLogin ? 'Login to continue your journey' : 'Join the ultimate gaming platform'}
+            </Text>
+
+            {/* Form */}
+            <View style={styles.form}>
               {!isLogin && (
-                <View style={styles.inputContainer}>
-                  <View style={styles.labelRow}>
-                    <Ionicons name="person" size={16} color={COLORS.accent} />
-                    <Text style={styles.inputLabel}>USERNAME</Text>
-                  </View>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="person-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
+                <View style={styles.inputGroup}>
+                  <View style={styles.inputContainer}>
+                    <MaterialCommunityIcons name="account" size={20} color={COLORS.gray} />
                     <TextInput
-                      style={styles.gamingInput}
-                      placeholder="Enter your gamer tag"
+                      style={styles.input}
+                      placeholder="Username"
                       placeholderTextColor={COLORS.gray}
                       value={username}
                       onChangeText={setUsername}
@@ -261,16 +181,12 @@ const AuthScreen = ({ navigation }) => {
                 </View>
               )}
 
-              <View style={styles.inputContainer}>
-                <View style={styles.labelRow}>
-                  <MaterialCommunityIcons name="email" size={16} color={COLORS.accent} />
-                  <Text style={styles.inputLabel}>EMAIL</Text>
-                </View>
-                <View style={styles.inputWrapper}>
-                  <MaterialCommunityIcons name="email-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
+              <View style={styles.inputGroup}>
+                <View style={styles.inputContainer}>
+                  <MaterialCommunityIcons name="email" size={20} color={COLORS.gray} />
                   <TextInput
-                    style={styles.gamingInput}
-                    placeholder="your.email@example.com"
+                    style={styles.input}
+                    placeholder="Email"
                     placeholderTextColor={COLORS.gray}
                     value={email}
                     onChangeText={setEmail}
@@ -280,332 +196,165 @@ const AuthScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              <View style={styles.inputContainer}>
-                <View style={styles.labelRow}>
-                  <Ionicons name="lock-closed" size={16} color={COLORS.accent} />
-                  <Text style={styles.inputLabel}>PASSWORD</Text>
-                </View>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="lock-closed-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
+              <View style={styles.inputGroup}>
+                <View style={styles.inputContainer}>
+                  <MaterialCommunityIcons name="lock" size={20} color={COLORS.gray} />
                   <TextInput
-                    style={styles.gamingInput}
-                    placeholder="Enter secure password"
+                    style={styles.input}
+                    placeholder="Password"
                     placeholderTextColor={COLORS.gray}
                     value={password}
                     onChangeText={setPassword}
-                    secureTextEntry
+                    secureTextEntry={!showPassword}
                     autoCapitalize="none"
                   />
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                    <MaterialCommunityIcons 
+                      name={showPassword ? 'eye-off' : 'eye'} 
+                      size={20} 
+                      color={COLORS.gray} 
+                    />
+                  </TouchableOpacity>
                 </View>
               </View>
 
               {!isLogin && (
-                <View style={styles.inputContainer}>
-                  <View style={styles.labelRow}>
-                    <Ionicons name="checkmark-circle" size={16} color={COLORS.accent} />
-                    <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-                  </View>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.gray} style={styles.inputIcon} />
+                <View style={styles.inputGroup}>
+                  <View style={styles.inputContainer}>
+                    <MaterialCommunityIcons name="lock-check" size={20} color={COLORS.gray} />
                     <TextInput
-                      style={styles.gamingInput}
-                      placeholder="Confirm your password"
+                      style={styles.input}
+                      placeholder="Confirm Password"
                       placeholderTextColor={COLORS.gray}
                       value={confirmPassword}
                       onChangeText={setConfirmPassword}
-                      secureTextEntry
+                      secureTextEntry={!showPassword}
                       autoCapitalize="none"
                     />
                   </View>
                 </View>
               )}
 
+              {/* Auth Button */}
               <TouchableOpacity
-                style={[styles.authButton, styles.glowButton]}
-                onPress={handleEmailAuth}
+                style={styles.authButton}
+                onPress={handleAuth}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.authButtonText}>
+                  {isLogin ? 'Login' : 'Sign Up'}
+                </Text>
+                <MaterialCommunityIcons 
+                  name={isLogin ? 'login' : 'account-plus'} 
+                  size={20} 
+                  color={COLORS.black} 
+                />
+              </TouchableOpacity>
+
+              {/* Switch Mode */}
+              <TouchableOpacity
+                style={styles.switchButton}
+                onPress={toggleAuthMode}
                 activeOpacity={0.8}
               >
-                {isLogin ? (
-                  <Ionicons name="flash" size={20} color={COLORS.white} style={{ marginRight: 8 }} />
-                ) : (
-                  <MaterialCommunityIcons name="rocket-launch" size={20} color={COLORS.white} style={{ marginRight: 8 }} />
-                )}
-                <Text style={styles.authButtonText}>
-                  {isLogin ? 'LOGIN NOW' : 'CREATE ACCOUNT'}
+                <Text style={styles.switchText}>
+                  {isLogin ? "Don't have an account? " : 'Already have an account? '}
+                  <Text style={styles.switchTextBold}>
+                    {isLogin ? 'Sign Up' : 'Login'}
+                  </Text>
                 </Text>
               </TouchableOpacity>
             </View>
-
-            {!isLogin && (
-              <View style={styles.termsContainer}>
-                <Ionicons name="shield-checkmark" size={16} color={COLORS.gray} />
-                <Text style={styles.termsText}>
-                  By registering, you agree to our Terms & Privacy Policy
-                </Text>
-              </View>
-            )}
-
-            <TouchableOpacity onPress={toggleAuthMode} style={styles.switchButton}>
-              <View style={styles.switchContent}>
-                {isLogin ? (
-                  <>
-                    <MaterialCommunityIcons name="gamepad-variant" size={18} color={COLORS.accent} />
-                    <Text style={styles.switchText}>New player? CREATE ACCOUNT</Text>
-                  </>
-                ) : (
-                  <>
-                    <FontAwesome5 name="user-shield" size={16} color={COLORS.accent} />
-                    <Text style={styles.switchText}>Already a warrior? LOGIN HERE</Text>
-                  </>
-                )}
-              </View>
-            </TouchableOpacity>
           </Animated.View>
-        </Animated.View>
-      </ScrollView>
+        </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  keyboardView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-    minHeight: '100%',
+    paddingVertical: height * 0.06,
+    paddingHorizontal: 24,
   },
   content: {
     alignItems: 'center',
-    paddingHorizontal: 10,
     width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
   },
   logoContainer: {
-    width: 80,
-    height: 80,
-    marginBottom: 20,
-    backgroundColor: COLORS.primary,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 8,
+    marginBottom: height * 0.03,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: width * 0.08,
+    fontWeight: '700',
     color: COLORS.white,
-    marginLeft: 12,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
-    color: COLORS.accent,
-    marginBottom: 25,
-    textAlign: 'center',
-    paddingHorizontal: 10,
-    fontWeight: '600',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.darkGray,
-    borderRadius: 30,
-    padding: 4,
-    marginBottom: 25,
-    width: '100%',
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    borderRadius: 26,
-  },
-  activeTab: {
-    backgroundColor: COLORS.primary,
-  },
-  tabText: {
+    fontSize: width * 0.038,
     color: COLORS.gray,
-    fontSize: 14,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  activeTabText: {
-    color: COLORS.white,
+    marginBottom: height * 0.04,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   form: {
     width: '100%',
-    maxWidth: 350,
+    maxWidth: 400,
   },
-  googleButton: {
-    backgroundColor: COLORS.white,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
-  googleIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  googleIcon: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  googleButtonText: {
-    color: '#1a1a1a',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: COLORS.primary,
-    opacity: 0.3,
-  },
-  dividerText: {
-    color: COLORS.primary,
-    paddingHorizontal: 15,
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  gameCard: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
+  inputGroup: {
+    marginBottom: 16,
   },
   inputContainer: {
-    marginBottom: 20,
-    width: '100%',
-  },
-  labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  inputLabel: {
-    color: COLORS.accent,
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 6,
-    letterSpacing: 1,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.darkGray,
+    backgroundColor: COLORS.lightGray,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    gap: 12,
   },
-  inputIcon: {
-    marginRight: 10,
-  },
-  gamingInput: {
+  input: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    fontSize: 15,
+    fontSize: width * 0.04,
     color: COLORS.white,
+    paddingVertical: 14,
   },
   authButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.accent,
+    borderRadius: 12,
     paddingVertical: 16,
-    borderRadius: 15,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    marginTop: 10,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
+    gap: 8,
+    marginTop: 24,
   },
   authButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  glowButton: {
+    fontSize: width * 0.042,
+    fontWeight: '700',
+    color: COLORS.black,
+    letterSpacing: 0.5,
   },
   switchButton: {
-    marginTop: 25,
+    marginTop: 24,
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: COLORS.darkGray,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  switchContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   switchText: {
-    color: COLORS.accent,
-    fontSize: 13,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-    marginLeft: 8,
-  },
-  termsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 15,
-    paddingHorizontal: 20,
-  },
-  termsText: {
+    fontSize: width * 0.036,
     color: COLORS.gray,
-    fontSize: 11,
-    marginLeft: 6,
-    lineHeight: 16,
-    flex: 1,
   },
-  logoGlow: {
+  switchTextBold: {
+    color: COLORS.accent,
+    fontWeight: '700',
   },
 });
 

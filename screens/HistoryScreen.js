@@ -198,7 +198,7 @@ const HistoryScreen = ({ navigation }) => {
       
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <SKWinLogo size={70} />
+          <SKWinLogo size={110} />
           <View style={styles.headerText}>
             <Text style={styles.headerTitle}>Match History</Text>
             <Text style={styles.headerSubtitle}>Your performance</Text>
