@@ -10,6 +10,10 @@ const tournamentSchema = new mongoose.Schema({
     type: String,
     default: 'Free Fire',
   },
+  gameType: {
+    type: String,
+    default: 'Battle Royale',
+  },
   entryFee: {
     type: Number,
     required: true,
@@ -43,6 +47,21 @@ const tournamentSchema = new mongoose.Schema({
   minimumBalance: {
     type: Number,
     default: 0,
+  },
+  roomId: String, // Game room ID
+  roomPassword: String, // Game room password (encrypted)
+  showRoomCredentials: {
+    type: Boolean,
+    default: false,
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  prizes: {
+    first: Number,
+    second: Number,
+    third: Number,
   },
   winners: [{
     userId: mongoose.Schema.Types.ObjectId,

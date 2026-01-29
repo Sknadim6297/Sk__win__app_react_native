@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,159 +6,244 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import CalendarDaysIcon from 'react-native-heroicons/outline/CalendarDaysIcon';
+import SignalIcon from 'react-native-heroicons/outline/SignalIcon';
+import CheckCircleIcon from 'react-native-heroicons/outline/CheckCircleIcon';
+import XCircleIcon from 'react-native-heroicons/outline/XCircleIcon';
+import PlusCircleIcon from 'react-native-heroicons/outline/PlusCircleIcon';
+import UserGroupIcon from 'react-native-heroicons/outline/UserGroupIcon';
+import TrophyIcon from 'react-native-heroicons/outline/TrophyIcon';
+import CurrencyDollarIcon from 'react-native-heroicons/outline/CurrencyDollarIcon';
+import ClockIcon from 'react-native-heroicons/outline/ClockIcon';
 import { COLORS } from '../styles/theme';
-import SKWinLogo from '../components/SKWinLogo';
+import { tournamentService } from '../services/api';
+import Toast from '../components/Toast';
 
 const TournamentScreen = ({ navigation }) => {
   const [selectedTab, setSelectedTab] = useState('upcoming');
+  const [tournaments, setTournaments] = useState([]);
+  const [joinedTournaments, setJoinedTournaments] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [joiningTournamentId, setJoiningTournamentId] = useState(null);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
 
-  // Mock tournament data
-  const tournaments = {
-    ongoing: [
-      {
-        id: 1,
-        title: 'Free Fire Champions League',
-        entryFee: 50,
-        prizePool: 2000,
-        startTime: 'Live Now',
-        participants: 89,
-        maxParticipants: 100,
-        status: 'ongoing',
-        type: 'Battle Royale',
-      },
-      {
-        id: 2,
-        title: 'Clash Squad Pro Tournament',
-        entryFee: 25,
-        prizePool: 800,
-        startTime: 'Started 30 min ago',
-        participants: 64,
-        maxParticipants: 64,
-        status: 'ongoing',
-        type: 'Clash Squad',
-      }
-    ],
-    upcoming: [
-      {
-        id: 3,
-        title: 'Elite Battle Royale',
-        entryFee: 100,
-        prizePool: 5000,
-        startTime: '2 hours',
-        participants: 45,
-        maxParticipants: 100,
-        status: 'upcoming',
-        type: 'Battle Royale',
-      },
-      {
-        id: 4,
-        title: 'Sunday Special Tournament',
-        entryFee: 30,
-        prizePool: 1200,
-        startTime: '6 hours',
-        participants: 23,
-        maxParticipants: 80,
-        status: 'upcoming',
-        type: 'Battle Royale',
-      },
-      {
-        id: 5,
-        title: 'Quick Clash Tournament',
-        entryFee: 15,
-        prizePool: 500,
-        startTime: '1 day',
-        participants: 12,
-        maxParticipants: 50,
-        status: 'upcoming',
-        type: 'Clash Squad',
-      }
-    ],
-    completed: [
-      {
-        id: 6,
-        title: 'Weekend Warriors Championship',
-        entryFee: 75,
-        prizePool: 3000,
-        startTime: 'Completed',
-        participants: 100,
-        maxParticipants: 100,
-        status: 'completed',
-        type: 'Battle Royale',
-        winner: 'ProGamer_99',
-      },
-      {
-        id: 7,
-        title: 'Speed Run Challenge',
-        entryFee: 20,
-        prizePool: 600,
-        startTime: 'Completed',
-        participants: 50,
-        maxParticipants: 50,
-        status: 'completed',
-        type: 'Clash Squad',
-        winner: 'FastFingers',
-      }
-    ]
+  useEffect(() => {
+    fetchTournaments();
+  }, []);
+
+  const fetchTournaments = async () => {
+    try {
+      setLoading(true);
+      const data = await tournamentService.getList();
+      setTournaments(data);
+
+      // Build set of joined tournaments from API data
+      const joined = new Set();
+      data.forEach((tournament) => {
+        if (tournament.userJoined) {
+          joined.add(tournament._id);
+        }
+      });
+      setJoinedTournaments(joined);
+    } catch (error) {
+      showToast(error.message || 'Failed to fetch tournaments', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleJoinTournament = (tournament) => {
-    if (tournament.status === 'ongoing') {
-      Alert.alert('Tournament In Progress', 'This tournament is already in progress and cannot be joined.');
-      return;
-    }
-    if (tournament.status === 'completed') {
-      Alert.alert('Tournament Completed', 'This tournament has already ended.');
-      return;
-    }
-    
-    Alert.alert(
-      'Join Tournament',
-      `Join "${tournament.title}" for ₹${tournament.entryFee}?\n\nPrize Pool: ₹${tournament.prizePool}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Join Now', 
-          onPress: () => {
-            Alert.alert('Success!', 'You have successfully joined the tournament!');
-          }
-        }
-      ]
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTournaments();
+    setRefreshing(false);
+  };
+
+  const showToast = (message, type = 'error') => {
+    setToast({ visible: true, message, type });
+  };
+
+  const hideToast = () => {
+    setToast({ visible: false, message: '', type: 'error' });
+  };
+
+  const shouldShowJoinToast = (message = '') => {
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes('balance') ||
+      normalized.includes('full') ||
+      normalized.includes('started')
     );
+  };
+
+  const handleJoinTournament = async (tournament) => {
+    try {
+      // Check if already joined
+      if (joinedTournaments.has(tournament._id)) {
+        return;
+      }
+
+      try {
+        setJoiningTournamentId(tournament._id);
+        await tournamentService.join(tournament._id);
+        const updated = new Set(joinedTournaments);
+        updated.add(tournament._id);
+        setJoinedTournaments(updated);
+        await fetchTournaments();
+      } catch (error) {
+        const message = error.message || 'Failed to join tournament';
+        if (shouldShowJoinToast(message)) {
+          showToast(message, 'error');
+        }
+      } finally {
+        setJoiningTournamentId(null);
+      }
+    } catch (error) {
+      setJoiningTournamentId(null);
+      const message = error.message || 'Failed to check eligibility';
+      if (shouldShowJoinToast(message)) {
+        showToast(message, 'error');
+      }
+    }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'ongoing': return COLORS.success;
-      case 'upcoming': return COLORS.accent;
-      case 'completed': return COLORS.gray;
-      default: return COLORS.gray;
+      case 'live':
+        return '#FF3B30';
+      case 'upcoming':
+        return COLORS.accent;
+      case 'completed':
+        return '#34C759';
+      case 'cancelled':
+        return COLORS.gray;
+      default:
+        return COLORS.gray;
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'ongoing': return 'play-circle';
-      case 'upcoming': return 'clock';
-      case 'completed': return 'checkmark-circle';
-      default: return 'clock';
+      case 'live':
+        return SignalIcon;
+      case 'upcoming':
+        return CalendarDaysIcon;
+      case 'completed':
+        return CheckCircleIcon;
+      case 'cancelled':
+        return XCircleIcon;
+      default:
+        return CalendarDaysIcon;
     }
   };
 
+  const getTimeRemaining = (startDate) => {
+    const now = new Date();
+    const start = new Date(startDate);
+    const diff = start - now;
+
+    if (diff < 0) return 'Live';
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h`;
+
+    const minutes = Math.floor((diff / 1000 / 60) % 60);
+    return `${minutes}m`;
+  };
+
+  const getTournamentsByStatus = (status) => {
+    return tournaments.filter((t) => t.status === status);
+  };
+
+  const isUserJoined = (tournamentId) => {
+    return joinedTournaments.has(tournamentId);
+  };
+
+  const canJoinTournament = (tournament) => {
+    if (tournament.status === 'live' || tournament.status === 'completed' || tournament.status === 'cancelled') {
+      return false;
+    }
+    return true;
+  };
+
+  const getJoinButtonState = (tournament) => {
+    const userJoined = isUserJoined(tournament._id);
+    const canJoin = canJoinTournament(tournament);
+
+    if (userJoined) {
+      return {
+        label: 'JOINED',
+        Icon: CheckCircleIcon,
+        disabled: true,
+        buttonStyle: styles.joinedButton,
+        textStyle: styles.joinedButtonText,
+        showIcon: true,
+      };
+    }
+
+    if (!canJoin) {
+      let label = 'Tournament Ended';
+      if (tournament.status === 'cancelled') {
+        label = 'Tournament Cancelled';
+      } else if (tournament.status === 'live') {
+        label = 'Tournament Live';
+      }
+      return {
+        label,
+        Icon: null,
+        disabled: true,
+        buttonStyle: styles.disabledJoinButton,
+        textStyle: styles.disabledJoinButtonText,
+        showIcon: false,
+      };
+    }
+
+    return {
+      label: 'Join Now',
+      Icon: PlusCircleIcon,
+      disabled: false,
+      buttonStyle: styles.joinButton,
+      textStyle: styles.joinButtonText,
+      showIcon: true,
+    };
+  };
+
+  if (loading && tournaments.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading tournaments...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const TournamentCard = ({ tournament }) => (
-    <View style={styles.tournamentCard}>
+    <TouchableOpacity
+      style={styles.tournamentCard}
+      activeOpacity={0.9}
+      onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
+    >
       <View style={styles.cardHeader}>
         <View style={styles.titleSection}>
-          <Text style={styles.tournamentTitle}>{tournament.title}</Text>
+          <Text style={styles.tournamentTitle}>{tournament.name}</Text>
           <View style={styles.typeTag}>
-            <Text style={styles.typeText}>{tournament.type}</Text>
+            <Text style={styles.typeText}>{tournament.gameType}</Text>
           </View>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(tournament.status) }]}>
-          <Ionicons name={getStatusIcon(tournament.status)} size={12} color={COLORS.white} />
+          {(() => {
+            const StatusIcon = getStatusIcon(tournament.status);
+            return <StatusIcon size={12} color={COLORS.white} />;
+          })()}
           <Text style={styles.statusText}>{tournament.status.toUpperCase()}</Text>
         </View>
       </View>
@@ -166,12 +251,12 @@ const TournamentScreen = ({ navigation }) => {
       <View style={styles.cardContent}>
         <View style={styles.infoRow}>
           <View style={styles.infoItem}>
-            <MaterialCommunityIcons name="currency-inr" size={18} color={COLORS.accent} />
+            <CurrencyDollarIcon size={18} color={COLORS.accent} />
             <Text style={styles.infoLabel}>Entry Fee</Text>
             <Text style={styles.infoValue}>₹{tournament.entryFee}</Text>
           </View>
           <View style={styles.infoItem}>
-            <MaterialCommunityIcons name="trophy" size={18} color={COLORS.accent} />
+            <TrophyIcon size={18} color={COLORS.accent} />
             <Text style={styles.infoLabel}>Prize Pool</Text>
             <Text style={styles.infoValue}>₹{tournament.prizePool}</Text>
           </View>
@@ -179,72 +264,92 @@ const TournamentScreen = ({ navigation }) => {
 
         <View style={styles.infoRow}>
           <View style={styles.infoItem}>
-            <Ionicons name="time" size={18} color={COLORS.accent} />
-            <Text style={styles.infoLabel}>Start Time</Text>
-            <Text style={styles.infoValue}>{tournament.startTime}</Text>
+            <ClockIcon size={18} color={COLORS.accent} />
+            <Text style={styles.infoLabel}>Start In</Text>
+            <Text style={styles.infoValue}>{getTimeRemaining(tournament.startDate)}</Text>
           </View>
           <View style={styles.infoItem}>
-            <Ionicons name="people" size={18} color={COLORS.accent} />
+            <UserGroupIcon size={18} color={COLORS.accent} />
             <Text style={styles.infoLabel}>Players</Text>
-            <Text style={styles.infoValue}>{tournament.participants}/{tournament.maxParticipants}</Text>
+            <Text style={styles.infoValue}>
+              {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxPlayers}
+            </Text>
           </View>
         </View>
 
-        {tournament.winner && (
-          <View style={styles.winnerSection}>
-            <MaterialCommunityIcons name="crown" size={16} color="#FFD700" />
-            <Text style={styles.winnerText}>Winner: {tournament.winner}</Text>
+        {tournament.description && (
+          <View style={styles.descriptionSection}>
+            <Text style={styles.descriptionText}>{tournament.description}</Text>
           </View>
         )}
       </View>
 
-      <TouchableOpacity
-        style={[
-          styles.joinButton,
-          tournament.status === 'completed' && styles.disabledButton,
-          tournament.status === 'ongoing' && styles.ongoingButton
-        ]}
-        onPress={() => handleJoinTournament(tournament)}
-        disabled={tournament.status === 'completed'}
-      >
-        <Text style={[
-          styles.joinButtonText,
-          tournament.status === 'completed' && styles.disabledButtonText
-        ]}>
-          {tournament.status === 'ongoing' ? 'In Progress' :
-           tournament.status === 'completed' ? 'Completed' : 'Join Now'}
-        </Text>
-        {tournament.status === 'upcoming' && (
-          <Ionicons name="arrow-forward" size={16} color={COLORS.white} style={{ marginLeft: 8 }} />
-        )}
-      </TouchableOpacity>
-    </View>
+      {/* Join Button */}
+      {(() => {
+        const buttonState = getJoinButtonState(tournament);
+        const isJoining = joiningTournamentId === tournament._id;
+
+        return (
+          <TouchableOpacity
+            style={[buttonState.buttonStyle, isJoining && { opacity: 0.7 }]}
+            onPress={() => handleJoinTournament(tournament)}
+            disabled={buttonState.disabled || isJoining}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+              {isJoining ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+              ) : (
+                <>
+                  {buttonState.showIcon && buttonState.Icon && (
+                    <View style={{ marginRight: 6 }}>
+                      <buttonState.Icon
+                        size={16}
+                        color={buttonState.disabled ? COLORS.gray : COLORS.white}
+                      />
+                    </View>
+                  )}
+                  <Text style={buttonState.textStyle}>{buttonState.label}</Text>
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+        );
+      })()}
+    </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+      />
+
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <SKWinLogo size={70} />
-          <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>Tournaments</Text>
-            <Text style={styles.headerSubtitle}>Join and compete for amazing prizes</Text>
-          </View>
-        </View>
+        <Text style={styles.headerTitle}>Tournaments</Text>
+        <Text style={styles.headerSubtitle}>Join and compete for amazing prizes!</Text>
       </View>
 
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
-        {['upcoming', 'ongoing', 'completed'].map((tab) => (
+        {['upcoming', 'live', 'completed', 'cancelled'].map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tab, selectedTab === tab && styles.activeTab]}
             onPress={() => setSelectedTab(tab)}
           >
             <Text style={[styles.tabText, selectedTab === tab && styles.activeTabText]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'live'
+                ? 'Live'
+                : tab === 'upcoming'
+                ? 'Upcoming'
+                : tab === 'completed'
+                ? 'Completed'
+                : 'Cancelled'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -254,11 +359,19 @@ const TournamentScreen = ({ navigation }) => {
       <ScrollView 
         style={styles.scrollView} 
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
         contentContainerStyle={styles.scrollContent}
       >
-        {tournaments[selectedTab].map((tournament) => (
-          <TournamentCard key={tournament.id} tournament={tournament} />
-        ))}
+        {getTournamentsByStatus(selectedTab).length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <TrophyIcon size={60} color={COLORS.gray} />
+            <Text style={styles.emptyText}>No {selectedTab} tournaments</Text>
+          </View>
+        ) : (
+          getTournamentsByStatus(selectedTab).map((tournament) => (
+            <TournamentCard key={tournament._id} tournament={tournament} />
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -269,46 +382,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
-  },
-  headerContent: {
-    flexDirection: 'row',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  headerText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+  loadingText: {
     color: COLORS.white,
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: COLORS.gray,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 5,
-  },
-  headerSubtitle: {
+    marginTop: 10,
     fontSize: 14,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: `${COLORS.primary}40`,
+  },
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: COLORS.white,
+    letterSpacing: 0.5,
+  },
+  headerSubtitle: {
+    fontSize: 13,
     color: COLORS.gray,
+    marginTop: 4,
   },
   tabContainer: {
     flexDirection: 'row',
-    marginHorizontal: 20,
-    marginBottom: 20,
-    backgroundColor: COLORS.darkGray,
+    marginHorizontal: 15,
+    marginVertical: 12,
+    backgroundColor: COLORS.lightGray,
     borderRadius: 12,
     padding: 4,
   },
@@ -322,7 +427,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: COLORS.gray,
   },
@@ -331,43 +436,52 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    paddingHorizontal: 20,
   },
   scrollContent: {
+    paddingHorizontal: 15,
     paddingBottom: 100,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 80,
+  },
+  emptyText: {
+    color: COLORS.gray,
+    fontSize: 16,
+    marginTop: 12,
   },
   tournamentCard: {
     backgroundColor: COLORS.lightGray,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   titleSection: {
     flex: 1,
   },
   tournamentTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
     color: COLORS.white,
     marginBottom: 6,
   },
   typeTag: {
     backgroundColor: COLORS.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
     borderRadius: 6,
     alignSelf: 'flex-start',
   },
   typeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
     color: COLORS.white,
   },
@@ -376,75 +490,81 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
     marginLeft: 10,
   },
   statusText: {
     fontSize: 10,
     fontWeight: 'bold',
     color: COLORS.white,
-    marginLeft: 4,
+    marginLeft: 3,
   },
   cardContent: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   infoItem: {
     flex: 1,
     alignItems: 'center',
   },
   infoLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.gray,
     marginTop: 4,
     marginBottom: 2,
   },
   infoValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '700',
     color: COLORS.white,
   },
-  winnerSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.darkGray,
+  descriptionSection: {
+    backgroundColor: `${COLORS.primary}20`,
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderRadius: 8,
     marginTop: 8,
   },
-  winnerText: {
+  descriptionText: {
     fontSize: 12,
-    color: '#FFD700',
-    fontWeight: '600',
-    marginLeft: 6,
+    color: COLORS.gray,
   },
   joinButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ongoingButton: {
+  joinedButton: {
     backgroundColor: COLORS.success,
+    paddingVertical: 12,
+    borderRadius: 10,
   },
-  disabledButton: {
+  disabledJoinButton: {
     backgroundColor: COLORS.darkGray,
+    paddingVertical: 12,
+    borderRadius: 10,
   },
   joinButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '700',
     color: COLORS.white,
   },
-  disabledButtonText: {
+  joinedButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  disabledJoinButtonText: {
     color: COLORS.gray,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 
