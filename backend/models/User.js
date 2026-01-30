@@ -19,6 +19,21 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6,
   },
+  name: {
+    type: String,
+    trim: true,
+  },
+  gameUsername: {
+    type: String,
+    trim: true,
+  },
+  dateOfBirth: {
+    type: Date,
+  },
+  profilePhoto: {
+    type: String,
+    default: '',
+  },
   role: {
     type: String,
     enum: ['user', 'admin'],
@@ -51,6 +66,10 @@ const userSchema = new mongoose.Schema({
       type: Number,
       default: 0,
     },
+    totalWinnings: {
+      type: Number,
+      default: 0,
+    },
   },
   tournament: {
     participatedCount: {
@@ -64,6 +83,19 @@ const userSchema = new mongoose.Schema({
     earnings: {
       type: Number,
       default: 0,
+    },
+  },
+  gameStats: {
+    totalKills: {
+      type: Number,
+      default: 0,
+    },
+    totalDeaths: {
+      type: Number,
+      default: 0,
+    },
+    lastMatchDate: {
+      type: Date,
     },
   },
   status: {
