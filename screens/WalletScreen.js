@@ -24,6 +24,7 @@ const WalletScreen = ({ navigation }) => {
   const [stats, setStats] = useState({ totalWinnings: 0, tournamentsJoined: 0, tournamentsWon: 0 });
   const [transactions, setTransactions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -36,11 +37,38 @@ const WalletScreen = ({ navigation }) => {
         setIsLoading(true);
       }
 
-      const [balanceData, historyData, profileData] = await Promise.all([
-        walletService.getBalance(),
-        walletService.getHistory(),
-        userService.getProfile(),
-      ]);
+      console.log('Loading wallet data...');
+
+      // Load each service separately for better error isolation
+      let balanceData = { balance: 0, totalDeposited: 0, totalWithdrawn: 0 };
+      let historyData = { transactions: [] };
+      let profileData = { tournament: {} };
+
+      try {
+        console.log('Fetching balance...');
+        balanceData = await walletService.getBalance();
+        console.log('Balance fetched:', balanceData);
+      } catch (error) {
+        console.error('Error fetching balance:', error.message);
+      }
+
+      try {
+        console.log('Fetching history...');
+        historyData = await walletService.getHistory();
+        console.log('History fetched successfully:', historyData);
+      } catch (error) {
+        console.error('Error fetching history:', error.message);
+        historyData = { transactions: [] };
+      }
+
+      try {
+        console.log('Fetching profile...');
+        profileData = await userService.getProfile();
+        console.log('Profile fetched:', profileData);
+      } catch (error) {
+        console.error('Error fetching profile:', error.message);
+        profileData = { tournament: {} };
+      }
 
       setBalance(balanceData?.balance ?? 0);
       setTotals({
@@ -55,15 +83,29 @@ const WalletScreen = ({ navigation }) => {
         tournamentsWon: tournamentStats.wins ?? 0,
       });
 
-      setTransactions(Array.isArray(historyData) ? historyData : []);
+      // Handle transaction history
+      if (historyData && Array.isArray(historyData.transactions)) {
+        setTransactions(historyData.transactions);
+      } else {
+        setTransactions([]);
+      }
+
+      console.log('Wallet data loaded successfully');
     } catch (error) {
+      console.error('Unexpected error loading wallet:', error);
       Alert.alert('Wallet Error', error.message || 'Failed to load wallet data');
     } finally {
       if (!silent) {
         setIsLoading(false);
       }
+      setRefreshing(false);
     }
   }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadWalletData(true);
+  }, [loadWalletData]);
 
   useFocusEffect(
     useCallback(() => {
@@ -72,8 +114,9 @@ const WalletScreen = ({ navigation }) => {
   );
 
   const handleDeposit = async () => {
-    const parsedAmount = parseFloat(depositAmount);
-    if (!depositAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
+    const trimmedAmount = depositAmount.trim();
+    const parsedAmount = parseFloat(trimmedAmount);
+    if (!trimmedAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount');
       return;
     }
@@ -89,11 +132,21 @@ const WalletScreen = ({ navigation }) => {
     try {
       setIsSubmitting(true);
       const transactionId = `MANUAL-${Date.now()}`;
-      await walletService.topup(parsedAmount, 'manual', transactionId);
-      setShowDepositModal(false);
-      setDepositAmount('');
-      await loadWalletData(true);
-      Alert.alert('Success!', `₹${parsedAmount} has been added to your wallet`);
+      const response = await walletService.topup({
+        amount: parsedAmount,
+        paymentMethod: 'manual',
+        transactionId: transactionId
+      });
+
+      if (response && response.success) {
+        setShowDepositModal(false);
+        setDepositAmount('');
+        await loadWalletData(true);
+        Alert.alert('Success!', `₹${parsedAmount} has been added to your wallet`);
+      } else {
+        const errorMsg = response?.message || 'Failed to add money. Please try again.';
+        Alert.alert('Deposit Failed', errorMsg);
+      }
     } catch (error) {
       Alert.alert('Deposit Failed', error.message || 'Unable to add money right now');
     } finally {
@@ -102,8 +155,9 @@ const WalletScreen = ({ navigation }) => {
   };
 
   const handleWithdraw = async () => {
-    const parsedAmount = parseFloat(withdrawAmount);
-    if (!withdrawAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
+    const trimmedAmount = withdrawAmount.trim();
+    const parsedAmount = parseFloat(trimmedAmount);
+    if (!trimmedAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount');
       return;
     }
@@ -118,11 +172,20 @@ const WalletScreen = ({ navigation }) => {
 
     try {
       setIsSubmitting(true);
-      await walletService.withdraw(parsedAmount, {});
-      setShowWithdrawModal(false);
-      setWithdrawAmount('');
-      await loadWalletData(true);
-      Alert.alert('Success!', `₹${parsedAmount} withdrawal request has been submitted`);
+      const response = await walletService.withdraw({
+        amount: parsedAmount,
+        bankDetails: {}
+      });
+
+      if (response && response.success) {
+        setShowWithdrawModal(false);
+        setWithdrawAmount('');
+        await loadWalletData(true);
+        Alert.alert('Success!', `₹${parsedAmount} withdrawal request has been submitted`);
+      } else {
+        const errorMsg = response?.message || 'Failed to process withdrawal. Please try again.';
+        Alert.alert('Withdrawal Failed', errorMsg);
+      }
     } catch (error) {
       Alert.alert('Withdrawal Failed', error.message || 'Unable to withdraw right now');
     } finally {
@@ -319,9 +382,9 @@ const WalletScreen = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
-            refreshing={isLoading}
-            onRefresh={() => loadWalletData()}
-            tintColor={COLORS.primary}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.accent}
           />
         }
       >

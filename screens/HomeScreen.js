@@ -6,6 +6,8 @@ import {
   StyleSheet,
   StatusBar,
   ScrollView,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -13,13 +15,57 @@ import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
 import SKWinLogo from '../components/SKWinLogo';
-import { tournamentService, userService, walletService } from '../services/api';
+import { tournamentService, userService, walletService, gameService } from '../services/api';
 
 const HomeScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
   const [walletBalance, setWalletBalance] = useState(0);
   const [tournamentStats, setTournamentStats] = useState({ joined: 0, won: 0 });
   const [upcomingTournaments, setUpcomingTournaments] = useState([]);
+  const [popularGames, setPopularGames] = useState([]);
+  const [gamesLoading, setGamesLoading] = useState(false);
+  const [contestTab, setContestTab] = useState('upcoming'); // upcoming, ongoing, completed
+  const [sliderIndex, setSliderIndex] = useState(0);
+
+  // Slider data with tutorial videos
+  const tutorials = [
+    {
+      id: 1,
+      title: 'How to Join Tournament',
+      description: 'Learn step by step how to join any tournament',
+      icon: 'tournament',
+      videoLink: 'https://youtu.be/tutorial-join-tournament',
+      color: COLORS.accent,
+      image: require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg'),
+    },
+    {
+      id: 2,
+      title: 'Wallet Guide',
+      description: 'Add money and manage your wallet',
+      icon: 'wallet-outline',
+      videoLink: 'https://youtu.be/tutorial-wallet',
+      color: '#4CAF50',
+      image: require('../assets/images/87904deacf9b547a95f019e0a322152a.jpg'),
+    },
+    {
+      id: 3,
+      title: 'Winning Strategy',
+      description: 'Tips to increase your winning chances',
+      icon: 'trophy-outline',
+      videoLink: 'https://youtu.be/tutorial-strategy',
+      color: '#FFD700',
+      image: require('../assets/images/87904deacf9b547a95f019e0a322152a77.jpg'),
+    },
+    {
+      id: 4,
+      title: 'Leaderboard',
+      description: 'Check rankings and top players',
+      icon: 'podium-gold',
+      videoLink: 'https://youtu.be/tutorial-leaderboard',
+      color: '#FF6B6B',
+      image: require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg'),
+    },
+  ];
 
   const handleLogout = async () => {
     await logout();
@@ -28,6 +74,30 @@ const HomeScreen = ({ navigation }) => {
 
   const announcements = [];
   const featuredMatches = [];
+
+  const getDefaultGames = () => [
+    {
+      _id: '1',
+      name: 'Free Fire',
+      image: require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg'),
+      rating: 4.8,
+      players: '2.5M Players',
+    },
+    {
+      _id: '2',
+      name: 'PUBG Mobile',
+      image: require('../assets/images/87904deacf9b547a95f019e0a322152a.jpg'),
+      rating: 4.7,
+      players: '1.8M Players',
+    },
+    {
+      _id: '3',
+      name: 'Call of Duty',
+      image: require('../assets/images/87904deacf9b547a95f019e0a322152a77.jpg'),
+      rating: 4.6,
+      players: '950K Players',
+    },
+  ];
 
   const getTimeRemaining = (startDate) => {
     const now = new Date();
@@ -47,33 +117,44 @@ const HomeScreen = ({ navigation }) => {
 
   const loadHomeData = useCallback(async () => {
     try {
-      
-      const [balanceData, profileData, tournamentData] = await Promise.all([
-        walletService.getBalance(),
-        userService.getProfile(),
-        tournamentService.getList(),
-      ]);
+      // Load games first (public endpoint, doesn't require auth)
+      const gamesData = await gameService.getPopularGames().catch(() => []);
+      const games = Array.isArray(gamesData) && gamesData.length > 0 
+        ? gamesData 
+        : getDefaultGames();
+      setPopularGames(games);
 
-      setWalletBalance(balanceData?.balance ?? 0);
+      // Only load user-specific data if user is logged in
+      if (user) {
+        const [balanceData, profileData, tournamentData] = await Promise.all([
+          walletService.getBalance().catch(() => ({ balance: 0 })),
+          userService.getProfile().catch(() => ({ tournament: {} })),
+          tournamentService.getList().catch(() => []),
+        ]);
 
-      const tournament = profileData?.tournament || {};
-      setTournamentStats({
-        joined: tournament.participatedCount ?? 0,
-        won: tournament.wins ?? 0,
-      });
+        setWalletBalance(balanceData?.balance ?? 0);
 
-      const upcoming = Array.isArray(tournamentData)
-        ? tournamentData
-            .filter((tournament) => tournament.status === 'upcoming')
-            .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
-            .slice(0, 2)
-        : [];
+        const tournament = profileData?.tournament || {};
+        setTournamentStats({
+          joined: tournament.participatedCount ?? 0,
+          won: tournament.wins ?? 0,
+        });
 
-      setUpcomingTournaments(upcoming);
+        const upcoming = Array.isArray(tournamentData)
+          ? tournamentData
+              .filter((tournament) => tournament.status === 'upcoming')
+              .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+              .slice(0, 2)
+          : [];
+
+        setUpcomingTournaments(upcoming);
+      }
     } catch (error) {
       console.error('Failed to load home data:', error);
+      // Fallback to default games if API fails
+      setPopularGames(getDefaultGames());
     }
-  }, []);
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -85,47 +166,125 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
-      {/* Header */}
+      {/* Header with Wallet, Notifications, and Support Icons */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <SKWinLogo size={120} />
-          <View>
-            <Text style={styles.welcomeText}>Welcome back!</Text>
-            <Text style={styles.usernameText}>
-              {user?.username ? `@${user.username}` : '@Player'}
-            </Text>
+          <SKWinLogo size={50} />
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.welcomeText}>Welcome back,</Text>
+            <Text style={styles.userName}>{user?.name || 'Player'}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={20} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {/* Wallet Balance Icon */}
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => navigation.navigate('WalletTab')}
+          >
+            <View style={styles.walletBadge}>
+              <MaterialCommunityIcons name="wallet" size={18} color={COLORS.white} />
+              <Text style={styles.walletText}>₹{walletBalance.toFixed(0)}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Notifications Icon */}
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => navigation.navigate('Notifications')}
+          >
+            <View style={styles.notificationBell}>
+              <MaterialCommunityIcons name="bell-outline" size={20} color={COLORS.accent} />
+              <View style={styles.notificationDot} />
+            </View>
+          </TouchableOpacity>
+
+          {/* Support/Help Icon */}
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => navigation.navigate('ContactUs')}
+          >
+            <MaterialCommunityIcons name="headset" size={20} color={COLORS.white} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
         style={styles.scrollView} 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-      >
-        {/* Quick Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="wallet" size={24} color={COLORS.success} />
-            <Text style={styles.statValue}>₹{walletBalance.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>Wallet Balance</Text>
+      >                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+        {/* Tutorial Slider */}
+        <View style={styles.sliderSection}>
+          <View style={styles.sliderHeader}>
+            <View style={styles.sectionTitleRow}>
+              <MaterialCommunityIcons name="play-circle-outline" size={20} color={COLORS.accent} />
+              <Text style={styles.sectionTitle}>How To Play</Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="trophy-variant" size={24} color="#FFD700" />
-            <Text style={styles.statValue}>{tournamentStats.won}</Text>
-            <Text style={styles.statLabel}>Tournaments Won</Text>
-          </View>
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="target" size={24} color={COLORS.error} />
-            <Text style={styles.statValue}>{tournamentStats.joined}</Text>
-            <Text style={styles.statLabel}>Tournaments Joined</Text>
+
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            style={styles.sliderContainer}
+            onScroll={(event) => {
+              const contentOffsetX = event.nativeEvent.contentOffset.x;
+              const index = Math.round(contentOffsetX / (300 + 12));
+              setSliderIndex(index);
+            }}
+          >
+            {tutorials.map((tutorial) => (
+              <TouchableOpacity 
+                key={tutorial.id} 
+                style={styles.sliderCard}
+              >
+                <View 
+                  style={[
+                    styles.sliderCardHeader,
+                    { backgroundColor: tutorial.color },
+                  ]}
+                >
+                  <Image
+                    source={tutorial.image}
+                    style={styles.sliderCardImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.sliderCardImageOverlay} />
+                </View>
+                <View style={styles.sliderCardContent}>
+                  <Text style={styles.sliderTitle}>{tutorial.title}</Text>
+                  <Text style={styles.sliderDescription}>{tutorial.description}</Text>
+                  <TouchableOpacity 
+                    style={styles.videoButton}
+                    onPress={() => {
+                      // Open video link
+                      console.log('Playing video:', tutorial.videoLink);
+                    }}
+                  >
+                    <MaterialCommunityIcons name="play" size={16} color={COLORS.white} />
+                    <Text style={styles.videoButtonText}>Watch Video</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Slider Dots */}
+          <View style={styles.dotsContainer}>
+            {tutorials.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.dot,
+                  sliderIndex === index && styles.dotActive,
+                ]}
+              />
+            ))}
           </View>
         </View>
 
         {/* Announcements */}
+        {false && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
@@ -153,8 +312,10 @@ const HomeScreen = ({ navigation }) => {
             ))
           )}
         </View>
+        )}
 
         {/* Featured Matches */}
+        {false && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
@@ -197,61 +358,144 @@ const HomeScreen = ({ navigation }) => {
             ))
           )}
         </View>
+        )}
 
-        {/* Upcoming Tournaments */}
+        {/* My Contests */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
               <MaterialCommunityIcons name="trophy-outline" size={20} color={COLORS.accent} />
-              <Text style={styles.sectionTitle}>Upcoming Tournaments</Text>
+              <Text style={styles.sectionTitle}>My Contests</Text>
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Tournaments')}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
           </View>
-          
-          {upcomingTournaments.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No upcoming tournaments</Text>
-            </View>
-          ) : (
-            upcomingTournaments.map((tournament) => (
-              <TouchableOpacity 
-                key={tournament._id} 
-                style={styles.tournamentCard}
-                onPress={() => navigation.navigate('Tournaments')}
+
+          {/* Contest Tabs */}
+          <View style={styles.tabsContainer}>
+            {['upcoming', 'ongoing', 'completed'].map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[
+                  styles.tabButton,
+                  contestTab === tab && styles.tabButtonActive,
+                ]}
+                onPress={() => setContestTab(tab)}
               >
-                <View style={styles.tournamentHeader}>
-                  <Text style={styles.tournamentTitle}>{tournament.name}</Text>
-                  <View style={styles.timeTag}>
-                    <Ionicons name="time" size={12} color={COLORS.white} />
-                    <Text style={styles.timeText}>{getTimeRemaining(tournament.startDate)}</Text>
+                <Text
+                  style={[
+                    styles.tabText,
+                    contestTab === tab && styles.tabTextActive,
+                  ]}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Contest Content */}
+          {contestTab === 'upcoming' && (
+            upcomingTournaments.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyText}>No upcoming contests</Text>
+              </View>
+            ) : (
+              upcomingTournaments.map((tournament) => (
+                <TouchableOpacity 
+                  key={tournament._id} 
+                  style={styles.tournamentCard}
+                  onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
+                >
+                  <View style={styles.tournamentHeader}>
+                    <Text style={styles.tournamentTitle}>{tournament.name}</Text>
+                    <View style={styles.timeTag}>
+                      <Ionicons name="time" size={12} color={COLORS.white} />
+                      <Text style={styles.timeText}>{getTimeRemaining(tournament.startDate)}</Text>
+                    </View>
                   </View>
-                </View>
-                
-                <View style={styles.tournamentDetails}>
-                  <View style={styles.detailItem}>
-                    <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
-                    <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
+                  
+                  <View style={styles.tournamentDetails}>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="people" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>
+                        {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxPlayers}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.detailItem}>
-                    <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                    <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
-                  </View>
-                  <View style={styles.detailItem}>
-                    <Ionicons name="people" size={16} color={COLORS.accent} />
-                    <Text style={styles.detailText}>
-                      {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxPlayers}
-                    </Text>
-                  </View>
-                </View>
-                
-                <TouchableOpacity style={styles.joinButton}>
-                  <Text style={styles.joinButtonText}>Join Now</Text>
-                  <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
+                  
+                  <TouchableOpacity style={styles.joinButton}>
+                    <Text style={styles.joinButtonText}>Join Now</Text>
+                    <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
+                  </TouchableOpacity>
                 </TouchableOpacity>
+              ))
+            )
+          )}
+
+          {contestTab === 'ongoing' && (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No ongoing contests</Text>
+            </View>
+          )}
+
+          {contestTab === 'completed' && (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No completed contests</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Games Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <MaterialCommunityIcons name="gamepad-variant" size={20} color={COLORS.accent} />
+              <Text style={styles.sectionTitle}>Popular Games</Text>
+            </View>
+          </View>
+
+          {popularGames.length > 0 ? (
+            popularGames.map((game) => (
+              <TouchableOpacity 
+                key={game._id} 
+                style={styles.gameCard}
+                onPress={() => navigation.navigate('GameModes', { gameId: game._id })}
+                activeOpacity={0.8}
+              >
+                {/* Game Image */}
+                <View style={styles.gameImageContainer}>
+                  {game.image ? (
+                    <Image
+                      source={typeof game.image === 'string' ? { uri: game.image } : game.image}
+                      style={styles.gameImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.gameImage, { backgroundColor: COLORS.darkGray }]}>
+                      <MaterialCommunityIcons name="gamepad-variant" size={40} color={COLORS.gray} />
+                    </View>
+                  )}
+                  <View style={styles.gameInfo}>
+                    <Text style={styles.gameName}>{game.name}</Text>
+                    <View style={styles.ratingContainer}>
+                      <MaterialCommunityIcons name="star" size={14} color="#FFD700" />
+                      <Text style={styles.ratingText}>{game.rating} • {game.players}</Text>
+                    </View>
+                  </View>
+                </View>
               </TouchableOpacity>
             ))
+          ) : (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>No games available</Text>
+            </View>
           )}
         </View>
 
@@ -264,7 +508,7 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.quickActions}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('Tournaments')}
+              onPress={() => navigation.navigate('Tournament')}
             >
               <MaterialCommunityIcons name="tournament" size={24} color={COLORS.accent} />
               <Text style={styles.actionText}>Join Tournament</Text>
@@ -272,7 +516,7 @@ const HomeScreen = ({ navigation }) => {
             
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('Wallet')}
+              onPress={() => navigation.navigate('WalletTab')}
             >
               <MaterialCommunityIcons name="plus-circle" size={24} color={COLORS.success} />
               <Text style={styles.actionText}>Add Money</Text>
@@ -280,7 +524,7 @@ const HomeScreen = ({ navigation }) => {
             
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('History')}
+              onPress={() => navigation.navigate('MyWallet')}
             >
               <MaterialCommunityIcons name="history" size={24} color={COLORS.gray} />
               <Text style={styles.actionText}>View History</Text>
@@ -301,10 +545,79 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
     paddingVertical: 15,
+    backgroundColor: COLORS.darkGray,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
+    borderBottomColor: COLORS.lightGray,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  headerTextContainer: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+  },
+  welcomeText: {
+    fontSize: 11,
+    color: COLORS.gray,
+    fontWeight: '400',
+  },
+  userName: {
+    fontSize: 16,
+    color: COLORS.white,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.accent,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: COLORS.white,
+    fontWeight: '500',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: 10,
+  },
+  walletBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  walletText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  notificationBell: {
+    position: 'relative',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    backgroundColor: '#FF6B6B',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: COLORS.background,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -550,6 +863,186 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: 'bold',
     marginRight: 8,
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: COLORS.lightGray,
+    borderWidth: 1,
+    borderColor: COLORS.darkGray,
+    alignItems: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  tabText: {
+    color: COLORS.gray,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: COLORS.white,
+  },
+  gameCard: {
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.darkGray,
+  },
+  gameImageContainer: {
+    backgroundColor: COLORS.darkGray,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  gameImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  gameImagePlaceholder: {
+    width: 80,
+    height: 80,
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  gameInfo: {
+    flex: 1,
+  },
+  gameName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.white,
+    marginBottom: 4,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ratingText: {
+    color: COLORS.gray,
+    fontSize: 12,
+  },
+  gameButtonsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 12,
+    gap: 8,
+  },
+  gameActionButton: {
+    width: '48%',
+    backgroundColor: COLORS.darkGray,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gameActionText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  sliderSection: {
+    marginVertical: 24,
+  },
+  sliderHeader: {
+    marginBottom: 12,
+  },
+  sliderContainer: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+  },
+  sliderCard: {
+    width: 300,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: COLORS.darkGray,
+  },
+  sliderCardHeader: {
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  sliderCardImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  sliderCardImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  sliderCardContent: {
+    padding: 14,
+  },
+  sliderTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.white,
+    marginBottom: 4,
+  },
+  sliderDescription: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  videoButton: {
+    backgroundColor: COLORS.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 6,
+    gap: 6,
+  },
+  videoButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.darkGray,
+  },
+  dotActive: {
+    backgroundColor: COLORS.accent,
+    width: 24,
   },
   quickActions: {
     flexDirection: 'row',

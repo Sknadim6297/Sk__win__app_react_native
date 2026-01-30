@@ -6,73 +6,94 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  SafeAreaView,
   TextInput,
   ActivityIndicator,
   RefreshControl,
   Modal,
   Switch,
+  Alert,
 } from 'react-native';
-import ArrowLeftIcon from 'react-native-heroicons/outline/ArrowLeftIcon';
-import PlusCircleIcon from 'react-native-heroicons/outline/PlusCircleIcon';
-import TrophyIcon from 'react-native-heroicons/outline/TrophyIcon';
-import UserGroupIcon from 'react-native-heroicons/outline/UserGroupIcon';
-import CurrencyDollarIcon from 'react-native-heroicons/outline/CurrencyDollarIcon';
-import CalendarIcon from 'react-native-heroicons/outline/CalendarIcon';
-import PlayIcon from 'react-native-heroicons/outline/PlayIcon';
-import CheckIcon from 'react-native-heroicons/outline/CheckIcon';
-import XMarkIcon from 'react-native-heroicons/outline/XMarkIcon';
-import TrashIcon from 'react-native-heroicons/outline/TrashIcon';
-import Cog6ToothIcon from 'react-native-heroicons/outline/Cog6ToothIcon';
-import EyeIcon from 'react-native-heroicons/outline/EyeIcon';
-import EyeSlashIcon from 'react-native-heroicons/outline/EyeSlashIcon';
-import CalendarDaysIcon from 'react-native-heroicons/outline/CalendarDaysIcon';
-import SignalIcon from 'react-native-heroicons/outline/SignalIcon';
-import CheckCircleIcon from 'react-native-heroicons/outline/CheckCircleIcon';
-import XCircleIcon from 'react-native-heroicons/outline/XCircleIcon';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../styles/theme';
-import { tournamentService } from '../../services/api';
+import { tournamentService, gameService } from '../../services/api';
 import Toast from '../../components/Toast';
 
 const TournamentManagement = ({ navigation }) => {
+  const [games, setGames] = useState([]);
+  const [gameModes, setGameModes] = useState([]);
   const [tournaments, setTournaments] = useState([]);
+  const [selectedGame, setSelectedGame] = useState(null);
+  const [selectedGameMode, setSelectedGameMode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showRoomModal, setShowRoomModal] = useState(false);
-  const [selectedTournament, setSelectedTournament] = useState(null);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
 
   // Form states
   const [form, setForm] = useState({
     name: '',
     description: '',
+    game: '',
+    gameMode: '',
+    mode: 'solo',
+    map: 'Bermuda',
+    version: 'TPP',
+    rules: [''],
     entryFee: '',
     prizePool: '',
-    maxPlayers: '',
-    gameType: 'Battle Royale',
-    minimumKYC: false,
-    minimumBalance: '',
+    perKill: '',
+    maxParticipants: '',
     startDate: '',
     endDate: '',
-    roomId: '',
-    roomPassword: '',
-    showRoomCredentials: false,
-  });
-  const [roomForm, setRoomForm] = useState({
+    minimumKYC: false,
+    minimumBalance: '',
     roomId: '',
     roomPassword: '',
     showRoomCredentials: false,
   });
 
   useEffect(() => {
-    fetchTournaments();
+    fetchGames();
   }, []);
+
+  useEffect(() => {
+    if (selectedGame) {
+      fetchGameModes(selectedGame);
+    }
+  }, [selectedGame]);
+
+  useEffect(() => {
+    if (selectedGameMode) {
+      fetchTournaments();
+    }
+  }, [selectedGameMode]);
+
+  const fetchGames = async () => {
+    try {
+      setLoading(true);
+      const data = await gameService.getAllGames();
+      setGames(data);
+    } catch (error) {
+      showToast(error.message || 'Failed to fetch games', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchGameModes = async (gameId) => {
+    try {
+      const data = await gameService.getGameModes(gameId);
+      setGameModes(data);
+    } catch (error) {
+      showToast(error.message || 'Failed to fetch game modes', 'error');
+    }
+  };
 
   const fetchTournaments = async () => {
     try {
       setLoading(true);
-      const data = await tournamentService.getAllTournaments();
+      const data = await tournamentService.getTournamentsByGameMode(selectedGameMode);
       setTournaments(data);
     } catch (error) {
       showToast(error.message || 'Failed to fetch tournaments', 'error');
@@ -83,7 +104,10 @@ const TournamentManagement = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchTournaments();
+    await fetchGames();
+    if (selectedGameMode) {
+      await fetchTournaments();
+    }
     setRefreshing(false);
   };
 
@@ -96,92 +120,48 @@ const TournamentManagement = ({ navigation }) => {
   };
 
   const handleCreateTournament = async () => {
-    if (!form.name || !form.startDate || !form.endDate) {
-      showToast('Please fill all required fields', 'error');
+    // Check if game and game mode are selected first
+    if (!selectedGame) {
+      showToast('Please select a game first', 'error');
+      return;
+    }
+    
+    if (!selectedGameMode) {
+      showToast('Please select a game mode first', 'error');
       return;
     }
 
-    if (form.showRoomCredentials && (!form.roomId || !form.roomPassword)) {
-      showToast('Room ID and password are required to show credentials', 'error');
+    // Validate required form fields
+    const missingFields = [];
+    if (!form.name.trim()) missingFields.push('Tournament Name');
+    if (!form.startDate.trim()) missingFields.push('Start Date');
+    if (!form.maxParticipants.trim()) missingFields.push('Max Players');
+    
+    if (missingFields.length > 0) {
+      showToast(`Missing required fields: ${missingFields.join(', ')}`, 'error');
       return;
     }
 
     try {
-      await tournamentService.createTournament({
-        name: form.name,
-        description: form.description,
-        entryFee: parseInt(form.entryFee) || 0,
-        prizePool: parseInt(form.prizePool) || 0,
-        maxPlayers: parseInt(form.maxPlayers) || 100,
-        gameType: form.gameType,
-        minimumKYC: form.minimumKYC,
-        minimumBalance: parseInt(form.minimumBalance) || 0,
-        startDate: new Date(form.startDate),
-        endDate: new Date(form.endDate),
-        roomId: form.roomId || '',
-        roomPassword: form.roomPassword || '',
-        showRoomCredentials: !!form.showRoomCredentials,
-      });
+      const tournamentData = {
+        ...form,
+        game: selectedGame,
+        gameMode: selectedGameMode,
+        entryFee: parseFloat(form.entryFee) || 0,
+        prizePool: parseFloat(form.prizePool) || 0,
+        perKill: parseFloat(form.perKill) || 0,
+        maxParticipants: parseInt(form.maxParticipants) || 20,
+        minimumBalance: parseFloat(form.minimumBalance) || 0,
+        rules: form.rules.filter(rule => rule.trim() !== ''),
+      };
 
+      await tournamentService.createTournament(tournamentData);
       showToast('Tournament created successfully!', 'success');
-      resetForm();
       setShowCreateModal(false);
-      await fetchTournaments();
+      resetForm();
+      fetchTournaments();
     } catch (error) {
       showToast(error.message || 'Failed to create tournament', 'error');
-    }
-  };
-
-  const handleUpdateStatus = async (tournamentId, newStatus) => {
-    try {
-      await tournamentService.updateStatus(tournamentId, newStatus);
-      showToast('Tournament status updated', 'success');
-      await fetchTournaments();
-    } catch (error) {
-      showToast(error.message || 'Failed to update status', 'error');
-    }
-  };
-
-  const handleDeleteTournament = async (tournamentId) => {
-    try {
-      await tournamentService.deleteTournament(tournamentId);
-      showToast('Tournament deleted', 'success');
-      await fetchTournaments();
-    } catch (error) {
-      showToast(error.message || 'Failed to delete tournament', 'error');
-    }
-  };
-
-  const openRoomModal = (tournament) => {
-    setSelectedTournament(tournament);
-    setRoomForm({
-      roomId: tournament.roomId || '',
-      roomPassword: tournament.roomPassword || '',
-      showRoomCredentials: !!tournament.showRoomCredentials,
-    });
-    setShowRoomModal(true);
-  };
-
-  const handleSaveRoomDetails = async () => {
-    if (!selectedTournament) return;
-
-    if (roomForm.showRoomCredentials && (!roomForm.roomId || !roomForm.roomPassword)) {
-      showToast('Room ID and password are required to show credentials', 'error');
-      return;
-    }
-
-    try {
-      await tournamentService.setRoomDetails(
-        selectedTournament._id,
-        roomForm.roomId,
-        roomForm.roomPassword,
-        roomForm.showRoomCredentials
-      );
-      showToast('Room details updated', 'success');
-      setShowRoomModal(false);
-      await fetchTournaments();
-    } catch (error) {
-      showToast(error.message || 'Failed to update room details', 'error');
     }
   };
 
@@ -189,64 +169,389 @@ const TournamentManagement = ({ navigation }) => {
     setForm({
       name: '',
       description: '',
+      game: '',
+      gameMode: '',
+      mode: 'solo',
+      map: 'Bermuda',
+      version: 'TPP',
+      rules: [''],
       entryFee: '',
       prizePool: '',
-      maxPlayers: '',
-      gameType: 'Battle Royale',
-      minimumKYC: false,
-      minimumBalance: '',
+      perKill: '',
+      maxParticipants: '',
       startDate: '',
       endDate: '',
+      minimumKYC: false,
+      minimumBalance: '',
       roomId: '',
       roomPassword: '',
       showRoomCredentials: false,
     });
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'upcoming':
-        return CalendarDaysIcon;
-      case 'live':
-        return SignalIcon;
-      case 'completed':
-        return CheckCircleIcon;
-      case 'cancelled':
-        return XCircleIcon;
-      default:
-        return CalendarDaysIcon;
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'upcoming':
-        return CalendarDaysIcon;
-      case 'live':
-        return SignalIcon;
-      case 'completed':
-        return CheckCircleIcon;
-      case 'cancelled':
-        return XCircleIcon;
-      default:
-        return CalendarDaysIcon;
-    }
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading tournaments...</Text>
-        </View>
-      </SafeAreaView>
+  const handleDeleteTournament = (tournament) => {
+    Alert.alert(
+      'Delete Tournament',
+      `Are you sure you want to delete "${tournament.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive', 
+          onPress: () => deleteTournament(tournament._id) 
+        },
+      ]
     );
-  }
+  };
+
+  const deleteTournament = async (tournamentId) => {
+    try {
+      await tournamentService.deleteTournament(tournamentId);
+      showToast('Tournament deleted successfully!', 'success');
+      fetchTournaments();
+    } catch (error) {
+      showToast(error.message || 'Failed to delete tournament', 'error');
+    }
+  };
+
+  const addRule = () => {
+    setForm(prev => ({
+      ...prev,
+      rules: [...prev.rules, '']
+    }));
+  };
+
+  const removeRule = (index) => {
+    setForm(prev => ({
+      ...prev,
+      rules: prev.rules.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateRule = (index, value) => {
+    setForm(prev => ({
+      ...prev,
+      rules: prev.rules.map((rule, i) => i === index ? value : rule)
+    }));
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Tournament Management</Text>
+        <TouchableOpacity 
+          onPress={() => setShowCreateModal(true)}
+          style={styles.addButton}
+          disabled={!selectedGameMode}
+        >
+          <MaterialCommunityIcons name="plus" size={24} color={selectedGameMode ? COLORS.white : COLORS.gray} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Game Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Select Game</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.gameList}>
+            {games.map(game => (
+              <TouchableOpacity
+                key={game._id}
+                style={[
+                  styles.gameCard,
+                  selectedGame === game._id && styles.gameCardSelected
+                ]}
+                onPress={() => {
+                  setSelectedGame(game._id);
+                  setSelectedGameMode(null);
+                  setTournaments([]);
+                }}
+              >
+                <MaterialCommunityIcons 
+                  name="gamepad-variant" 
+                  size={24} 
+                  color={selectedGame === game._id ? COLORS.white : COLORS.accent} 
+                />
+                <Text style={[
+                  styles.gameCardText,
+                  selectedGame === game._id && styles.gameCardTextSelected
+                ]}>
+                  {game.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Game Mode Selection */}
+        {selectedGame && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Select Game Mode</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.gameModeList}>
+              {gameModes.map(mode => (
+                <TouchableOpacity
+                  key={mode._id}
+                  style={[
+                    styles.gameModeCard,
+                    selectedGameMode === mode._id && styles.gameModeCardSelected
+                  ]}
+                  onPress={() => setSelectedGameMode(mode._id)}
+                >
+                  <MaterialCommunityIcons 
+                    name="play-circle-outline" 
+                    size={20} 
+                    color={selectedGameMode === mode._id ? COLORS.white : COLORS.accent} 
+                  />
+                  <Text style={[
+                    styles.gameModeCardText,
+                    selectedGameMode === mode._id && styles.gameModeCardTextSelected
+                  ]}>
+                    {mode.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Tournaments */}
+        {selectedGameMode && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Tournaments</Text>
+              <Text style={styles.tournamentCount}>{tournaments.length} tournaments</Text>
+            </View>
+
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.accent} />
+                <Text style={styles.loadingText}>Loading tournaments...</Text>
+              </View>
+            ) : tournaments.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <MaterialCommunityIcons name="trophy-outline" size={64} color={COLORS.gray} />
+                <Text style={styles.emptyText}>No tournaments yet</Text>
+                <Text style={styles.emptySubtext}>Create your first tournament for this game mode</Text>
+              </View>
+            ) : (
+              tournaments.map(tournament => (
+                <View key={tournament._id} style={styles.tournamentCard}>
+                  <View style={styles.tournamentHeader}>
+                    <View style={styles.tournamentInfo}>
+                      <Text style={styles.tournamentName}>{tournament.name}</Text>
+                      <Text style={styles.tournamentGame}>
+                        {tournament.game?.name} - {tournament.gameMode?.name}
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, styles[`status${tournament.status}`]]}>
+                      <Text style={styles.statusText}>{tournament.status.toUpperCase()}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tournamentDetails}>
+                    <View style={styles.detailRow}>
+                      <MaterialCommunityIcons name="currency-usd" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>Entry: ₹{tournament.entryFee}</Text>
+                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>Prize: ₹{tournament.prizePool}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <MaterialCommunityIcons name="account-group" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>
+                        {tournament.currentParticipants || 0}/{tournament.maxParticipants} Players
+                      </Text>
+                      <MaterialCommunityIcons name="clock-outline" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>
+                        {new Date(tournament.startDate).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tournamentActions}>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
+                    >
+                      <MaterialCommunityIcons name="eye" size={16} color={COLORS.accent} />
+                      <Text style={styles.actionText}>View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, styles.deleteButton]}
+                      onPress={() => handleDeleteTournament(tournament)}
+                    >
+                      <MaterialCommunityIcons name="delete" size={16} color="#FF6B6B" />
+                      <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Create Tournament Modal */}
+      <Modal visible={showCreateModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Create Tournament</Text>
+                <TouchableOpacity onPress={() => setShowCreateModal(false)}>
+                  <Ionicons name="close" size={24} color={COLORS.white} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Show selected game and mode */}
+              {selectedGame && selectedGameMode && (
+                <View style={styles.selectionInfo}>
+                  <Text style={styles.selectionTitle}>Creating tournament for:</Text>
+                  <View style={styles.selectionDetails}>
+                    <Text style={styles.selectionText}>
+                      Game: {games.find(g => g._id === selectedGame)?.name}
+                    </Text>
+                    <Text style={styles.selectionText}>
+                      Mode: {gameModes.find(m => m._id === selectedGameMode)?.name}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Tournament Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={form.name}
+                  onChangeText={(text) => setForm(prev => ({ ...prev, name: text }))}
+                  placeholder="Enter tournament name"
+                  placeholderTextColor={COLORS.gray}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Description</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={form.description}
+                  onChangeText={(text) => setForm(prev => ({ ...prev, description: text }))}
+                  placeholder="Enter tournament description"
+                  placeholderTextColor={COLORS.gray}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.label}>Entry Fee (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.entryFee}
+                    onChangeText={(text) => setForm(prev => ({ ...prev, entryFee: text }))}
+                    placeholder="0"
+                    placeholderTextColor={COLORS.gray}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.label}>Prize Pool (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.prizePool}
+                    onChangeText={(text) => setForm(prev => ({ ...prev, prizePool: text }))}
+                    placeholder="0"
+                    placeholderTextColor={COLORS.gray}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.label}>Per Kill (₹)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.perKill}
+                    onChangeText={(text) => setForm(prev => ({ ...prev, perKill: text }))}
+                    placeholder="0"
+                    placeholderTextColor={COLORS.gray}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.label}>Max Players *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.maxParticipants}
+                    onChangeText={(text) => setForm(prev => ({ ...prev, maxParticipants: text }))}
+                    placeholder="20"
+                    placeholderTextColor={COLORS.gray}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Start Date *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={form.startDate}
+                  onChangeText={(text) => setForm(prev => ({ ...prev, startDate: text }))}
+                  placeholder="YYYY-MM-DD HH:MM"
+                  placeholderTextColor={COLORS.gray}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Rules</Text>
+                {form.rules.map((rule, index) => (
+                  <View key={index} style={styles.ruleRow}>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      value={rule}
+                      onChangeText={(text) => updateRule(index, text)}
+                      placeholder={`Rule ${index + 1}`}
+                      placeholderTextColor={COLORS.gray}
+                    />
+                    {form.rules.length > 1 && (
+                      <TouchableOpacity onPress={() => removeRule(index)} style={styles.removeRuleButton}>
+                        <MaterialCommunityIcons name="minus-circle" size={20} color="#FF6B6B" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                <TouchableOpacity onPress={addRule} style={styles.addRuleButton}>
+                  <MaterialCommunityIcons name="plus-circle" size={20} color={COLORS.accent} />
+                  <Text style={styles.addRuleText}>Add Rule</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setShowCreateModal(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.createButton]}
+                  onPress={handleCreateTournament}
+                >
+                  <Text style={styles.createButtonText}>Create</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <Toast
         visible={toast.visible}
@@ -254,438 +559,6 @@ const TournamentManagement = ({ navigation }) => {
         type={toast.type}
         onHide={hideToast}
       />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <ArrowLeftIcon size={24} color={COLORS.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>TOURNAMENTS</Text>
-        <TouchableOpacity onPress={() => setShowCreateModal(true)}>
-          <PlusCircleIcon size={28} color={COLORS.accent} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Stats Cards */}
-      <View style={styles.statsContainer}>
-        <View style={[styles.statMini, { backgroundColor: `${COLORS.primary}20` }]}>
-          <Text style={styles.statMiniValue}>{tournaments.length}</Text>
-          <Text style={styles.statMiniLabel}>Total</Text>
-        </View>
-        <View style={[styles.statMini, { backgroundColor: `${COLORS.success}20` }]}>
-          <Text style={styles.statMiniValue}>{tournaments.filter(t => t.status === 'live').length}</Text>
-          <Text style={styles.statMiniLabel}>Live</Text>
-        </View>
-        <View style={[styles.statMini, { backgroundColor: `${COLORS.accent}20` }]}>
-          <Text style={styles.statMiniValue}>{tournaments.filter(t => t.status === 'upcoming').length}</Text>
-          <Text style={styles.statMiniLabel}>Upcoming</Text>
-        </View>
-      </View>
-
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-      >
-        {tournaments.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <TrophyIcon size={64} color={COLORS.gray} />
-            <Text style={styles.emptyText}>No tournaments created yet</Text>
-            <TouchableOpacity
-              style={styles.createButton}
-              onPress={() => setShowCreateModal(true)}
-            >
-              <PlusCircleIcon size={20} color={COLORS.white} />
-              <Text style={styles.createButtonText}>Create Tournament</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          tournaments.map((tournament) => (
-            <View key={tournament._id} style={styles.tournamentCard}>
-              {/* Card Header */}
-              <View style={styles.cardHeader}>
-                <View style={styles.cardHeaderLeft}>
-                  <View
-                    style={[
-                      styles.statusIcon,
-                      { backgroundColor: `${getStatusColor(tournament.status)}30` },
-                    ]}
-                  >
-                    {(() => {
-                      const StatusIcon = getStatusIcon(tournament.status);
-                      return <StatusIcon size={20} color={getStatusColor(tournament.status)} />;
-                    })()}
-                  </View>
-                  <View style={styles.cardTitle}>
-                    <Text style={styles.tournamentName}>{tournament.name}</Text>
-                    <Text style={styles.gameType}>{tournament.gameType}</Text>
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: getStatusColor(tournament.status) },
-                  ]}
-                >
-                  <Text style={styles.statusText}>{tournament.status.toUpperCase()}</Text>
-                </View>
-              </View>
-
-              {/* Card Details Grid */}
-              <View style={styles.detailsGrid}>
-                <View style={styles.detailItem}>
-                  <CurrencyDollarIcon size={18} color={COLORS.accent} />
-                  <Text style={styles.detailLabel}>Entry: ₹{tournament.entryFee}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <TrophyIcon size={18} color={COLORS.accent} />
-                  <Text style={styles.detailLabel}>Prize: ₹{tournament.prizePool}</Text>
-                </View>
-                <View style={styles.detailItem}>
-                  <UserGroupIcon size={18} color={COLORS.accent} />
-                  <Text style={styles.detailLabel}>
-                    {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxPlayers}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Dates */}
-              <View style={styles.datesContainer}>
-                <View style={styles.dateItem}>
-                  <CalendarIcon size={16} color={COLORS.gray} />
-                  <Text style={styles.dateText}>
-                    Start: {new Date(tournament.startDate).toLocaleDateString('en-IN')}
-                  </Text>
-                </View>
-                <View style={styles.dateItem}>
-                  <CalendarIcon size={16} color={COLORS.gray} />
-                  <Text style={styles.dateText}>
-                    End: {new Date(tournament.endDate).toLocaleDateString('en-IN')}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.roomRow}>
-                <View style={styles.roomStatus}>
-                  {tournament.showRoomCredentials ? (
-                    <EyeIcon size={16} color={COLORS.success} />
-                  ) : (
-                    <EyeSlashIcon size={16} color={COLORS.gray} />
-                  )}
-
-                  <Text style={styles.roomStatusText}>
-                    {tournament.showRoomCredentials ? 'Room Visible' : 'Room Hidden'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.roomButton}
-                  onPress={() => openRoomModal(tournament)}
-                >
-                  <Cog6ToothIcon size={14} color={COLORS.white} />
-                  <Text style={styles.roomButtonText}>Room Settings</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.actionButtons}>
-                {tournament.status === 'upcoming' && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: COLORS.success }]}
-                    onPress={() => handleUpdateStatus(tournament._id, 'live')}
-                  >
-                    <PlayIcon size={16} color={COLORS.white} />
-                    <Text style={styles.actionBtnText}>Start Live</Text>
-                  </TouchableOpacity>
-                )}
-
-                {tournament.status === 'live' && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: COLORS.primary }]}
-                    onPress={() => handleUpdateStatus(tournament._id, 'completed')}
-                  >
-                    <CheckIcon size={16} color={COLORS.white} />
-                    <Text style={styles.actionBtnText}>Complete</Text>
-                  </TouchableOpacity>
-                )}
-
-                {(tournament.status === 'upcoming' || tournament.status === 'live') && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: COLORS.error }]}
-                    onPress={() => handleUpdateStatus(tournament._id, 'cancelled')}
-                  >
-                    <XMarkIcon size={16} color={COLORS.white} />
-                    <Text style={styles.actionBtnText}>Cancel</Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: COLORS.darkGray }]}
-                  onPress={() => handleDeleteTournament(tournament._id)}
-                >
-                  <TrashIcon size={16} color={COLORS.white} />
-                  <Text style={styles.actionBtnText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        )}
-
-        <View style={{ height: 30 }} />
-      </ScrollView>
-
-      {/* Create Tournament Modal */}
-      <Modal
-        visible={showCreateModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCreateModal(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowCreateModal(false)}>
-              <XMarkIcon size={28} color={COLORS.white} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>CREATE TOURNAMENT</Text>
-            <View style={{ width: 28 }} />
-          </View>
-
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            {/* Tournament Name */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Tournament Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., Elite Squad Battle"
-                placeholderTextColor={COLORS.gray}
-                value={form.name}
-                onChangeText={(text) => setForm({ ...form, name: text })}
-              />
-            </View>
-
-            {/* Description */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Description</Text>
-              <TextInput
-                style={[styles.input, { height: 80 }]}
-                placeholder="Tournament description"
-                placeholderTextColor={COLORS.gray}
-                value={form.description}
-                onChangeText={(text) => setForm({ ...form, description: text })}
-                multiline
-              />
-            </View>
-
-            {/* Game Type */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Game Type</Text>
-              <View style={styles.gameTypeButtons}>
-                {['Battle Royale', 'Clash Squad', 'TDM'].map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.gameTypeBtn,
-                      form.gameType === type && styles.gameTypeBtnActive,
-                    ]}
-                    onPress={() => setForm({ ...form, gameType: type })}
-                  >
-                    <Text
-                      style={[
-                        styles.gameTypeText,
-                        form.gameType === type && styles.gameTypeTextActive,
-                      ]}
-                    >
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* Entry Fee & Prize Pool */}
-            <View style={styles.twoColumnGroup}>
-              <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>Entry Fee (₹)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="0"
-                  placeholderTextColor={COLORS.gray}
-                  value={form.entryFee}
-                  onChangeText={(text) => setForm({ ...form, entryFee: text })}
-                  keyboardType="numeric"
-                />
-              </View>
-              <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>Prize Pool (₹)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="0"
-                  placeholderTextColor={COLORS.gray}
-                  value={form.prizePool}
-                  onChangeText={(text) => setForm({ ...form, prizePool: text })}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            {/* Max Players */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Max Players</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="100"
-                placeholderTextColor={COLORS.gray}
-                value={form.maxPlayers}
-                onChangeText={(text) => setForm({ ...form, maxPlayers: text })}
-                keyboardType="numeric"
-              />
-            </View>
-
-            {/* Minimum Balance */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Minimum Balance (₹)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0"
-                placeholderTextColor={COLORS.gray}
-                value={form.minimumBalance}
-                onChangeText={(text) => setForm({ ...form, minimumBalance: text })}
-                keyboardType="numeric"
-              />
-            </View>
-
-            {/* KYC Required */}
-            <View style={styles.switchGroup}>
-              <Text style={styles.label}>KYC Required</Text>
-              <Switch
-                value={form.minimumKYC}
-                onValueChange={(value) => setForm({ ...form, minimumKYC: value })}
-                trackColor={{ false: COLORS.darkGray, true: COLORS.primary }}
-                thumbColor={form.minimumKYC ? COLORS.accent : COLORS.gray}
-              />
-            </View>
-
-            {/* Dates */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Start Date & Time *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="YYYY-MM-DD HH:MM"
-                placeholderTextColor={COLORS.gray}
-                value={form.startDate}
-                onChangeText={(text) => setForm({ ...form, startDate: text })}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>End Date & Time *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="YYYY-MM-DD HH:MM"
-                placeholderTextColor={COLORS.gray}
-                value={form.endDate}
-                onChangeText={(text) => setForm({ ...form, endDate: text })}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Room ID</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Optional"
-                placeholderTextColor={COLORS.gray}
-                value={form.roomId}
-                onChangeText={(text) => setForm({ ...form, roomId: text })}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Room Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Optional"
-                placeholderTextColor={COLORS.gray}
-                value={form.roomPassword}
-                onChangeText={(text) => setForm({ ...form, roomPassword: text })}
-              />
-            </View>
-
-            <View style={styles.switchGroup}>
-              <Text style={styles.label}>Show Room Credentials</Text>
-              <Switch
-                value={form.showRoomCredentials}
-                onValueChange={(value) => setForm({ ...form, showRoomCredentials: value })}
-                trackColor={{ false: COLORS.darkGray, true: COLORS.primary }}
-                thumbColor={form.showRoomCredentials ? COLORS.accent : COLORS.gray}
-              />
-            </View>
-
-            {/* Create Button */}
-            <TouchableOpacity style={styles.createModalBtn} onPress={handleCreateTournament}>
-              <PlusCircleIcon size={24} color={COLORS.white} />
-              <Text style={styles.createModalBtnText}>Create Tournament</Text>
-            </TouchableOpacity>
-
-            <View style={{ height: 30 }} />
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
-
-      <Modal
-        visible={showRoomModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowRoomModal(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowRoomModal(false)}>
-              <XMarkIcon size={28} color={COLORS.white} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>ROOM SETTINGS</Text>
-            <View style={{ width: 28 }} />
-          </View>
-
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Room ID</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter Room ID"
-                placeholderTextColor={COLORS.gray}
-                value={roomForm.roomId}
-                onChangeText={(text) => setRoomForm({ ...roomForm, roomId: text })}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Room Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter Room Password"
-                placeholderTextColor={COLORS.gray}
-                value={roomForm.roomPassword}
-                onChangeText={(text) => setRoomForm({ ...roomForm, roomPassword: text })}
-              />
-            </View>
-
-            <View style={styles.switchGroup}>
-              <Text style={styles.label}>Show Room Credentials</Text>
-              <Switch
-                value={roomForm.showRoomCredentials}
-                onValueChange={(value) => setRoomForm({ ...roomForm, showRoomCredentials: value })}
-                trackColor={{ false: COLORS.darkGray, true: COLORS.primary }}
-                thumbColor={roomForm.showRoomCredentials ? COLORS.accent : COLORS.gray}
-              />
-            </View>
-
-            <TouchableOpacity style={styles.createModalBtn} onPress={handleSaveRoomDetails}>
-              <Cog6ToothIcon size={20} color={COLORS.white} />
-              <Text style={styles.createModalBtnText}>Save Room Settings</Text>
-            </TouchableOpacity>
-            <View style={{ height: 30 }} />
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -697,310 +570,328 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: COLORS.lightGray,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: `${COLORS.primary}40`,
+    borderBottomColor: COLORS.darkGray,
+  },
+  backButton: {
+    padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    letterSpacing: 1,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  statMini: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  statMiniValue: {
     fontSize: 20,
     fontWeight: 'bold',
     color: COLORS.white,
+    textAlign: 'center',
+    marginHorizontal: 16,
   },
-  statMiniLabel: {
-    fontSize: 10,
+  addButton: {
+    padding: 8,
+  },
+  section: {
+    margin: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.white,
+    marginBottom: 12,
+  },
+  tournamentCount: {
+    fontSize: 14,
     color: COLORS.gray,
-    marginTop: 2,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 15,
+  gameList: {
+    paddingVertical: 8,
+  },
+  gameCard: {
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minWidth: 100,
+  },
+  gameCardSelected: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  gameCardText: {
+    fontSize: 12,
+    color: COLORS.white,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  gameCardTextSelected: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
+  gameModeList: {
+    paddingVertical: 8,
+  },
+  gameModeCard: {
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 6,
+    padding: 10,
+    marginRight: 10,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minWidth: 80,
+  },
+  gameModeCardSelected: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  gameModeCardText: {
+    fontSize: 11,
+    color: COLORS.white,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  gameModeCardTextSelected: {
+    color: COLORS.white,
+    fontWeight: 'bold',
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    padding: 40,
   },
   loadingText: {
-    color: COLORS.white,
-    marginTop: 10,
-    fontSize: 14,
+    color: COLORS.gray,
+    marginTop: 12,
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 100,
+    padding: 40,
   },
   emptyText: {
-    color: COLORS.gray,
     fontSize: 16,
-    marginTop: 12,
-    marginBottom: 24,
-  },
-  createButton: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    gap: 8,
-  },
-  createButtonText: {
+    fontWeight: 'bold',
     color: COLORS.white,
+    marginTop: 16,
+  },
+  emptySubtext: {
     fontSize: 14,
-    fontWeight: '600',
+    color: COLORS.gray,
+    marginTop: 8,
+    textAlign: 'center',
   },
   tournamentCard: {
     backgroundColor: COLORS.lightGray,
     borderRadius: 12,
-    padding: 14,
+    padding: 16,
     marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: COLORS.darkGray,
   },
-  cardHeader: {
+  tournamentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
-  cardHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  tournamentInfo: {
     flex: 1,
-  },
-  statusIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  cardTitle: {
-    flex: 1,
+    marginRight: 12,
   },
   tournamentName: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
     color: COLORS.white,
+    marginBottom: 4,
   },
-  gameType: {
+  tournamentGame: {
     fontSize: 12,
     color: COLORS.gray,
-    marginTop: 2,
   },
   statusBadge: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 4,
+  },
+  statusupcoming: {
+    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+  },
+  statuslive: {
+    backgroundColor: 'rgba(40, 167, 69, 0.2)',
+  },
+  statuscompleted: {
+    backgroundColor: 'rgba(108, 117, 125, 0.2)',
   },
   statusText: {
     fontSize: 10,
     fontWeight: 'bold',
     color: COLORS.white,
   },
-  detailsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+  tournamentDetails: {
+    marginBottom: 12,
   },
-  detailItem: {
-    flex: 1,
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    marginBottom: 8,
   },
-  detailLabel: {
-    fontSize: 11,
-    color: COLORS.gray,
+  detailText: {
+    fontSize: 12,
+    color: COLORS.white,
+    marginLeft: 6,
+    marginRight: 16,
   },
-  datesContainer: {
-    marginBottom: 10,
+  tournamentActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.darkGray,
   },
-  roomRow: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
     backgroundColor: COLORS.darkGray,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    marginBottom: 10,
   },
-  roomStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  deleteButton: {
+    backgroundColor: 'rgba(255, 107, 107, 0.2)',
   },
-  roomStatusText: {
-    color: COLORS.gray,
-    fontSize: 11,
-  },
-  roomButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.primary,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  roomButtonText: {
+  actionText: {
+    fontSize: 12,
     color: COLORS.white,
-    fontSize: 10,
-    fontWeight: '600',
+    marginLeft: 4,
   },
-  dateItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
+  deleteText: {
+    color: '#FF6B6B',
   },
-  dateText: {
-    fontSize: 11,
-    color: COLORS.gray,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  actionBtn: {
+  modalOverlay: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  actionBtnText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: '600',
+    paddingHorizontal: 20,
   },
   modalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 12,
+    padding: 20,
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: COLORS.lightGray,
-    borderBottomWidth: 1,
-    borderBottomColor: `${COLORS.primary}40`,
+    marginBottom: 20,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.white,
-    letterSpacing: 1,
-  },
-  modalContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
   },
   formGroup: {
     marginBottom: 16,
   },
+  formRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
   label: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     color: COLORS.white,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: COLORS.white,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}40`,
-  },
-  twoColumnGroup: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  gameTypeButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  gameTypeBtn: {
-    flex: 1,
-    paddingVertical: 10,
+    backgroundColor: COLORS.darkGray,
     borderRadius: 8,
-    backgroundColor: COLORS.lightGray,
-    borderWidth: 1,
-    borderColor: `${COLORS.primary}40`,
-    alignItems: 'center',
-  },
-  gameTypeBtnActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.accent,
-  },
-  gameTypeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.gray,
-  },
-  gameTypeTextActive: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
     color: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
   },
-  switchGroup: {
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  removeRuleButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  addRuleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  addRuleText: {
+    fontSize: 14,
+    color: COLORS.accent,
+    marginLeft: 6,
+  },
+  modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 12,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 10,
-    marginBottom: 16,
-  },
-  createModalBtn: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 20,
+    marginHorizontal: 6,
   },
-  createModalBtnText: {
+  cancelButton: {
+    backgroundColor: COLORS.darkGray,
+  },
+  createButton: {
+    backgroundColor: COLORS.accent,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.gray,
+  },
+  createButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
     color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  },
+  selectionInfo: {
+    backgroundColor: COLORS.darkGray,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.accent,
+  },
+  selectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.white,
+    marginBottom: 8,
+  },
+  selectionDetails: {
+    gap: 4,
+  },
+  selectionText: {
+    fontSize: 12,
+    color: COLORS.gray,
   },
 });
 
