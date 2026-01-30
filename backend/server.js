@@ -17,6 +17,15 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Custom middleware to log requests
+app.use((req, res, next) => {
+  if (req.method === 'POST' || req.method === 'PUT') {
+    console.log(`${req.method} ${req.path} - Content-Type: ${req.headers['content-type']}`);
+  }
+  next();
+});
+
 app.use(express.json());
 
 // MongoDB Connection
@@ -38,7 +47,11 @@ app.use('/api/tournaments', tournamentRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('JSON Parse Error:', err.message);
+    return res.status(400).json({ error: 'Invalid JSON in request body' });
+  }
+  console.error('Server Error:', err.stack);
   res.status(500).json({ error: 'Internal server error', message: err.message });
 });
 
