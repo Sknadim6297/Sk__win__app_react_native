@@ -32,6 +32,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUser = async (userData) => {
+    try {
+      const updatedUser = { ...user, ...userData };
+      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating user:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const login = async (email, password) => {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
@@ -122,6 +134,7 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         getAuthToken,
+        updateUser,
       }}
     >
       {children}

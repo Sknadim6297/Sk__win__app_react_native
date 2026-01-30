@@ -1,7 +1,30 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Your machine's IP address (192.168.31.216)
-const API_URL = 'http://192.168.31.216:5000/api';
+// Backend API URL - Update this to your actual backend URL
+// For local testing: http://localhost:5000/api (Expo dev server) or http://192.168.31.216:5000/api (physical device)
+// For production: https://your-deployed-backend.com/api
+
+// Try multiple API URLs in case of network configuration changes
+const API_URLS = [
+  'http://192.168.31.216:5000/api',  // Current IP
+  'http://localhost:5000/api',       // For simulators
+  'http://127.0.0.1:5000/api',       // Alternative localhost
+];
+
+const API_URL = API_URLS[0]; // Default to current IP
+
+// Test API connectivity
+export const testAPIConnection = async () => {
+  for (const url of API_URLS) {
+    try {
+      const response = await fetch(`${url}/health`, { timeout: 3000 });
+      return url;
+    } catch (error) {
+      console.log(`Failed to connect to ${url}:`, error.message);
+    }
+  }
+  return null;
+};
 
 // Helper function to make API calls with auth
 export const apiCall = async (endpoint, options = {}) => {
@@ -17,19 +40,53 @@ export const apiCall = async (endpoint, options = {}) => {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
+    // Ensure body is properly stringified if it's an object
+    let body = options.body;
+    if (body && typeof body === 'object') {
+      body = JSON.stringify(body);
+    }
+
+    const fetchOptions = {
+      method: options.method || 'GET',
       headers,
-    });
+      ...(body && { body }),
+    };
+
+    // Add timeout to prevent hanging requests
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000)
+    );
+
+    const fetchPromise = fetch(`${API_URL}${endpoint}`, fetchOptions);
+    const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error(`Server returned ${contentType || 'non-JSON'} response. Check if backend is running.`);
+    }
 
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'API Error');
+      // Return error response with message
+      const errorMessage = data.message || data.error || 'API Error';
+      throw new Error(errorMessage);
     }
 
     return data;
   } catch (error) {
+    // Enhanced error logging for debugging
+    console.log('API Call Error Details:');
+    console.log('Endpoint:', endpoint);
+    console.log('API URL:', API_URL);
+    console.log('Error:', error.message);
+    console.log('Error Type:', error.constructor.name);
+    
+    if (error.message.includes('Network request failed') || error.message.includes('timeout')) {
+      throw new Error('Unable to connect to server. Please check your internet connection and ensure the server is running.');
+    }
+    
     throw error;
   }
 };
@@ -37,22 +94,30 @@ export const apiCall = async (endpoint, options = {}) => {
 // User Services
 export const userService = {
   getProfile: () => apiCall('/users/profile'),
+  updateProfile: (profileData) => apiCall('/users/profile', {
+    method: 'PUT',
+    body: profileData, // Let apiCall handle stringify
+  }),
   updateKYC: (kycData) => apiCall('/users/kyc', {
     method: 'POST',
-    body: JSON.stringify(kycData),
+    body: kycData, // Let apiCall handle stringify
+  }),
+  changePassword: (passwordData) => apiCall('/users/change-password', {
+    method: 'POST',
+    body: passwordData, // Let apiCall handle stringify
   }),
 };
 
 // Wallet Services
 export const walletService = {
   getBalance: () => apiCall('/wallet/balance'),
-  topup: (amount, paymentMethod, transactionId) => apiCall('/wallet/topup', {
+  topup: (topupData) => apiCall('/wallet/topup', {
     method: 'POST',
-    body: JSON.stringify({ amount, paymentMethod, transactionId }),
+    body: topupData, // Let apiCall handle stringify
   }),
-  withdraw: (amount, bankDetails) => apiCall('/wallet/withdraw', {
+  withdraw: (withdrawData) => apiCall('/wallet/withdraw', {
     method: 'POST',
-    body: JSON.stringify({ amount, bankDetails }),
+    body: withdrawData, // Let apiCall handle stringify
   }),
   getHistory: () => apiCall('/wallet/history'),
 };
@@ -74,7 +139,12 @@ export const tournamentService = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+  updateTournament: (id, data) => apiCall(`/tournaments/admin/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
   getAllTournaments: () => apiCall('/tournaments/admin/all'),
+  getTournamentsByGameMode: (gameModeId) => apiCall(`/tournaments/admin/by-gamemode/${gameModeId}`),
   updateStatus: (id, status) => apiCall(`/tournaments/admin/${id}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status }),
@@ -112,5 +182,46 @@ export const adminService = {
   }),
   verifyUser: (userId) => apiCall(`/admin/verify/${userId}`, {
     method: 'POST',
+  }),
+};
+// Games Services
+export const gameService = {
+  // Get all popular games for home screen
+  getPopularGames: () => apiCall('/games/popular'),
+  
+  // Get all games
+  getGamesList: () => apiCall('/games/list'),
+  
+  // Get specific game details
+  getGameDetails: (gameId) => apiCall(`/games/${gameId}`),
+  
+  // Get game modes for a specific game
+  getGameModes: (gameId) => apiCall(`/games/${gameId}/modes`),
+  
+  // Admin endpoints
+  createGame: (data) => apiCall('/games/admin/create', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  updateGame: (gameId, data) => apiCall(`/games/admin/${gameId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  deleteGame: (gameId) => apiCall(`/games/admin/${gameId}`, {
+    method: 'DELETE',
+  }),
+  getAllGames: () => apiCall('/games/admin/all'),
+  
+  // Game modes
+  createGameMode: (data) => apiCall('/games/modes/admin/create', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  updateGameMode: (modeId, data) => apiCall(`/games/modes/admin/${modeId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  deleteGameMode: (modeId) => apiCall(`/games/modes/admin/${modeId}`, {
+    method: 'DELETE',
   }),
 };

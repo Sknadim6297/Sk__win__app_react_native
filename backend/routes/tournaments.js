@@ -1,6 +1,8 @@
 const express = require('express');
 const User = require('../models/User');
 const Tournament = require('../models/Tournament');
+const Game = require('../models/Game');
+const GameMode = require('../models/GameMode');
 const TournamentParticipant = require('../models/TournamentParticipant');
 const TournamentResult = require('../models/TournamentResult');
 const WalletTransaction = require('../models/WalletTransaction');
@@ -12,32 +14,92 @@ const router = express.Router();
 // Create tournament (Admin)
 router.post('/admin/create', authMiddleware, async (req, res) => {
   try {
+    console.log('Tournament creation request:', req.body);
+    console.log('User ID:', req.userId);
+
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can create tournaments' });
     }
 
-    const { name, description, entryFee, prizePool, maxPlayers, startDate, endDate, minimumKYC, minimumBalance, gameType, prizes, roomId, roomPassword, showRoomCredentials } = req.body;
+    const { 
+      name, 
+      description, 
+      game,
+      gameMode,
+      mode,
+      map,
+      version,
+      rules,
+      entryFee, 
+      prizePool,
+      perKill,
+      maxParticipants, 
+      startDate, 
+      endDate, 
+      minimumKYC, 
+      minimumBalance,
+      prizes, 
+      roomId, 
+      roomPassword, 
+      showRoomCredentials 
+    } = req.body;
 
-    if (!name || !startDate || !endDate) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    console.log('Extracted fields:', { name, game, gameMode, startDate, maxParticipants });
+
+    if (!name || !game || !gameMode || !startDate) {
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        missing: { name: !name, game: !game, gameMode: !gameMode, startDate: !startDate }
+      });
     }
 
-    if (showRoomCredentials && (!roomId || !roomPassword)) {
-      return res.status(400).json({ error: 'Room ID and password required to show credentials' });
+    // Verify game and gameMode exist
+    console.log('Verifying game and gameMode:', { game, gameMode });
+    const gameExists = await Game.findById(game);
+    const gameModeExists = await GameMode.findById(gameMode);
+    
+    if (!gameExists) {
+      console.log('Game not found:', game);
+      return res.status(400).json({ error: 'Game not found', gameId: game });
+    }
+    
+    if (!gameModeExists) {
+      console.log('Game mode not found:', gameMode);
+      return res.status(400).json({ error: 'Game mode not found', gameModeId: gameMode });
     }
 
-    const tournament = new Tournament({
+    console.log('Found game and gameMode:', { 
+      game: gameExists.name, 
+      gameMode: gameModeExists.name 
+    });
+    console.log('Found game and gameMode:', { 
+      game: gameExists.name, 
+      gameMode: gameModeExists.name 
+    });
+
+    const tournamentData = {
       name,
       description: description || '',
+      game,
+      gameMode,
+      mode: mode || 'solo',
+      map: map || 'Bermuda',
+      version: version || 'TPP',
+      rules: rules || [],
       entryFee: entryFee || 0,
       prizePool: prizePool || 0,
-      maxPlayers: maxPlayers || 100,
+      perKill: perKill || 0,
+      maxParticipants: maxParticipants || 20,
+      currentParticipants: 0,
       startDate: new Date(startDate),
-      endDate: new Date(endDate),
+      endDate: endDate ? new Date(endDate) : null,
       minimumKYC: minimumKYC || false,
       minimumBalance: minimumBalance || 0,
-      gameType: gameType || 'Battle Royale',
       prizes: prizes || {
         first: prizePool ? prizePool * 0.5 : 0,
         second: prizePool ? prizePool * 0.3 : 0,
@@ -49,17 +111,103 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       status: 'upcoming',
       registeredPlayers: [],
       createdBy: req.userId,
-    });
+    };
 
+    console.log('Creating tournament with data:', tournamentData);
+
+    const tournament = new Tournament(tournamentData);
     await tournament.save();
+
+    console.log('Tournament saved successfully:', tournament._id);
+
+    const populatedTournament = await Tournament.findById(tournament._id)
+      .populate('game', 'name')
+      .populate('gameMode', 'name');
+
+    console.log('Tournament populated successfully');
 
     res.status(201).json({
       message: 'Tournament created successfully',
-      tournament,
+      tournament: populatedTournament,
     });
   } catch (error) {
     console.error('Error creating tournament:', error);
-    res.status(500).json({ error: 'Failed to create tournament' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to create tournament', 
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Update tournament (Admin)
+router.put('/admin/:id', authMiddleware, async (req, res) => {
+  try {
+    const admin = await User.findById(req.userId);
+    if (admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can update tournaments' });
+    }
+
+    const tournament = await Tournament.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, updatedAt: new Date() },
+      { new: true }
+    ).populate('game', 'name').populate('gameMode', 'name');
+
+    if (!tournament) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    res.json({ message: 'Tournament updated successfully', tournament });
+  } catch (error) {
+    console.error('Error updating tournament:', error);
+    res.status(500).json({ error: 'Failed to update tournament' });
+  }
+});
+
+// Delete tournament (Admin)
+router.delete('/admin/:id', authMiddleware, async (req, res) => {
+  try {
+    const admin = await User.findById(req.userId);
+    if (admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can delete tournaments' });
+    }
+
+    const tournament = await Tournament.findByIdAndDelete(req.params.id);
+    if (!tournament) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    // Clean up related data
+    await TournamentParticipant.deleteMany({ tournamentId: req.params.id });
+    await TournamentResult.deleteMany({ tournamentId: req.params.id });
+
+    res.json({ message: 'Tournament deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting tournament:', error);
+    res.status(500).json({ error: 'Failed to delete tournament' });
+  }
+});
+
+// Get tournaments by game mode (Admin)
+router.get('/admin/by-gamemode/:gameModeId', authMiddleware, async (req, res) => {
+  try {
+    const admin = await User.findById(req.userId);
+    if (admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can view this' });
+    }
+
+    const tournaments = await Tournament.find({ gameMode: req.params.gameModeId })
+      .populate('game', 'name')
+      .populate('gameMode', 'name')
+      .populate('registeredPlayers', 'username email')
+      .sort({ startDate: -1 });
+
+    res.json(tournaments);
+  } catch (error) {
+    console.error('Error fetching tournaments by game mode:', error);
+    res.status(500).json({ error: 'Failed to fetch tournaments' });
   }
 });
 
@@ -347,6 +495,8 @@ router.get('/list', async (req, res) => {
   try {
     const userId = req.headers.authorization ? await extractUserIdFromToken(req.headers.authorization) : null;
     const tournaments = await Tournament.find()
+      .populate('game', 'name')
+      .populate('gameMode', 'name')
       .sort({ startDate: -1 });
 
     // Add participant count and user joined status for each tournament

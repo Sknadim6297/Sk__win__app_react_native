@@ -7,13 +7,31 @@ const tournamentSchema = new mongoose.Schema({
   },
   description: String,
   game: {
-    type: String,
-    default: 'Free Fire',
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Game',
+    required: true,
   },
-  gameType: {
-    type: String,
-    default: 'Battle Royale',
+  gameMode: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'GameMode',
+    required: true,
   },
+  mode: {
+    type: String,
+    enum: ['solo', 'duo', 'squad'],
+    default: 'solo',
+  },
+  map: {
+    type: String,
+    default: 'Bermuda',
+  },
+  version: {
+    type: String,
+    default: 'TPP',
+  },
+  rules: [{
+    type: String,
+  }],
   entryFee: {
     type: Number,
     required: true,
@@ -22,9 +40,17 @@ const tournamentSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
-  maxPlayers: {
+  perKill: {
+    type: Number,
+    default: 0,
+  },
+  maxParticipants: {
     type: Number,
     required: true,
+  },
+  currentParticipants: {
+    type: Number,
+    default: 0,
   },
   registeredPlayers: [{
     type: mongoose.Schema.Types.ObjectId,

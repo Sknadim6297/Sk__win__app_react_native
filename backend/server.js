@@ -7,6 +7,7 @@ const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
 const walletRoutes = require('./routes/wallet');
 const tournamentRoutes = require('./routes/tournaments');
+const gamesRoutes = require('./routes/games');
 
 const app = express();
 
@@ -28,6 +29,15 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Server is running', 
+    timestamp: new Date().toISOString() 
+  });
+});
+
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/sk-win', {
   useNewUrlParser: true,
@@ -44,6 +54,12 @@ app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/tournaments', tournamentRoutes);
+app.use('/api/games', gamesRoutes);
+
+// Catch-all for API routes that don't exist
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

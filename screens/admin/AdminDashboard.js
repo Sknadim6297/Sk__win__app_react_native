@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
 import { adminService } from '../../services/api';
@@ -200,6 +200,24 @@ const AdminDashboard = ({ navigation }) => {
                     <Text style={styles.actionCardSubtitle}>View all tournaments</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={24} color="#FF9800" />
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionCardWide}
+              onPress={() => navigateTo('GameManagement')}
+            >
+              <View style={[styles.actionGradient, { backgroundColor: `#9C27B015` }]}>
+                <View style={styles.actionCardContent}>
+                  <View style={[styles.actionCardIcon, { backgroundColor: `#9C27B030` }]}>
+                    <MaterialCommunityIcons name="gamepad-variant" size={32} color="#9C27B0" />
+                  </View>
+                  <View style={styles.actionCardText}>
+                    <Text style={styles.actionCardTitle}>Game Management</Text>
+                    <Text style={styles.actionCardSubtitle}>Manage games & modes</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#9C27B0" />
                 </View>
               </View>
             </TouchableOpacity>

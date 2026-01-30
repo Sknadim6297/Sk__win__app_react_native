@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './context/AuthContext';
 import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
@@ -11,33 +12,53 @@ import TournamentScreen from './screens/TournamentScreen';
 import TournamentDetailsScreen from './screens/TournamentDetailsScreen';
 import WalletScreen from './screens/WalletScreen';
 import HistoryScreen from './screens/HistoryScreen';
+import LeaderboardScreen from './screens/LeaderboardScreen';
+import AccountScreen from './screens/AccountScreen';
+import AccountProfileScreen from './screens/AccountProfileScreen';
+import EditProfileScreen from './screens/EditProfileScreen';
+import MyWalletScreen from './screens/MyWalletScreen';
+import MyStatisticsScreen from './screens/MyStatisticsScreen';
+import TopPlayersScreen from './screens/TopPlayersScreen';
+import NotificationsScreen from './screens/NotificationsScreen';
+import ContactUsScreen from './screens/ContactUsScreen';
+import FAQScreen from './screens/FAQScreen';
+import AboutUsScreen from './screens/AboutUsScreen';
+import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen';
+import TermsAndConditionsScreen from './screens/TermsAndConditionsScreen';
+import ShareAppScreen from './screens/ShareAppScreen';
+import GameModesScreen from './screens/GameModesScreen';
+import GameDetailsScreen from './screens/GameDetailsScreen';
 import AdminDashboard from './screens/admin/AdminDashboard';
 import UserManagement from './screens/admin/UserManagement';
 import TournamentHistory from './screens/admin/TournamentHistory';
 import TournamentManagement from './screens/admin/TournamentManagement';
+import GameManagement from './screens/admin/GameManagement';
 import { COLORS } from './styles/theme';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Bottom Tab Navigator for main app screens
+// Bottom Tab Navigator for main app screens (4 Main Tabs: Home, Leaderboard, Wallet, Account)
 function MainTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-          let IconComponent = Ionicons;
+          let IconComponent = MaterialCommunityIcons;
 
-          if (route.name === 'Home') {
+          if (route.name === 'HomeTab') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Tournaments') {
-            iconName = focused ? 'trophy' : 'trophy-outline';
             IconComponent = MaterialCommunityIcons;
-          } else if (route.name === 'Wallet') {
+          } else if (route.name === 'LeaderboardTab') {
+            iconName = focused ? 'podium' : 'podium';
+            IconComponent = MaterialCommunityIcons;
+          } else if (route.name === 'WalletTab') {
             iconName = focused ? 'wallet' : 'wallet-outline';
-          } else if (route.name === 'History') {
-            iconName = focused ? 'timer' : 'timer-outline';
+            IconComponent = MaterialCommunityIcons;
+          } else if (route.name === 'AccountTab') {
+            iconName = focused ? 'account-circle' : 'account-circle-outline';
+            IconComponent = MaterialCommunityIcons;
           }
 
           return <IconComponent name={iconName} size={size} color={color} />;
@@ -48,44 +69,45 @@ function MainTabNavigator() {
           backgroundColor: COLORS.lightGray,
           borderTopColor: COLORS.darkGray,
           borderTopWidth: 1,
-          height: 80,
-          paddingBottom: 20,
-          paddingTop: 10,
-          paddingHorizontal: 10,
+          height: 85,
+          paddingBottom: 10,
+          paddingTop: 8,
+          paddingHorizontal: 5,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: '600',
+          marginTop: 0,
         },
         headerShown: false,
       })}
     >
       <Tab.Screen 
-        name="Home" 
+        name="HomeTab" 
         component={HomeScreen}
         options={{
           tabBarLabel: 'Home',
         }}
       />
       <Tab.Screen 
-        name="Tournaments" 
-        component={TournamentScreen}
+        name="LeaderboardTab" 
+        component={LeaderboardScreen}
         options={{
-          tabBarLabel: 'Tournaments',
+          tabBarLabel: 'Leaderboard',
         }}
       />
       <Tab.Screen 
-        name="Wallet" 
+        name="WalletTab" 
         component={WalletScreen}
         options={{
           tabBarLabel: 'Wallet',
         }}
       />
       <Tab.Screen 
-        name="History" 
-        component={HistoryScreen}
+        name="AccountTab" 
+        component={AccountScreen}
         options={{
-          tabBarLabel: 'History',
+          tabBarLabel: 'Account',
         }}
       />
     </Tab.Navigator>
@@ -94,26 +116,56 @@ function MainTabNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName="Landing"
-          screenOptions={{
-            headerShown: false,
-            gestureEnabled: false,
-            cardStyle: { backgroundColor: '#0a0e27' },
-          }}
-        >
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <Stack.Navigator
+            initialRouteName="Landing"
+            screenOptions={{
+              headerShown: false,
+              gestureEnabled: false,
+              cardStyle: { backgroundColor: '#0a0e27' },
+            }}
+          >
+          {/* Auth Stack */}
           <Stack.Screen name="Landing" component={LandingScreen} />
           <Stack.Screen name="Auth" component={AuthScreen} />
+          
+          {/* Main App */}
           <Stack.Screen name="MainApp" component={MainTabNavigator} />
+          
+          {/* Account SubScreen */}
+          <Stack.Screen name="AccountProfile" component={AccountProfileScreen} />
+          <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+          <Stack.Screen name="MyWallet" component={MyWalletScreen} />
+          <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
+          <Stack.Screen name="TopPlayers" component={TopPlayersScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Screen name="ContactUs" component={ContactUsScreen} />
+          <Stack.Screen name="FAQ" component={FAQScreen} />
+          <Stack.Screen name="AboutUs" component={AboutUsScreen} />
+          <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+          <Stack.Screen name="TermsAndConditions" component={TermsAndConditionsScreen} />
+          <Stack.Screen name="ShareApp" component={ShareAppScreen} />
+          
+          {/* Game Modes */}
+          <Stack.Screen name="GameModes" component={GameModesScreen} />
+          <Stack.Screen name="GameDetails" component={GameDetailsScreen} />
+          
+          {/* Tournament Screens */}
+          <Stack.Screen name="TournamentDetails" component={TournamentDetailsScreen} />
+          <Stack.Screen name="Tournament" component={TournamentScreen} />
+          <Stack.Screen name="History" component={HistoryScreen} />
+          
+          {/* Admin Screens */}
           <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
           <Stack.Screen name="UserManagement" component={UserManagement} />
           <Stack.Screen name="TournamentHistory" component={TournamentHistory} />
           <Stack.Screen name="TournamentManagement" component={TournamentManagement} />
-          <Stack.Screen name="TournamentDetails" component={TournamentDetailsScreen} />
+          <Stack.Screen name="GameManagement" component={GameManagement} />
         </Stack.Navigator>
       </NavigationContainer>
     </AuthProvider>
+  </SafeAreaProvider>
   );
 }

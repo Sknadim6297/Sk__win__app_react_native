@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "extra": {
+      "apiUrl": "https://your-backend-url.com",
+      "eas": {
+        "projectId": "9bf33d68-cc48-4456-9873-3cb14d624b77"
+      }
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
