@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  SafeAreaView,
   TextInput,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../../styles/theme';
 import { adminService } from '../../services/api';
@@ -257,6 +257,14 @@ const UserManagement = ({ navigation }) => {
 
               {/* Action Buttons */}
               <View style={styles.actionButtons}>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, styles.viewBtn]}
+                  onPress={() => navigation.navigate('UserDetails', { userId: user._id, username: user.username })}
+                >
+                  <Ionicons name="eye" size={14} color={COLORS.white} />
+                  <Text style={styles.actionBtnText}>View Details</Text>
+                </TouchableOpacity>
+                
                 {user.status === 'active' && (
                   <>
                     <TouchableOpacity 
@@ -470,28 +478,38 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
+    flexWrap: 'wrap',
   },
   actionBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: 8,
     gap: 4,
   },
+  viewBtn: {
+    backgroundColor: COLORS.accent,
+    flex: 1,
+    minWidth: '100%',
+  },
   suspendBtn: {
     backgroundColor: '#FF9800',
+    flex: 1,
   },
   banBtn: {
     backgroundColor: COLORS.error,
+    flex: 1,
   },
   activateBtn: {
     backgroundColor: COLORS.success,
+    flex: 1,
   },
   verifyBtn: {
     backgroundColor: COLORS.primary,
+    flex: 1,
   },
   actionBtnText: {
     color: COLORS.white,

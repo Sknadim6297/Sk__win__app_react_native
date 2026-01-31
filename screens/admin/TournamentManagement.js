@@ -12,12 +12,23 @@ import {
   Modal,
   Switch,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import DatePicker from 'react-native-date-picker';
+import { Picker } from '@react-native-picker/picker';
 import { COLORS } from '../../styles/theme';
 import { tournamentService, gameService } from '../../services/api';
 import Toast from '../../components/Toast';
+
+const AVAILABLE_MAPS = [
+  { label: 'Bermuda', value: 'Bermuda' },
+  { label: 'Purgatory', value: 'Purgatory' },
+  { label: 'Kalahari', value: 'Kalahari' },
+  { label: 'Diner', value: 'Diner' },
+  { label: 'Pipeline', value: 'Pipeline' },
+];
 
 const TournamentManagement = ({ navigation }) => {
   const [games, setGames] = useState([]);
@@ -28,6 +39,23 @@ const TournamentManagement = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [showWinnersModal, setShowWinnersModal] = useState(false);
+  const [selectedTournamentForRoom, setSelectedTournamentForRoom] = useState(null);
+  const [selectedTournamentForWinners, setSelectedTournamentForWinners] = useState(null);
+  const [tournamentParticipants, setTournamentParticipants] = useState([]);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [roomForm, setRoomForm] = useState({
+    roomId: '',
+    roomPassword: '',
+    showRoomCredentials: false,
+  });
+  const [winnersForm, setWinnersForm] = useState({
+    firstPlace: null,
+    secondPlace: null,
+    thirdPlace: null,
+  });
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
 
   // Form states
@@ -38,14 +66,13 @@ const TournamentManagement = ({ navigation }) => {
     gameMode: '',
     mode: 'solo',
     map: 'Bermuda',
-    version: 'TPP',
     rules: [''],
     entryFee: '',
     prizePool: '',
     perKill: '',
     maxParticipants: '',
-    startDate: '',
-    endDate: '',
+    startDate: new Date(),
+    endDate: null,
     minimumKYC: false,
     minimumBalance: '',
     roomId: '',
@@ -119,6 +146,24 @@ const TournamentManagement = ({ navigation }) => {
     setToast({ visible: false, message: '', type: 'error' });
   };
 
+  const formatDateForDisplay = (date) => {
+    if (!date) return 'Select Date';
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const formatTimeForDisplay = (date) => {
+    if (!date) return 'Select Time';
+    return date.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
   const handleCreateTournament = async () => {
     // Check if game and game mode are selected first
     if (!selectedGame) {
@@ -134,7 +179,7 @@ const TournamentManagement = ({ navigation }) => {
     // Validate required form fields
     const missingFields = [];
     if (!form.name.trim()) missingFields.push('Tournament Name');
-    if (!form.startDate.trim()) missingFields.push('Start Date');
+    if (!form.startDate) missingFields.push('Start Date');
     if (!form.maxParticipants.trim()) missingFields.push('Max Players');
     
     if (missingFields.length > 0) {
@@ -144,15 +189,24 @@ const TournamentManagement = ({ navigation }) => {
 
     try {
       const tournamentData = {
-        ...form,
+        name: form.name,
+        description: form.description,
         game: selectedGame,
         gameMode: selectedGameMode,
+        mode: form.mode,
+        map: form.map,
+        rules: form.rules.filter(rule => rule.trim() !== ''),
         entryFee: parseFloat(form.entryFee) || 0,
         prizePool: parseFloat(form.prizePool) || 0,
         perKill: parseFloat(form.perKill) || 0,
         maxParticipants: parseInt(form.maxParticipants) || 20,
+        minimumKYC: form.minimumKYC,
         minimumBalance: parseFloat(form.minimumBalance) || 0,
-        rules: form.rules.filter(rule => rule.trim() !== ''),
+        startDate: form.startDate.toISOString(),
+        endDate: form.endDate ? form.endDate.toISOString() : null,
+        roomId: form.roomId,
+        roomPassword: form.roomPassword,
+        showRoomCredentials: form.showRoomCredentials,
       };
 
       await tournamentService.createTournament(tournamentData);
@@ -173,20 +227,21 @@ const TournamentManagement = ({ navigation }) => {
       gameMode: '',
       mode: 'solo',
       map: 'Bermuda',
-      version: 'TPP',
       rules: [''],
       entryFee: '',
       prizePool: '',
       perKill: '',
       maxParticipants: '',
-      startDate: '',
-      endDate: '',
+      startDate: new Date(),
+      endDate: null,
       minimumKYC: false,
       minimumBalance: '',
       roomId: '',
       roomPassword: '',
       showRoomCredentials: false,
     });
+    setShowStartDatePicker(false);
+    setShowEndDatePicker(false);
   };
 
   const handleDeleteTournament = (tournament) => {
@@ -233,6 +288,109 @@ const TournamentManagement = ({ navigation }) => {
       ...prev,
       rules: prev.rules.map((rule, i) => i === index ? value : rule)
     }));
+  };
+
+  const handleManageRoom = (tournament) => {
+    setSelectedTournamentForRoom(tournament);
+    setRoomForm({
+      roomId: tournament.roomId || '',
+      roomPassword: tournament.roomPassword || '',
+      showRoomCredentials: tournament.showRoomCredentials || false,
+    });
+    setShowRoomModal(true);
+  };
+
+  const handleSaveRoomCredentials = async () => {
+    if (!selectedTournamentForRoom) return;
+    
+    try {
+      await tournamentService.setRoomDetails(
+        selectedTournamentForRoom._id,
+        roomForm.roomId,
+        roomForm.roomPassword,
+        roomForm.showRoomCredentials
+      );
+      showToast('Room credentials updated successfully!', 'success');
+      setShowRoomModal(false);
+      fetchTournaments(); // Refresh the list
+    } catch (error) {
+      showToast(error.message || 'Failed to update room credentials', 'error');
+    }
+  };
+
+  const handleDeclarWinners = async (tournament) => {
+    try {
+      // Fetch tournament participants
+      const participantsData = await tournamentService.getTournamentParticipants(tournament._id);
+      // Ensure data is an array - handle if it's wrapped in an object
+      const participants = Array.isArray(participantsData) ? participantsData : (participantsData?.data || participantsData?.participants || []);
+      setTournamentParticipants(participants);
+      setSelectedTournamentForWinners(tournament);
+      setWinnersForm({ firstPlace: null, secondPlace: null, thirdPlace: null });
+      setShowWinnersModal(true);
+    } catch (error) {
+      showToast(error.message || 'Failed to load participants', 'error');
+    }
+  };
+
+  const handleSaveWinners = async () => {
+    if (!selectedTournamentForWinners) return;
+
+    if (!winnersForm.firstPlace) {
+      showToast('Please select 1st place winner', 'error');
+      return;
+    }
+
+    try {
+      const winners = [];
+      
+      // Find participant objects from selectedParticipants
+      const findParticipantById = (participantId) => {
+        return tournamentParticipants.find(p => p._id === participantId);
+      };
+
+      if (winnersForm.firstPlace) {
+        const participant = findParticipantById(winnersForm.firstPlace);
+        if (participant) {
+          winners.push({
+            position: 1,
+            userId: participant.user?._id || participant.userId,
+            reward: selectedTournamentForWinners.prizes?.first || 0,
+          });
+        }
+      }
+      if (winnersForm.secondPlace) {
+        const participant = findParticipantById(winnersForm.secondPlace);
+        if (participant) {
+          winners.push({
+            position: 2,
+            userId: participant.user?._id || participant.userId,
+            reward: selectedTournamentForWinners.prizes?.second || 0,
+          });
+        }
+      }
+      if (winnersForm.thirdPlace) {
+        const participant = findParticipantById(winnersForm.thirdPlace);
+        if (participant) {
+          winners.push({
+            position: 3,
+            userId: participant.user?._id || participant.userId,
+            reward: selectedTournamentForWinners.prizes?.third || 0,
+          });
+        }
+      }
+
+      await tournamentService.setTournamentWinners(selectedTournamentForWinners._id, winners);
+      
+      // Auto complete tournament after setting winners
+      await tournamentService.completeTournament(selectedTournamentForWinners._id);
+      
+      showToast('Winners declared and tournament completed!', 'success');
+      setShowWinnersModal(false);
+      fetchTournaments();
+    } catch (error) {
+      showToast(error.message || 'Failed to save winners', 'error');
+    }
   };
 
   return (
@@ -384,6 +542,20 @@ const TournamentManagement = ({ navigation }) => {
                       <Text style={styles.actionText}>View</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => handleManageRoom(tournament)}
+                    >
+                      <MaterialCommunityIcons name="key" size={16} color={COLORS.accent} />
+                      <Text style={styles.actionText}>Room</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => handleDeclarWinners(tournament)}
+                    >
+                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
+                      <Text style={styles.actionText}>Winners</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
                       style={[styles.actionButton, styles.deleteButton]}
                       onPress={() => handleDeleteTournament(tournament)}
                     >
@@ -499,14 +671,71 @@ const TournamentManagement = ({ navigation }) => {
                 </View>
               </View>
 
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.label}>Mode</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={form.mode}
+                      onValueChange={(itemValue) => setForm(prev => ({ ...prev, mode: itemValue }))}
+                      style={styles.picker}
+                      itemStyle={styles.pickerItem}
+                    >
+                      <Picker.Item label="Solo" value="solo" />
+                      <Picker.Item label="Duo" value="duo" />
+                      <Picker.Item label="Squad" value="squad" />
+                    </Picker>
+                  </View>
+                </View>
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.label}>Map</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={form.map}
+                      onValueChange={(itemValue) => setForm(prev => ({ ...prev, map: itemValue }))}
+                      style={styles.picker}
+                      itemStyle={styles.pickerItem}
+                    >
+                      {AVAILABLE_MAPS.map((map) => (
+                        <Picker.Item key={map.value} label={map.label} value={map.value} />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              </View>
+
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Start Date *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={form.startDate}
-                  onChangeText={(text) => setForm(prev => ({ ...prev, startDate: text }))}
-                  placeholder="YYYY-MM-DD HH:MM"
-                  placeholderTextColor={COLORS.gray}
+                <Text style={styles.label}>Start Date & Time *</Text>
+                <View style={styles.dateTimeRow}>
+                  <TouchableOpacity
+                    style={[styles.input, styles.dateInput]}
+                    onPress={() => setShowStartDatePicker(true)}
+                  >
+                    <MaterialCommunityIcons name="calendar" size={20} color={COLORS.accent} />
+                    <Text style={styles.dateInputText}>{formatDateForDisplay(form.startDate)}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.input, styles.timeInput]}
+                    onPress={() => setShowStartDatePicker(true)}
+                  >
+                    <MaterialCommunityIcons name="clock-outline" size={20} color={COLORS.accent} />
+                    <Text style={styles.dateInputText}>{formatTimeForDisplay(form.startDate)}</Text>
+                  </TouchableOpacity>
+                </View>
+                <DatePicker
+                  modal
+                  open={showStartDatePicker}
+                  date={form.startDate || new Date()}
+                  onConfirm={(date) => {
+                    setForm(prev => ({ ...prev, startDate: date }));
+                    setShowStartDatePicker(false);
+                  }}
+                  onCancel={() => setShowStartDatePicker(false)}
+                  title="Select Start Date & Time"
+                  confirmText="Confirm"
+                  cancelText="Cancel"
+                  mode="datetime"
+                  is24hourSource="locale"
                 />
               </View>
 
@@ -534,6 +763,51 @@ const TournamentManagement = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
 
+              {/* Room Credentials Section */}
+              <View style={styles.sectionDivider}>
+                <MaterialCommunityIcons name="key" size={20} color={COLORS.accent} />
+                <Text style={styles.sectionDividerText}>Room Credentials</Text>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.label}>Room ID</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.roomId}
+                    onChangeText={(text) => setForm(prev => ({ ...prev, roomId: text }))}
+                    placeholder="Enter room ID"
+                    placeholderTextColor={COLORS.gray}
+                  />
+                </View>
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.label}>Room Password</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.roomPassword}
+                    onChangeText={(text) => setForm(prev => ({ ...prev, roomPassword: text }))}
+                    placeholder="Enter room password"
+                    placeholderTextColor={COLORS.gray}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <View style={styles.switchRow}>
+                  <MaterialCommunityIcons name="eye" size={20} color={COLORS.accent} />
+                  <Text style={styles.switchLabel}>Show Room Credentials to Players</Text>
+                  <Switch
+                    value={form.showRoomCredentials}
+                    onValueChange={(value) => setForm(prev => ({ ...prev, showRoomCredentials: value }))}
+                    trackColor={{ false: COLORS.darkGray, true: COLORS.accent }}
+                    thumbColor={form.showRoomCredentials ? COLORS.white : COLORS.gray}
+                  />
+                </View>
+                <Text style={styles.switchDescription}>
+                  When enabled, players who joined this tournament will be able to see room credentials
+                </Text>
+              </View>
+
               <View style={styles.modalActions}>
                 <TouchableOpacity 
                   style={[styles.modalButton, styles.cancelButton]}
@@ -546,6 +820,236 @@ const TournamentManagement = ({ navigation }) => {
                   onPress={handleCreateTournament}
                 >
                   <Text style={styles.createButtonText}>Create</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Room Management Modal */}
+      <Modal visible={showRoomModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Room Credentials - {selectedTournamentForRoom?.name}
+              </Text>
+              <TouchableOpacity onPress={() => setShowRoomModal(false)}>
+                <Ionicons name="close" size={24} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Room ID</Text>
+              <TextInput
+                style={styles.input}
+                value={roomForm.roomId}
+                onChangeText={(text) => setRoomForm(prev => ({ ...prev, roomId: text }))}
+                placeholder="Enter room ID"
+                placeholderTextColor={COLORS.gray}
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Room Password</Text>
+              <TextInput
+                style={styles.input}
+                value={roomForm.roomPassword}
+                onChangeText={(text) => setRoomForm(prev => ({ ...prev, roomPassword: text }))}
+                placeholder="Enter room password"
+                placeholderTextColor={COLORS.gray}
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <View style={styles.switchRow}>
+                <MaterialCommunityIcons 
+                  name={roomForm.showRoomCredentials ? "eye" : "eye-off"} 
+                  size={20} 
+                  color={roomForm.showRoomCredentials ? COLORS.accent : COLORS.gray} 
+                />
+                <Text style={styles.switchLabel}>Show Room Credentials to Players</Text>
+                <Switch
+                  value={roomForm.showRoomCredentials}
+                  onValueChange={(value) => setRoomForm(prev => ({ ...prev, showRoomCredentials: value }))}
+                  trackColor={{ false: COLORS.darkGray, true: COLORS.accent }}
+                  thumbColor={roomForm.showRoomCredentials ? COLORS.white : COLORS.gray}
+                />
+              </View>
+              <Text style={styles.switchDescription}>
+                When enabled, players who joined this tournament will be able to see room credentials
+              </Text>
+            </View>
+
+            {/* Room Status Display */}
+            <View style={styles.roomStatusSection}>
+              <Text style={styles.roomStatusTitle}>Current Status:</Text>
+              <View style={styles.roomStatusItem}>
+                <Text style={styles.roomStatusLabel}>Room ID:</Text>
+                <Text style={[styles.roomStatusValue, !roomForm.roomId && styles.roomStatusEmpty]}>
+                  {roomForm.roomId || 'Not set'}
+                </Text>
+              </View>
+              <View style={styles.roomStatusItem}>
+                <Text style={styles.roomStatusLabel}>Room Password:</Text>
+                <Text style={[styles.roomStatusValue, !roomForm.roomPassword && styles.roomStatusEmpty]}>
+                  {roomForm.roomPassword || 'Not set'}
+                </Text>
+              </View>
+              <View style={styles.roomStatusItem}>
+                <Text style={styles.roomStatusLabel}>Visibility:</Text>
+                <View style={[
+                  styles.visibilityBadge,
+                  { backgroundColor: roomForm.showRoomCredentials ? '#34C759' : COLORS.gray }
+                ]}>
+                  <MaterialCommunityIcons 
+                    name={roomForm.showRoomCredentials ? "eye" : "eye-off"} 
+                    size={12} 
+                    color={COLORS.white} 
+                  />
+                  <Text style={styles.visibilityBadgeText}>
+                    {roomForm.showRoomCredentials ? 'Visible' : 'Hidden'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowRoomModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.createButton]}
+                onPress={handleSaveRoomCredentials}
+              >
+                <Text style={styles.createButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Winners Declaration Modal */}
+      <Modal visible={showWinnersModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Declare Winners</Text>
+                <TouchableOpacity onPress={() => setShowWinnersModal(false)}>
+                  <Ionicons name="close" size={24} color={COLORS.white} />
+                </TouchableOpacity>
+              </View>
+
+              {selectedTournamentForWinners && (
+                <View style={styles.selectionInfo}>
+                  <Text style={styles.selectionTitle}>Tournament: {selectedTournamentForWinners.name}</Text>
+                </View>
+              )}
+
+              {/* 1st Place */}
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>🥇 1st Place (Required) *</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={winnersForm.firstPlace}
+                    onValueChange={(itemValue) => setWinnersForm(prev => ({ ...prev, firstPlace: itemValue }))}
+                    style={styles.picker}
+                    itemStyle={styles.pickerItem}
+                  >
+                    <Picker.Item label="Select 1st Place Winner" value={null} />
+                    {Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0 ? (
+                      tournamentParticipants.map((participant) => {
+                        const userName = participant.user?.username || participant.user?.email || participant.playerName || 'Player';
+                        return (
+                          <Picker.Item 
+                            key={participant._id}
+                            label={userName} 
+                            value={participant._id}
+                          />
+                        );
+                      })
+                    ) : (
+                      <Picker.Item label="No participants found" value={null} />
+                    )}
+                  </Picker>
+                </View>
+              </View>
+
+              {/* 2nd Place */}
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>🥈 2nd Place (Optional)</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={winnersForm.secondPlace}
+                    onValueChange={(itemValue) => setWinnersForm(prev => ({ ...prev, secondPlace: itemValue }))}
+                    style={styles.picker}
+                    itemStyle={styles.pickerItem}
+                  >
+                    <Picker.Item label="Select 2nd Place Winner" value={null} />
+                    {Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0 ? (
+                      tournamentParticipants.map((participant) => {
+                        const userName = participant.user?.username || participant.user?.email || participant.playerName || 'Player';
+                        return (
+                          <Picker.Item 
+                            key={participant._id}
+                            label={userName} 
+                            value={participant._id}
+                          />
+                        );
+                      })
+                    ) : (
+                      <Picker.Item label="No participants found" value={null} />
+                    )}
+                  </Picker>
+                </View>
+              </View>
+
+              {/* 3rd Place */}
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>🥉 3rd Place (Optional)</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={winnersForm.thirdPlace}
+                    onValueChange={(itemValue) => setWinnersForm(prev => ({ ...prev, thirdPlace: itemValue }))}
+                    style={styles.picker}
+                    itemStyle={styles.pickerItem}
+                  >
+                    <Picker.Item label="Select 3rd Place Winner" value={null} />
+                    {Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0 ? (
+                      tournamentParticipants.map((participant) => {
+                        const userName = participant.user?.username || participant.user?.email || participant.playerName || 'Player';
+                        return (
+                          <Picker.Item 
+                            key={participant._id}
+                            label={userName} 
+                            value={participant._id}
+                          />
+                        );
+                      })
+                    ) : (
+                      <Picker.Item label="No participants found" value={null} />
+                    )}
+                  </Picker>
+                </View>
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setShowWinnersModal(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalButton, styles.createButton]}
+                  onPress={handleSaveWinners}
+                >
+                  <Text style={styles.createButtonText}>Declare Winners</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -844,6 +1348,82 @@ const styles = StyleSheet.create({
     color: COLORS.accent,
     marginLeft: 6,
   },
+  sectionDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.darkGray,
+  },
+  sectionDividerText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.white,
+    marginLeft: 8,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  switchLabel: {
+    fontSize: 14,
+    color: COLORS.white,
+    marginLeft: 8,
+    flex: 1,
+  },
+  switchDescription: {
+    fontSize: 12,
+    color: COLORS.gray,
+    fontStyle: 'italic',
+    marginLeft: 28,
+  },
+  roomStatusSection: {
+    backgroundColor: COLORS.darkGray,
+    borderRadius: 8,
+    padding: 16,
+    marginVertical: 16,
+  },
+  roomStatusTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.white,
+    marginBottom: 12,
+  },
+  roomStatusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  roomStatusLabel: {
+    fontSize: 12,
+    color: COLORS.gray,
+    width: 80,
+  },
+  roomStatusValue: {
+    fontSize: 12,
+    color: COLORS.white,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  roomStatusEmpty: {
+    color: COLORS.gray,
+    fontStyle: 'italic',
+  },
+  visibilityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  visibilityBadgeText: {
+    fontSize: 10,
+    color: COLORS.white,
+    marginLeft: 4,
+    fontWeight: 'bold',
+  },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -892,6 +1472,46 @@ const styles = StyleSheet.create({
   selectionText: {
     fontSize: 12,
     color: COLORS.gray,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  dateInput: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  timeInput: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  dateInputText: {
+    color: COLORS.white,
+    marginLeft: 10,
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+  },
+  pickerContainer: {
+    backgroundColor: COLORS.darkGray,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
+  },
+  picker: {
+    color: COLORS.white,
+    backgroundColor: COLORS.darkGray,
+  },
+  pickerItem: {
+    backgroundColor: COLORS.darkGray,
+    color: COLORS.white,
   },
 });
 

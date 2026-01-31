@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [role, setRole] = useState(null); // Track role separately for persistence
   const [isLoading, setIsLoading] = useState(true);
 
   // Check if user is already logged in on app start
@@ -20,10 +21,19 @@ export const AuthProvider = ({ children }) => {
     try {
       const savedToken = await AsyncStorage.getItem('token');
       const savedUser = await AsyncStorage.getItem('user');
+      const savedRole = await AsyncStorage.getItem('userRole'); // Restore role from storage
+      
       if (savedToken && savedUser) {
         setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        
+        // Restore role from storage or from user object
+        const restoredRole = savedRole || parsedUser.role || 'user';
+        setRole(restoredRole);
         setIsAuthenticated(true);
+        
+        console.log(`Auth status restored - Role: ${restoredRole}, User: ${parsedUser.username}`);
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
@@ -60,13 +70,19 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error };
       }
 
+      const userRole = data.user.role || 'user';
+      
+      // Store token, user, and role persistently
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      await AsyncStorage.setItem('userRole', userRole); // Persist role explicitly
       
       setToken(data.token);
       setUser(data.user);
+      setRole(userRole); // Set role in state
       setIsAuthenticated(true);
 
+      console.log(`Login successful - Role: ${userRole}, Email: ${email}`);
       return { success: true, user: data.user };
     } catch (error) {
       console.error('Login error:', error);
@@ -113,9 +129,12 @@ export const AuthProvider = ({ children }) => {
     try {
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('userRole'); // Clear role on logout
       setUser(null);
       setToken(null);
+      setRole(null); // Clear role from state
       setIsAuthenticated(false);
+      console.log('Logout successful');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -123,18 +142,23 @@ export const AuthProvider = ({ children }) => {
 
   const getAuthToken = () => token;
 
+  // Helper function to check if user is admin
+  const isAdmin = () => role === 'admin';
+
   return (
     <AuthContext.Provider
       value={{
         isAuthenticated,
         user,
         token,
+        role,
         isLoading,
         login,
         register,
         logout,
         getAuthToken,
         updateUser,
+        isAdmin, // Expose admin check function
       }}
     >
       {children}

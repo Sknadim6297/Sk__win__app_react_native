@@ -24,8 +24,9 @@ import { tournamentService } from '../services/api';
 import Toast from '../components/Toast';
 
 const TournamentScreen = ({ navigation }) => {
-  const [selectedTab, setSelectedTab] = useState('upcoming');
+  const [selectedTab, setSelectedTab] = useState('my-contests');
   const [tournaments, setTournaments] = useState([]);
+  const [myTournaments, setMyTournaments] = useState([]);
   const [joinedTournaments, setJoinedTournaments] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -39,12 +40,17 @@ const TournamentScreen = ({ navigation }) => {
   const fetchTournaments = async () => {
     try {
       setLoading(true);
-      const data = await tournamentService.getList();
-      setTournaments(data);
+      const [allTournaments, userTournaments] = await Promise.all([
+        tournamentService.getList(),
+        tournamentService.getMyTournaments().catch(() => []),
+      ]);
+      
+      setTournaments(allTournaments);
+      setMyTournaments(userTournaments);
 
       // Build set of joined tournaments from API data
       const joined = new Set();
-      data.forEach((tournament) => {
+      allTournaments.forEach((tournament) => {
         if (tournament.userJoined) {
           joined.add(tournament._id);
         }
@@ -159,6 +165,9 @@ const TournamentScreen = ({ navigation }) => {
   };
 
   const getTournamentsByStatus = (status) => {
+    if (status === 'my-contests') {
+      return myTournaments;
+    }
     return tournaments.filter((t) => t.status === status);
   };
 
@@ -336,20 +345,20 @@ const TournamentScreen = ({ navigation }) => {
 
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
-        {['upcoming', 'live', 'completed', 'cancelled'].map((tab) => (
+        {['my-contests', 'upcoming', 'live', 'completed'].map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tab, selectedTab === tab && styles.activeTab]}
             onPress={() => setSelectedTab(tab)}
           >
             <Text style={[styles.tabText, selectedTab === tab && styles.activeTabText]}>
-              {tab === 'live'
+              {tab === 'my-contests'
+                ? 'My Contests'
+                : tab === 'live'
                 ? 'Live'
                 : tab === 'upcoming'
                 ? 'Upcoming'
-                : tab === 'completed'
-                ? 'Completed'
-                : 'Cancelled'}
+                : 'Completed'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -365,7 +374,16 @@ const TournamentScreen = ({ navigation }) => {
         {getTournamentsByStatus(selectedTab).length === 0 ? (
           <View style={styles.emptyContainer}>
             <TrophyIcon size={60} color={COLORS.gray} />
-            <Text style={styles.emptyText}>No {selectedTab} tournaments</Text>
+            <Text style={styles.emptyText}>
+              {selectedTab === 'my-contests'
+                ? 'You have not participated in any contest yet.'
+                : `No ${selectedTab} tournaments`}
+            </Text>
+            {selectedTab === 'my-contests' && (
+              <Text style={styles.emptySubtext}>
+                Join a tournament to see it here!
+              </Text>
+            )}
           </View>
         ) : (
           getTournamentsByStatus(selectedTab).map((tournament) => (
@@ -449,6 +467,15 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     fontSize: 16,
     marginTop: 12,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  emptySubtext: {
+    color: COLORS.gray,
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
+    opacity: 0.7,
   },
   tournamentCard: {
     backgroundColor: COLORS.lightGray,

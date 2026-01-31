@@ -202,9 +202,19 @@ const GameManagement = ({ navigation }) => {
     setShowModal(true);
   };
 
+  const handleEditMode = (mode) => {
+    setEditingModeId(mode._id);
+    setModeFormData({
+      name: mode.name || '',
+      description: mode.description || '',
+      image: mode.image || '',
+    });
+  };
+
   const handleViewModes = (game) => {
     setSelectedGameForModes(game);
     fetchGameModes(game._id);
+    resetModeForm();
     setShowModesModal(true);
   };
 
@@ -437,6 +447,49 @@ const GameManagement = ({ navigation }) => {
           </View>
 
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Mode Name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter mode name"
+                placeholderTextColor={COLORS.gray}
+                value={modeFormData.name}
+                onChangeText={(text) => setModeFormData({ ...modeFormData, name: text })}
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Description</Text>
+              <TextInput
+                style={[styles.input, { minHeight: 70 }]}
+                placeholder="Mode description"
+                placeholderTextColor={COLORS.gray}
+                multiline
+                value={modeFormData.description}
+                onChangeText={(text) => setModeFormData({ ...modeFormData, description: text })}
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Image URL</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter image URL"
+                placeholderTextColor={COLORS.gray}
+                value={modeFormData.image}
+                onChangeText={(text) => setModeFormData({ ...modeFormData, image: text })}
+              />
+            </View>
+
+            <TouchableOpacity 
+              style={styles.submitButton}
+              onPress={handleAddGameMode}
+            >
+              <Text style={styles.submitButtonText}>
+                {editingModeId ? 'Update Mode' : 'Add Mode'}
+              </Text>
+            </TouchableOpacity>
+
             {gameModes.length === 0 ? (
               <View style={styles.emptyState}>
                 <MaterialCommunityIcons name="puzzle" size={48} color={COLORS.gray} />
@@ -453,6 +506,12 @@ const GameManagement = ({ navigation }) => {
                     )}
                   </View>
                   <View style={styles.modeActions}>
+                    <TouchableOpacity 
+                      style={styles.editButton}
+                      onPress={() => handleEditMode(mode)}
+                    >
+                      <Ionicons name="pencil" size={16} color={COLORS.accent} />
+                    </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.deleteButton}
                       onPress={() => handleDeleteMode(mode._id)}

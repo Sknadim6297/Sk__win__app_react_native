@@ -27,7 +27,6 @@ const GameDetailsScreen = ({ navigation, route }) => {
     description: gameMode?.description || 'SNIPER BAN & VEHICLES ON',
     map: 'Bermuda',
     type: 'Solo',
-    version: 'TPP',
   };
 
   useEffect(() => {
@@ -108,7 +107,6 @@ const GameDetailsScreen = ({ navigation, route }) => {
       entryFee: item.entryFee || 0,
       spotsLeft: spotsLeft > 0 ? spotsLeft : 0,
       totalSpots: item.maxParticipants || 20,
-      version: item.version || 'TPP',
       rules: item.rules || ['Follow game rules', 'No cheating', 'Respect other players'],
     };
 
@@ -130,10 +128,6 @@ const GameDetailsScreen = ({ navigation, route }) => {
         <View style={styles.infoItem}>
           <Text style={styles.infoLabel}>TYPE</Text>
           <Text style={styles.infoValue}>{displayTournament.type}</Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>VERSION</Text>
-          <Text style={styles.infoValue}>{displayTournament.version}</Text>
         </View>
         <View style={styles.infoItem}>
           <Text style={styles.infoLabel}>MAP</Text>
