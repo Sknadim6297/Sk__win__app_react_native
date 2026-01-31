@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, AuthContext } from './context/AuthContext';
 import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
 import HomeScreen from './screens/HomeScreen';
@@ -30,6 +30,7 @@ import GameModesScreen from './screens/GameModesScreen';
 import GameDetailsScreen from './screens/GameDetailsScreen';
 import AdminDashboard from './screens/admin/AdminDashboard';
 import UserManagement from './screens/admin/UserManagement';
+import UserDetails from './screens/admin/UserDetails';
 import TournamentHistory from './screens/admin/TournamentHistory';
 import TournamentManagement from './screens/admin/TournamentManagement';
 import GameManagement from './screens/admin/GameManagement';
@@ -118,54 +119,79 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <NavigationContainer>
-          <Stack.Navigator
-            initialRouteName="Landing"
-            screenOptions={{
-              headerShown: false,
-              gestureEnabled: false,
-              cardStyle: { backgroundColor: '#0a0e27' },
-            }}
-          >
-          {/* Auth Stack */}
-          <Stack.Screen name="Landing" component={LandingScreen} />
-          <Stack.Screen name="Auth" component={AuthScreen} />
-          
-          {/* Main App */}
-          <Stack.Screen name="MainApp" component={MainTabNavigator} />
-          
-          {/* Account SubScreen */}
-          <Stack.Screen name="AccountProfile" component={AccountProfileScreen} />
-          <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-          <Stack.Screen name="MyWallet" component={MyWalletScreen} />
-          <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
-          <Stack.Screen name="TopPlayers" component={TopPlayersScreen} />
-          <Stack.Screen name="Notifications" component={NotificationsScreen} />
-          <Stack.Screen name="ContactUs" component={ContactUsScreen} />
-          <Stack.Screen name="FAQ" component={FAQScreen} />
-          <Stack.Screen name="AboutUs" component={AboutUsScreen} />
-          <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-          <Stack.Screen name="TermsAndConditions" component={TermsAndConditionsScreen} />
-          <Stack.Screen name="ShareApp" component={ShareAppScreen} />
-          
-          {/* Game Modes */}
-          <Stack.Screen name="GameModes" component={GameModesScreen} />
-          <Stack.Screen name="GameDetails" component={GameDetailsScreen} />
-          
-          {/* Tournament Screens */}
-          <Stack.Screen name="TournamentDetails" component={TournamentDetailsScreen} />
-          <Stack.Screen name="Tournament" component={TournamentScreen} />
-          <Stack.Screen name="History" component={HistoryScreen} />
-          
-          {/* Admin Screens */}
-          <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
-          <Stack.Screen name="UserManagement" component={UserManagement} />
-          <Stack.Screen name="TournamentHistory" component={TournamentHistory} />
-          <Stack.Screen name="TournamentManagement" component={TournamentManagement} />
-          <Stack.Screen name="GameManagement" component={GameManagement} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </AuthProvider>
-  </SafeAreaProvider>
+        <AppNavigator />
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function AppNavigator() {
+  const { isAuthenticated, isLoading, isAdmin } = useContext(AuthContext);
+
+  if (isLoading) {
+    return null; // Show splash screen or loading indicator
+  }
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName={isAuthenticated ? (isAdmin() ? 'AdminDashboard' : 'MainApp') : 'Landing'}
+        screenOptions={{
+          headerShown: false,
+          gestureEnabled: false,
+          cardStyle: { backgroundColor: '#0a0e27' },
+        }}
+      >
+        {/* Non-authenticated screens */}
+        {!isAuthenticated ? (
+          <>
+            <Stack.Screen name="Landing" component={LandingScreen} />
+            <Stack.Screen name="Auth" component={AuthScreen} />
+          </>
+        ) : (
+          <>
+            {/* Admin-only routes */}
+            {isAdmin() ? (
+              <>
+                <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
+                <Stack.Screen name="UserManagement" component={UserManagement} />
+                <Stack.Screen name="UserDetails" component={UserDetails} />
+                <Stack.Screen name="TournamentHistory" component={TournamentHistory} />
+                <Stack.Screen name="TournamentManagement" component={TournamentManagement} />
+                <Stack.Screen name="GameManagement" component={GameManagement} />
+              </>
+            ) : (
+              <>
+                {/* User routes */}
+                <Stack.Screen name="MainApp" component={MainTabNavigator} />
+                
+                {/* Account SubScreen */}
+                <Stack.Screen name="AccountProfile" component={AccountProfileScreen} />
+                <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+                <Stack.Screen name="MyWallet" component={MyWalletScreen} />
+                <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
+                <Stack.Screen name="TopPlayers" component={TopPlayersScreen} />
+                <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                <Stack.Screen name="ContactUs" component={ContactUsScreen} />
+                <Stack.Screen name="FAQ" component={FAQScreen} />
+                <Stack.Screen name="AboutUs" component={AboutUsScreen} />
+                <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+                <Stack.Screen name="TermsAndConditions" component={TermsAndConditionsScreen} />
+                <Stack.Screen name="ShareApp" component={ShareAppScreen} />
+                
+                {/* Game Modes */}
+                <Stack.Screen name="GameModes" component={GameModesScreen} />
+                <Stack.Screen name="GameDetails" component={GameDetailsScreen} />
+              </>
+            )}
+            
+            {/* Shared screens available to both admin and regular users */}
+            <Stack.Screen name="TournamentDetails" component={TournamentDetailsScreen} />
+            <Stack.Screen name="Tournament" component={TournamentScreen} />
+            <Stack.Screen name="History" component={HistoryScreen} />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }

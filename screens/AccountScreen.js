@@ -127,8 +127,8 @@ const AccountScreen = ({ navigation }) => {
         {
           text: 'Logout',
           onPress: async () => {
+            // Just call logout - conditional rendering in AppNavigator will handle the navigation
             await logout();
-            navigation.replace('Auth');
           },
         },
       ]

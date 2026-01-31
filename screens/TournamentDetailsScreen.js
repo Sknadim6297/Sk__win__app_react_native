@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,23 +7,35 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../styles/theme';
 import { tournamentService } from '../services/api';
+import { AuthContext } from '../context/AuthContext';
+import Toast from '../components/Toast';
 
 const TournamentDetailsScreen = ({ navigation, route }) => {
   const { tournamentId } = route.params || {};
+  const { user, isAdmin } = useContext(AuthContext);
   const [tournament, setTournament] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [joining, setJoining] = useState(false);
+  const [hasJoined, setHasJoined] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
 
-  useEffect(() => {
-    loadDetails();
-  }, [tournamentId]);
+  const showToast = (message, type = 'error') => {
+    setToast({ visible: true, message, type });
+  };
 
-  const loadDetails = async () => {
+  const hideToast = () => {
+    setToast({ visible: false, message: '', type: 'error' });
+  };
+
+  const loadDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -33,12 +45,78 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
       }
       const data = await tournamentService.getDetails(tournamentId);
       setTournament(data);
+      
+      // Check if user has already joined - use userJoined from backend
+      if (data.userJoined !== undefined) {
+        setHasJoined(data.userJoined);
+      }
     } catch (error) {
       console.error('Error loading tournament details:', error);
       setError(error.message || 'Failed to load tournament details');
     } finally {
       setLoading(false);
     }
+  }, [tournamentId]);
+
+  useEffect(() => {
+    loadDetails();
+  }, [loadDetails]);
+
+  // Reload tournament details whenever screen comes into focus to check latest join status
+  useFocusEffect(
+    useCallback(() => {
+      loadDetails();
+    }, [loadDetails])
+  );
+
+  const handleJoinTournament = async () => {
+    if (!user) {
+      showToast('Please login to join tournament', 'error');
+      return;
+    }
+
+    // Prevent admins from joining tournaments
+    if (isAdmin()) {
+      showToast('Admins cannot join tournaments', 'error');
+      return;
+    }
+
+    if (hasJoined) {
+      showToast('You have already joined this tournament', 'info');
+      return;
+    }
+
+    Alert.alert(
+      'Join Tournament',
+      `Entry Fee: ₹${tournament.entryFee}\n\nAre you sure you want to join this tournament?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Join',
+          onPress: async () => {
+            try {
+              setJoining(true);
+              await tournamentService.join(tournamentId);
+              showToast('Successfully joined tournament!', 'success');
+              setHasJoined(true);
+              // Reload details to update participant count
+              await loadDetails();
+            } catch (error) {
+              console.error('Error joining tournament:', error);
+              // If already registered error, update state and show appropriate message
+              if (error.message && error.message.includes('Already registered')) {
+                setHasJoined(true);
+                showToast('You have already joined this tournament', 'info');
+              } else {
+                showToast(error.message || 'Failed to join tournament', 'error');
+              }
+            } finally {
+              setJoining(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getStatusColor = (status) => {
@@ -169,7 +247,7 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
               <MaterialCommunityIcons name="account-group" size={20} color={COLORS.accent} />
               <Text style={styles.infoLabel}>Players</Text>
               <Text style={styles.infoValue}>
-                {tournament.currentParticipants || 0}/{tournament.maxParticipants || 0}
+                {tournament.participantCount || 0}/{tournament.maxParticipants || 0}
               </Text>
             </View>
           </View>
@@ -185,10 +263,6 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
               <View style={styles.gameInfoItem}>
                 <Text style={styles.gameInfoLabel}>Map:</Text>
                 <Text style={styles.gameInfoValue}>{tournament.map || 'Bermuda'}</Text>
-              </View>
-              <View style={styles.gameInfoItem}>
-                <Text style={styles.gameInfoLabel}>Version:</Text>
-                <Text style={styles.gameInfoValue}>{tournament.version || 'TPP'}</Text>
               </View>
             </View>
           </View>
@@ -224,40 +298,124 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
           </View>
 
           {/* Room Credentials */}
-          {tournament.showRoomCredentials && tournament.roomId && (
+          {tournament.showRoomCredentials && tournament.roomId && hasJoined && (
             <View style={styles.roomSection}>
-              <Text style={styles.sectionTitle}>Room Credentials</Text>
-              <View style={styles.roomItem}>
-                <MaterialCommunityIcons name="key" size={20} color={COLORS.accent} />
-                <Text style={styles.roomLabel}>Room ID:</Text>
-                <Text style={styles.roomValue}>{tournament.roomId}</Text>
-              </View>
-              {tournament.roomPassword && (
+              <Text style={styles.sectionTitle}>🎮 Room Credentials</Text>
+              <View style={styles.credentialsBox}>
                 <View style={styles.roomItem}>
-                  <MaterialCommunityIcons name="lock" size={20} color={COLORS.accent} />
-                  <Text style={styles.roomLabel}>Password:</Text>
-                  <Text style={styles.roomValue}>{tournament.roomPassword}</Text>
+                  <MaterialCommunityIcons name="identifier" size={20} color={COLORS.accent} />
+                  <Text style={styles.roomLabel}>Room ID:</Text>
+                  <Text style={styles.roomValue} selectable>{tournament.roomId}</Text>
                 </View>
-              )}
+                {tournament.roomPassword && (
+                  <View style={styles.roomItem}>
+                    <MaterialCommunityIcons name="lock" size={20} color={COLORS.accent} />
+                    <Text style={styles.roomLabel}>Password:</Text>
+                    <Text style={styles.roomValue} selectable>{tournament.roomPassword}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.credentialsNote}>
+                Use these credentials to join the game room
+              </Text>
+            </View>
+          )}
+
+          {/* Room Credentials Not Available Message */}
+          {!hasJoined && tournament.roomId && (
+            <View style={styles.roomSection}>
+              <Text style={styles.sectionTitle}>🔒 Room Access Required</Text>
+              <View style={styles.credentialsUnavailable}>
+                <MaterialCommunityIcons name="lock-outline" size={48} color={COLORS.gray} />
+                <Text style={styles.credentialsUnavailableText}>
+                  Join this tournament to access room credentials
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Tournament Results / Winners */}
+          {tournament.status === 'completed' && tournament.winners && tournament.winners.length > 0 && (
+            <View style={styles.resultsSection}>
+              <Text style={styles.sectionTitle}>🏆 Tournament Results</Text>
+              {tournament.winners.map((winner, index) => (
+                <View key={index} style={styles.winnerCard}>
+                  <View style={styles.positionBadge}>
+                    <Text style={styles.positionText}>
+                      {winner.position === 1 ? '🥇' : winner.position === 2 ? '🥈' : '🥉'}
+                    </Text>
+                  </View>
+                  <View style={styles.winnerInfo}>
+                    <Text style={styles.winnerPosition}>
+                      {winner.position === 1 ? '1st Place' : winner.position === 2 ? '2nd Place' : '3rd Place'}
+                    </Text>
+                    <Text style={styles.winnerName}>
+                      {winner.user?.username || winner.user?.email || 'Player'}
+                    </Text>
+                  </View>
+                  <View style={styles.rewardInfo}>
+                    <Text style={styles.rewardText}>
+                      <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
+                      {` ₹${winner.reward}`}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* No Results Yet */}
+          {tournament.status === 'completed' && (!tournament.winners || tournament.winners.length === 0) && (
+            <View style={styles.resultsSection}>
+              <Text style={styles.sectionTitle}>🏆 Tournament Results</Text>
+              <View style={styles.noResultsCard}>
+                <Text style={styles.noResultsText}>Winners not declared yet</Text>
+              </View>
             </View>
           )}
 
           {/* Join Button */}
-          <View style={styles.joinSection}>
-            <TouchableOpacity 
-              style={[
-                styles.joinButton,
-                tournament.status === 'completed' && styles.joinButtonDisabled
-              ]}
-              disabled={tournament.status === 'completed'}
-            >
-              <Text style={styles.joinButtonText}>
-                {tournament.status === 'completed' ? 'Tournament Ended' : 'JOIN TOURNAMENT'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {!isAdmin() && (
+            <View style={styles.joinSection}>
+              <TouchableOpacity 
+                style={[
+                  styles.joinButton,
+                  (tournament.status === 'completed' || tournament.status === 'cancelled' || hasJoined || joining) && styles.joinButtonDisabled
+                ]}
+                disabled={tournament.status === 'completed' || tournament.status === 'cancelled' || hasJoined || joining}
+                onPress={handleJoinTournament}
+              >
+                {joining ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={styles.joinButtonText}>
+                    {hasJoined 
+                      ? '✓ ALREADY JOINED' 
+                      : tournament.status === 'completed' 
+                      ? 'TOURNAMENT ENDED' 
+                      : tournament.status === 'cancelled'
+                      ? 'TOURNAMENT CANCELLED'
+                      : tournament.participantCount >= tournament.maxParticipants
+                      ? 'TOURNAMENT FULL'
+                      : 'JOIN TOURNAMENT'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+              {hasJoined && (
+                <Text style={styles.joinedNote}>
+                  You have successfully joined this tournament
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
+      <Toast 
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+      />
     </SafeAreaView>
   );
 };
@@ -460,6 +618,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.darkGray,
   },
+  credentialsBox: {
+    backgroundColor: COLORS.background,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
   roomItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -474,7 +639,93 @@ const styles = StyleSheet.create({
   roomValue: {
     fontSize: 14,
     fontWeight: 'bold',
+    color: COLORS.accent,
+  },
+  credentialsNote: {
+    fontSize: 12,
+    color: COLORS.gray,
+    fontStyle: 'italic',
+    marginTop: 8,
+  },
+  credentialsUnavailable: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.darkGray,
+  },
+  credentialsUnavailableText: {
+    fontSize: 14,
+    color: COLORS.gray,
+    textAlign: 'center',
+    marginTop: 12,
+    fontStyle: 'italic',
+  },
+  resultsSection: {
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  winnerCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.darkGray,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    alignItems: 'center',
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.accent,
+  },
+  positionBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  positionText: {
+    fontSize: 24,
+  },
+  winnerInfo: {
+    flex: 1,
+  },
+  winnerPosition: {
+    fontSize: 12,
+    color: COLORS.gray,
+    fontWeight: '600',
+  },
+  winnerName: {
+    fontSize: 14,
     color: COLORS.white,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  rewardInfo: {
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  rewardText: {
+    fontSize: 13,
+    color: COLORS.white,
+    fontWeight: '700',
+  },
+  noResultsCard: {
+    backgroundColor: COLORS.darkGray,
+    borderRadius: 8,
+    padding: 20,
+    marginTop: 8,
+    alignItems: 'center',
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.gray,
+  },
+  noResultsText: {
+    fontSize: 14,
+    color: COLORS.gray,
+    fontStyle: 'italic',
   },
   joinSection: {
     paddingTop: 16,
@@ -494,6 +745,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: COLORS.white,
+  },
+  joinedNote: {
+    fontSize: 12,
+    color: COLORS.accent,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 

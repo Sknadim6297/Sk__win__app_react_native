@@ -266,12 +266,23 @@ const HistoryScreen = ({ navigation }) => {
         ) : (
           <View style={styles.emptyState}>
             <TrophyIcon size={64} color={COLORS.gray} />
-            <Text style={styles.emptyStateText}>No matches found</Text>
-            <Text style={styles.emptyStateSubtext}>
-              {selectedFilter === 'won' 
+            <Text style={styles.emptyStateText}>
+              {matchHistory.length === 0 
+                ? "You have not participated in any contest yet."
+                : selectedFilter === 'won' 
                 ? "You haven't won any tournaments yet"
                 : selectedFilter === 'lost'
                 ? "You haven't lost any tournaments"
+                : "No matches found"
+              }
+            </Text>
+            <Text style={styles.emptyStateSubtext}>
+              {matchHistory.length === 0
+                ? "Join a tournament to start building your match history!"
+                : selectedFilter === 'won' 
+                ? "Keep practicing to get your first win!"
+                : selectedFilter === 'lost'
+                ? "Great! You're doing well in tournaments"
                 : "Start playing tournaments to see your match history"
               }
             </Text>

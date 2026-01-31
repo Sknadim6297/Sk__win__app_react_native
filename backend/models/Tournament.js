@@ -25,10 +25,6 @@ const tournamentSchema = new mongoose.Schema({
     type: String,
     default: 'Bermuda',
   },
-  version: {
-    type: String,
-    default: 'TPP',
-  },
   rules: [{
     type: String,
   }],

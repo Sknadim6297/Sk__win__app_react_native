@@ -44,8 +44,8 @@ const AdminDashboard = ({ navigation }) => {
   };
 
   const handleLogout = async () => {
+    // Just call logout - conditional rendering in AppNavigator will handle the navigation
     await logout();
-    navigation.replace('Landing');
   };
 
   const navigateTo = (screen) => {

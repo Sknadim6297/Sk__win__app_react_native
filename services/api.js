@@ -125,6 +125,7 @@ export const walletService = {
 // Tournament Services
 export const tournamentService = {
   getList: () => apiCall('/tournaments/list'),
+  getMyTournaments: () => apiCall('/tournaments/my-tournaments'),
   getDetails: (id) => apiCall(`/tournaments/${id}/details`),
   canJoin: (id) => apiCall(`/tournaments/${id}/canJoin`),
   join: (id) => apiCall(`/tournaments/${id}/join`, {
@@ -145,6 +146,8 @@ export const tournamentService = {
   }),
   getAllTournaments: () => apiCall('/tournaments/admin/all'),
   getTournamentsByGameMode: (gameModeId) => apiCall(`/tournaments/admin/by-gamemode/${gameModeId}`),
+  getTournamentHistory: () => apiCall('/tournaments/admin/history'),
+  getTournamentParticipants: (id) => apiCall(`/tournaments/admin/${id}/participants`),
   updateStatus: (id, status) => apiCall(`/tournaments/admin/${id}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status }),
@@ -164,12 +167,20 @@ export const tournamentService = {
   deleteTournament: (id) => apiCall(`/tournaments/admin/${id}`, {
     method: 'DELETE',
   }),
+  setTournamentWinners: (tournamentId, winners) => apiCall(`/admin/tournaments/${tournamentId}/set-winners`, {
+    method: 'POST',
+    body: JSON.stringify({ winners }),
+  }),
+  completeTournament: (tournamentId) => apiCall(`/admin/tournaments/${tournamentId}/complete`, {
+    method: 'POST',
+  }),
 };
 
 // Admin Services
 export const adminService = {
   getAllUsers: () => apiCall('/admin/all'),
   getStats: () => apiCall('/admin/stats'),
+  getUserDetails: (userId) => apiCall(`/admin/user/${userId}/details`),
   suspendUser: (userId) => apiCall(`/admin/suspend/${userId}`, {
     method: 'POST',
   }),
@@ -181,6 +192,14 @@ export const adminService = {
     method: 'POST',
   }),
   verifyUser: (userId) => apiCall(`/admin/verify/${userId}`, {
+    method: 'POST',
+  }),
+  // Tournament winner and completion endpoints
+  setTournamentWinners: (tournamentId, winners) => apiCall(`/admin/tournaments/${tournamentId}/set-winners`, {
+    method: 'POST',
+    body: JSON.stringify({ winners }),
+  }),
+  completeTournament: (tournamentId) => apiCall(`/admin/tournaments/${tournamentId}/complete`, {
     method: 'POST',
   }),
 };

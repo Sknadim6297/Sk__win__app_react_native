@@ -9,7 +9,44 @@ const WalletTransaction = require('../models/WalletTransaction');
 const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
 
+// Helper function to calculate tournament status based on time
+function calculateTournamentStatus(tournament) {
+  const now = new Date();
+  const startDate = new Date(tournament.startDate);
+  const endDate = tournament.endDate ? new Date(tournament.endDate) : null;
+
+  // If manually set to cancelled, keep it cancelled
+  if (tournament.status === 'cancelled') {
+    return 'cancelled';
+  }
+
+  // If manually set to completed, keep it completed
+  if (tournament.status === 'completed') {
+    return 'completed';
+  }
+
+  // Auto-calculate based on time
+  if (endDate && now > endDate) {
+    return 'completed';
+  }
+
+  if (now >= startDate && (!endDate || now <= endDate)) {
+    return 'live';
+  }
+
+  if (now < startDate) {
+    return 'upcoming';
+  }
+
+  return 'upcoming';
+}
+
 // ===== ADMIN ROUTES (Must be before :id routes) =====
+
+// Test route for debugging
+router.get('/admin/test', (req, res) => {
+  res.json({ message: 'Admin test route working' });
+});
 
 // Create tournament (Admin)
 router.post('/admin/create', authMiddleware, async (req, res) => {
@@ -33,7 +70,6 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       gameMode,
       mode,
       map,
-      version,
       rules,
       entryFee, 
       prizePool,
@@ -89,7 +125,6 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       gameMode,
       mode: mode || 'solo',
       map: map || 'Bermuda',
-      version: version || 'TPP',
       rules: rules || [],
       entryFee: entryFee || 0,
       prizePool: prizePool || 0,
@@ -488,6 +523,123 @@ router.delete('/admin/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Get tournament history with participants (Admin)
+router.get('/admin/history', authMiddleware, async (req, res) => {
+  try {
+    const admin = await User.findById(req.userId);
+    if (admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can view tournament history' });
+    }
+
+    const tournaments = await Tournament.find()
+      .populate('game', 'name')
+      .populate('gameMode', 'name')
+      .sort({ startDate: -1 });
+
+    // Fetch participants for each tournament
+    const tournamentHistory = await Promise.all(
+      tournaments.map(async (tournament) => {
+        const participants = await TournamentParticipant.find({ 
+          tournamentId: tournament._id 
+        })
+          .populate('userId', 'username email phoneNumber')
+          .sort({ joinedAt: -1 });
+
+        // Calculate status based on time
+        const calculatedStatus = calculateTournamentStatus(tournament);
+
+        return {
+          _id: tournament._id,
+          name: tournament.name,
+          game: tournament.game,
+          gameMode: tournament.gameMode,
+          mode: tournament.mode,
+          map: tournament.map,
+          entryFee: tournament.entryFee,
+          prizePool: tournament.prizePool,
+          perKill: tournament.perKill,
+          maxParticipants: tournament.maxParticipants,
+          startDate: tournament.startDate,
+          endDate: tournament.endDate,
+          status: calculatedStatus,
+          roomId: tournament.roomId,
+          roomPassword: tournament.roomPassword,
+          showRoomCredentials: tournament.showRoomCredentials,
+          totalJoined: participants.length,
+          participants: participants.map(p => ({
+            userId: p.userId?._id,
+            username: p.userId?.username,
+            email: p.userId?.email,
+            phoneNumber: p.userId?.phoneNumber,
+            status: p.status,
+            joinedAt: p.joinedAt,
+            rank: p.rank,
+            prizeAmount: p.prizeAmount,
+          })),
+        };
+      })
+    );
+
+    res.json(tournamentHistory);
+  } catch (error) {
+    console.error('Error fetching tournament history:', error);
+    res.status(500).json({ error: 'Failed to fetch tournament history' });
+  }
+});
+
+// Get participants for a specific tournament (Admin)
+router.get('/admin/:id/participants', authMiddleware, async (req, res) => {
+  try {
+    const admin = await User.findById(req.userId);
+    if (admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can view participants' });
+    }
+
+    const tournament = await Tournament.findById(req.params.id)
+      .populate('game', 'name')
+      .populate('gameMode', 'name');
+
+    if (!tournament) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    const participants = await TournamentParticipant.find({ 
+      tournamentId: req.params.id 
+    })
+      .populate('userId', 'username email phoneNumber wallet')
+      .sort({ joinedAt: -1 });
+
+    res.json({
+      tournament: {
+        _id: tournament._id,
+        name: tournament.name,
+        game: tournament.game,
+        gameMode: tournament.gameMode,
+        maxParticipants: tournament.maxParticipants,
+        roomId: tournament.roomId,
+        roomPassword: tournament.roomPassword,
+        showRoomCredentials: tournament.showRoomCredentials,
+      },
+      participants: participants.map(p => ({
+        _id: p._id,
+        userId: p.userId?._id,
+        username: p.userId?.username,
+        email: p.userId?.email,
+        phoneNumber: p.userId?.phoneNumber,
+        walletBalance: p.userId?.wallet?.balance,
+        status: p.status,
+        joinedAt: p.joinedAt,
+        rank: p.rank,
+        prizeAmount: p.prizeAmount,
+      })),
+      totalJoined: participants.length,
+    });
+  } catch (error) {
+    console.error('Error fetching participants:', error);
+    res.status(500).json({ error: 'Failed to fetch participants' });
+  }
+});
+
 // ===== USER ROUTES =====
 
 // Get all tournaments
@@ -515,10 +667,14 @@ router.get('/list', async (req, res) => {
           userJoined = !!userParticipant;
         }
 
+        // Calculate real-time status
+        const calculatedStatus = calculateTournamentStatus(tournament);
+
         return {
           ...tournament.toObject(),
           participantCount,
           userJoined,
+          status: calculatedStatus, // Override with calculated status
         };
       })
     );
@@ -574,6 +730,62 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch tournament details' });
+  }
+});
+
+// Get user's joined tournaments (My Contests) - MUST BE BEFORE /:id
+router.get('/my-tournaments', authMiddleware, async (req, res) => {
+  try {
+    const participants = await TournamentParticipant.find({ userId: req.userId })
+      .populate({
+        path: 'tournamentId',
+        populate: [
+          { path: 'game', select: 'name' },
+          { path: 'gameMode', select: 'name' }
+        ]
+      })
+      .sort({ joinedAt: -1 });
+
+    const myTournaments = participants
+      .filter(p => p.tournamentId) // Filter out null tournaments
+      .map(p => {
+        const tournament = p.tournamentId;
+        const calculatedStatus = calculateTournamentStatus(tournament);
+        
+        return {
+          ...tournament.toObject(),
+          status: calculatedStatus,
+          userJoined: true,
+          joinedAt: p.joinedAt,
+          participantStatus: p.status,
+          rank: p.rank,
+          prizeAmount: p.prizeAmount,
+        };
+      });
+
+    res.json(myTournaments);
+  } catch (error) {
+    console.error('Error fetching my tournaments:', error);
+    res.status(500).json({ error: 'Failed to fetch tournaments' });
+  }
+});
+
+// Get user's tournament history - MUST BE BEFORE /:id
+router.get('/user/history', authMiddleware, async (req, res) => {
+  try {
+    const participants = await TournamentParticipant.find({ userId: req.userId })
+      .populate('tournamentId')
+      .sort({ joinedAt: -1 });
+
+    const tournaments = participants.map(p => ({
+      ...p.toObject(),
+      tournament: p.tournamentId,
+    }));
+
+    res.json(tournaments);
+  } catch (error) {
+    console.error('Error fetching tournament history:', error);
+    res.status(500).json({ error: 'Failed to fetch tournament history' });
   }
 });
 
@@ -657,6 +869,11 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
 
     if (!tournament) {
       return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    // Prevent admins from joining tournaments as participants
+    if (user.role === 'admin') {
+      return res.status(403).json({ error: 'Admins cannot join tournaments as participants' });
     }
 
     // Check eligibility
@@ -788,25 +1005,6 @@ router.get('/:id/room-info', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error getting room info:', error);
     res.status(500).json({ error: 'Failed to get room information' });
-  }
-});
-
-// Get user's tournament history
-router.get('/user/history', authMiddleware, async (req, res) => {
-  try {
-    const participants = await TournamentParticipant.find({ userId: req.userId })
-      .populate('tournamentId')
-      .sort({ joinedAt: -1 });
-
-    const tournaments = participants.map(p => ({
-      ...p.toObject(),
-      tournament: p.tournamentId,
-    }));
-
-    res.json(tournaments);
-  } catch (error) {
-    console.error('Error fetching tournament history:', error);
-    res.status(500).json({ error: 'Failed to fetch tournament history' });
   }
 });
 

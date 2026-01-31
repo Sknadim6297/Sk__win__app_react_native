@@ -139,11 +139,23 @@ GET    /api/wallet/history      - Transaction history
 
 ### Tournaments
 ```
-GET    /api/tournaments/list           - All tournaments
-GET    /api/tournaments/:id            - Tournament details
-GET    /api/tournaments/:id/canJoin    - Check eligibility
-POST   /api/tournaments/:id/join       - Join tournament
-GET    /api/tournaments/user/history   - User's tournaments
+GET    /api/tournaments/list                 - All tournaments
+GET    /api/tournaments/:id                  - Tournament details
+GET    /api/tournaments/:id/canJoin          - Check eligibility
+POST   /api/tournaments/:id/join             - Join tournament
+GET    /api/tournaments/user/history         - User's tournaments
+
+ADMIN ENDPOINTS:
+POST   /api/tournaments/admin/create         - Create tournament (admin)
+PUT    /api/tournaments/admin/:id            - Update tournament (admin)  
+DELETE /api/tournaments/admin/:id            - Delete tournament (admin)
+GET    /api/tournaments/admin/all            - Get all tournaments (admin)
+GET    /api/tournaments/admin/history        - Tournament history with participants (admin)
+GET    /api/tournaments/admin/:id/participants - Get tournament participants (admin)
+PUT    /api/tournaments/admin/:id/room       - Set room credentials (admin)
+PUT    /api/tournaments/admin/:id/status     - Update tournament status (admin)
+POST   /api/tournaments/admin/:id/winners    - Select winners (admin)
+POST   /api/tournaments/admin/:id/distribute-prizes - Distribute prizes (admin)
 ```
 
 ## 🧪 Test Credentials

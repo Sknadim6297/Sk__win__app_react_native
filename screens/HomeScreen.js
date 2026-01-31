@@ -22,9 +22,12 @@ const HomeScreen = ({ navigation }) => {
   const [walletBalance, setWalletBalance] = useState(0);
   const [tournamentStats, setTournamentStats] = useState({ joined: 0, won: 0 });
   const [upcomingTournaments, setUpcomingTournaments] = useState([]);
+  const [ongoingTournaments, setOngoingTournaments] = useState([]);
+  const [completedTournaments, setCompletedTournaments] = useState([]);
   const [popularGames, setPopularGames] = useState([]);
   const [gamesLoading, setGamesLoading] = useState(false);
   const [contestTab, setContestTab] = useState('upcoming'); // upcoming, ongoing, completed
+  const [selectedMatchType, setSelectedMatchType] = useState(null); // null = all, 'solo', 'duo', 'squad'
   const [sliderIndex, setSliderIndex] = useState(0);
 
   // Slider data with tutorial videos
@@ -69,7 +72,6 @@ const HomeScreen = ({ navigation }) => {
 
   const handleLogout = async () => {
     await logout();
-    navigation.replace('Landing');
   };
 
   const announcements = [];
@@ -115,6 +117,13 @@ const HomeScreen = ({ navigation }) => {
     return `${minutes}m`;
   };
 
+  const getFilteredTournaments = (tournaments) => {
+    if (!selectedMatchType) {
+      return tournaments; // Return all if no filter selected
+    }
+    return tournaments.filter((t) => t.mode === selectedMatchType);
+  };
+
   const loadHomeData = useCallback(async () => {
     try {
       // Load games first (public endpoint, doesn't require auth)
@@ -126,10 +135,10 @@ const HomeScreen = ({ navigation }) => {
 
       // Only load user-specific data if user is logged in
       if (user) {
-        const [balanceData, profileData, tournamentData] = await Promise.all([
+        const [balanceData, profileData, myTournamentsData] = await Promise.all([
           walletService.getBalance().catch(() => ({ balance: 0 })),
           userService.getProfile().catch(() => ({ tournament: {} })),
-          tournamentService.getList().catch(() => []),
+          tournamentService.getMyTournaments().catch(() => []),
         ]);
 
         setWalletBalance(balanceData?.balance ?? 0);
@@ -140,14 +149,21 @@ const HomeScreen = ({ navigation }) => {
           won: tournament.wins ?? 0,
         });
 
-        const upcoming = Array.isArray(tournamentData)
-          ? tournamentData
-              .filter((tournament) => tournament.status === 'upcoming')
-              .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
-              .slice(0, 2)
-          : [];
+        // Filter my tournaments by status
+        const myTournaments = Array.isArray(myTournamentsData) ? myTournamentsData : [];
+        const upcoming = myTournaments
+          .filter((t) => t.status === 'upcoming')
+          .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+        const ongoing = myTournaments
+          .filter((t) => t.status === 'live')
+          .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+        const completed = myTournaments
+          .filter((t) => t.status === 'completed')
+          .sort((a, b) => new Date(b.endDate || b.startDate) - new Date(a.endDate || a.startDate));
 
         setUpcomingTournaments(upcoming);
+        setOngoingTournaments(ongoing);
+        setCompletedTournaments(completed);
       }
     } catch (error) {
       console.error('Failed to load home data:', error);
@@ -359,99 +375,6 @@ const HomeScreen = ({ navigation }) => {
           )}
         </View>
         )}
-
-        {/* My Contests */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <MaterialCommunityIcons name="trophy-outline" size={20} color={COLORS.accent} />
-              <Text style={styles.sectionTitle}>My Contests</Text>
-            </View>
-          </View>
-
-          {/* Contest Tabs */}
-          <View style={styles.tabsContainer}>
-            {['upcoming', 'ongoing', 'completed'].map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                style={[
-                  styles.tabButton,
-                  contestTab === tab && styles.tabButtonActive,
-                ]}
-                onPress={() => setContestTab(tab)}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    contestTab === tab && styles.tabTextActive,
-                  ]}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Contest Content */}
-          {contestTab === 'upcoming' && (
-            upcomingTournaments.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyText}>No upcoming contests</Text>
-              </View>
-            ) : (
-              upcomingTournaments.map((tournament) => (
-                <TouchableOpacity 
-                  key={tournament._id} 
-                  style={styles.tournamentCard}
-                  onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
-                >
-                  <View style={styles.tournamentHeader}>
-                    <Text style={styles.tournamentTitle}>{tournament.name}</Text>
-                    <View style={styles.timeTag}>
-                      <Ionicons name="time" size={12} color={COLORS.white} />
-                      <Text style={styles.timeText}>{getTimeRemaining(tournament.startDate)}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.tournamentDetails}>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <Ionicons name="people" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>
-                        {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxPlayers}
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  <TouchableOpacity style={styles.joinButton}>
-                    <Text style={styles.joinButtonText}>Join Now</Text>
-                    <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))
-            )
-          )}
-
-          {contestTab === 'ongoing' && (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No ongoing contests</Text>
-            </View>
-          )}
-
-          {contestTab === 'completed' && (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No completed contests</Text>
-            </View>
-          )}
-        </View>
-
         {/* Games Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -498,38 +421,248 @@ const HomeScreen = ({ navigation }) => {
             </View>
           )}
         </View>
-
-        {/* Quick Actions */}
+                {/* My Contests */}
         <View style={styles.section}>
-          <View style={styles.sectionTitleRow}>
-            <MaterialCommunityIcons name="lightning-bolt" size={20} color={COLORS.accent} />
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <MaterialCommunityIcons name="trophy-outline" size={20} color={COLORS.accent} />
+              <Text style={styles.sectionTitle}>My Contests</Text>
+            </View>
           </View>
-          <View style={styles.quickActions}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Tournament')}
-            >
-              <MaterialCommunityIcons name="tournament" size={24} color={COLORS.accent} />
-              <Text style={styles.actionText}>Join Tournament</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('WalletTab')}
-            >
-              <MaterialCommunityIcons name="plus-circle" size={24} color={COLORS.success} />
-              <Text style={styles.actionText}>Add Money</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('MyWallet')}
-            >
-              <MaterialCommunityIcons name="history" size={24} color={COLORS.gray} />
-              <Text style={styles.actionText}>View History</Text>
-            </TouchableOpacity>
+
+          {/* Match Type Filter */}
+          <View style={styles.matchTypeFilterContainer}>
+            {['All', 'Solo', 'Duo', 'Squad'].map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.matchTypeFilterButton,
+                  (type === 'All' ? selectedMatchType === null : selectedMatchType === type.toLowerCase()) && styles.matchTypeFilterButtonActive,
+                ]}
+                onPress={() => setSelectedMatchType(type === 'All' ? null : type.toLowerCase())}
+              >
+                <Text
+                  style={[
+                    styles.matchTypeFilterText,
+                    (type === 'All' ? selectedMatchType === null : selectedMatchType === type.toLowerCase()) && styles.matchTypeFilterTextActive,
+                  ]}
+                >
+                  {type}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
+
+          {/* Contest Tabs */}
+          <View style={styles.tabsContainer}>
+            {['upcoming', 'ongoing', 'completed'].map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[
+                  styles.tabButton,
+                  contestTab === tab && styles.tabButtonActive,
+                ]}
+                onPress={() => setContestTab(tab)}
+              >
+                <Text
+                  style={[
+                    styles.tabText,
+                    contestTab === tab && styles.tabTextActive,
+                  ]}
+                >
+                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Contest Content */}
+          {contestTab === 'upcoming' && (
+            getFilteredTournaments(upcomingTournaments).length === 0 ? (
+              <View style={styles.emptyCard}>
+                <MaterialCommunityIcons name="trophy-outline" size={40} color={COLORS.gray} />
+                <Text style={styles.emptyText}>No tournaments available.</Text>
+                <Text style={styles.emptySubtext}>{selectedMatchType ? `No ${selectedMatchType} tournaments found` : 'Join a tournament to see it here!'}</Text>
+              </View>
+            ) : (
+              getFilteredTournaments(upcomingTournaments).map((tournament) => (
+                <TouchableOpacity 
+                  key={tournament._id} 
+                  style={styles.tournamentCard}
+                  onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
+                >
+                  <View style={styles.tournamentHeader}>
+                    <Text style={styles.tournamentTitle}>{tournament.name}</Text>
+                    <View style={styles.timeTag}>
+                      <Ionicons name="time" size={12} color={COLORS.white} />
+                      <Text style={styles.timeText}>{getTimeRemaining(tournament.startDate)}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.tournamentDetails}>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="people" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>
+                        {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxParticipants ?? tournament.maxPlayers}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tournamentDetails}>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="sword" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.perKill ?? 0} / kill</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="account-group" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>{tournament.mode || '-'}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="map" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>{tournament.map || '-'}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.joinedBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                    <Text style={styles.joinedBadgeText}>Joined</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )
+          )}
+
+          {contestTab === 'ongoing' && (
+            getFilteredTournaments(ongoingTournaments).length === 0 ? (
+              <View style={styles.emptyCard}>
+                <MaterialCommunityIcons name="tournament" size={40} color={COLORS.gray} />
+                <Text style={styles.emptyText}>No ongoing contests</Text>
+              </View>
+            ) : (
+              getFilteredTournaments(ongoingTournaments).map((tournament) => (
+                <TouchableOpacity 
+                  key={tournament._id} 
+                  style={styles.tournamentCard}
+                  onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
+                >
+                  <View style={styles.tournamentHeader}>
+                    <Text style={styles.tournamentTitle}>{tournament.name}</Text>
+                    <View style={styles.timeTag}>
+                      <Ionicons name="time" size={12} color={COLORS.white} />
+                      <Text style={styles.timeText}>Live</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.tournamentDetails}>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="people" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>
+                        {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxParticipants ?? tournament.maxPlayers}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tournamentDetails}>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="sword" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.perKill ?? 0} / kill</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="account-group" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>{tournament.mode || '-'}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="map" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>{tournament.map || '-'}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.joinedBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                    <Text style={styles.joinedBadgeText}>Joined</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )
+          )}
+
+          {contestTab === 'completed' && (
+            getFilteredTournaments(completedTournaments).length === 0 ? (
+              <View style={styles.emptyCard}>
+                <MaterialCommunityIcons name="trophy" size={40} color={COLORS.gray} />
+                <Text style={styles.emptyText}>No completed contests</Text>
+              </View>
+            ) : (
+              getFilteredTournaments(completedTournaments).map((tournament) => (
+                <TouchableOpacity 
+                  key={tournament._id} 
+                  style={styles.tournamentCard}
+                  onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
+                >
+                  <View style={styles.tournamentHeader}>
+                    <Text style={styles.tournamentTitle}>{tournament.name}</Text>
+                    <View style={styles.timeTag}>
+                      <Ionicons name="trophy" size={12} color={COLORS.white} />
+                      <Text style={styles.timeText}>Completed</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.tournamentDetails}>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="people" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>
+                        {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxParticipants ?? tournament.maxPlayers}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tournamentDetails}>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="sword" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>₹{tournament.perKill ?? 0} / kill</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="account-group" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>{tournament.mode || '-'}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <MaterialCommunityIcons name="map" size={16} color={COLORS.accent} />
+                      <Text style={styles.detailText}>{tournament.map || '-'}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.joinedBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                    <Text style={styles.joinedBadgeText}>Joined</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -697,6 +830,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.lightGray,
     borderRadius: 12,
     paddingVertical: 20,
+    paddingHorizontal: 16,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.darkGray,
@@ -704,6 +838,15 @@ const styles = StyleSheet.create({
   emptyText: {
     color: COLORS.gray,
     fontSize: 13,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  emptySubtext: {
+    color: COLORS.gray,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 4,
+    opacity: 0.7,
   },
   sectionTitle: {
     fontSize: 20,
@@ -863,6 +1006,22 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: 'bold',
     marginRight: 8,
+  },
+  joinedBadge: {
+    backgroundColor: `${COLORS.success}20`,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.success,
+  },
+  joinedBadgeText: {
+    color: COLORS.success,
+    fontWeight: 'bold',
+    marginLeft: 6,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -1064,6 +1223,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 8,
     textAlign: 'center',
+  },
+  matchTypeFilterContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 0,
+  },
+  matchTypeFilterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: COLORS.darkGray,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  matchTypeFilterButtonActive: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  matchTypeFilterText: {
+    fontSize: 12,
+    color: COLORS.gray,
+    fontWeight: '600',
+  },
+  matchTypeFilterTextActive: {
+    color: COLORS.white,
   },
 });
 
