@@ -115,16 +115,6 @@ const AdminDashboard = ({ navigation }) => {
               </View>
             </View>
 
-            <View style={[styles.metricCard, { borderLeftColor: COLORS.accent }]}>
-              <View style={[styles.metricIcon, { backgroundColor: `${COLORS.accent}20` }]}>
-                <MaterialCommunityIcons name="shield-check" size={28} color={COLORS.accent} />
-              </View>
-              <View style={styles.metricContent}>
-                <Text style={styles.metricValue}>{stats?.kycVerifiedUsers || 0}</Text>
-                <Text style={styles.metricLabel}>KYC Verified</Text>
-              </View>
-            </View>
-
             <View style={[styles.metricCard, { borderLeftColor: COLORS.error }]}>
               <View style={[styles.metricIcon, { backgroundColor: `${COLORS.error}20` }]}>
                 <Ionicons name="ban" size={28} color={COLORS.error} />

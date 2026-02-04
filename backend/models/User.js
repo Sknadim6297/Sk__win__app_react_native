@@ -43,16 +43,6 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  kycVerified: {
-    type: Boolean,
-    default: false,
-  },
-  kycDetails: {
-    fullName: String,
-    idType: String, // Aadhar, Passport, etc.
-    idNumber: String,
-    dateOfBirth: Date,
-  },
   wallet: {
     balance: {
       type: Number,

@@ -102,10 +102,6 @@ router.post('/withdraw', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Insufficient balance. You cannot withdraw more than your current balance.' });
     }
 
-    if (!user.kycVerified) {
-      return res.status(400).json({ success: false, message: 'KYC verification required for withdrawal' });
-    }
-
     // Create transaction
     const transaction = new WalletTransaction({
       userId: req.userId,

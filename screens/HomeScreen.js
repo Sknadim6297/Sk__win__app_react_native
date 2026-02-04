@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useState } from 'react';
+import React, { useCallback, useContext, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ const HomeScreen = ({ navigation }) => {
   const [contestTab, setContestTab] = useState('upcoming'); // upcoming, ongoing, completed
   const [selectedMatchType, setSelectedMatchType] = useState(null); // null = all, 'solo', 'duo', 'squad'
   const [sliderIndex, setSliderIndex] = useState(0);
+  const [countdowns, setCountdowns] = useState({}); // Store countdown for each tournament
 
   // Slider data with tutorial videos
   const tutorials = [
@@ -117,6 +118,38 @@ const HomeScreen = ({ navigation }) => {
     return `${minutes}m`;
   };
 
+  const getCountdownTimer = (startDate) => {
+    const now = new Date();
+    const start = new Date(startDate);
+    const diff = start - now;
+
+    if (diff <= 0) return null; // Tournament started
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff / 1000 / 60) % 60);
+    const seconds = Math.floor((diff / 1000) % 60);
+
+    return {
+      hours: hours.toString().padStart(2, '0'),
+      minutes: minutes.toString().padStart(2, '0'),
+      seconds: seconds.toString().padStart(2, '0'),
+      total: diff
+    };
+  };
+
+  const formatStartDate = (startDate) => {
+    const date = new Date(startDate);
+    const options = { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    };
+    return date.toLocaleDateString('en-GB', options);
+  };
+
   const getFilteredTournaments = (tournaments) => {
     if (!selectedMatchType) {
       return tournaments; // Return all if no filter selected
@@ -171,6 +204,22 @@ const HomeScreen = ({ navigation }) => {
       setPopularGames(getDefaultGames());
     }
   }, [user]);
+
+  // Countdown timer effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newCountdowns = {};
+      [...upcomingTournaments, ...ongoingTournaments].forEach(tournament => {
+        const timer = getCountdownTimer(tournament.startDate);
+        if (timer) {
+          newCountdowns[tournament._id] = timer;
+        }
+      });
+      setCountdowns(newCountdowns);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [upcomingTournaments, ongoingTournaments]);
 
   useFocusEffect(
     useCallback(() => {
@@ -491,6 +540,35 @@ const HomeScreen = ({ navigation }) => {
                   style={styles.tournamentCard}
                   onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
                 >
+                  {/* Start Date Display */}
+                  <View style={styles.startDateContainer}>
+                    <MaterialCommunityIcons name="calendar-clock" size={16} color={COLORS.accent} />
+                    <Text style={styles.startDateText}>Starts on: {formatStartDate(tournament.startDate)}</Text>
+                  </View>
+                  
+                  {/* Countdown Timer - Only show if user joined */}
+                  {countdowns[tournament._id] && (
+                    <View style={styles.countdownContainer}>
+                      <Text style={styles.countdownLabel}>Starts in:</Text>
+                      <View style={styles.countdownTimer}>
+                        <View style={styles.timeBox}>
+                          <Text style={styles.timeNumber}>{countdowns[tournament._id].hours}</Text>
+                          <Text style={styles.timeLabel}>H</Text>
+                        </View>
+                        <Text style={styles.timeSeparator}>:</Text>
+                        <View style={styles.timeBox}>
+                          <Text style={styles.timeNumber}>{countdowns[tournament._id].minutes}</Text>
+                          <Text style={styles.timeLabel}>M</Text>
+                        </View>
+                        <Text style={styles.timeSeparator}>:</Text>
+                        <View style={styles.timeBox}>
+                          <Text style={styles.timeNumber}>{countdowns[tournament._id].seconds}</Text>
+                          <Text style={styles.timeLabel}>S</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
                   <View style={styles.tournamentHeader}>
                     <Text style={styles.tournamentTitle}>{tournament.name}</Text>
                     <View style={styles.timeTag}>
@@ -1022,6 +1100,63 @@ const styles = StyleSheet.create({
     color: COLORS.success,
     fontWeight: 'bold',
     marginLeft: 6,
+  },
+  startDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    backgroundColor: COLORS.darkGray,
+    padding: 8,
+    borderRadius: 8,
+  },
+  startDateText: {
+    fontSize: 13,
+    color: COLORS.white,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  countdownContainer: {
+    backgroundColor: COLORS.darkGray,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  countdownLabel: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  countdownTimer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeBox: {
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    minWidth: 35,
+    alignItems: 'center',
+  },
+  timeNumber: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.white,
+  },
+  timeLabel: {
+    fontSize: 10,
+    color: COLORS.white,
+    opacity: 0.8,
+    marginTop: -2,
+  },
+  timeSeparator: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.accent,
+    marginHorizontal: 4,
   },
   tabsContainer: {
     flexDirection: 'row',

@@ -154,13 +154,6 @@ const UserDetails = ({ navigation, route }) => {
               </Text>
             </View>
             <View style={styles.statItem}>
-              <MaterialCommunityIcons name="shield-check" size={20} color={user.kycVerified ? COLORS.success : COLORS.gray} />
-              <Text style={styles.statLabel}>KYC</Text>
-              <Text style={[styles.statValue, { color: user.kycVerified ? COLORS.success : COLORS.gray }]}>
-                {user.kycVerified ? 'Done' : 'Pending'}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
               <Ionicons name="calendar" size={20} color={COLORS.accent} />
               <Text style={styles.statLabel}>Joined</Text>
               <Text style={styles.statValue}>

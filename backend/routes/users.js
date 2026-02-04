@@ -61,39 +61,6 @@ router.put('/profile', authMiddleware, async (req, res) => {
   }
 });
 
-// Update KYC
-router.post('/kyc', authMiddleware, async (req, res) => {
-  try {
-    const { fullName, idType, idNumber, dateOfBirth } = req.body;
-
-    const user = await User.findById(req.userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    user.kycDetails = {
-      fullName,
-      idType,
-      idNumber,
-      dateOfBirth,
-    };
-    user.kycVerified = true;
-
-    await user.save();
-
-    res.json({
-      message: 'KYC updated successfully',
-      user: {
-        id: user._id,
-        username: user.username,
-        kycVerified: user.kycVerified,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'KYC update failed' });
-  }
-});
-
 // Change password
 router.post('/change-password', authMiddleware, async (req, res) => {
   try {

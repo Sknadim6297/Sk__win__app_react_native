@@ -26,10 +26,6 @@ const FAQScreen = ({ navigation }) => {
       answer: 'Yes, you can withdraw your winnings anytime. Go to Wallet > Withdraw Money and follow the process.',
     },
     {
-      question: 'What is KYC verification?',
-      answer: 'KYC (Know Your Customer) verification is required for withdrawals. It helps us comply with regulations and protect your account.',
-    },
-    {
       question: 'How do I report a user?',
       answer: 'If you encounter inappropriate behavior, contact our support team with details and screenshot evidence.',
     },

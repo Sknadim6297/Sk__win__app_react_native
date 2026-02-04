@@ -8,11 +8,15 @@ export const COLORS = {
   lightBlue: '#f5f542',
   darkBlue: '#2C5F8F',
   white: '#ffffff',
+  black: '#000000',
   gray: '#A0A8B8',
   lightGray: '#1a1f38',
   darkGray: '#131829',
   success: '#4CAF50',
   error: '#EF5350',
+  green: '#22C55E',
+  red: '#EF4444',
+  orange: '#F59E0B',
 };
 
 export const FONTS = {

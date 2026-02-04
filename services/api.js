@@ -98,10 +98,6 @@ export const userService = {
     method: 'PUT',
     body: profileData, // Let apiCall handle stringify
   }),
-  updateKYC: (kycData) => apiCall('/users/kyc', {
-    method: 'POST',
-    body: kycData, // Let apiCall handle stringify
-  }),
   changePassword: (passwordData) => apiCall('/users/change-password', {
     method: 'POST',
     body: passwordData, // Let apiCall handle stringify
@@ -135,6 +131,17 @@ export const tournamentService = {
   getResults: (id) => apiCall(`/tournaments/${id}/results`),
   getHistory: () => apiCall('/tournaments/user/history'),
   
+  // Slot booking endpoints
+  getSlots: (id) => apiCall(`/tournaments/${id}/slots`),
+  bookSlot: (id, slotNumber, gamingUsername) => apiCall(`/tournaments/${id}/book-slot`, {
+    method: 'POST',
+    body: JSON.stringify({ slotNumber, gamingUsername }),
+  }),
+  confirmSlotBooking: (id, slotNumber, gamingUsername) => apiCall(`/tournaments/${id}/confirm-slot-booking`, {
+    method: 'POST',
+    body: JSON.stringify({ slotNumber, gamingUsername }),
+  }),
+  
   // Admin endpoints
   createTournament: (data) => apiCall('/tournaments/admin/create', {
     method: 'POST',
@@ -166,6 +173,10 @@ export const tournamentService = {
   }),
   deleteTournament: (id) => apiCall(`/tournaments/admin/${id}`, {
     method: 'DELETE',
+  }),
+  lockTournament: (id, locked) => apiCall(`/tournaments/admin/${id}/lock`, {
+    method: 'POST',
+    body: JSON.stringify({ locked }),
   }),
   setTournamentWinners: (tournamentId, winners) => apiCall(`/admin/tournaments/${tournamentId}/set-winners`, {
     method: 'POST',

@@ -16,8 +16,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import DatePicker from 'react-native-date-picker';
-import { Picker } from '@react-native-picker/picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import RNPickerSelect from 'react-native-picker-select';
 import { COLORS } from '../../styles/theme';
 import { tournamentService, gameService } from '../../services/api';
 import Toast from '../../components/Toast';
@@ -73,7 +73,6 @@ const TournamentManagement = ({ navigation }) => {
     maxParticipants: '',
     startDate: new Date(),
     endDate: null,
-    minimumKYC: false,
     minimumBalance: '',
     roomId: '',
     roomPassword: '',
@@ -200,7 +199,6 @@ const TournamentManagement = ({ navigation }) => {
         prizePool: parseFloat(form.prizePool) || 0,
         perKill: parseFloat(form.perKill) || 0,
         maxParticipants: parseInt(form.maxParticipants) || 20,
-        minimumKYC: form.minimumKYC,
         minimumBalance: parseFloat(form.minimumBalance) || 0,
         startDate: form.startDate.toISOString(),
         endDate: form.endDate ? form.endDate.toISOString() : null,
@@ -234,7 +232,6 @@ const TournamentManagement = ({ navigation }) => {
       maxParticipants: '',
       startDate: new Date(),
       endDate: null,
-      minimumKYC: false,
       minimumBalance: '',
       roomId: '',
       roomPassword: '',
@@ -298,6 +295,35 @@ const TournamentManagement = ({ navigation }) => {
       showRoomCredentials: tournament.showRoomCredentials || false,
     });
     setShowRoomModal(true);
+  };
+
+  const handleLockToggle = async (tournament) => {
+    try {
+      const newLockedState = !tournament.locked;
+      const action = newLockedState ? 'lock' : 'unlock';
+      
+      Alert.alert(
+        `${action.charAt(0).toUpperCase() + action.slice(1)} Tournament`,
+        `Are you sure you want to ${action} "${tournament.name}"? ${newLockedState ? 'Users will not be able to join.' : 'Users will be able to join again.'}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: action.toUpperCase(),
+            onPress: async () => {
+              try {
+                await tournamentService.lockTournament(tournament._id, newLockedState);
+                showToast(`Tournament ${action}ed successfully!`, 'success');
+                fetchTournaments();
+              } catch (error) {
+                showToast(error.message || `Failed to ${action} tournament`, 'error');
+              }
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      showToast(error.message || 'Failed to toggle lock', 'error');
+    }
   };
 
   const handleSaveRoomCredentials = async () => {
@@ -504,7 +530,12 @@ const TournamentManagement = ({ navigation }) => {
                 <View key={tournament._id} style={styles.tournamentCard}>
                   <View style={styles.tournamentHeader}>
                     <View style={styles.tournamentInfo}>
-                      <Text style={styles.tournamentName}>{tournament.name}</Text>
+                      <View style={styles.tournamentTitleRow}>
+                        <Text style={styles.tournamentName}>{tournament.name}</Text>
+                        {tournament.locked && (
+                          <MaterialCommunityIcons name="lock" size={16} color="#FF8500" style={styles.lockIcon} />
+                        )}
+                      </View>
                       <Text style={styles.tournamentGame}>
                         {tournament.game?.name} - {tournament.gameMode?.name}
                       </Text>
@@ -540,6 +571,19 @@ const TournamentManagement = ({ navigation }) => {
                     >
                       <MaterialCommunityIcons name="eye" size={16} color={COLORS.accent} />
                       <Text style={styles.actionText}>View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[styles.actionButton, tournament.locked && styles.lockedButton]}
+                      onPress={() => handleLockToggle(tournament)}
+                    >
+                      <MaterialCommunityIcons 
+                        name={tournament.locked ? "lock" : "lock-open"} 
+                        size={16} 
+                        color={tournament.locked ? "#FF8500" : COLORS.accent} 
+                      />
+                      <Text style={[styles.actionText, tournament.locked && styles.lockedText]}>
+                        {tournament.locked ? "Locked" : "Lock"}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={styles.actionButton}
@@ -675,31 +719,37 @@ const TournamentManagement = ({ navigation }) => {
                 <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
                   <Text style={styles.label}>Mode</Text>
                   <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={form.mode}
+                    <RNPickerSelect
                       onValueChange={(itemValue) => setForm(prev => ({ ...prev, mode: itemValue }))}
-                      style={styles.picker}
-                      itemStyle={styles.pickerItem}
-                    >
-                      <Picker.Item label="Solo" value="solo" />
-                      <Picker.Item label="Duo" value="duo" />
-                      <Picker.Item label="Squad" value="squad" />
-                    </Picker>
+                      items={[
+                        { label: 'Solo', value: 'solo' },
+                        { label: 'Duo', value: 'duo' },
+                        { label: 'Squad', value: 'squad' },
+                      ]}
+                      value={form.mode}
+                      style={{
+                        inputIOS: styles.picker,
+                        inputAndroid: styles.picker,
+                        placeholder: { color: COLORS.gray },
+                      }}
+                      useNativeAndroidPickerStyle={false}
+                    />
                   </View>
                 </View>
                 <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
                   <Text style={styles.label}>Map</Text>
                   <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={form.map}
+                    <RNPickerSelect
                       onValueChange={(itemValue) => setForm(prev => ({ ...prev, map: itemValue }))}
-                      style={styles.picker}
-                      itemStyle={styles.pickerItem}
-                    >
-                      {AVAILABLE_MAPS.map((map) => (
-                        <Picker.Item key={map.value} label={map.label} value={map.value} />
-                      ))}
-                    </Picker>
+                      items={AVAILABLE_MAPS}
+                      value={form.map}
+                      style={{
+                        inputIOS: styles.picker,
+                        inputAndroid: styles.picker,
+                        placeholder: { color: COLORS.gray },
+                      }}
+                      useNativeAndroidPickerStyle={false}
+                    />
                   </View>
                 </View>
               </View>
@@ -722,21 +772,19 @@ const TournamentManagement = ({ navigation }) => {
                     <Text style={styles.dateInputText}>{formatTimeForDisplay(form.startDate)}</Text>
                   </TouchableOpacity>
                 </View>
-                <DatePicker
-                  modal
-                  open={showStartDatePicker}
-                  date={form.startDate || new Date()}
-                  onConfirm={(date) => {
-                    setForm(prev => ({ ...prev, startDate: date }));
-                    setShowStartDatePicker(false);
-                  }}
-                  onCancel={() => setShowStartDatePicker(false)}
-                  title="Select Start Date & Time"
-                  confirmText="Confirm"
-                  cancelText="Cancel"
-                  mode="datetime"
-                  is24hourSource="locale"
-                />
+                {showStartDatePicker && (
+                  <DateTimePicker
+                    value={form.startDate || new Date()}
+                    mode="datetime"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, selectedDate) => {
+                      setShowStartDatePicker(Platform.OS === 'ios');
+                      if (selectedDate) {
+                        setForm(prev => ({ ...prev, startDate: selectedDate }));
+                      }
+                    }}
+                  />
+                )}
               </View>
 
               <View style={styles.formGroup}>
@@ -955,28 +1003,26 @@ const TournamentManagement = ({ navigation }) => {
               <View style={styles.formGroup}>
                 <Text style={styles.label}>🥇 1st Place (Required) *</Text>
                 <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={winnersForm.firstPlace}
+                  <RNPickerSelect
                     onValueChange={(itemValue) => setWinnersForm(prev => ({ ...prev, firstPlace: itemValue }))}
-                    style={styles.picker}
-                    itemStyle={styles.pickerItem}
-                  >
-                    <Picker.Item label="Select 1st Place Winner" value={null} />
-                    {Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0 ? (
-                      tournamentParticipants.map((participant) => {
-                        const userName = participant.user?.username || participant.user?.email || participant.playerName || 'Player';
-                        return (
-                          <Picker.Item 
-                            key={participant._id}
-                            label={userName} 
-                            value={participant._id}
-                          />
-                        );
-                      })
-                    ) : (
-                      <Picker.Item label="No participants found" value={null} />
-                    )}
-                  </Picker>
+                    items={[
+                      ...(Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0
+                        ? tournamentParticipants.map((participant) => ({
+                            label: participant.user?.username || participant.user?.email || participant.playerName || 'Player',
+                            value: participant._id,
+                          }))
+                        : []
+                      ),
+                    ]}
+                    value={winnersForm.firstPlace}
+                    placeholder={{ label: 'Select 1st Place Winner', value: null }}
+                    style={{
+                      inputIOS: styles.picker,
+                      inputAndroid: styles.picker,
+                      placeholder: { color: COLORS.gray },
+                    }}
+                    useNativeAndroidPickerStyle={false}
+                  />
                 </View>
               </View>
 
@@ -984,28 +1030,26 @@ const TournamentManagement = ({ navigation }) => {
               <View style={styles.formGroup}>
                 <Text style={styles.label}>🥈 2nd Place (Optional)</Text>
                 <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={winnersForm.secondPlace}
+                  <RNPickerSelect
                     onValueChange={(itemValue) => setWinnersForm(prev => ({ ...prev, secondPlace: itemValue }))}
-                    style={styles.picker}
-                    itemStyle={styles.pickerItem}
-                  >
-                    <Picker.Item label="Select 2nd Place Winner" value={null} />
-                    {Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0 ? (
-                      tournamentParticipants.map((participant) => {
-                        const userName = participant.user?.username || participant.user?.email || participant.playerName || 'Player';
-                        return (
-                          <Picker.Item 
-                            key={participant._id}
-                            label={userName} 
-                            value={participant._id}
-                          />
-                        );
-                      })
-                    ) : (
-                      <Picker.Item label="No participants found" value={null} />
-                    )}
-                  </Picker>
+                    items={[
+                      ...(Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0
+                        ? tournamentParticipants.map((participant) => ({
+                            label: participant.user?.username || participant.user?.email || participant.playerName || 'Player',
+                            value: participant._id,
+                          }))
+                        : []
+                      ),
+                    ]}
+                    value={winnersForm.secondPlace}
+                    placeholder={{ label: 'Select 2nd Place Winner', value: null }}
+                    style={{
+                      inputIOS: styles.picker,
+                      inputAndroid: styles.picker,
+                      placeholder: { color: COLORS.gray },
+                    }}
+                    useNativeAndroidPickerStyle={false}
+                  />
                 </View>
               </View>
 
@@ -1013,28 +1057,26 @@ const TournamentManagement = ({ navigation }) => {
               <View style={styles.formGroup}>
                 <Text style={styles.label}>🥉 3rd Place (Optional)</Text>
                 <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={winnersForm.thirdPlace}
+                  <RNPickerSelect
                     onValueChange={(itemValue) => setWinnersForm(prev => ({ ...prev, thirdPlace: itemValue }))}
-                    style={styles.picker}
-                    itemStyle={styles.pickerItem}
-                  >
-                    <Picker.Item label="Select 3rd Place Winner" value={null} />
-                    {Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0 ? (
-                      tournamentParticipants.map((participant) => {
-                        const userName = participant.user?.username || participant.user?.email || participant.playerName || 'Player';
-                        return (
-                          <Picker.Item 
-                            key={participant._id}
-                            label={userName} 
-                            value={participant._id}
-                          />
-                        );
-                      })
-                    ) : (
-                      <Picker.Item label="No participants found" value={null} />
-                    )}
-                  </Picker>
+                    items={[
+                      ...(Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0
+                        ? tournamentParticipants.map((participant) => ({
+                            label: participant.user?.username || participant.user?.email || participant.playerName || 'Player',
+                            value: participant._id,
+                          }))
+                        : []
+                      ),
+                    ]}
+                    value={winnersForm.thirdPlace}
+                    placeholder={{ label: 'Select 3rd Place Winner', value: null }}
+                    style={{
+                      inputIOS: styles.picker,
+                      inputAndroid: styles.picker,
+                      placeholder: { color: COLORS.gray },
+                    }}
+                    useNativeAndroidPickerStyle={false}
+                  />
                 </View>
               </View>
 
@@ -1210,11 +1252,18 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
+  tournamentTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   tournamentName: {
     fontSize: 16,
     fontWeight: 'bold',
     color: COLORS.white,
-    marginBottom: 4,
+  },
+  lockIcon: {
+    marginLeft: 6,
   },
   tournamentGame: {
     fontSize: 12,
@@ -1227,6 +1276,9 @@ const styles = StyleSheet.create({
   },
   statusupcoming: {
     backgroundColor: 'rgba(255, 193, 7, 0.2)',
+  },
+  statuslocked: {
+    backgroundColor: 'rgba(255, 133, 0, 0.2)',
   },
   statuslive: {
     backgroundColor: 'rgba(40, 167, 69, 0.2)',
@@ -1271,6 +1323,9 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: 'rgba(255, 107, 107, 0.2)',
   },
+  lockedButton: {
+    backgroundColor: 'rgba(255, 133, 0, 0.2)',
+  },
   actionText: {
     fontSize: 12,
     color: COLORS.white,
@@ -1278,6 +1333,9 @@ const styles = StyleSheet.create({
   },
   deleteText: {
     color: '#FF6B6B',
+  },
+  lockedText: {
+    color: '#FF8500',
   },
   modalOverlay: {
     flex: 1,

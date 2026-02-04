@@ -25,6 +25,21 @@ function calculateTournamentStatus(tournament) {
     return 'completed';
   }
 
+  // If room credentials are shared, tournament becomes locked
+  if (tournament.roomCredentialsSharedAt || (tournament.roomId && tournament.roomPassword && tournament.showRoomCredentials)) {
+    if (!tournament.locked) {
+      tournament.locked = true;
+      tournament.lockedAt = tournament.roomCredentialsSharedAt || new Date();
+      tournament.status = 'locked';
+    }
+    
+    // Check if it should move to live
+    if (now >= startDate) {
+      return 'live';
+    }
+    return 'locked';
+  }
+
   // Auto-calculate based on time
   if (endDate && now > endDate) {
     return 'completed';
@@ -35,7 +50,7 @@ function calculateTournamentStatus(tournament) {
   }
 
   if (now < startDate) {
-    return 'upcoming';
+    return tournament.locked ? 'locked' : 'upcoming';
   }
 
   return 'upcoming';
@@ -77,7 +92,6 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       maxParticipants, 
       startDate, 
       endDate, 
-      minimumKYC, 
       minimumBalance,
       prizes, 
       roomId, 
@@ -133,7 +147,6 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       currentParticipants: 0,
       startDate: new Date(startDate),
       endDate: endDate ? new Date(endDate) : null,
-      minimumKYC: minimumKYC || false,
       minimumBalance: minimumBalance || 0,
       prizes: prizes || {
         first: prizePool ? prizePool * 0.5 : 0,
@@ -180,18 +193,41 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
 router.put('/admin/:id', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can update tournaments' });
     }
 
+    const updateData = { ...req.body, updatedAt: new Date() };
+    
+    // Check if room credentials are being shared for the first time
+    if (updateData.showRoomCredentials && updateData.roomId && updateData.roomPassword) {
+      const existingTournament = await Tournament.findById(req.params.id);
+      if (!existingTournament.roomCredentialsSharedAt) {
+        updateData.roomCredentialsSharedAt = new Date();
+        updateData.locked = true;
+        updateData.lockedAt = new Date();
+        updateData.status = 'locked';
+      }
+    }
+
     const tournament = await Tournament.findByIdAndUpdate(
       req.params.id,
-      { ...req.body, updatedAt: new Date() },
+      updateData,
       { new: true }
     ).populate('game', 'name').populate('gameMode', 'name');
 
     if (!tournament) {
       return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    // Update status based on current time
+    const newStatus = calculateTournamentStatus(tournament);
+    if (newStatus !== tournament.status) {
+      tournament.status = newStatus;
+      await tournament.save();
     }
 
     res.json({ message: 'Tournament updated successfully', tournament });
@@ -205,6 +241,9 @@ router.put('/admin/:id', authMiddleware, async (req, res) => {
 router.delete('/admin/:id', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can delete tournaments' });
     }
@@ -225,10 +264,63 @@ router.delete('/admin/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// Lock/Unlock tournament (Admin)
+router.post('/admin/:id/lock', authMiddleware, async (req, res) => {
+  try {
+    const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can lock/unlock tournaments' });
+    }
+
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    const { locked } = req.body;
+    
+    tournament.locked = locked;
+    if (locked) {
+      tournament.lockedAt = new Date();
+      tournament.status = 'locked';
+    } else {
+      tournament.lockedAt = null;
+      // Recalculate status when unlocking
+      const now = new Date();
+      const startDate = new Date(tournament.startDate);
+      if (now >= startDate) {
+        tournament.status = 'live';
+      } else {
+        tournament.status = 'upcoming';
+      }
+    }
+    
+    await tournament.save();
+
+    const populatedTournament = await Tournament.findById(tournament._id)
+      .populate('game', 'name')
+      .populate('gameMode', 'name');
+
+    res.json({ 
+      message: `Tournament ${locked ? 'locked' : 'unlocked'} successfully`, 
+      tournament: populatedTournament 
+    });
+  } catch (error) {
+    console.error('Error locking/unlocking tournament:', error);
+    res.status(500).json({ error: 'Failed to lock/unlock tournament' });
+  }
+});
+
 // Get tournaments by game mode (Admin)
 router.get('/admin/by-gamemode/:gameModeId', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view this' });
     }
@@ -242,6 +334,7 @@ router.get('/admin/by-gamemode/:gameModeId', authMiddleware, async (req, res) =>
     res.json(tournaments);
   } catch (error) {
     console.error('Error fetching tournaments by game mode:', error);
+    console.error('Stack trace:', error.stack);
     res.status(500).json({ error: 'Failed to fetch tournaments' });
   }
 });
@@ -250,6 +343,9 @@ router.get('/admin/by-gamemode/:gameModeId', authMiddleware, async (req, res) =>
 router.get('/admin/all', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view this' });
     }
@@ -281,6 +377,9 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
 router.put('/admin/:id/room', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can update room details' });
     }
@@ -314,6 +413,9 @@ router.put('/admin/:id/room', authMiddleware, async (req, res) => {
 router.put('/admin/:id/status', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can update tournaments' });
     }
@@ -376,6 +478,9 @@ router.put('/admin/:id/status', authMiddleware, async (req, res) => {
 router.post('/admin/:id/winners', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can select winners' });
     }
@@ -439,6 +544,9 @@ router.post('/admin/:id/winners', authMiddleware, async (req, res) => {
 router.post('/admin/:id/distribute-prizes', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can distribute prizes' });
     }
@@ -503,6 +611,9 @@ router.post('/admin/:id/distribute-prizes', authMiddleware, async (req, res) => 
 router.delete('/admin/:id', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can delete tournaments' });
     }
@@ -527,6 +638,9 @@ router.delete('/admin/:id', authMiddleware, async (req, res) => {
 router.get('/admin/history', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view tournament history' });
     }
@@ -571,6 +685,8 @@ router.get('/admin/history', authMiddleware, async (req, res) => {
             username: p.userId?.username,
             email: p.userId?.email,
             phoneNumber: p.userId?.phoneNumber,
+            slotNumber: p.slotNumber,
+            gamingUsername: p.gamingUsername,
             status: p.status,
             joinedAt: p.joinedAt,
             rank: p.rank,
@@ -591,6 +707,9 @@ router.get('/admin/history', authMiddleware, async (req, res) => {
 router.get('/admin/:id/participants', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Only admins can view participants' });
     }
@@ -627,6 +746,8 @@ router.get('/admin/:id/participants', authMiddleware, async (req, res) => {
         email: p.userId?.email,
         phoneNumber: p.userId?.phoneNumber,
         walletBalance: p.userId?.wallet?.balance,
+        slotNumber: p.slotNumber,
+        gamingUsername: p.gamingUsername,
         status: p.status,
         joinedAt: p.joinedAt,
         rank: p.rank,
@@ -641,6 +762,30 @@ router.get('/admin/:id/participants', authMiddleware, async (req, res) => {
 });
 
 // ===== USER ROUTES =====
+
+// Debug endpoint to check user's joined tournaments
+router.get('/debug/my-joins', authMiddleware, async (req, res) => {
+  try {
+    const participants = await TournamentParticipant.find({ userId: req.userId })
+      .populate('tournamentId', 'name')
+      .select('tournamentId slotNumber gamingUsername joinedAt');
+    
+    res.json({
+      userId: req.userId,
+      totalJoined: participants.length,
+      tournaments: participants.map(p => ({
+        tournamentId: p.tournamentId?._id,
+        tournamentName: p.tournamentId?.name,
+        slotNumber: p.slotNumber,
+        gamingUsername: p.gamingUsername,
+        joinedAt: p.joinedAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: 'Debug failed' });
+  }
+});
 
 // Get all tournaments
 router.get('/list', async (req, res) => {
@@ -665,6 +810,11 @@ router.get('/list', async (req, res) => {
             userId,
           });
           userJoined = !!userParticipant;
+          
+          // Debug logging
+          if (userParticipant) {
+            console.log(`User ${userId} has joined tournament ${tournament._id} (${tournament.name})`);
+          }
         }
 
         // Calculate real-time status
@@ -690,10 +840,15 @@ async function extractUserIdFromToken(authHeader) {
   try {
     if (!authHeader?.startsWith('Bearer ')) return null;
     const token = authHeader.slice(7);
-    // Decode token logic - assuming JWT
-    const decoded = require('jsonwebtoken').decode(token);
-    return decoded?.userId || null;
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+    
+    // Verify and decode token properly
+    const decoded = jwt.verify(token, JWT_SECRET);
+    console.log('Extracted userId from token:', decoded.userId);
+    return decoded.userId || null;
   } catch (err) {
+    console.error('Error extracting userId from token:', err.message);
     return null;
   }
 }
@@ -789,35 +944,13 @@ router.get('/user/history', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
-  try {
-    const tournament = await Tournament.findById(req.params.id);
-
-    if (!tournament) {
-      return res.status(404).json({ error: 'Tournament not found' });
-    }
-
-    // Get participants
-    const participants = await TournamentParticipant.find({ tournamentId: req.params.id })
-      .populate('userId', 'username email');
-
-    res.json({
-      ...tournament.toObject(),
-      participants,
-      participantCount: participants.length,
-      roomId: null,
-      roomPassword: null,
-      showRoomCredentials: tournament.showRoomCredentials,
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch tournament' });
-  }
-});
-
 // Check if user can join tournament
 router.get('/:id/canJoin', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     const tournament = await Tournament.findById(req.params.id);
 
     if (!tournament) {
@@ -838,7 +971,6 @@ router.get('/:id/canJoin', authMiddleware, async (req, res) => {
     // Check eligibility
     const checks = {
       isActive: user.status === 'active',
-      hasKYC: tournament.minimumKYC ? user.kycVerified : true,
       hasSufficientBalance: user.wallet.balance >= tournament.entryFee,
       spotsAvailable: participantCount < tournament.maxPlayers,
       notAlreadyRegistered: !alreadyJoined,
@@ -865,6 +997,9 @@ router.get('/:id/canJoin', authMiddleware, async (req, res) => {
 router.post('/:id/join', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     const tournament = await Tournament.findById(req.params.id);
 
     if (!tournament) {
@@ -881,16 +1016,35 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Account is not active' });
     }
 
-    if (tournament.minimumKYC && !user.kycVerified) {
-      return res.status(403).json({ error: 'KYC verification required' });
+    if (user.wallet.balance < tournament.entryFee) {
+      return res.status(400).json({ 
+        error: `Insufficient balance! You need ₹${tournament.entryFee} but have ₹${user.wallet.balance}. Please add money to your wallet.` 
+      });
     }
 
-    if (user.wallet.balance < tournament.entryFee) {
-      return res.status(400).json({ error: 'Insufficient balance' });
+    // Check if tournament is locked (room credentials shared)
+    if (tournament.locked || tournament.status === 'locked') {
+      return res.status(400).json({ 
+        error: 'Tournament will start soon! Registration is now closed. Better luck in the next tournament!' 
+      });
+    }
+
+    if (tournament.status === 'live') {
+      return res.status(400).json({ 
+        error: 'Tournament has already started! Registration is closed. Join the next tournament!' 
+      });
+    }
+
+    if (tournament.status === 'completed') {
+      return res.status(400).json({ 
+        error: 'This tournament has ended. Check out our upcoming tournaments!' 
+      });
     }
 
     if (tournament.status !== 'upcoming') {
-      return res.status(400).json({ error: 'Tournament is not accepting registrations' });
+      return res.status(400).json({ 
+        error: 'Registration is currently closed for this tournament. Try another one!' 
+      });
     }
 
     // Check if already joined
@@ -900,7 +1054,9 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
     });
 
     if (alreadyJoined) {
-      return res.status(400).json({ error: 'Already registered for this tournament' });
+      return res.status(400).json({ 
+        error: 'You have already joined this tournament! Good luck!' 
+      });
     }
 
     // Check spot availability
@@ -909,7 +1065,9 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
     });
 
     if (participantCount >= tournament.maxPlayers) {
-      return res.status(400).json({ error: 'Tournament is full' });
+      return res.status(400).json({ 
+        error: 'Tournament is full! All slots are taken. Check out other available tournaments!' 
+      });
     }
 
     // Add participant
@@ -1018,6 +1176,327 @@ router.get('/:id/results', async (req, res) => {
     res.json(results);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch tournament results' });
+  }
+});
+
+// ===== SLOT BOOKING ENDPOINTS =====
+
+// Get all slots for a tournament (initialized if not exists)
+router.get('/:id/slots', async (req, res) => {
+  try {
+    let tournament = await Tournament.findById(req.params.id);
+
+    if (!tournament) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    // Initialize slots if not already created
+    if (!tournament.slots || tournament.slots.length === 0) {
+      const newSlots = [];
+      for (let i = 1; i <= 50; i++) {
+        newSlots.push({
+          slotNumber: i,
+          userId: null,
+          gamingUsername: null,
+          bookedAt: null,
+          isBooked: false,
+        });
+      }
+      tournament.slots = newSlots;
+      tournament = await tournament.save();
+    }
+
+    // Format response with slot details
+    const slotsWithUsernames = tournament.slots.map(slot => ({
+      slotNumber: slot.slotNumber,
+      isBooked: slot.isBooked,
+      gamingUsername: slot.isBooked ? slot.gamingUsername : null,
+      userId: slot.isBooked ? slot.userId : null,
+    }));
+
+    res.json({
+      tournamentId: tournament._id,
+      totalSlots: 50,
+      bookedSlots: tournament.slots.filter(s => s.isBooked).length,
+      availableSlots: 50 - tournament.slots.filter(s => s.isBooked).length,
+      slots: slotsWithUsernames,
+    });
+  } catch (error) {
+    console.error('Error fetching slots:', error);
+    res.status(500).json({ error: 'Failed to fetch slots' });
+  }
+});
+
+// Book a slot for tournament
+router.post('/:id/book-slot', authMiddleware, async (req, res) => {
+  try {
+    const { slotNumber, gamingUsername } = req.body;
+
+    // Validate input
+    if (!slotNumber || !gamingUsername) {
+      return res.status(400).json({ error: 'Slot number and gaming username are required' });
+    }
+
+    if (slotNumber < 1 || slotNumber > 50) {
+      return res.status(400).json({ error: 'Invalid slot number. Must be between 1 and 50' });
+    }
+
+    if (gamingUsername.length < 3) {
+      return res.status(400).json({ error: 'Gaming username must be at least 3 characters' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    // Initialize slots if not already created
+    if (!tournament.slots || tournament.slots.length === 0) {
+      const newSlots = [];
+      for (let i = 1; i <= 50; i++) {
+        newSlots.push({
+          slotNumber: i,
+          userId: null,
+          gamingUsername: null,
+          bookedAt: null,
+          isBooked: false,
+        });
+      }
+      tournament.slots = newSlots;
+      await tournament.save();
+    }
+
+    // Check if tournament is accepting registrations
+    if (tournament.status !== 'upcoming') {
+      return res.status(400).json({ error: 'Tournament registration is closed' });
+    }
+
+    if (tournament.locked || tournament.status === 'locked') {
+      return res.status(400).json({ error: 'Tournament will start soon! Registration is now closed.' });
+    }
+
+    // Check 1: Does user already have a slot in this tournament? (Check slots array)
+    const existingSlot = tournament.slots.find(s => s.userId && s.userId.toString() === req.userId);
+    if (existingSlot) {
+      return res.status(400).json({ 
+        error: 'You have already booked a slot in this tournament',
+        existingSlotNumber: existingSlot.slotNumber 
+      });
+    }
+
+    // Check 2: Does user already have a participant record? (Double check)
+    const existingParticipant = await TournamentParticipant.findOne({
+      tournamentId: req.params.id,
+      userId: req.userId,
+    });
+    if (existingParticipant) {
+      return res.status(400).json({ 
+        error: 'You have already joined this tournament',
+        existingSlotNumber: existingParticipant.slotNumber 
+      });
+    }
+
+    // Check 3: Find the requested slot
+    const slot = tournament.slots.find(s => s.slotNumber === slotNumber);
+    if (!slot) {
+      return res.status(404).json({ error: 'Slot not found' });
+    }
+
+    // Check 4: Is THIS specific slot already booked by someone else?
+    if (slot.isBooked) {
+      return res.status(400).json({ 
+        error: 'This slot is already booked by another player',
+        slotNumber: slotNumber 
+      });
+    }
+
+    // Step 1: Check wallet balance
+    if (user.wallet.balance < tournament.entryFee) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Insufficient balance',
+        message: `❌ Insufficient balance. You need ₹${tournament.entryFee} but have ₹${user.wallet.balance}. Please add money to join this tournament.`,
+        requiredAmount: tournament.entryFee,
+        currentBalance: user.wallet.balance,
+      });
+    }
+
+    // Step 4: Check for username mismatch
+    const usernameMismatch = user.gameUsername && user.gameUsername.toLowerCase() !== gamingUsername.toLowerCase();
+
+    if (usernameMismatch) {
+      return res.status(200).json({
+        success: true,
+        step: 'confirm_username_mismatch',
+        message: '⚠️ Gaming username does not match your profile username.',
+        profileUsername: user.gameUsername,
+        enteredUsername: gamingUsername,
+        warning: 'You can continue, but no refund will be given if details are wrong.',
+        requiresConfirmation: true,
+      });
+    }
+
+    // Step 5: Atomic transaction - Book the slot and deduct entry fee
+    // Update slot with booking
+    slot.userId = req.userId;
+    slot.gamingUsername = gamingUsername;
+    slot.bookedAt = new Date();
+    slot.isBooked = true;
+
+    // Deduct entry fee from wallet
+    user.wallet.balance -= tournament.entryFee;
+    user.wallet.totalDeposited = (user.wallet.totalDeposited || 0);
+    
+    // Create transaction record
+    const transaction = new WalletTransaction({
+      userId: req.userId,
+      type: 'tournament_entry',
+      amount: tournament.entryFee,
+      tournamentId: req.params.id,
+      description: `Entry fee for ${tournament.name} - Slot ${slotNumber}`,
+      status: 'completed',
+    });
+
+    // Save all changes atomically
+    await tournament.save();
+    await user.save();
+    await transaction.save();
+
+    // Create tournament participant record
+    const participant = new TournamentParticipant({
+      tournamentId: req.params.id,
+      userId: req.userId,
+      slotNumber: slotNumber,
+      gamingUsername: gamingUsername,
+      status: 'joined',
+      joinedAt: new Date(),
+    });
+    await participant.save();
+
+    res.json({
+      success: true,
+      message: '✅ Slot booked successfully!',
+      booking: {
+        slotNumber: slotNumber,
+        gamingUsername: gamingUsername,
+        entryFee: tournament.entryFee,
+        tournamentName: tournament.name,
+        remainingBalance: user.wallet.balance,
+      },
+    });
+  } catch (error) {
+    console.error('Error booking slot:', error);
+    res.status(500).json({ error: 'Failed to book slot' });
+  }
+});
+
+// Confirm username mismatch and proceed with booking
+router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
+  try {
+    const { slotNumber, gamingUsername } = req.body;
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    // Find the slot
+    const slot = tournament.slots.find(s => s.slotNumber === slotNumber);
+    if (!slot) {
+      return res.status(404).json({ error: 'Slot not found' });
+    }
+
+    if (slot.isBooked) {
+      return res.status(400).json({ error: 'This slot is already booked' });
+    }
+
+    // Final wallet check
+    if (user.wallet.balance < tournament.entryFee) {
+      return res.status(400).json({ error: 'Insufficient balance' });
+    }
+
+    // Book the slot and deduct entry fee
+    slot.userId = req.userId;
+    slot.gamingUsername = gamingUsername;
+    slot.bookedAt = new Date();
+    slot.isBooked = true;
+
+    user.wallet.balance -= tournament.entryFee;
+
+    const transaction = new WalletTransaction({
+      userId: req.userId,
+      type: 'tournament_entry',
+      amount: tournament.entryFee,
+      tournamentId: req.params.id,
+      description: `Entry fee for ${tournament.name} - Slot ${slotNumber}`,
+      status: 'completed',
+    });
+
+    await tournament.save();
+    await user.save();
+    await transaction.save();
+
+    const participant = new TournamentParticipant({
+      tournamentId: req.params.id,
+      userId: req.userId,
+      slotNumber: slotNumber,
+      gamingUsername: gamingUsername,
+      status: 'joined',
+      joinedAt: new Date(),
+    });
+    await participant.save();
+
+    res.json({
+      success: true,
+      message: '✅ Slot booked successfully!',
+      booking: {
+        slotNumber: slotNumber,
+        gamingUsername: gamingUsername,
+        entryFee: tournament.entryFee,
+        tournamentName: tournament.name,
+        remainingBalance: user.wallet.balance,
+      },
+    });
+  } catch (error) {
+    console.error('Error confirming slot booking:', error);
+    res.status(500).json({ error: 'Failed to confirm slot booking' });
+  }
+});
+
+// ===== GENERIC ROUTE - MUST BE LAST =====
+// Get tournament by ID (generic - must be after all specific routes)
+router.get('/:id', async (req, res) => {
+  try {
+    const tournament = await Tournament.findById(req.params.id);
+
+    if (!tournament) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    // Get participants
+    const participants = await TournamentParticipant.find({ tournamentId: req.params.id })
+      .populate('userId', 'username email');
+
+    res.json({
+      ...tournament.toObject(),
+      participants,
+      participantCount: participants.length,
+      roomId: null,
+      roomPassword: null,
+      showRoomCredentials: tournament.showRoomCredentials,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch tournament' });
   }
 });
 

@@ -48,6 +48,8 @@ const HistoryScreen = ({ navigation }) => {
               prize: item.prizeAmount || 0,
               entryFee: tournament.entryFee || 0,
               totalPlayers: tournament.maxPlayers || 0,
+              slotNumber: item.slotNumber,
+              gamingUsername: item.gamingUsername,
             };
           })
         : [];
@@ -169,6 +171,12 @@ const HistoryScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.matchFooter}>
+        <View style={styles.slotInfoRow}>
+          <Text style={styles.slotInfoLabel}>Slot:</Text>
+          <Text style={styles.slotInfoValue}>{match.slotNumber ? `#${match.slotNumber}` : '-'}</Text>
+          <Text style={[styles.slotInfoLabel, { marginLeft: 12 }]}>Gaming ID:</Text>
+          <Text style={styles.slotInfoValue}>{match.gamingUsername || '-'}</Text>
+        </View>
         <View style={styles.dateTimeInfo}>
           <CalendarIcon size={14} color={COLORS.gray} />
           <Text style={styles.dateText}>{formatDateTime(match.joinedAt).date}</Text>
@@ -481,6 +489,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.darkGray,
     paddingTop: 12,
+  },
+  slotInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  slotInfoLabel: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginRight: 4,
+  },
+  slotInfoValue: {
+    fontSize: 12,
+    color: COLORS.white,
+    fontWeight: '600',
   },
   dateTimeInfo: {
     flexDirection: 'row',
