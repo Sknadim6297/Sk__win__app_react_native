@@ -54,18 +54,21 @@ const tournamentSchema = new mongoose.Schema({
   }],
   status: {
     type: String,
-    enum: ['upcoming', 'live', 'completed', 'cancelled'],
+    enum: ['upcoming', 'locked', 'live', 'completed', 'cancelled'],
     default: 'upcoming',
+  },
+  locked: {
+    type: Boolean,
+    default: false,
+  },
+  lockedAt: {
+    type: Date,
   },
   startDate: {
     type: Date,
     required: true,
   },
   endDate: Date,
-  minimumKYC: {
-    type: Boolean,
-    default: true,
-  },
   minimumBalance: {
     type: Number,
     default: 0,
@@ -75,6 +78,9 @@ const tournamentSchema = new mongoose.Schema({
   showRoomCredentials: {
     type: Boolean,
     default: false,
+  },
+  roomCredentialsSharedAt: {
+    type: Date,
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -89,6 +95,25 @@ const tournamentSchema = new mongoose.Schema({
     userId: mongoose.Schema.Types.ObjectId,
     position: Number,
     reward: Number,
+  }],
+  // Slot booking system (50 fixed slots)
+  slots: [{
+    slotNumber: {
+      type: Number,
+      min: 1,
+      max: 50,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    gamingUsername: String,
+    bookedAt: Date,
+    isBooked: {
+      type: Boolean,
+      default: false,
+    },
   }],
   createdAt: {
     type: Date,

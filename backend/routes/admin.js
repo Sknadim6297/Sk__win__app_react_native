@@ -10,6 +10,9 @@ const router = express.Router();
 router.get('/all', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -25,13 +28,15 @@ router.get('/all', authMiddleware, async (req, res) => {
 router.get('/stats', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
     const totalUsers = await User.countDocuments();
     const verifiedUsers = await User.countDocuments({ verified: true });
-    const kycVerifiedUsers = await User.countDocuments({ kycVerified: true });
     const suspendedUsers = await User.countDocuments({ status: 'suspended' });
     const bannedUsers = await User.countDocuments({ status: 'banned' });
 
@@ -47,12 +52,13 @@ router.get('/stats', authMiddleware, async (req, res) => {
     res.json({
       totalUsers,
       verifiedUsers,
-      kycVerifiedUsers,
       suspendedUsers,
       bannedUsers,
       totalWalletBalance: totalWalletBalance[0]?.total || 0,
     });
   } catch (error) {
+    console.error('Error fetching statistics:', error);
+    console.error('Stack trace:', error.stack);
     res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 });
@@ -61,6 +67,9 @@ router.get('/stats', authMiddleware, async (req, res) => {
 router.get('/user/:userId/details', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -144,6 +153,9 @@ router.get('/user/:userId/details', authMiddleware, async (req, res) => {
 router.post('/suspend/:userId', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -164,6 +176,9 @@ router.post('/suspend/:userId', authMiddleware, async (req, res) => {
 router.post('/ban/:userId', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -185,6 +200,9 @@ router.post('/ban/:userId', authMiddleware, async (req, res) => {
 router.post('/activate/:userId', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -205,6 +223,9 @@ router.post('/activate/:userId', authMiddleware, async (req, res) => {
 router.post('/verify/:userId', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -225,6 +246,9 @@ router.post('/verify/:userId', authMiddleware, async (req, res) => {
 router.post('/tournaments/:tournamentId/set-winners', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
@@ -256,6 +280,9 @@ router.post('/tournaments/:tournamentId/set-winners', authMiddleware, async (req
 router.post('/tournaments/:tournamentId/complete', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     if (admin.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }

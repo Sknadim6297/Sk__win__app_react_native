@@ -63,7 +63,6 @@ Server will run on `http://localhost:5000`
 
 ### Users
 - `GET /api/users/profile` - Get user profile
-- `POST /api/users/kyc` - Update KYC details
 
 ### Admin
 - `GET /api/admin/all` - Get all users (admin only)
@@ -90,10 +89,9 @@ Server will run on `http://localhost:5000`
 
 A user can join a tournament only if:
 1. Account status is 'active' (not banned/suspended)
-2. KYC verification is completed (if required)
-3. Sufficient wallet balance (entry fee + minimum balance)
-4. Tournament has available spots
-5. User not already registered
+2. Sufficient wallet balance (entry fee + minimum balance)
+3. Tournament has available spots
+4. User not already registered
 
 ## Admin Capabilities
 

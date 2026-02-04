@@ -113,7 +113,6 @@ router.post('/login', async (req, res) => {
         email: user.email,
         role: user.role,
         verified: user.verified,
-        kycVerified: user.kycVerified,
         wallet: user.wallet,
       },
     });

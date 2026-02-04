@@ -78,12 +78,8 @@ const TournamentScreen = ({ navigation }) => {
   };
 
   const shouldShowJoinToast = (message = '') => {
-    const normalized = message.toLowerCase();
-    return (
-      normalized.includes('balance') ||
-      normalized.includes('full') ||
-      normalized.includes('started')
-    );
+    // Always show user-friendly messages
+    return true;
   };
 
   const handleJoinTournament = async (tournament) => {
@@ -99,21 +95,23 @@ const TournamentScreen = ({ navigation }) => {
         const updated = new Set(joinedTournaments);
         updated.add(tournament._id);
         setJoinedTournaments(updated);
+        showToast('Successfully joined tournament! Good luck! 🎮', 'success');
         await fetchTournaments();
       } catch (error) {
         const message = error.message || 'Failed to join tournament';
-        if (shouldShowJoinToast(message)) {
-          showToast(message, 'error');
+        // Determine toast type based on error message
+        let toastType = 'error';
+        if (message.includes('balance') || message.includes('full') || message.includes('locked') || message.includes('closed') || message.includes('start')) {
+          toastType = 'warning';
         }
+        showToast(message, toastType);
       } finally {
         setJoiningTournamentId(null);
       }
     } catch (error) {
       setJoiningTournamentId(null);
-      const message = error.message || 'Failed to check eligibility';
-      if (shouldShowJoinToast(message)) {
-        showToast(message, 'error');
-      }
+      const message = error.message || 'Failed to join tournament';
+      showToast(message, 'warning');
     }
   };
 
@@ -123,6 +121,8 @@ const TournamentScreen = ({ navigation }) => {
         return '#FF3B30';
       case 'upcoming':
         return COLORS.accent;
+      case 'locked':
+        return '#FF8500'; // Orange color for locked
       case 'completed':
         return '#34C759';
       case 'cancelled':
@@ -138,6 +138,8 @@ const TournamentScreen = ({ navigation }) => {
         return SignalIcon;
       case 'upcoming':
         return CalendarDaysIcon;
+      case 'locked':
+        return XCircleIcon; // Lock icon for locked tournaments
       case 'completed':
         return CheckCircleIcon;
       case 'cancelled':
@@ -176,7 +178,7 @@ const TournamentScreen = ({ navigation }) => {
   };
 
   const canJoinTournament = (tournament) => {
-    if (tournament.status === 'live' || tournament.status === 'completed' || tournament.status === 'cancelled') {
+    if (tournament.status === 'live' || tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'locked') {
       return false;
     }
     return true;
@@ -184,7 +186,6 @@ const TournamentScreen = ({ navigation }) => {
 
   const getJoinButtonState = (tournament) => {
     const userJoined = isUserJoined(tournament._id);
-    const canJoin = canJoinTournament(tournament);
 
     if (userJoined) {
       return {
@@ -197,7 +198,21 @@ const TournamentScreen = ({ navigation }) => {
       };
     }
 
-    if (!canJoin) {
+    // For locked tournaments, show Join Now button but it will show notification when clicked
+    if (tournament.status === 'locked') {
+      return {
+        label: 'Join Now',
+        Icon: PlusCircleIcon,
+        disabled: false,
+        buttonStyle: styles.joinButton,
+        textStyle: styles.joinButtonText,
+        showIcon: true,
+        isLocked: true, // Flag to show lock icon
+      };
+    }
+
+    // For ended tournaments, disable button
+    if (tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live') {
       let label = 'Tournament Ended';
       if (tournament.status === 'cancelled') {
         label = 'Tournament Cancelled';
@@ -244,6 +259,12 @@ const TournamentScreen = ({ navigation }) => {
       <View style={styles.cardHeader}>
         <View style={styles.titleSection}>
           <Text style={styles.tournamentTitle}>{tournament.name}</Text>
+          {tournament.locked && (
+            <View style={styles.lockBadge}>
+              <XCircleIcon size={12} color="#FF8500" />
+              <Text style={styles.lockBadgeText}>LOCKED</Text>
+            </View>
+          )}
           <View style={styles.typeTag}>
             <Text style={styles.typeText}>{tournament.gameType}</Text>
           </View>
@@ -506,6 +527,23 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
     alignSelf: 'flex-start',
+  },
+  lockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 133, 0, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#FF8500',
+  },
+  lockBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FF8500',
+    marginLeft: 4,
   },
   typeText: {
     fontSize: 11,

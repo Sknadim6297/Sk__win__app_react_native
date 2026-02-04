@@ -214,18 +214,6 @@ const UserManagement = ({ navigation }) => {
                 </View>
 
                 <View style={styles.detailBox}>
-                  <MaterialCommunityIcons 
-                    name="account-check" 
-                    size={16} 
-                    color={user.kycVerified ? COLORS.success : COLORS.gray} 
-                  />
-                  <Text style={styles.detailLabel}>KYC</Text>
-                  <Text style={[styles.detailValue, { color: user.kycVerified ? COLORS.success : COLORS.gray }]}>
-                    {user.kycVerified ? 'Done' : 'Pending'}
-                  </Text>
-                </View>
-
-                <View style={styles.detailBox}>
                   <MaterialCommunityIcons name="wallet" size={16} color={COLORS.accent} />
                   <Text style={styles.detailLabel}>Wallet</Text>
                   <Text style={styles.detailValue}>₹{user.wallet?.balance || 0}</Text>

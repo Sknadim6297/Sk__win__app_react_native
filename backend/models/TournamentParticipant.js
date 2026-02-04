@@ -11,6 +11,12 @@ const tournamentParticipantSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  slotNumber: {
+    type: Number,
+    min: 1,
+    max: 50,
+  },
+  gamingUsername: String, // Gaming username entered during slot booking
   status: {
     type: String,
     enum: ['joined', 'disqualified', 'winner'],

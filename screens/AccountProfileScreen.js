@@ -207,20 +207,6 @@ const AccountProfileScreen = ({ navigation }) => {
               <Text style={styles.infoLabel}>User ID</Text>
               <Text style={styles.infoValue}>#{stats._id?.slice(-8) || 'N/A'}</Text>
             </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>KYC Status</Text>
-              <View style={[
-                styles.statusBadge, 
-                stats.kycVerified ? styles.verified : styles.pending
-              ]}>
-                <Text style={styles.statusText}>
-                  {stats.kycVerified ? 'Verified' : 'Not Verified'}
-                </Text>
-              </View>
-            </View>
           </View>
         </View>
 

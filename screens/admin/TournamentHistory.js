@@ -363,6 +363,9 @@ const TournamentHistory = ({ navigation }) => {
                     <View style={styles.participantInfo}>
                       <Text style={styles.participantName}>{item.username}</Text>
                       <Text style={styles.participantEmail}>{item.email}</Text>
+                      <Text style={styles.participantMeta}>
+                        Slot: {item.slotNumber ? `#${item.slotNumber}` : '-'} | Gaming ID: {item.gamingUsername || '-'}
+                      </Text>
                       <Text style={styles.joinedDate}>
                         Joined: {formatDateTime(item.joinedAt)}
                       </Text>
@@ -655,6 +658,11 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   participantEmail: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginBottom: 2,
+  },
+  participantMeta: {
     fontSize: 12,
     color: COLORS.gray,
     marginBottom: 2,

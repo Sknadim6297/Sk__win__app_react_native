@@ -16,6 +16,7 @@ import { COLORS } from '../styles/theme';
 import { tournamentService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import Toast from '../components/Toast';
+import SlotBookingModal from '../components/SlotBookingModal';
 
 const TournamentDetailsScreen = ({ navigation, route }) => {
   const { tournamentId } = route.params || {};
@@ -26,6 +27,7 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
   const [joining, setJoining] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
+  const [slotBookingVisible, setSlotBookingVisible] = useState(false);
 
   const showToast = (message, type = 'error') => {
     setToast({ visible: true, message, type });
@@ -82,41 +84,20 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
     }
 
     if (hasJoined) {
-      showToast('You have already joined this tournament', 'info');
+      showToast('You have already joined this tournament! Good luck!', 'info');
       return;
     }
 
-    Alert.alert(
-      'Join Tournament',
-      `Entry Fee: ₹${tournament.entryFee}\n\nAre you sure you want to join this tournament?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Join',
-          onPress: async () => {
-            try {
-              setJoining(true);
-              await tournamentService.join(tournamentId);
-              showToast('Successfully joined tournament!', 'success');
-              setHasJoined(true);
-              // Reload details to update participant count
-              await loadDetails();
-            } catch (error) {
-              console.error('Error joining tournament:', error);
-              // If already registered error, update state and show appropriate message
-              if (error.message && error.message.includes('Already registered')) {
-                setHasJoined(true);
-                showToast('You have already joined this tournament', 'info');
-              } else {
-                showToast(error.message || 'Failed to join tournament', 'error');
-              }
-            } finally {
-              setJoining(false);
-            }
-          },
-        },
-      ]
-    );
+    // Open slot booking modal instead of directly joining
+    setSlotBookingVisible(true);
+  };
+
+  const handleSlotBookingSuccess = async () => {
+    showToast('Successfully joined tournament! Good luck! 🎮', 'success');
+    setHasJoined(true);
+    setSlotBookingVisible(false);
+    // Reload details to update participant count
+    await loadDetails();
   };
 
   const getStatusColor = (status) => {
@@ -125,6 +106,8 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
         return '#FF3B30';
       case 'upcoming':
         return '#FF9500';
+      case 'locked':
+        return '#FF8500';
       case 'completed':
         return '#34C759';
       case 'cancelled':
@@ -415,6 +398,14 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
         message={toast.message}
         type={toast.type}
         onHide={hideToast}
+      />
+      <SlotBookingModal
+        visible={slotBookingVisible}
+        tournament={tournament}
+        onClose={() => setSlotBookingVisible(false)}
+        onSuccess={handleSlotBookingSuccess}
+        userBalance={user?.wallet?.balance}
+        userGameUsername={user?.gameUsername}
       />
     </SafeAreaView>
   );

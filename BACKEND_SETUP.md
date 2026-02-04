@@ -9,7 +9,7 @@ Complete backend system with Node.js/Express, MongoDB, and Admin dashboard for S
 - **Express.js API Server** - RESTful API with JWT authentication
 - **MongoDB Database** - User, Tournament, and Transaction schemas
 - **Authentication** - Register, Login with password hashing (bcryptjs)
-- **User Management** - KYC verification, profile management
+- **User Management** - Profile management
 - **Admin Controls** - Suspend, ban, verify users
 - **Wallet System** - Deposits, withdrawals, transaction history
 - **Tournament Logic** - Registration with eligibility checks
@@ -59,15 +59,13 @@ const API_URL = 'http://localhost:5000/api';
 Users can participate in tournaments only if:
 
 1. ✅ **Account Status** - Active (not banned/suspended)
-2. ✅ **KYC Verification** - Required if tournament mandates it
-3. ✅ **Wallet Balance** - Sufficient funds for entry + minimum balance
-4. ✅ **Registration Status** - Not already registered
-5. ✅ **Availability** - Tournament has available spots
+2. ✅ **Wallet Balance** - Sufficient funds for entry + minimum balance
+3. ✅ **Registration Status** - Not already registered
+4. ✅ **Availability** - Tournament has available spots
 
 ### User Restrictions
 - **Banned** - Completely blocked from platform
 - **Suspended** - Temporary block, can be reactivated
-- **Inactive** - Cannot join tournaments (KYC not verified)
 
 ## 💰 Wallet System
 
@@ -77,7 +75,6 @@ Users can participate in tournaments only if:
    - Transaction recorded
 
 2. **Withdrawal** - Withdraw to bank account
-   - Requires KYC verification
    - Pending approval process
    - Transaction history
 
@@ -92,7 +89,7 @@ Users can participate in tournaments only if:
 
 ### User Management
 - **View All Users** - Complete user list with details
-- **User Statistics** - Total users, verified, KYC done, blocked
+- **User Statistics** - Total users, verified, blocked
 - **Suspend Users** - Temporary deactivation
 - **Ban Users** - Permanent blocking with reason
 - **Activate/Unban** - Reactivate suspended users
@@ -116,7 +113,6 @@ POST   /api/auth/login          - Login user
 ### Users
 ```
 GET    /api/users/profile       - Get user profile
-POST   /api/users/kyc           - Submit KYC details
 ```
 
 ### Admin
@@ -174,7 +170,6 @@ POST   /api/tournaments/admin/:id/distribute-prizes - Distribute prizes (admin)
 - Basic info (username, email, password)
 - Role (user/admin)
 - Status (active/suspended/banned)
-- KYC details & verification
 - Wallet (balance, total deposited, total withdrawn)
 - Tournament stats (participated, wins, earnings)
 
@@ -183,7 +178,7 @@ POST   /api/tournaments/admin/:id/distribute-prizes - Distribute prizes (admin)
 - Max players, registered players list
 - Status (upcoming/live/completed)
 - Start/end dates
-- Minimum KYC & balance requirements
+- Minimum balance requirements
 - Winners and rewards
 
 ### Wallet Transaction
