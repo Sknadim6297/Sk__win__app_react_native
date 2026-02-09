@@ -8,6 +8,7 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -15,7 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
 import SKWinLogo from '../components/SKWinLogo';
-import { tournamentService, userService, walletService, gameService } from '../services/api';
+import { tournamentService, userService, walletService, gameService, tutorialService } from '../services/api';
 
 const HomeScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
@@ -26,48 +27,29 @@ const HomeScreen = ({ navigation }) => {
   const [completedTournaments, setCompletedTournaments] = useState([]);
   const [popularGames, setPopularGames] = useState([]);
   const [gamesLoading, setGamesLoading] = useState(false);
-  const [contestTab, setContestTab] = useState('upcoming'); // upcoming, ongoing, completed
+  const [contestTab, setContestTab] = useState('incoming'); // incoming, ongoing, completed
   const [selectedMatchType, setSelectedMatchType] = useState(null); // null = all, 'solo', 'duo', 'squad'
   const [sliderIndex, setSliderIndex] = useState(0);
   const [countdowns, setCountdowns] = useState({}); // Store countdown for each tournament
+  const [tutorials, setTutorials] = useState([]);
+  const [tutorialsLoading, setTutorialsLoading] = useState(false);
 
-  // Slider data with tutorial videos
-  const tutorials = [
+  const getDefaultTutorials = () => [
     {
-      id: 1,
+      _id: 'local-1',
       title: 'How to Join Tournament',
       description: 'Learn step by step how to join any tournament',
-      icon: 'tournament',
       videoLink: 'https://youtu.be/tutorial-join-tournament',
       color: COLORS.accent,
-      image: require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg'),
+      thumbnail: '',
     },
     {
-      id: 2,
+      _id: 'local-2',
       title: 'Wallet Guide',
       description: 'Add money and manage your wallet',
-      icon: 'wallet-outline',
       videoLink: 'https://youtu.be/tutorial-wallet',
       color: '#4CAF50',
-      image: require('../assets/images/87904deacf9b547a95f019e0a322152a.jpg'),
-    },
-    {
-      id: 3,
-      title: 'Winning Strategy',
-      description: 'Tips to increase your winning chances',
-      icon: 'trophy-outline',
-      videoLink: 'https://youtu.be/tutorial-strategy',
-      color: '#FFD700',
-      image: require('../assets/images/87904deacf9b547a95f019e0a322152a77.jpg'),
-    },
-    {
-      id: 4,
-      title: 'Leaderboard',
-      description: 'Check rankings and top players',
-      icon: 'podium-gold',
-      videoLink: 'https://youtu.be/tutorial-leaderboard',
-      color: '#FF6B6B',
-      image: require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg'),
+      thumbnail: '',
     },
   ];
 
@@ -166,6 +148,11 @@ const HomeScreen = ({ navigation }) => {
         : getDefaultGames();
       setPopularGames(games);
 
+      setTutorialsLoading(true);
+      const tutorialData = await tutorialService.getPublicList().catch(() => []);
+      const normalizedTutorials = Array.isArray(tutorialData) ? tutorialData : [];
+      setTutorials(normalizedTutorials.length > 0 ? normalizedTutorials : getDefaultTutorials());
+
       // Only load user-specific data if user is logged in
       if (user) {
         const [balanceData, profileData, myTournamentsData] = await Promise.all([
@@ -185,10 +172,10 @@ const HomeScreen = ({ navigation }) => {
         // Filter my tournaments by status
         const myTournaments = Array.isArray(myTournamentsData) ? myTournamentsData : [];
         const upcoming = myTournaments
-          .filter((t) => t.status === 'upcoming')
+          .filter((t) => t.status === 'incoming' || t.status === 'upcoming')
           .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
         const ongoing = myTournaments
-          .filter((t) => t.status === 'live')
+          .filter((t) => t.status === 'ongoing' || t.status === 'live')
           .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
         const completed = myTournaments
           .filter((t) => t.status === 'completed')
@@ -202,6 +189,9 @@ const HomeScreen = ({ navigation }) => {
       console.error('Failed to load home data:', error);
       // Fallback to default games if API fails
       setPopularGames(getDefaultGames());
+      setTutorials(getDefaultTutorials());
+    } finally {
+      setTutorialsLoading(false);
     }
   }, [user]);
 
@@ -298,40 +288,43 @@ const HomeScreen = ({ navigation }) => {
               setSliderIndex(index);
             }}
           >
-            {tutorials.map((tutorial) => (
-              <TouchableOpacity 
-                key={tutorial.id} 
-                style={styles.sliderCard}
-              >
-                <View 
-                  style={[
-                    styles.sliderCardHeader,
-                    { backgroundColor: tutorial.color },
-                  ]}
+            {tutorialsLoading ? (
+              <View style={styles.tutorialsLoading}>
+                <ActivityIndicator size="small" color={COLORS.accent} />
+                <Text style={styles.loadingText}>Loading videos...</Text>
+              </View>
+            ) : (
+              tutorials.map((tutorial) => (
+                <TouchableOpacity 
+                  key={tutorial._id || tutorial.id} 
+                  style={styles.sliderCard}
                 >
-                  <Image
-                    source={tutorial.image}
-                    style={styles.sliderCardImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.sliderCardImageOverlay} />
-                </View>
-                <View style={styles.sliderCardContent}>
-                  <Text style={styles.sliderTitle}>{tutorial.title}</Text>
-                  <Text style={styles.sliderDescription}>{tutorial.description}</Text>
-                  <TouchableOpacity 
-                    style={styles.videoButton}
-                    onPress={() => {
-                      // Open video link
-                      console.log('Playing video:', tutorial.videoLink);
-                    }}
-                  >
-                    <MaterialCommunityIcons name="play" size={16} color={COLORS.white} />
-                    <Text style={styles.videoButtonText}>Watch Video</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View style={styles.sliderCardHeader}>
+                    <Image
+                      source={tutorial.thumbnail ? { uri: tutorial.thumbnail } : require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg')}
+                      style={styles.sliderCardImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.sliderCardImageOverlay} />
+                  </View>
+                  <View style={styles.sliderCardContent}>
+                    <Text style={styles.sliderTitle}>{tutorial.title}</Text>
+                    <Text style={styles.sliderDescription}>{tutorial.description}</Text>
+                    <TouchableOpacity 
+                      style={styles.videoButton}
+                      onPress={() => {
+                        if (tutorial.videoLink) {
+                          Linking.openURL(tutorial.videoLink);
+                        }
+                      }}
+                    >
+                      <MaterialCommunityIcons name="play" size={16} color={COLORS.white} />
+                      <Text style={styles.videoButtonText}>Watch Video</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </ScrollView>
 
           {/* Slider Dots */}
@@ -504,7 +497,7 @@ const HomeScreen = ({ navigation }) => {
 
           {/* Contest Tabs */}
           <View style={styles.tabsContainer}>
-            {['upcoming', 'ongoing', 'completed'].map((tab) => (
+            {['incoming', 'ongoing', 'completed'].map((tab) => (
               <TouchableOpacity
                 key={tab}
                 style={[
@@ -526,7 +519,7 @@ const HomeScreen = ({ navigation }) => {
           </View>
 
           {/* Contest Content */}
-          {contestTab === 'upcoming' && (
+          {contestTab === 'incoming' && (
             getFilteredTournaments(upcomingTournaments).length === 0 ? (
               <View style={styles.emptyCard}>
                 <MaterialCommunityIcons name="trophy-outline" size={40} color={COLORS.gray} />
@@ -582,10 +575,12 @@ const HomeScreen = ({ navigation }) => {
                       <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
                     </View>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
-                    </View>
+                    {Number(tournament.prizePool) > 0 && (
+                      <View style={styles.detailItem}>
+                        <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
+                        <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
+                      </View>
+                    )}
                     <View style={styles.detailItem}>
                       <Ionicons name="people" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>
@@ -635,7 +630,7 @@ const HomeScreen = ({ navigation }) => {
                     <Text style={styles.tournamentTitle}>{tournament.name}</Text>
                     <View style={styles.timeTag}>
                       <Ionicons name="time" size={12} color={COLORS.white} />
-                      <Text style={styles.timeText}>Live</Text>
+                      <Text style={styles.timeText}>Ongoing</Text>
                     </View>
                   </View>
                   
@@ -644,10 +639,12 @@ const HomeScreen = ({ navigation }) => {
                       <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
                     </View>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
-                    </View>
+                    {Number(tournament.prizePool) > 0 && (
+                      <View style={styles.detailItem}>
+                        <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
+                        <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
+                      </View>
+                    )}
                     <View style={styles.detailItem}>
                       <Ionicons name="people" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>
@@ -706,10 +703,12 @@ const HomeScreen = ({ navigation }) => {
                       <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
                     </View>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
-                    </View>
+                    {Number(tournament.prizePool) > 0 && (
+                      <View style={styles.detailItem}>
+                        <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
+                        <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
+                      </View>
+                    )}
                     <View style={styles.detailItem}>
                       <Ionicons name="people" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>
@@ -761,6 +760,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.darkGray,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
+  },
+  loadingText: {
+    color: COLORS.gray,
+    marginTop: 12,
+    fontSize: 14,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -1321,6 +1325,16 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '600',
     fontSize: 12,
+  },
+  tutorialsLoading: {
+    width: 300,
+    height: 240,
+    borderRadius: 16,
+    backgroundColor: COLORS.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    gap: 8,
   },
   dotsContainer: {
     flexDirection: 'row',

@@ -76,6 +76,14 @@ async function seedDatabase() {
     const gameModes = [];
     
     // Free Fire modes
+    const battleRoyaleMode = new GameMode({
+      game: savedGames[0]._id,
+      name: 'Full Map Battle Royale',
+      description: 'Full map battle royale for 50 players',
+      status: 'active',
+    });
+    gameModes.push(battleRoyaleMode);
+
     gameModes.push(new GameMode({
       game: savedGames[0]._id,
       name: 'FF Full Match',
@@ -113,9 +121,58 @@ async function seedDatabase() {
       return slots;
     };
 
-    // Create 5 upcoming Free Fire tournaments only
+    // Create upcoming Free Fire tournaments
     const tournaments = [];
     const now = new Date();
+
+    // Tournament 0 - Battle Royale Solo (Today 4 PM)
+    const today4PM = new Date(now);
+    today4PM.setHours(16, 0, 0, 0);
+    tournaments.push(new Tournament({
+      name: 'BR Solo Storm',
+      description: 'Battle Royale Solo on full map Bermuda',
+      game: savedGames[0]._id,
+      gameMode: battleRoyaleMode._id,
+      mode: 'solo',
+      map: 'Bermuda',
+      rules: ['No teaming', 'Join room 5 minutes early'],
+      entryFee: 40,
+      prizePool: 2000,
+      perKill: 8,
+      maxParticipants: 50,
+      currentParticipants: 0,
+      status: 'upcoming',
+      startDate: today4PM,
+      minimumBalance: 40,
+      prizes: { first: 1000, second: 600, third: 400 },
+      slots: createSlots(),
+      createdBy: admin._id,
+    }));
+
+    // Tournament 0B - Battle Royale Squad (Tomorrow 8 PM)
+    const tomorrow8PM = new Date(now);
+    tomorrow8PM.setDate(tomorrow8PM.getDate() + 1);
+    tomorrow8PM.setHours(20, 0, 0, 0);
+    tournaments.push(new Tournament({
+      name: 'BR Squad Clash',
+      description: 'Battle Royale Squad on full map Bermuda',
+      game: savedGames[0]._id,
+      gameMode: battleRoyaleMode._id,
+      mode: 'squad',
+      map: 'Bermuda',
+      rules: ['4 players per squad', 'No switching teams'],
+      entryFee: 60,
+      prizePool: 3000,
+      perKill: 10,
+      maxParticipants: 50,
+      currentParticipants: 0,
+      status: 'upcoming',
+      startDate: tomorrow8PM,
+      minimumBalance: 60,
+      prizes: { first: 1500, second: 900, third: 600 },
+      slots: createSlots(),
+      createdBy: admin._id,
+    }));
     
     // Tournament 1 - Upcoming Free Fire (Today 6 PM)
     const today6PM = new Date(now);

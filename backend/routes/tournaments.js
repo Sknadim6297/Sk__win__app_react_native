@@ -9,19 +9,34 @@ const WalletTransaction = require('../models/WalletTransaction');
 const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
 
+const normalizeStatus = (status) => {
+  if (status === 'upcoming') return 'incoming';
+  if (status === 'live') return 'ongoing';
+  return status;
+};
+
 // Helper function to calculate tournament status based on time
 function calculateTournamentStatus(tournament) {
   const now = new Date();
   const startDate = new Date(tournament.startDate);
   const endDate = tournament.endDate ? new Date(tournament.endDate) : null;
+  const normalizedStatus = normalizeStatus(tournament.status);
+
+  // Respect manual override
+  if (tournament.statusOverride) {
+    if (normalizedStatus === 'cancelled') return 'cancelled';
+    if (normalizedStatus === 'completed') return 'completed';
+    if (normalizedStatus === 'ongoing') return 'ongoing';
+    if (normalizedStatus === 'incoming') return 'incoming';
+  }
 
   // If manually set to cancelled, keep it cancelled
-  if (tournament.status === 'cancelled') {
+  if (normalizedStatus === 'cancelled') {
     return 'cancelled';
   }
 
   // If manually set to completed, keep it completed
-  if (tournament.status === 'completed') {
+  if (normalizedStatus === 'completed') {
     return 'completed';
   }
 
@@ -34,10 +49,12 @@ function calculateTournamentStatus(tournament) {
     }
     
     // Check if it should move to live
-    if (now >= startDate) {
-      return 'live';
+    if (!tournament.statusOverride) {
+      if (now >= startDate) {
+        return 'ongoing';
+      }
+      return 'locked';
     }
-    return 'locked';
   }
 
   // Auto-calculate based on time
@@ -46,14 +63,14 @@ function calculateTournamentStatus(tournament) {
   }
 
   if (now >= startDate && (!endDate || now <= endDate)) {
-    return 'live';
+    return 'ongoing';
   }
 
   if (now < startDate) {
-    return tournament.locked ? 'locked' : 'upcoming';
+    return tournament.locked ? 'locked' : 'incoming';
   }
 
-  return 'upcoming';
+  return 'incoming';
 }
 
 // ===== ADMIN ROUTES (Must be before :id routes) =====
@@ -96,7 +113,9 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       prizes, 
       roomId, 
       roomPassword, 
-      showRoomCredentials 
+      showRoomCredentials,
+      status,
+      statusOverride
     } = req.body;
 
     console.log('Extracted fields:', { name, game, gameMode, startDate, maxParticipants });
@@ -156,7 +175,10 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       roomId: roomId || '',
       roomPassword: roomPassword || '',
       showRoomCredentials: !!showRoomCredentials,
-      status: 'upcoming',
+      status: normalizeStatus(status) || 'incoming',
+      statusOverride: typeof statusOverride === 'boolean'
+        ? statusOverride
+        : Boolean(status && normalizeStatus(status) !== 'incoming'),
       registeredPlayers: [],
       createdBy: req.userId,
     };
@@ -201,6 +223,13 @@ router.put('/admin/:id', authMiddleware, async (req, res) => {
     }
 
     const updateData = { ...req.body, updatedAt: new Date() };
+
+    if (updateData.status) {
+      updateData.status = normalizeStatus(updateData.status);
+      if (typeof updateData.statusOverride !== 'boolean') {
+        updateData.statusOverride = updateData.status !== 'incoming';
+      }
+    }
     
     // Check if room credentials are being shared for the first time
     if (updateData.showRoomCredentials && updateData.roomId && updateData.roomPassword) {

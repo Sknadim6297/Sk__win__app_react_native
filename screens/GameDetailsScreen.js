@@ -17,8 +17,9 @@ import { tournamentService } from '../services/api';
 
 const GameDetailsScreen = ({ navigation, route }) => {
   const gameMode = route?.params?.gameMode;
-  const [selectedTab, setSelectedTab] = useState('upcoming'); // ongoing, upcoming, results
+  const [selectedTab, setSelectedTab] = useState('incoming'); // ongoing, incoming, results
   const [selectedFilter, setSelectedFilter] = useState('all'); // all, solo, duo, squad
+  const [selectedRewardFilter, setSelectedRewardFilter] = useState('all'); // all, survival, per_kill, hybrid
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,7 +32,7 @@ const GameDetailsScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     loadTournaments();
-  }, [selectedTab, selectedFilter]);
+  }, [selectedTab, selectedFilter, selectedRewardFilter]);
 
   const loadTournaments = async () => {
     try {
@@ -40,9 +41,18 @@ const GameDetailsScreen = ({ navigation, route }) => {
       
       // Filter tournaments based on selected tab
       let filtered = Array.isArray(data) ? data : [];
+
+      // Filter by game mode (from route) so only relevant tournaments show
+      if (gameMode?._id) {
+        filtered = filtered.filter(t =>
+          t.gameMode?._id === gameMode._id || t.gameMode === gameMode._id
+        );
+      } else if (gameMode?.name) {
+        filtered = filtered.filter(t => t.gameMode?.name === gameMode.name);
+      }
       
-      if (selectedTab === 'upcoming') {
-        filtered = filtered.filter(t => t.status === 'upcoming');
+      if (selectedTab === 'incoming') {
+        filtered = filtered.filter(t => t.status === 'incoming' || t.status === 'upcoming');
       } else if (selectedTab === 'ongoing') {
         filtered = filtered.filter(t => t.status === 'ongoing' || t.status === 'live');
       } else if (selectedTab === 'results') {
@@ -54,6 +64,11 @@ const GameDetailsScreen = ({ navigation, route }) => {
         filtered = filtered.filter(t => 
           t.mode?.toLowerCase() === selectedFilter.toLowerCase()
         );
+      }
+
+      // Filter by reward type if not 'all'
+      if (selectedRewardFilter !== 'all') {
+        filtered = filtered.filter(t => t.rewardType === selectedRewardFilter);
       }
 
       setTournaments(filtered);
@@ -72,9 +87,16 @@ const GameDetailsScreen = ({ navigation, route }) => {
     { id: 'squad', label: 'SQUAD' },
   ];
 
+  const rewardTabsData = [
+    { id: 'all', label: 'ALL' },
+    { id: 'survival', label: 'SURVIVAL' },
+    { id: 'per_kill', label: 'PER KILL' },
+    { id: 'hybrid', label: 'HYBRID' },
+  ];
+
   const statusTabsData = [
     { id: 'ongoing', label: 'ONGOING' },
-    { id: 'upcoming', label: 'UPCOMING' },
+    { id: 'incoming', label: 'INCOMING' },
     { id: 'results', label: 'RESULTS' },
   ];
 
@@ -150,11 +172,13 @@ const GameDetailsScreen = ({ navigation, route }) => {
 
       {/* Tournament Details Grid */}
       <View style={styles.detailsGrid}>
-        <View style={styles.detailBox}>
-          <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
-          <Text style={styles.detailLabel}>Prize Pool</Text>
-          <Text style={styles.detailValue}>₹{displayTournament.prizePool}</Text>
-        </View>
+        {Number(displayTournament.prizePool) > 0 && (
+          <View style={styles.detailBox}>
+            <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
+            <Text style={styles.detailLabel}>Prize Pool</Text>
+            <Text style={styles.detailValue}>₹{displayTournament.prizePool}</Text>
+          </View>
+        )}
         <View style={styles.detailBox}>
           <MaterialCommunityIcons name="skull-crossbones" size={20} color="#FF6B6B" />
           <Text style={styles.detailLabel}>Per Kill</Text>
@@ -275,6 +299,29 @@ const GameDetailsScreen = ({ navigation, route }) => {
                 style={[
                   styles.filterTabText,
                   selectedFilter === tab.id && styles.filterTabTextActive,
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Reward Filter Tabs */}
+        <View style={styles.filterTabsContainer}>
+          {rewardTabsData.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={[
+                styles.filterTabButton,
+                selectedRewardFilter === tab.id && styles.filterTabButtonActive,
+              ]}
+              onPress={() => setSelectedRewardFilter(tab.id)}
+            >
+              <Text
+                style={[
+                  styles.filterTabText,
+                  selectedRewardFilter === tab.id && styles.filterTabTextActive,
                 ]}
               >
                 {tab.label}

@@ -34,6 +34,7 @@ import UserDetails from './screens/admin/UserDetails';
 import TournamentHistory from './screens/admin/TournamentHistory';
 import TournamentManagement from './screens/admin/TournamentManagement';
 import GameManagement from './screens/admin/GameManagement';
+import TutorialManagement from './screens/admin/TutorialManagement';
 import { COLORS } from './styles/theme';
 
 const Stack = createStackNavigator();
@@ -159,6 +160,7 @@ function AppNavigator() {
                 <Stack.Screen name="TournamentHistory" component={TournamentHistory} />
                 <Stack.Screen name="TournamentManagement" component={TournamentManagement} />
                 <Stack.Screen name="GameManagement" component={GameManagement} />
+                <Stack.Screen name="TutorialManagement" component={TutorialManagement} />
               </>
             ) : (
               <>

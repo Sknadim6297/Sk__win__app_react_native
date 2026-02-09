@@ -178,6 +178,24 @@ const AdminDashboard = ({ navigation }) => {
 
             <TouchableOpacity 
               style={styles.actionCardWide}
+              onPress={() => navigateTo('TutorialManagement')}
+            >
+              <View style={[styles.actionGradient, { backgroundColor: `#00BCD415` }]}>
+                <View style={styles.actionCardContent}>
+                  <View style={[styles.actionCardIcon, { backgroundColor: `#00BCD430` }]}>
+                    <MaterialCommunityIcons name="play-box-multiple" size={32} color="#00BCD4" />
+                  </View>
+                  <View style={styles.actionCardText}>
+                    <Text style={styles.actionCardTitle}>How To Play</Text>
+                    <Text style={styles.actionCardSubtitle}>Manage tutorial videos</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#00BCD4" />
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionCardWide}
               onPress={() => navigateTo('TournamentHistory')}
             >
               <View style={[styles.actionGradient, { backgroundColor: `#FF980015` }]}>
