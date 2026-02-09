@@ -21,6 +21,11 @@ const tournamentSchema = new mongoose.Schema({
     enum: ['solo', 'duo', 'squad'],
     default: 'solo',
   },
+  rewardType: {
+    type: String,
+    enum: ['per_kill', 'survival', 'hybrid'],
+    default: 'per_kill',
+  },
   map: {
     type: String,
     default: 'Bermuda',
@@ -34,7 +39,7 @@ const tournamentSchema = new mongoose.Schema({
   },
   prizePool: {
     type: Number,
-    required: true,
+    default: 0,
   },
   perKill: {
     type: Number,
@@ -54,8 +59,12 @@ const tournamentSchema = new mongoose.Schema({
   }],
   status: {
     type: String,
-    enum: ['upcoming', 'locked', 'live', 'completed', 'cancelled'],
-    default: 'upcoming',
+    enum: ['incoming', 'ongoing', 'upcoming', 'live', 'locked', 'completed', 'cancelled'],
+    default: 'incoming',
+  },
+  statusOverride: {
+    type: Boolean,
+    default: false,
   },
   locked: {
     type: Boolean,

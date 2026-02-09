@@ -102,8 +102,10 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
+      case 'ongoing':
       case 'live':
         return '#FF3B30';
+      case 'incoming':
       case 'upcoming':
         return '#FF9500';
       case 'locked':
@@ -119,8 +121,10 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
 
   const getStatusIcon = (status) => {
     switch (status) {
+      case 'ongoing':
       case 'live':
         return 'signal';
+      case 'incoming':
       case 'upcoming':
         return 'calendar';
       case 'completed':
@@ -201,7 +205,7 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
             </View>
             <View style={[styles.statusBadge, { backgroundColor: getStatusColor(tournament.status) }]}>
               <MaterialCommunityIcons name={getStatusIcon(tournament.status)} size={16} color={COLORS.white} />
-              <Text style={styles.statusText}>{tournament.status?.toUpperCase() || 'UPCOMING'}</Text>
+              <Text style={styles.statusText}>{tournament.status?.toUpperCase() || 'INCOMING'}</Text>
             </View>
           </View>
 
@@ -216,11 +220,13 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
               <Text style={styles.infoLabel}>Entry Fee</Text>
               <Text style={styles.infoValue}>₹{tournament.entryFee || 0}</Text>
             </View>
-            <View style={styles.infoItem}>
-              <MaterialCommunityIcons name="trophy" size={20} color={COLORS.accent} />
-              <Text style={styles.infoLabel}>Prize Pool</Text>
-              <Text style={styles.infoValue}>₹{tournament.prizePool || 0}</Text>
-            </View>
+            {Number(tournament.prizePool) > 0 && (
+              <View style={styles.infoItem}>
+                <MaterialCommunityIcons name="trophy" size={20} color={COLORS.accent} />
+                <Text style={styles.infoLabel}>Prize Pool</Text>
+                <Text style={styles.infoValue}>₹{tournament.prizePool}</Text>
+              </View>
+            )}
             <View style={styles.infoItem}>
               <MaterialCommunityIcons name="skull-crossbones" size={20} color={COLORS.accent} />
               <Text style={styles.infoLabel}>Per Kill</Text>
@@ -363,9 +369,9 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
               <TouchableOpacity 
                 style={[
                   styles.joinButton,
-                  (tournament.status === 'completed' || tournament.status === 'cancelled' || hasJoined || joining) && styles.joinButtonDisabled
+                  ((tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live' || tournament.status === 'ongoing') || hasJoined || joining) && styles.joinButtonDisabled
                 ]}
-                disabled={tournament.status === 'completed' || tournament.status === 'cancelled' || hasJoined || joining}
+                disabled={(tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live' || tournament.status === 'ongoing') || hasJoined || joining}
                 onPress={handleJoinTournament}
               >
                 {joining ? (
@@ -378,6 +384,8 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
                       ? 'TOURNAMENT ENDED' 
                       : tournament.status === 'cancelled'
                       ? 'TOURNAMENT CANCELLED'
+                      : tournament.status === 'live' || tournament.status === 'ongoing'
+                      ? 'TOURNAMENT LIVE'
                       : tournament.participantCount >= tournament.maxParticipants
                       ? 'TOURNAMENT FULL'
                       : 'JOIN TOURNAMENT'}

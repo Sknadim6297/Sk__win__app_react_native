@@ -2,12 +2,15 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
 const walletRoutes = require('./routes/wallet');
 const tournamentRoutes = require('./routes/tournaments');
 const gamesRoutes = require('./routes/games');
+const uploadRoutes = require('./routes/upload');
+const tutorialRoutes = require('./routes/tutorials');
 
 const app = express();
 
@@ -28,6 +31,9 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+// Serve uploaded images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -55,6 +61,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/games', gamesRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/tutorials', tutorialRoutes);
 
 // Catch-all for API routes that don't exist
 app.use('/api/*', (req, res) => {

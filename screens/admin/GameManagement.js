@@ -12,9 +12,11 @@ import {
   TextInput,
   Alert,
   FlatList,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { gameService } from '../../services/api';
 import { COLORS } from '../../styles/theme';
 
@@ -36,6 +38,9 @@ const GameManagement = ({ navigation }) => {
     description: '',
     isPopular: false,
   });
+  
+  const [uploading, setUploading] = useState(false);
+  const [uploadingMode, setUploadingMode] = useState(false);
   
   const [modeFormData, setModeFormData] = useState({
     name: '',
@@ -240,6 +245,72 @@ const GameManagement = ({ navigation }) => {
     setEditingModeId(null);
   };
 
+  const pickGameImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Please allow access to photo library');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setUploading(true);
+        try {
+          const uploadResult = await gameService.uploadImage(result.assets[0].uri);
+          setFormData({ ...formData, image: uploadResult.url });
+          Alert.alert('Success', 'Game image uploaded successfully');
+        } catch (error) {
+          Alert.alert('Upload Failed', error.message);
+        } finally {
+          setUploading(false);
+        }
+      }
+    } catch (error) {
+      setUploading(false);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const pickModeImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Please allow access to photo library');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setUploadingMode(true);
+        try {
+          const uploadResult = await gameService.uploadImage(result.assets[0].uri);
+          setModeFormData({ ...modeFormData, image: uploadResult.url });
+          Alert.alert('Success', 'Mode image uploaded successfully');
+        } catch (error) {
+          Alert.alert('Upload Failed', error.message);
+        } finally {
+          setUploadingMode(false);
+        }
+      }
+    } catch (error) {
+      setUploadingMode(false);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -293,7 +364,18 @@ const GameManagement = ({ navigation }) => {
               <View key={game._id} style={styles.gameCard}>
                 <View style={styles.gameCardContent}>
                   <View style={styles.gameIcon}>
-                    <MaterialCommunityIcons name="gamepad-variant" size={28} color={COLORS.accent} />
+                    {game.image ? (
+                      <Image 
+                        source={{ uri: game.image }} 
+                        style={styles.gameImage}
+                        defaultSource={require('../../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg')}
+                      />
+                    ) : (
+                      <Image 
+                        source={require('../../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg')} 
+                        style={styles.gameImage}
+                      />
+                    )}
                   </View>
                   <View style={styles.gameInfo}>
                     <Text style={styles.gameName}>{game.name}</Text>
@@ -362,14 +444,28 @@ const GameManagement = ({ navigation }) => {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Image URL *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter image URL"
-                placeholderTextColor={COLORS.gray}
-                value={formData.image}
-                onChangeText={(text) => setFormData({ ...formData, image: text })}
-              />
+              <Text style={styles.label}>Game Image *</Text>
+              <TouchableOpacity 
+                style={styles.imagePickerButton}
+                onPress={pickGameImage}
+                disabled={uploading}
+              >
+                {uploading ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <>
+                    <Ionicons name="camera" size={20} color={COLORS.white} />
+                    <Text style={styles.imagePickerText}>
+                      {formData.image ? 'Change Image' : 'Pick Image'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              {formData.image && (
+                <View style={styles.imagePreview}>
+                  <Image source={{ uri: formData.image }} style={styles.previewImage} />
+                </View>
+              )}
             </View>
 
             <View style={styles.formRow}>
@@ -471,14 +567,28 @@ const GameManagement = ({ navigation }) => {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Image URL</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter image URL"
-                placeholderTextColor={COLORS.gray}
-                value={modeFormData.image}
-                onChangeText={(text) => setModeFormData({ ...modeFormData, image: text })}
-              />
+              <Text style={styles.label}>Mode Image</Text>
+              <TouchableOpacity 
+                style={styles.imagePickerButton}
+                onPress={pickModeImage}
+                disabled={uploadingMode}
+              >
+                {uploadingMode ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <>
+                    <Ionicons name="camera" size={20} color={COLORS.white} />
+                    <Text style={styles.imagePickerText}>
+                      {modeFormData.image ? 'Change Image' : 'Pick Image'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              {modeFormData.image && (
+                <View style={styles.imagePreview}>
+                  <Image source={{ uri: modeFormData.image }} style={styles.previewImage} />
+                </View>
+              )}
             </View>
 
             <TouchableOpacity 
@@ -499,11 +609,16 @@ const GameManagement = ({ navigation }) => {
             ) : (
               gameModes.map((mode) => (
                 <View key={mode._id} style={styles.modeCard}>
-                  <View>
-                    <Text style={styles.modeName}>{mode.name}</Text>
-                    {mode.description && (
-                      <Text style={styles.modeDescription}>{mode.description}</Text>
+                  <View style={styles.modeContent}>
+                    {mode.image && (
+                      <Image source={{ uri: mode.image }} style={styles.modeImage} />
                     )}
+                    <View style={styles.modeInfo}>
+                      <Text style={styles.modeName}>{mode.name}</Text>
+                      {mode.description && (
+                        <Text style={styles.modeDescription}>{mode.description}</Text>
+                      )}
+                    </View>
                   </View>
                   <View style={styles.modeActions}>
                     <TouchableOpacity 
@@ -605,6 +720,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  gameImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
   },
   gameInfo: {
     flex: 1,
@@ -766,6 +887,47 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
+  },
+  imagePickerButton: {
+    backgroundColor: COLORS.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  imagePickerText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  imagePreview: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  previewImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: COLORS.accent,
+  },
+  modeContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modeImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    marginRight: 12,
+    backgroundColor: `${COLORS.accent}20`,
+  },
+  modeInfo: {
+    flex: 1,
   },
   modeCard: {
     backgroundColor: COLORS.darkGray,

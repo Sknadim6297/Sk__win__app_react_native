@@ -91,6 +91,60 @@ export const apiCall = async (endpoint, options = {}) => {
   }
 };
 
+const getFileMetadata = (fileUri) => {
+  const uriParts = fileUri.split('/');
+  const fileName = uriParts[uriParts.length - 1] || `upload_${Date.now()}.jpg`;
+  const extension = fileName.split('.').pop()?.toLowerCase();
+  const typeMap = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+  };
+  const type = typeMap[extension] || 'image/jpeg';
+  return { fileName, type };
+};
+
+export const uploadImageFile = async (fileUri) => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+    const { fileName, type } = getFileMetadata(fileUri);
+
+    const formData = new FormData();
+    formData.append('image', {
+      uri: fileUri,
+      name: fileName,
+      type,
+    });
+
+    const headers = {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    const response = await fetch(`${API_URL}/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('Server returned non-JSON response. Check upload endpoint.');
+    }
+
+    const data = await response.json();
+    if (!response.ok) {
+      const errorMessage = data.message || data.error || 'Upload failed';
+      throw new Error(errorMessage);
+    }
+
+    return data;
+  } catch (error) {
+    console.log('Upload Error:', error.message);
+    throw error;
+  }
+};
+
 // User Services
 export const userService = {
   getProfile: () => apiCall('/users/profile'),
@@ -187,6 +241,23 @@ export const tournamentService = {
   }),
 };
 
+// Tutorial Services
+export const tutorialService = {
+  getPublicList: () => apiCall('/tutorials'),
+  getAdminList: () => apiCall('/tutorials/admin/list'),
+  create: (data) => apiCall('/tutorials/admin/create', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  update: (id, data) => apiCall(`/tutorials/admin/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  remove: (id) => apiCall(`/tutorials/admin/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
 // Admin Services
 export const adminService = {
   getAllUsers: () => apiCall('/admin/all'),
@@ -254,4 +325,5 @@ export const gameService = {
   deleteGameMode: (modeId) => apiCall(`/games/modes/admin/${modeId}`, {
     method: 'DELETE',
   }),
+  uploadImage: (fileUri) => uploadImageFile(fileUri),
 };

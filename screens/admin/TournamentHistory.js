@@ -18,7 +18,7 @@ import { tournamentService } from '../../services/api';
 import Toast from '../../components/Toast';
 
 const TournamentHistory = ({ navigation }) => {
-  const [filter, setFilter] = useState('all'); // all, completed, live, upcoming
+  const [filter, setFilter] = useState('all'); // all, completed, ongoing, incoming
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,13 +80,21 @@ const TournamentHistory = ({ navigation }) => {
 
   const getFilteredTournaments = () => {
     if (filter === 'all') return tournaments;
+    if (filter === 'incoming') {
+      return tournaments.filter(t => t.status === 'incoming' || t.status === 'upcoming');
+    }
+    if (filter === 'ongoing') {
+      return tournaments.filter(t => t.status === 'ongoing' || t.status === 'live');
+    }
     return tournaments.filter(t => t.status === filter);
   };
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed': return COLORS.gray;
+      case 'ongoing': return '#FF3B30';
       case 'live': return '#FF3B30';
+      case 'incoming': return '#FF9500';
       case 'upcoming': return '#FF9500';
       case 'cancelled': return COLORS.gray;
       default: return COLORS.gray;
@@ -96,7 +104,9 @@ const TournamentHistory = ({ navigation }) => {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'completed': return 'checkmark-circle';
+      case 'ongoing': return 'radio-button-on';
       case 'live': return 'radio-button-on';
+      case 'incoming': return 'time';
       case 'upcoming': return 'time';
       case 'cancelled': return 'close-circle';
       default: return 'ellipse';
@@ -168,15 +178,15 @@ const TournamentHistory = ({ navigation }) => {
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
-            {tournaments.filter(t => t.status === 'live').length}
+            {tournaments.filter(t => t.status === 'ongoing' || t.status === 'live').length}
           </Text>
-          <Text style={styles.statLabel}>Live</Text>
+          <Text style={styles.statLabel}>Ongoing</Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
-            {tournaments.filter(t => t.status === 'upcoming').length}
+            {tournaments.filter(t => t.status === 'incoming' || t.status === 'upcoming').length}
           </Text>
-          <Text style={styles.statLabel}>Upcoming</Text>
+          <Text style={styles.statLabel}>Incoming</Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
@@ -207,20 +217,20 @@ const TournamentHistory = ({ navigation }) => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.filterTab, filter === 'live' && styles.activeFilter]}
-          onPress={() => setFilter('live')}
+          style={[styles.filterTab, filter === 'ongoing' && styles.activeFilter]}
+          onPress={() => setFilter('ongoing')}
         >
-          <Text style={[styles.filterText, filter === 'live' && styles.activeFilterText]}>
-            LIVE
+          <Text style={[styles.filterText, filter === 'ongoing' && styles.activeFilterText]}>
+            ONGOING
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.filterTab, filter === 'upcoming' && styles.activeFilter]}
-          onPress={() => setFilter('upcoming')}
+          style={[styles.filterTab, filter === 'incoming' && styles.activeFilter]}
+          onPress={() => setFilter('incoming')}
         >
-          <Text style={[styles.filterText, filter === 'upcoming' && styles.activeFilterText]}>
-            UPCOMING
+          <Text style={[styles.filterText, filter === 'incoming' && styles.activeFilterText]}>
+            INCOMING
           </Text>
         </TouchableOpacity>
       </View>
@@ -294,6 +304,23 @@ const TournamentHistory = ({ navigation }) => {
                   <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
                 </View>
               </View>
+
+              {tournament.prizes && (
+                <View style={styles.prizesRow}>
+                  <View style={styles.prizeBadge}>
+                    <Text style={styles.prizeRank}>🥇</Text>
+                    <Text style={styles.prizeValue}>₹{tournament.prizes.first || 0}</Text>
+                  </View>
+                  <View style={styles.prizeBadge}>
+                    <Text style={styles.prizeRank}>🥈</Text>
+                    <Text style={styles.prizeValue}>₹{tournament.prizes.second || 0}</Text>
+                  </View>
+                  <View style={styles.prizeBadge}>
+                    <Text style={styles.prizeRank}>🥉</Text>
+                    <Text style={styles.prizeValue}>₹{tournament.prizes.third || 0}</Text>
+                  </View>
+                </View>
+              )}
 
               {/* Room Credentials */}
               {tournament.roomId && (
@@ -555,6 +582,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.white,
     marginLeft: 6,
+  },
+  prizesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  prizeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: COLORS.darkGray,
+  },
+  prizeRank: {
+    fontSize: 12,
+  },
+  prizeValue: {
+    fontSize: 12,
+    color: COLORS.white,
+    fontWeight: '600',
   },
   roomCredentials: {
     flexDirection: 'row',

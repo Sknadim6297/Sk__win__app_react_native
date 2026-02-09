@@ -117,8 +117,10 @@ const TournamentScreen = ({ navigation }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
+      case 'ongoing':
       case 'live':
         return '#FF3B30';
+      case 'incoming':
       case 'upcoming':
         return COLORS.accent;
       case 'locked':
@@ -134,8 +136,10 @@ const TournamentScreen = ({ navigation }) => {
 
   const getStatusIcon = (status) => {
     switch (status) {
+      case 'ongoing':
       case 'live':
         return SignalIcon;
+      case 'incoming':
       case 'upcoming':
         return CalendarDaysIcon;
       case 'locked':
@@ -170,6 +174,12 @@ const TournamentScreen = ({ navigation }) => {
     if (status === 'my-contests') {
       return myTournaments;
     }
+    if (status === 'incoming') {
+      return tournaments.filter((t) => t.status === 'incoming' || t.status === 'upcoming');
+    }
+    if (status === 'ongoing') {
+      return tournaments.filter((t) => t.status === 'ongoing' || t.status === 'live');
+    }
     return tournaments.filter((t) => t.status === status);
   };
 
@@ -178,7 +188,7 @@ const TournamentScreen = ({ navigation }) => {
   };
 
   const canJoinTournament = (tournament) => {
-    if (tournament.status === 'live' || tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'locked') {
+    if (tournament.status === 'live' || tournament.status === 'ongoing' || tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'locked') {
       return false;
     }
     return true;
@@ -212,11 +222,11 @@ const TournamentScreen = ({ navigation }) => {
     }
 
     // For ended tournaments, disable button
-    if (tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live') {
+    if (tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live' || tournament.status === 'ongoing') {
       let label = 'Tournament Ended';
       if (tournament.status === 'cancelled') {
         label = 'Tournament Cancelled';
-      } else if (tournament.status === 'live') {
+      } else if (tournament.status === 'live' || tournament.status === 'ongoing') {
         label = 'Tournament Live';
       }
       return {
@@ -285,11 +295,13 @@ const TournamentScreen = ({ navigation }) => {
             <Text style={styles.infoLabel}>Entry Fee</Text>
             <Text style={styles.infoValue}>₹{tournament.entryFee}</Text>
           </View>
-          <View style={styles.infoItem}>
-            <TrophyIcon size={18} color={COLORS.accent} />
-            <Text style={styles.infoLabel}>Prize Pool</Text>
-            <Text style={styles.infoValue}>₹{tournament.prizePool}</Text>
-          </View>
+          {Number(tournament.prizePool) > 0 && (
+            <View style={styles.infoItem}>
+              <TrophyIcon size={18} color={COLORS.accent} />
+              <Text style={styles.infoLabel}>Prize Pool</Text>
+              <Text style={styles.infoValue}>₹{tournament.prizePool}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.infoRow}>
@@ -366,7 +378,7 @@ const TournamentScreen = ({ navigation }) => {
 
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
-        {['my-contests', 'upcoming', 'live', 'completed'].map((tab) => (
+        {['my-contests', 'incoming', 'ongoing', 'completed'].map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tab, selectedTab === tab && styles.activeTab]}
@@ -375,10 +387,10 @@ const TournamentScreen = ({ navigation }) => {
             <Text style={[styles.tabText, selectedTab === tab && styles.activeTabText]}>
               {tab === 'my-contests'
                 ? 'My Contests'
-                : tab === 'live'
-                ? 'Live'
-                : tab === 'upcoming'
-                ? 'Upcoming'
+                : tab === 'ongoing'
+                ? 'Ongoing'
+                : tab === 'incoming'
+                ? 'Incoming'
                 : 'Completed'}
             </Text>
           </TouchableOpacity>
