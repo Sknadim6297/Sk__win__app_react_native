@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download SK Win - Tournament App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+        }
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .version {
+            color: #888;
+            margin-bottom: 30px;
+        }
+        .download-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 20px 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        .instructions {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 30px;
+            text-align: left;
+        }
+        .instructions h3 {
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        .instructions ol {
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .warning {
+            background: rgba(255, 152, 0, 0.1);
+            border: 1px solid rgba(255, 152, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 30px 0;
+        }
+        .feature {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">SK</div>
+        <h1>SK Win</h1>
+        <p class="version">Version 1.0.1 • Tournament Gaming App</p>
+        
+        <a href="https://expo.dev/artifacts/eas/fN1c676XyMbJyR4ncpduCm.apk" class="download-btn" download>
+            📥 Download APK (Android)
+        </a>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🏆</div>
+                <div>Join Tournaments</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">💰</div>
+                <div>Wallet System</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📊</div>
+                <div>Track History</div>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎮</div>
+                <div>Real-time Updates</div>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>📱 Installation Guide</h3>
+            <ol>
+                <li>Tap the <strong>Download APK</strong> button above</li>
+                <li>Wait for the download to complete</li>
+                <li>Open your phone's <strong>Settings</strong></li>
+                <li>Go to <strong>Security</strong> or <strong>Privacy</strong></li>
+                <li>Enable <strong>"Install from Unknown Sources"</strong> or <strong>"Allow from this source"</strong></li>
+                <li>Open your <strong>Downloads</strong> folder</li>
+                <li>Tap the <strong>SK Win APK</strong> file</li>
+                <li>Tap <strong>Install</strong></li>
+                <li>Open the app and start playing! 🎮</li>
+            </ol>
+        </div>
+
+        <div class="warning">
+            ⚠️ <strong>Note:</strong> This app is not available on Google Play Store. You need to enable "Unknown Sources" to install it. This is safe for trusted apps like SK Win.
+        </div>
+
+        <p style="margin-top: 20px; font-size: 14px; color: #888;">
+            Having trouble? Contact support at sknadim6297@gmail.com
+        </p>
+    </div>
+</body>
+</html>
