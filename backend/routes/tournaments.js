@@ -15,6 +15,52 @@ const normalizeStatus = (status) => {
   return status;
 };
 
+const getSurvivalReward = (tournament, rank) => {
+  if (!rank) return 0;
+  if (rank === 1) return tournament?.prizes?.first || 0;
+  if (rank === 2) return tournament?.prizes?.second || 0;
+  if (rank === 3) return tournament?.prizes?.third || 0;
+  return 0;
+};
+
+const calculateResultRewards = (tournament, resultsInput) => {
+  const rewardType = tournament.rewardType || 'survival';
+  const perKillAmount = rewardType === 'survival' ? 0 : (tournament.perKill || 0);
+
+  const teamMap = new Map();
+  for (const entry of resultsInput) {
+    const teamId = entry.teamId || entry.userId?.toString();
+    if (!teamMap.has(teamId)) {
+      teamMap.set(teamId, { teamKills: 0, members: [] });
+    }
+    const team = teamMap.get(teamId);
+    const kills = Number(entry.kills) || 0;
+    team.teamKills += kills;
+    team.members.push(entry.userId?.toString());
+  }
+
+  return resultsInput.map((entry) => {
+    const teamId = entry.teamId || entry.userId?.toString();
+    const team = teamMap.get(teamId) || { teamKills: 0, members: [] };
+    const teamSize = Math.max(team.members.length, 1);
+    const teamKillReward = rewardType === 'survival' ? 0 : team.teamKills * perKillAmount;
+    const killReward = rewardType === 'survival' ? 0 : Math.round(teamKillReward / teamSize);
+    const survivalReward = rewardType === 'per_kill' ? 0 : getSurvivalReward(tournament, entry.rank);
+    const totalReward = killReward + survivalReward;
+
+    return {
+      ...entry,
+      teamId,
+      perKillAmount,
+      rewardType,
+      killReward,
+      survivalReward,
+      totalReward,
+      prizeAmount: survivalReward,
+    };
+  });
+};
+
 // Helper function to calculate tournament status based on time
 function calculateTournamentStatus(tournament) {
   const now = new Date();
@@ -546,6 +592,12 @@ router.post('/admin/:id/winners', authMiddleware, async (req, res) => {
         userId: winner.userId,
         rank: winner.rank,
         prizeAmount: winner.prizeAmount,
+        perKillAmount: tournament.perKill || 0,
+        rewardType: tournament.rewardType || 'survival',
+        killReward: 0,
+        survivalReward: winner.prizeAmount,
+        totalReward: winner.prizeAmount,
+        screenshotUrl: null,
         prizeCredited: false,
       }))
     );
@@ -566,6 +618,92 @@ router.post('/admin/:id/winners', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Error selecting winners:', error);
     res.status(500).json({ error: 'Failed to select winners' });
+  }
+});
+
+// Submit match results (Admin)
+router.post('/admin/:id/results', authMiddleware, async (req, res) => {
+  try {
+    const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can submit results' });
+    }
+
+    const { results, screenshotUrl } = req.body;
+    if (!Array.isArray(results) || results.length === 0) {
+      return res.status(400).json({ error: 'Results array is required' });
+    }
+
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) {
+      return res.status(404).json({ error: 'Tournament not found' });
+    }
+
+    const participantIds = results.map(r => r.userId);
+    const participants = await TournamentParticipant.find({
+      tournamentId: req.params.id,
+      userId: { $in: participantIds },
+    });
+
+    if (participants.length === 0) {
+      return res.status(400).json({ error: 'No valid participants found in results' });
+    }
+
+    const normalizedResults = results.map(r => ({
+      userId: r.userId,
+      teamId: r.teamId || null,
+      kills: Number(r.kills) || 0,
+      rank: Number(r.rank) || 0,
+    }));
+
+    const computedResults = calculateResultRewards(tournament, normalizedResults);
+
+    await TournamentResult.deleteMany({ tournamentId: req.params.id });
+
+    const savedResults = await TournamentResult.insertMany(
+      computedResults.map(r => ({
+        tournamentId: req.params.id,
+        userId: r.userId,
+        teamId: r.teamId,
+        kills: r.kills,
+        rank: r.rank,
+        prizeAmount: r.prizeAmount,
+        perKillAmount: r.perKillAmount,
+        rewardType: r.rewardType,
+        killReward: r.killReward,
+        survivalReward: r.survivalReward,
+        totalReward: r.totalReward,
+        screenshotUrl: screenshotUrl || null,
+        prizeCredited: false,
+      }))
+    );
+
+    for (const result of computedResults) {
+      const status = result.rank >= 1 && result.rank <= 3 ? 'winner' : 'joined';
+      await TournamentParticipant.findOneAndUpdate(
+        { tournamentId: req.params.id, userId: result.userId },
+        { status, rank: result.rank, prizeAmount: result.totalReward },
+        { new: true }
+      );
+    }
+
+    const leaderboard = {
+      survival: [...savedResults].sort((a, b) => a.rank - b.rank),
+      kills: [...savedResults].sort((a, b) => (b.kills || 0) - (a.kills || 0)),
+      earnings: [...savedResults].sort((a, b) => (b.totalReward || 0) - (a.totalReward || 0)),
+    };
+
+    res.json({
+      message: 'Results saved and rewards calculated',
+      results: savedResults,
+      leaderboard,
+    });
+  } catch (error) {
+    console.error('Error submitting results:', error);
+    res.status(500).json({ error: 'Failed to submit results' });
   }
 });
 
@@ -596,31 +734,38 @@ router.post('/admin/:id/distribute-prizes', authMiddleware, async (req, res) => 
     for (const result of results) {
       const user = await User.findById(result.userId);
       if (user) {
-        // Credit prize to wallet
-        user.wallet.balance += result.prizeAmount;
-        user.tournament.wins += 1;
-        user.tournament.earnings += result.prizeAmount;
-        await user.save();
+        const rewardAmount = result.totalReward || result.prizeAmount || 0;
 
-        // Create transaction
-        const transaction = await WalletTransaction.create({
-          userId: result.userId,
-          type: 'tournament_reward',
-          amount: result.prizeAmount,
-          tournamentId: req.params.id,
-          description: `Prize for ${result.rank === 1 ? '1st' : result.rank === 2 ? '2nd' : '3rd'} place in ${tournament.name}`,
-          status: 'completed',
-        });
+        if (rewardAmount > 0) {
+          // Credit reward to wallet
+          user.wallet.balance += rewardAmount;
+          user.tournament.wins += result.rank >= 1 && result.rank <= 3 ? 1 : 0;
+          user.tournament.earnings += rewardAmount;
+          await user.save();
 
-        // Mark prize as credited
-        result.prizeCredited = true;
-        result.prizeTransactionId = transaction._id;
-        await result.save();
+          // Create transaction
+          const transaction = await WalletTransaction.create({
+            userId: result.userId,
+            type: 'tournament_reward',
+            amount: rewardAmount,
+            tournamentId: req.params.id,
+            description: `Reward for ${tournament.name}`,
+            status: 'completed',
+          });
+
+          // Mark prize as credited
+          result.prizeCredited = true;
+          result.prizeTransactionId = transaction._id;
+          await result.save();
+        } else {
+          result.prizeCredited = true;
+          await result.save();
+        }
 
         distributedPrizes.push({
           userId: result.userId,
           rank: result.rank,
-          prizeAmount: result.prizeAmount,
+          prizeAmount: rewardAmount,
           username: user.username,
         });
       }
@@ -777,6 +922,7 @@ router.get('/admin/:id/participants', authMiddleware, async (req, res) => {
         walletBalance: p.userId?.wallet?.balance,
         slotNumber: p.slotNumber,
         gamingUsername: p.gamingUsername,
+        teamName: p.teamName,
         status: p.status,
         joinedAt: p.joinedAt,
         rank: p.rank,
@@ -1301,11 +1447,24 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
     }
 
     // Check if tournament is accepting registrations
-    if (tournament.status !== 'upcoming') {
+    const currentStatus = calculateTournamentStatus(tournament);
+    console.log('Tournament booking check:', {
+      tournamentId: req.params.id,
+      dbStatus: tournament.status,
+      calculatedStatus: currentStatus,
+      startDate: tournament.startDate,
+      endDate: tournament.endDate,
+      locked: tournament.locked,
+      roomCredentialsShared: !!(tournament.roomCredentialsSharedAt || (tournament.roomId && tournament.roomPassword && tournament.showRoomCredentials)),
+      now: new Date()
+    });
+    
+    if (currentStatus !== 'incoming') {
+      console.log('Tournament registration closed due to status:', currentStatus);
       return res.status(400).json({ error: 'Tournament registration is closed' });
     }
 
-    if (tournament.locked || tournament.status === 'locked') {
+    if (tournament.locked || currentStatus === 'locked') {
       return res.status(400).json({ error: 'Tournament will start soon! Registration is now closed.' });
     }
 

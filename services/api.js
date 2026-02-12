@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 // Backend API URL - Update this to your actual backend URL
 // For local testing: http://localhost:5000/api (Expo dev server) or http://192.168.31.216:5000/api (physical device)
@@ -6,16 +7,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Try multiple API URLs in case of network configuration changes
 const API_URLS = [
-  'http://192.168.31.216:5000/api',  // Current IP
-  'http://localhost:5000/api',       // For simulators
-  'http://127.0.0.1:5000/api',       // Alternative localhost
+  'http://192.168.31.216:5000/api',
+  'http://localhost:5000/api',
+  'http://127.0.0.1:5000/api',
 ];
 
-const API_URL = API_URLS[0]; // Default to current IP
+const EXTRA_API_URL =
+  Constants.expoConfig?.extra?.apiUrl ||
+  Constants.manifest?.extra?.apiUrl ||
+  null;
+
+const RESOLVED_API_URLS = EXTRA_API_URL
+  ? [EXTRA_API_URL, ...API_URLS]
+  : API_URLS;
+
+const API_URL = RESOLVED_API_URLS[0];
 
 // Test API connectivity
 export const testAPIConnection = async () => {
-  for (const url of API_URLS) {
+  for (const url of RESOLVED_API_URLS) {
     try {
       const response = await fetch(`${url}/health`, { timeout: 3000 });
       return url;
@@ -209,6 +219,10 @@ export const tournamentService = {
   getTournamentsByGameMode: (gameModeId) => apiCall(`/tournaments/admin/by-gamemode/${gameModeId}`),
   getTournamentHistory: () => apiCall('/tournaments/admin/history'),
   getTournamentParticipants: (id) => apiCall(`/tournaments/admin/${id}/participants`),
+  submitResults: (id, payload) => apiCall(`/tournaments/admin/${id}/results`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
   updateStatus: (id, status) => apiCall(`/tournaments/admin/${id}/status`, {
     method: 'PUT',
     body: JSON.stringify({ status }),
@@ -223,6 +237,9 @@ export const tournamentService = {
     body: JSON.stringify({ firstWinnerId, secondWinnerId, thirdWinnerId }),
   }),
   distributePrizes: (id) => apiCall(`/tournaments/admin/${id}/distribute-prizes`, {
+    method: 'POST',
+  }),
+  distributeRewards: (id) => apiCall(`/tournaments/admin/${id}/distribute-prizes`, {
     method: 'POST',
   }),
   deleteTournament: (id) => apiCall(`/tournaments/admin/${id}`, {

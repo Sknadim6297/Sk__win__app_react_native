@@ -33,6 +33,7 @@ import UserManagement from './screens/admin/UserManagement';
 import UserDetails from './screens/admin/UserDetails';
 import TournamentHistory from './screens/admin/TournamentHistory';
 import TournamentManagement from './screens/admin/TournamentManagement';
+import TournamentLeaderboard from './screens/admin/TournamentLeaderboard';
 import GameManagement from './screens/admin/GameManagement';
 import TutorialManagement from './screens/admin/TutorialManagement';
 import { COLORS } from './styles/theme';
@@ -40,7 +41,6 @@ import { COLORS } from './styles/theme';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Bottom Tab Navigator for main app screens (4 Main Tabs: Home, Leaderboard, Wallet, Account)
 function MainTabNavigator() {
   return (
     <Tab.Navigator
@@ -159,6 +159,7 @@ function AppNavigator() {
                 <Stack.Screen name="UserDetails" component={UserDetails} />
                 <Stack.Screen name="TournamentHistory" component={TournamentHistory} />
                 <Stack.Screen name="TournamentManagement" component={TournamentManagement} />
+                <Stack.Screen name="TournamentLeaderboard" component={TournamentLeaderboard} />
                 <Stack.Screen name="GameManagement" component={GameManagement} />
                 <Stack.Screen name="TutorialManagement" component={TutorialManagement} />
               </>

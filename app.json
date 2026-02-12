@@ -4,10 +4,9 @@
     "slug": "sk-win",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo/App_logo.png",
     "userInterfaceStyle": "dark",
     "extra": {
-      "apiUrl": "https://your-backend-url.com",
       "eas": {
         "projectId": "9bf33d68-cc48-4456-9873-3cb14d624b77"
       }
@@ -23,7 +22,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/logo/App_logo.png",
         "backgroundColor": "#0a0e27"
       },
       "package": "com.skwin.tournament"

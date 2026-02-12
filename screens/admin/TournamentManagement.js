@@ -19,8 +19,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import RNPickerSelect from 'react-native-picker-select';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../../styles/theme';
-import { tournamentService, gameService } from '../../services/api';
+import { tournamentService, gameService, uploadImageFile } from '../../services/api';
 import Toast from '../../components/Toast';
 
 const AVAILABLE_MAPS = [
@@ -70,9 +71,16 @@ const TournamentManagement = ({ navigation }) => {
   const [editingTournament, setEditingTournament] = useState(null);
   const [showRoomModal, setShowRoomModal] = useState(false);
   const [showWinnersModal, setShowWinnersModal] = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
   const [selectedTournamentForRoom, setSelectedTournamentForRoom] = useState(null);
   const [selectedTournamentForWinners, setSelectedTournamentForWinners] = useState(null);
+  const [selectedTournamentForResults, setSelectedTournamentForResults] = useState(null);
   const [tournamentParticipants, setTournamentParticipants] = useState([]);
+  const [resultEntries, setResultEntries] = useState([]);
+  const [resultScreenshotUrl, setResultScreenshotUrl] = useState('');
+  const [resultsPreview, setResultsPreview] = useState([]);
+  const [resultsLeaderboard, setResultsLeaderboard] = useState(null);
+  const [uploadingResult, setUploadingResult] = useState(false);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [roomForm, setRoomForm] = useState({
@@ -515,13 +523,134 @@ const TournamentManagement = ({ navigation }) => {
       const participantsData = await tournamentService.getTournamentParticipants(tournament._id);
       // Ensure data is an array - handle if it's wrapped in an object
       const participants = Array.isArray(participantsData) ? participantsData : (participantsData?.data || participantsData?.participants || []);
-      setTournamentParticipants(participants);
+      const joinedParticipants = participants.filter(p => (p.status || 'joined') === 'joined');
+      setTournamentParticipants(joinedParticipants);
       setSelectedTournamentForWinners(tournament);
       setWinnersForm({ firstPlace: null, secondPlace: null, thirdPlace: null });
       setShowWinnersModal(true);
     } catch (error) {
       showToast(error.message || 'Failed to load participants', 'error');
     }
+  };
+
+  const handleManageResults = async (tournament) => {
+    try {
+      const participantsData = await tournamentService.getTournamentParticipants(tournament._id);
+      const participants = Array.isArray(participantsData) ? participantsData : (participantsData?.data || participantsData?.participants || []);
+      const joinedParticipants = participants.filter(p => (p.status || 'joined') === 'joined');
+      setTournamentParticipants(joinedParticipants);
+      setSelectedTournamentForResults(tournament);
+      setResultEntries(
+        joinedParticipants.map(p => ({
+          userId: p.userId,
+          name: p.username || p.gamingUsername || p.email || 'Player',
+          kills: '',
+          rank: '',
+          teamId: p.teamName || '',
+        }))
+      );
+      setResultScreenshotUrl('');
+      setResultsPreview([]);
+      setResultsLeaderboard(null);
+      setShowResultsModal(true);
+    } catch (error) {
+      showToast(error.message || 'Failed to load participants', 'error');
+    }
+  };
+
+  const pickResultScreenshot = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showToast('Permission to access gallery is required', 'error');
+        return;
+      }
+
+      const mediaTypes = ImagePicker.MediaType?.Images ?? ImagePicker.MediaTypeOptions?.Images;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        ...(mediaTypes ? { mediaTypes } : {}),
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      setUploadingResult(true);
+      const uploadResult = await uploadImageFile(result.assets[0].uri);
+      setResultScreenshotUrl(uploadResult.url);
+      showToast('Result screenshot uploaded', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to upload screenshot', 'error');
+    } finally {
+      setUploadingResult(false);
+    }
+  };
+
+  const updateResultEntry = (index, field, value) => {
+    setResultEntries(prev => prev.map((entry, i) => (
+      i === index ? { ...entry, [field]: value } : entry
+    )));
+  };
+
+  const getParticipantName = (userId) => {
+    const match = tournamentParticipants.find(p => p.userId === userId);
+    if (!match) return userId;
+    return match.username || match.gamingUsername || match.email || userId;
+  };
+
+  const handleCalculateResults = async () => {
+    if (!selectedTournamentForResults) return;
+
+    const missingRank = resultEntries.some(entry => !entry.rank || parseInt(entry.rank, 10) <= 0);
+    if (missingRank) {
+      showToast('Please enter rank for all players', 'error');
+      return;
+    }
+
+    try {
+      const payload = {
+        screenshotUrl: resultScreenshotUrl || null,
+        results: resultEntries.map(entry => ({
+          userId: entry.userId,
+          teamId: entry.teamId?.trim() || null,
+          kills: parseInt(entry.kills, 10) || 0,
+          rank: parseInt(entry.rank, 10) || 0,
+        })),
+      };
+
+      const response = await tournamentService.submitResults(selectedTournamentForResults._id, payload);
+      setResultsPreview(response.results || []);
+      setResultsLeaderboard(response.leaderboard || null);
+      showToast('Results calculated', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to calculate results', 'error');
+    }
+  };
+
+  const handleDistributeRewards = async () => {
+    if (!selectedTournamentForResults) return;
+
+    Alert.alert(
+      'Distribute Rewards?',
+      'This will credit rewards to player wallets. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await tournamentService.distributeRewards(selectedTournamentForResults._id);
+              showToast('Rewards distributed', 'success');
+              setShowResultsModal(false);
+              fetchTournaments();
+            } catch (error) {
+              showToast(error.message || 'Failed to distribute rewards', 'error');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSaveWinners = async () => {
@@ -821,6 +950,13 @@ const TournamentManagement = ({ navigation }) => {
                     >
                       <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
                       <Text style={styles.actionText}>Winners</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => handleManageResults(tournament)}
+                    >
+                      <MaterialCommunityIcons name="clipboard-list" size={16} color={COLORS.accent} />
+                      <Text style={styles.actionText}>Results</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={[styles.actionButton, styles.deleteButton]}
@@ -1407,7 +1543,7 @@ const TournamentManagement = ({ navigation }) => {
                     items={[
                       ...(Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0
                         ? tournamentParticipants.map((participant) => ({
-                            label: participant.user?.username || participant.user?.email || participant.playerName || 'Player',
+                            label: participant.username || participant.gamingUsername || participant.email || participant.user?.username || participant.user?.email || participant.playerName || 'Player',
                             value: participant._id,
                           }))
                         : []
@@ -1421,6 +1557,7 @@ const TournamentManagement = ({ navigation }) => {
                       placeholder: { color: COLORS.gray },
                     }}
                     useNativeAndroidPickerStyle={false}
+                    fixAndroidTouchableBug
                   />
                 </View>
               </View>
@@ -1434,7 +1571,7 @@ const TournamentManagement = ({ navigation }) => {
                     items={[
                       ...(Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0
                         ? tournamentParticipants.map((participant) => ({
-                            label: participant.user?.username || participant.user?.email || participant.playerName || 'Player',
+                            label: participant.username || participant.gamingUsername || participant.email || participant.user?.username || participant.user?.email || participant.playerName || 'Player',
                             value: participant._id,
                           }))
                         : []
@@ -1448,6 +1585,7 @@ const TournamentManagement = ({ navigation }) => {
                       placeholder: { color: COLORS.gray },
                     }}
                     useNativeAndroidPickerStyle={false}
+                    fixAndroidTouchableBug
                   />
                 </View>
               </View>
@@ -1461,7 +1599,7 @@ const TournamentManagement = ({ navigation }) => {
                     items={[
                       ...(Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0
                         ? tournamentParticipants.map((participant) => ({
-                            label: participant.user?.username || participant.user?.email || participant.playerName || 'Player',
+                            label: participant.username || participant.gamingUsername || participant.email || participant.user?.username || participant.user?.email || participant.playerName || 'Player',
                             value: participant._id,
                           }))
                         : []
@@ -1475,6 +1613,7 @@ const TournamentManagement = ({ navigation }) => {
                       placeholder: { color: COLORS.gray },
                     }}
                     useNativeAndroidPickerStyle={false}
+                    fixAndroidTouchableBug
                   />
                 </View>
               </View>
@@ -1493,6 +1632,124 @@ const TournamentManagement = ({ navigation }) => {
                   <Text style={styles.createButtonText}>Declare Winners</Text>
                 </TouchableOpacity>
               </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Results Entry Modal */}
+      <Modal visible={showResultsModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Match Results</Text>
+                <TouchableOpacity onPress={() => setShowResultsModal(false)}>
+                  <Ionicons name="close" size={24} color={COLORS.white} />
+                </TouchableOpacity>
+              </View>
+
+              {selectedTournamentForResults && (
+                <View style={styles.selectionInfo}>
+                  <Text style={styles.selectionTitle}>Tournament: {selectedTournamentForResults.name}</Text>
+                </View>
+              )}
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Result Screenshot</Text>
+                <TouchableOpacity
+                  style={[styles.imagePickerButton, uploadingResult && styles.disabledButton]}
+                  onPress={pickResultScreenshot}
+                  disabled={uploadingResult}
+                >
+                  <MaterialCommunityIcons name="image" size={16} color={COLORS.white} />
+                  <Text style={styles.imagePickerText}>
+                    {uploadingResult ? 'Uploading...' : (resultScreenshotUrl ? 'Replace Screenshot' : 'Upload Screenshot')}
+                  </Text>
+                </TouchableOpacity>
+                {resultScreenshotUrl ? (
+                  <Text style={styles.helperText}>Uploaded: {resultScreenshotUrl}</Text>
+                ) : null}
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Players</Text>
+                {resultEntries.map((entry, index) => (
+                  <View key={`${entry.userId}-${index}`} style={styles.resultRow}>
+                    <Text style={styles.resultName}>{entry.name}</Text>
+                    <View style={styles.resultInputs}>
+                      <TextInput
+                        style={styles.resultInput}
+                        value={entry.kills}
+                        onChangeText={(text) => updateResultEntry(index, 'kills', text)}
+                        placeholder="Kills"
+                        placeholderTextColor={COLORS.gray}
+                        keyboardType="numeric"
+                      />
+                      <TextInput
+                        style={styles.resultInput}
+                        value={entry.rank}
+                        onChangeText={(text) => updateResultEntry(index, 'rank', text)}
+                        placeholder="Rank"
+                        placeholderTextColor={COLORS.gray}
+                        keyboardType="numeric"
+                      />
+                      <TextInput
+                        style={styles.resultInput}
+                        value={entry.teamId}
+                        onChangeText={(text) => updateResultEntry(index, 'teamId', text)}
+                        placeholder="Team"
+                        placeholderTextColor={COLORS.gray}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {resultsPreview.length > 0 && (
+                <View style={styles.resultsPreview}>
+                  <Text style={styles.sectionTitle}>Calculated Rewards</Text>
+                  {resultsPreview.map((result) => (
+                    <View key={result._id} style={styles.previewRow}>
+                      <Text style={styles.previewName}>{getParticipantName(result.userId)}</Text>
+                      <Text style={styles.previewValue}>Kills: {result.kills || 0}</Text>
+                      <Text style={styles.previewValue}>Rank: {result.rank || '-'}</Text>
+                      <Text style={styles.previewValue}>Total: ₹{result.totalReward || 0}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {resultsLeaderboard && (
+                <View style={styles.resultsPreview}>
+                  <Text style={styles.sectionTitle}>Leaderboards</Text>
+                  <Text style={styles.helperText}>Survival: sorted by rank</Text>
+                  <Text style={styles.helperText}>Kills: sorted by kills</Text>
+                  <Text style={styles.helperText}>Earnings: sorted by total reward</Text>
+                </View>
+              )}
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setShowResultsModal(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Close</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.createButton]}
+                  onPress={handleCalculateResults}
+                >
+                  <Text style={styles.createButtonText}>Calculate Reward</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.createButton, styles.fullWidthButton]}
+                onPress={handleDistributeRewards}
+              >
+                <Text style={styles.createButtonText}>Distribute Rewards</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
@@ -2002,10 +2259,78 @@ const styles = StyleSheet.create({
   picker: {
     color: COLORS.white,
     backgroundColor: COLORS.darkGray,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   pickerItem: {
     backgroundColor: COLORS.darkGray,
     color: COLORS.white,
+  },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.accent,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  imagePickerText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  resultRow: {
+    backgroundColor: COLORS.darkGray,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+  },
+  resultName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 6,
+  },
+  resultInputs: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  resultInput: {
+    flex: 1,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    color: COLORS.white,
+    fontSize: 12,
+    borderWidth: 1,
+    borderColor: COLORS.gray,
+  },
+  resultsPreview: {
+    backgroundColor: COLORS.darkGray,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  previewRow: {
+    marginTop: 8,
+  },
+  previewName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.white,
+  },
+  previewValue: {
+    fontSize: 11,
+    color: COLORS.gray,
+  },
+  fullWidthButton: {
+    marginTop: 8,
   },
   gameImageContainer: {
     width: 32,

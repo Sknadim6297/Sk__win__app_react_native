@@ -214,6 +214,24 @@ const AdminDashboard = ({ navigation }) => {
 
             <TouchableOpacity 
               style={styles.actionCardWide}
+              onPress={() => navigateTo('TournamentLeaderboard')}
+            >
+              <View style={[styles.actionGradient, { backgroundColor: `#4CAF5015` }]}>
+                <View style={styles.actionCardContent}>
+                  <View style={[styles.actionCardIcon, { backgroundColor: `#4CAF5030` }]}>
+                    <MaterialCommunityIcons name="podium" size={32} color="#4CAF50" />
+                  </View>
+                  <View style={styles.actionCardText}>
+                    <Text style={styles.actionCardTitle}>Tournament Leaderboard</Text>
+                    <Text style={styles.actionCardSubtitle}>Rank, kills, earnings</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#4CAF50" />
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionCardWide}
               onPress={() => navigateTo('GameManagement')}
             >
               <View style={[styles.actionGradient, { backgroundColor: `#9C27B015` }]}>
