@@ -11,15 +11,43 @@ const tournamentResultSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  teamId: String,
+  kills: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
   rank: {
     type: Number,
-    enum: [1, 2, 3],
+    min: 1,
     required: true,
   },
   prizeAmount: {
     type: Number,
     required: true,
   },
+  perKillAmount: {
+    type: Number,
+    default: 0,
+  },
+  rewardType: {
+    type: String,
+    enum: ['per_kill', 'survival', 'hybrid'],
+    default: 'survival',
+  },
+  killReward: {
+    type: Number,
+    default: 0,
+  },
+  survivalReward: {
+    type: Number,
+    default: 0,
+  },
+  totalReward: {
+    type: Number,
+    default: 0,
+  },
+  screenshotUrl: String,
   prizeCredited: {
     type: Boolean,
     default: false,

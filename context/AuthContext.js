@@ -1,9 +1,21 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 export const AuthContext = createContext();
 
-const API_URL = 'http://192.168.31.216:5000/api';
+const DEFAULT_API_URLS = [
+  'http://192.168.31.216:5000/api',
+  'http://localhost:5000/api',
+  'http://127.0.0.1:5000/api',
+];
+
+const EXTRA_API_URL =
+  Constants.expoConfig?.extra?.apiUrl ||
+  Constants.manifest?.extra?.apiUrl ||
+  null;
+
+const API_URL = EXTRA_API_URL || DEFAULT_API_URLS[0];
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

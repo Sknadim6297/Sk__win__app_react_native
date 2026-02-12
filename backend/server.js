@@ -3,8 +3,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const bcrypt = require('bcryptjs');
-const User = require('./models/User');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
@@ -44,37 +42,6 @@ app.get('/api/health', (req, res) => {
     message: 'Server is running', 
     timestamp: new Date().toISOString() 
   });
-});
-
-// Seed database endpoint (one-time use)
-app.post('/api/seed', async (req, res) => {
-  try {
-    console.log('Seeding database...');
-    // Clear existing users
-    await User.deleteMany({});
-    
-    // Create admin user
-    const adminPassword = await bcrypt.hash('admin123', 10);
-    const admin = new User({
-      username: 'admin',
-      email: 'admin@skwin.com',
-      password: adminPassword,
-      role: 'admin',
-      verified: true,
-      status: 'active',
-      wallet: { balance: 10000 },
-    });
-    await admin.save();
-    
-    return res.json({ 
-      status: 'success',
-      message: 'Database seeded with admin user', 
-      credentials: { email: 'admin@skwin.com', password: 'admin123' }
-    });
-  } catch (error) {
-    console.error('Seed error:', error);
-    res.status(500).json({ error: 'Failed to seed database', message: error.message });
-  }
 });
 
 // MongoDB Connection
