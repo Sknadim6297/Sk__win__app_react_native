@@ -23,6 +23,7 @@ const MyWalletScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
   const [walletData, setWalletData] = useState({
     balance: 0,
+    bonusBalance: 0,
     totalDeposited: 0,
     totalWithdrawn: 0,
     totalWinnings: 0,
@@ -55,7 +56,7 @@ const MyWalletScreen = ({ navigation }) => {
       console.log('Loading wallet data...');
 
       // Load each service separately for better error isolation
-      let balanceData = { balance: 0, totalDeposited: 0, totalWithdrawn: 0, totalWinnings: 0 };
+      let balanceData = { balance: 0, bonusBalance: 0, totalDeposited: 0, totalWithdrawn: 0, totalWinnings: 0 };
       let historyData = { transactions: [] };
       let profileData = { tournament: {} };
 
@@ -87,6 +88,7 @@ const MyWalletScreen = ({ navigation }) => {
 
       setWalletData({
         balance: balanceData?.balance || 0,
+        bonusBalance: balanceData?.bonusBalance || 0,
         totalDeposited: balanceData?.totalDeposited || 0,
         totalWithdrawn: balanceData?.totalWithdrawn || 0,
         totalWinnings: balanceData?.totalWinnings || 0,
@@ -125,6 +127,7 @@ const MyWalletScreen = ({ navigation }) => {
   const getTransactionIcon = (type) => {
     switch (type) {
       case 'tournament_reward': return 'trophy';
+      case 'referral_bonus': return 'gift';
       case 'deposit': return 'add-circle';
       case 'tournament_entry': return 'game-controller';
       case 'withdraw': return 'remove-circle';
@@ -136,6 +139,7 @@ const MyWalletScreen = ({ navigation }) => {
   const getTransactionColor = (type) => {
     switch (type) {
       case 'tournament_reward': return '#FFD700';
+      case 'referral_bonus': return '#9C27B0';
       case 'deposit': return '#4CAF50';
       case 'tournament_entry': return '#FF6B6B';
       case 'withdraw': return '#FF6B6B';
@@ -145,7 +149,7 @@ const MyWalletScreen = ({ navigation }) => {
   };
 
   const isCreditTransaction = (type) => {
-    return ['deposit', 'tournament_reward', 'refund'].includes(type);
+    return ['deposit', 'tournament_reward', 'refund', 'referral_bonus'].includes(type);
   };
 
   const formatDateTime = (dateString) => {
@@ -272,8 +276,10 @@ const MyWalletScreen = ({ navigation }) => {
       >
         {/* Balance Card */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Available Balance</Text>
+          <Text style={styles.balanceLabel}>Real Wallet Balance</Text>
           <Text style={styles.balanceAmount}>₹{walletData.balance.toFixed(2)}</Text>
+          <Text style={styles.balanceSubText}>Referral Bonus Balance: ₹{walletData.bonusBalance.toFixed(2)}</Text>
+          <Text style={styles.balanceSubText}>Total Wallet (Real + Bonus): ₹{(walletData.balance + walletData.bonusBalance).toFixed(2)}</Text>
           <View style={styles.balanceActions}>
             <TouchableOpacity 
               style={styles.actionButton}
@@ -449,7 +455,7 @@ const MyWalletScreen = ({ navigation }) => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Withdraw Money</Text>
             <Text style={styles.modalSubtitle}>
-              Available Balance: ₹{walletData.balance.toFixed(2)}
+              Real Balance: ₹{walletData.balance.toFixed(2)} | Bonus: ₹{walletData.bonusBalance.toFixed(2)}
             </Text>
             
             <View style={styles.inputContainer}>
@@ -534,7 +540,12 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: 'bold',
     color: COLORS.white,
-    marginBottom: 20,
+    marginBottom: 10,
+  },
+  balanceSubText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 4,
   },
   balanceActions: {
     flexDirection: 'row',

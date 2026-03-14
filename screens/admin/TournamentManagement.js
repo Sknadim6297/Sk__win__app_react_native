@@ -269,7 +269,11 @@ const TournamentManagement = ({ navigation }) => {
 
   const getModeImage = (mode) => {
     if (mode?.image) {
-      return { uri: mode.image };
+      // Check if image is a full URL or relative path
+      const imageUrl = mode.image.startsWith('http') 
+        ? mode.image 
+        : `http://172.20.10.3:5000${mode.image}`;
+      return { uri: imageUrl };
     }
     // Default mode icon
     return null;
@@ -796,11 +800,12 @@ const TournamentManagement = ({ navigation }) => {
                       <Image 
                         source={getModeImage(mode)}
                         style={styles.modeImage}
+                        resizeMode="cover"
                       />
                     ) : (
                       <MaterialCommunityIcons 
-                        name="play-circle-outline" 
-                        size={20} 
+                        name="gamepad-variant" 
+                        size={28} 
                         color={selectedGameMode === mode._id ? COLORS.white : COLORS.accent} 
                       />
                     )}
@@ -1844,23 +1849,25 @@ const styles = StyleSheet.create({
   },
   gameModeCard: {
     backgroundColor: COLORS.lightGray,
-    borderRadius: 6,
-    padding: 10,
-    marginRight: 10,
+    borderRadius: 12,
+    padding: 14,
+    marginRight: 12,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
-    minWidth: 80,
+    minWidth: 120,
+    maxWidth: 140,
   },
   gameModeCardSelected: {
     backgroundColor: COLORS.accent,
     borderColor: COLORS.accent,
   },
   gameModeCardText: {
-    fontSize: 11,
+    fontSize: 13,
     color: COLORS.white,
-    marginTop: 4,
+    marginTop: 6,
     textAlign: 'center',
+    fontWeight: '600',
   },
   gameModeCardTextSelected: {
     color: COLORS.white,
@@ -2360,11 +2367,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   modeImageContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+    width: 50,
+    height: 50,
+    borderRadius: 8,
     overflow: 'hidden',
-    marginBottom: 6,
+    marginBottom: 8,
+    backgroundColor: COLORS.darkGray,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modeImage: {
     width: '100%',
@@ -2372,10 +2382,12 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   modeDescription: {
-    fontSize: 9,
+    fontSize: 11,
     color: COLORS.gray,
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: 4,
+    lineHeight: 14,
+    paddingHorizontal: 4,
   },
   teamConfigSection: {
     backgroundColor: COLORS.darkGray,

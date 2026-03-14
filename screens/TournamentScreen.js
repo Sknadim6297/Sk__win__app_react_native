@@ -98,12 +98,21 @@ const TournamentScreen = ({ navigation }) => {
         showToast('Successfully joined tournament! Good luck! 🎮', 'success');
         await fetchTournaments();
       } catch (error) {
-        const message = error.message || 'Failed to join tournament';
-        // Determine toast type based on error message
+        let message = error.message || 'Failed to join tournament';
         let toastType = 'error';
-        if (message.includes('balance') || message.includes('full') || message.includes('locked') || message.includes('closed') || message.includes('start')) {
+        
+        // Customize message for insufficient balance
+        if (message.includes('balance') || message.includes('insufficient')) {
+          message = 'Insufficient balance! Please top up your wallet and rejoin the tournament.';
+          toastType = 'warning';
+        } else if (message.includes('full')) {
+          toastType = 'warning';
+        } else if (message.includes('locked') || message.includes('closed')) {
+          toastType = 'warning';
+        } else if (message.includes('start')) {
           toastType = 'warning';
         }
+        
         showToast(message, toastType);
       } finally {
         setJoiningTournamentId(null);
@@ -223,11 +232,11 @@ const TournamentScreen = ({ navigation }) => {
 
     // For ended tournaments, disable button
     if (tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live' || tournament.status === 'ongoing') {
-      let label = 'Tournament Ended';
+      let label = 'COMPLETED';
       if (tournament.status === 'cancelled') {
-        label = 'Tournament Cancelled';
+        label = 'CANCELLED';
       } else if (tournament.status === 'live' || tournament.status === 'ongoing') {
-        label = 'Tournament Live';
+        label = 'LIVE';
       }
       return {
         label,

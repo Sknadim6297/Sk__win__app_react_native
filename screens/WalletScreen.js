@@ -20,6 +20,7 @@ import { userService, walletService } from '../services/api';
 
 const WalletScreen = ({ navigation }) => {
   const [balance, setBalance] = useState(0);
+  const [bonusBalance, setBonusBalance] = useState(0);
   const [totals, setTotals] = useState({ totalDeposited: 0, totalWithdrawn: 0 });
   const [stats, setStats] = useState({ totalWinnings: 0, tournamentsJoined: 0, tournamentsWon: 0 });
   const [transactions, setTransactions] = useState([]);
@@ -40,7 +41,7 @@ const WalletScreen = ({ navigation }) => {
       console.log('Loading wallet data...');
 
       // Load each service separately for better error isolation
-      let balanceData = { balance: 0, totalDeposited: 0, totalWithdrawn: 0 };
+      let balanceData = { balance: 0, bonusBalance: 0, totalDeposited: 0, totalWithdrawn: 0 };
       let historyData = { transactions: [] };
       let profileData = { tournament: {} };
 
@@ -71,6 +72,7 @@ const WalletScreen = ({ navigation }) => {
       }
 
       setBalance(balanceData?.balance ?? 0);
+      setBonusBalance(balanceData?.bonusBalance ?? 0);
       setTotals({
         totalDeposited: balanceData?.totalDeposited ?? 0,
         totalWithdrawn: balanceData?.totalWithdrawn ?? 0,
@@ -196,6 +198,7 @@ const WalletScreen = ({ navigation }) => {
   const getTransactionIcon = (type) => {
     switch (type) {
       case 'tournament_reward': return 'trophy';
+      case 'referral_bonus': return 'gift';
       case 'deposit': return 'add-circle';
       case 'tournament_entry': return 'game-controller';
       case 'withdraw': return 'remove-circle';
@@ -207,6 +210,7 @@ const WalletScreen = ({ navigation }) => {
   const getTransactionColor = (type) => {
     switch (type) {
       case 'tournament_reward': return '#FFD700';
+      case 'referral_bonus': return '#9C27B0';
       case 'deposit': return COLORS.success;
       case 'tournament_entry': return COLORS.error;
       case 'withdraw': return COLORS.error;
@@ -216,7 +220,7 @@ const WalletScreen = ({ navigation }) => {
   };
 
   const isCreditTransaction = (type) => {
-    return ['deposit', 'tournament_reward', 'refund'].includes(type);
+    return ['deposit', 'tournament_reward', 'refund', 'referral_bonus'].includes(type);
   };
 
   const formatDateTime = (dateString) => {
@@ -335,7 +339,8 @@ const WalletScreen = ({ navigation }) => {
           </View>
           
           <View style={styles.balanceInfo}>
-            <Text style={styles.availableBalanceText}>Available Balance: ₹{balance}</Text>
+            <Text style={styles.availableBalanceText}>Real Balance: ₹{balance}</Text>
+            <Text style={styles.availableBalanceText}>Bonus Balance: ₹{bonusBalance}</Text>
           </View>
 
           <View style={styles.amountInput}>
@@ -392,9 +397,20 @@ const WalletScreen = ({ navigation }) => {
         <View style={styles.balanceCard}>
           <View style={styles.balanceHeader}>
             <MaterialCommunityIcons name="wallet" size={32} color={COLORS.accent} />
-            <Text style={styles.balanceLabel}>Current Balance</Text>
+            <Text style={styles.balanceLabel}>Real Wallet Balance</Text>
           </View>
           <Text style={styles.balanceAmount}>₹{balance.toLocaleString()}</Text>
+
+          <View style={styles.balanceBreakdownContainer}>
+            <View style={styles.balanceBreakdownRow}>
+              <Text style={styles.balanceBreakdownLabel}>Referral Bonus Balance</Text>
+              <Text style={styles.balanceBreakdownValue}>₹{bonusBalance.toLocaleString()}</Text>
+            </View>
+            <View style={styles.balanceBreakdownRow}>
+              <Text style={styles.balanceBreakdownLabel}>Total Wallet (Real + Bonus)</Text>
+              <Text style={styles.balanceBreakdownValue}>₹{(balance + bonusBalance).toLocaleString()}</Text>
+            </View>
+          </View>
           
           <View style={styles.actionButtons}>
             <TouchableOpacity 
@@ -520,7 +536,27 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: 'bold',
     color: COLORS.white,
-    marginBottom: 20,
+    marginBottom: 12,
+  },
+  balanceBreakdownContainer: {
+    backgroundColor: COLORS.darkGray,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  balanceBreakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  balanceBreakdownLabel: {
+    color: COLORS.gray,
+    fontSize: 12,
+  },
+  balanceBreakdownValue: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '700',
   },
   actionButtons: {
     flexDirection: 'row',

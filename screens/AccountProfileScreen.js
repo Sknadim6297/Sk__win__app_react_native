@@ -64,18 +64,11 @@ const AccountProfileScreen = ({ navigation }) => {
 
   const stats = profileData || {};
   const tournament = stats.tournament || {};
-  const gameStats = stats.gameStats || {};
   const wallet = stats.wallet || {};
 
   const totalMatches = tournament.participatedCount || 0;
-  const totalKills = gameStats.totalKills || 0;
-  const totalDeaths = gameStats.totalDeaths || 0;
   const winMatches = tournament.wins || 0;
-  const kdRatio = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : totalKills.toFixed(2);
   const totalEarnings = wallet.totalWinnings || tournament.earnings || 0;
-  const lastMatchDate = gameStats.lastMatchDate 
-    ? new Date(gameStats.lastMatchDate).toLocaleDateString() 
-    : 'Never';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -128,33 +121,15 @@ const AccountProfileScreen = ({ navigation }) => {
             </View>
 
             <View style={styles.statCard}>
-              <MaterialCommunityIcons name="target" size={28} color="#FF6B6B" />
-              <Text style={styles.statValue}>{totalKills}</Text>
-              <Text style={styles.statLabel}>Total Kills</Text>
-            </View>
-
-            <View style={styles.statCard}>
               <MaterialCommunityIcons name="trophy" size={28} color="#FFD700" />
               <Text style={styles.statValue}>{winMatches}</Text>
               <Text style={styles.statLabel}>Win Matches</Text>
             </View>
 
             <View style={styles.statCard}>
-              <MaterialCommunityIcons name="chart-line" size={28} color="#4CAF50" />
-              <Text style={styles.statValue}>{kdRatio}</Text>
-              <Text style={styles.statLabel}>K/D Ratio</Text>
-            </View>
-
-            <View style={styles.statCard}>
               <MaterialCommunityIcons name="currency-inr" size={28} color="#2196F3" />
               <Text style={styles.statValue}>₹{totalEarnings.toLocaleString()}</Text>
               <Text style={styles.statLabel}>Total Earnings</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <MaterialCommunityIcons name="calendar-clock" size={28} color={COLORS.gray} />
-              <Text style={styles.statValue}>{lastMatchDate}</Text>
-              <Text style={styles.statLabel}>Last Match</Text>
             </View>
           </View>
         </View>
@@ -188,17 +163,6 @@ const AccountProfileScreen = ({ navigation }) => {
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Email</Text>
               <Text style={styles.infoValue}>{stats.email || 'N/A'}</Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Date of Birth</Text>
-              <Text style={styles.infoValue}>
-                {stats.dateOfBirth 
-                  ? new Date(stats.dateOfBirth).toLocaleDateString() 
-                  : 'Not set'}
-              </Text>
             </View>
 
             <View style={styles.divider} />

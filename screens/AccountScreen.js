@@ -15,14 +15,16 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
-import { userService, walletService } from '../services/api';
+import { userService, walletService, notificationService } from '../services/api';
 
 const AccountScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
   const [userData, setUserData] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [bonusBalance, setBonusBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -42,8 +44,12 @@ const AccountScreen = ({ navigation }) => {
         walletService.getBalance(),
       ]);
 
+      const notificationsResponse = await notificationService.getAll().catch(() => ({ notifications: [] }));
+
       setUserData(profileData);
       setWalletBalance(walletData?.balance || 0);
+      setBonusBalance(walletData?.bonusBalance || 0);
+      setUnreadNotifications((notificationsResponse?.notifications || []).filter((item) => !item?.isRead).length);
     } catch (error) {
       console.log('Error loading account data:', error.message);
       Alert.alert('Error', 'Failed to load account data. Please refresh.');
@@ -82,7 +88,7 @@ const AccountScreen = ({ navigation }) => {
       screen: 'TopPlayers',
     },
     {
-      title: 'Notifications',
+      title: unreadNotifications > 0 ? `My Notifications (${unreadNotifications})` : 'My Notifications',
       icon: 'bell',
       screen: 'Notifications',
     },
@@ -159,7 +165,8 @@ const AccountScreen = ({ navigation }) => {
               <View style={styles.userDetails}>
                 <Text style={styles.userName}>{userData?.name || userData?.username || 'User'}</Text>
                 <Text style={styles.userEmail}>{userData?.email || 'N/A'}</Text>
-                <Text style={styles.userPhone}>Balance: ₹{walletBalance.toLocaleString()}</Text>
+                <Text style={styles.userPhone}>Real: ₹{walletBalance.toLocaleString()} | Bonus: ₹{bonusBalance.toLocaleString()}</Text>
+                <Text style={styles.userWalletTotal}>Total Wallet: ₹{(walletBalance + bonusBalance).toLocaleString()}</Text>
               </View>
             </View>
           </View>
@@ -264,6 +271,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.accent,
     fontWeight: '600',
+  },
+  userWalletTotal: {
+    fontSize: 12,
+    color: COLORS.white,
+    marginTop: 4,
+    fontWeight: '700',
   },
   scrollView: {
     flex: 1,

@@ -88,8 +88,22 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
       return;
     }
 
+    // Check real balance after applying capped bonus usage (20% max).
+    const maxBonusAllowed = Math.floor((tournament.entryFee || 0) * 0.2);
+    const usableBonus = Math.min(userBonusBalance, maxBonusAllowed);
+    const requiredRealBalance = Math.max((tournament.entryFee || 0) - usableBonus, 0);
+
+    if (userBalance < requiredRealBalance) {
+      showToast('Insufficient balance! Please top up your wallet and rejoin the tournament.', 'warning');
+      return;
+    }
+
     // Open slot booking modal instead of directly joining
     setSlotBookingVisible(true);
+  };
+
+  const handleTopup = () => {
+    navigation.navigate('MainApp', { screen: 'WalletTab' });
   };
 
   const handleSlotBookingSuccess = async () => {
@@ -135,6 +149,9 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
         return 'calendar';
     }
   };
+
+  const userBalance = user?.wallet?.balance ?? 0;
+  const userBonusBalance = user?.wallet?.bonusBalance ?? 0;
 
   const formatDate = (dateString) => {
     if (!dateString) return 'TBA';
@@ -346,7 +363,10 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
                     <Text style={styles.rewardText}>
                       <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
                       {` ₹${winner.reward}`}
-                    </Text>
+                    rd /s /q node_modules
+                    del package-lock.json
+                    npm install
+                    npx expo install expo-notifications                    </Text>
                   </View>
                 </View>
               ))}
@@ -369,32 +389,39 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
               <TouchableOpacity 
                 style={[
                   styles.joinButton,
-                  ((tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live' || tournament.status === 'ongoing') || hasJoined || joining) && styles.joinButtonDisabled
+                  ((tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live' || tournament.status === 'ongoing' || tournament.status === 'locked') || hasJoined || joining) && styles.joinButtonDisabled
                 ]}
-                disabled={(tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live' || tournament.status === 'ongoing') || hasJoined || joining}
+                disabled={(tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live' || tournament.status === 'ongoing' || tournament.status === 'locked') || hasJoined || joining}
                 onPress={handleJoinTournament}
               >
-                {joining ? (
-                  <ActivityIndicator color={COLORS.white} />
-                ) : (
-                  <Text style={styles.joinButtonText}>
-                    {hasJoined 
-                      ? '✓ ALREADY JOINED' 
-                      : tournament.status === 'completed' 
-                      ? 'TOURNAMENT ENDED' 
-                      : tournament.status === 'cancelled'
-                      ? 'TOURNAMENT CANCELLED'
-                      : tournament.status === 'live' || tournament.status === 'ongoing'
-                      ? 'TOURNAMENT LIVE'
-                      : tournament.participantCount >= tournament.maxParticipants
-                      ? 'TOURNAMENT FULL'
-                      : 'JOIN TOURNAMENT'}
-                  </Text>
-                )}
+              {joining ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.joinButtonText}>
+                  {hasJoined 
+                    ? '✓ JOINED' 
+                    : tournament.status === 'completed' 
+                    ? 'COMPLETED' 
+                    : tournament.status === 'cancelled'
+                    ? 'CANCELLED'
+                    : tournament.status === 'locked'
+                    ? 'JOINING CLOSED'
+                    : tournament.status === 'live' || tournament.status === 'ongoing'
+                    ? 'LIVE'
+                    : tournament.participantCount >= tournament.maxParticipants
+                    ? 'TOURNAMENT FULL'
+                    : 'JOIN NOW'}
+                </Text>
+              )}
               </TouchableOpacity>
               {hasJoined && (
                 <Text style={styles.joinedNote}>
                   You have successfully joined this tournament
+                </Text>
+              )}
+              {tournament.status === 'locked' && (
+                <Text style={styles.joinedNote}>
+                  Tournament locked — joining closed
                 </Text>
               )}
             </View>

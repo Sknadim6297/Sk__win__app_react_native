@@ -16,7 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
 import SKWinLogo from '../components/SKWinLogo';
-import { tournamentService, userService, walletService, gameService, tutorialService } from '../services/api';
+import { tournamentService, userService, walletService, gameService, tutorialService, notificationService } from '../services/api';
 
 const HomeScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
@@ -33,6 +33,7 @@ const HomeScreen = ({ navigation }) => {
   const [countdowns, setCountdowns] = useState({}); // Store countdown for each tournament
   const [tutorials, setTutorials] = useState([]);
   const [tutorialsLoading, setTutorialsLoading] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const getDefaultTutorials = () => [
     {
@@ -161,6 +162,10 @@ const HomeScreen = ({ navigation }) => {
           tournamentService.getMyTournaments().catch(() => []),
         ]);
 
+        const notificationsResponse = await notificationService.getAll().catch(() => ({ notifications: [] }));
+        const unreadCount = (notificationsResponse?.notifications || []).filter((item) => !item?.isRead).length;
+        setUnreadNotifications(unreadCount);
+
         setWalletBalance(balanceData?.balance ?? 0);
 
         const tournament = profileData?.tournament || {};
@@ -249,7 +254,13 @@ const HomeScreen = ({ navigation }) => {
           >
             <View style={styles.notificationBell}>
               <MaterialCommunityIcons name="bell-outline" size={20} color={COLORS.accent} />
-              <View style={styles.notificationDot} />
+              {unreadNotifications > 0 && (
+                <View style={styles.notificationDot}>
+                  <Text style={styles.notificationDotText}>
+                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  </Text>
+                </View>
+              )}
             </View>
           </TouchableOpacity>
 
@@ -825,14 +836,22 @@ const styles = StyleSheet.create({
   },
   notificationDot: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 8,
-    height: 8,
+    top: -6,
+    right: -8,
+    minWidth: 16,
+    height: 16,
     backgroundColor: '#FF6B6B',
-    borderRadius: 4,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  notificationDotText: {
+    color: COLORS.white,
+    fontSize: 9,
+    fontWeight: '700',
   },
   headerLeft: {
     flexDirection: 'row',

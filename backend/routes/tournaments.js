@@ -6,8 +6,25 @@ const GameMode = require('../models/GameMode');
 const TournamentParticipant = require('../models/TournamentParticipant');
 const TournamentResult = require('../models/TournamentResult');
 const WalletTransaction = require('../models/WalletTransaction');
+const Notification = require('../models/Notification');
 const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
+
+const MAX_BONUS_ENTRY_PERCENT = 0.2;
+
+const getEntryPaymentSplit = (user, entryFee) => {
+  const fee = Number(entryFee) || 0;
+  const bonusBalance = Number(user?.wallet?.bonusBalance) || 0;
+  const maxBonusAllowed = Math.floor(fee * MAX_BONUS_ENTRY_PERCENT);
+  const bonusUsed = Math.min(bonusBalance, maxBonusAllowed);
+  const realMoneyRequired = Math.max(fee - bonusUsed, 0);
+
+  return {
+    bonusUsed,
+    realMoneyRequired,
+    maxBonusAllowed,
+  };
+};
 
 const normalizeStatus = (status) => {
   if (status === 'upcoming') return 'incoming';
@@ -576,6 +593,16 @@ router.post('/admin/:id/winners', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Tournament must be completed first' });
     }
 
+    const winnerIds = [firstWinnerId, secondWinnerId, thirdWinnerId];
+    const participants = await TournamentParticipant.find({
+      tournamentId: req.params.id,
+      userId: { $in: winnerIds },
+    }).select('userId');
+
+    if (participants.length !== winnerIds.length) {
+      return res.status(400).json({ error: 'All winners must be participants of this tournament' });
+    }
+
     const winners = [
       { userId: firstWinnerId, rank: 1, prizeAmount: tournament.prizes.first },
       { userId: secondWinnerId, rank: 2, prizeAmount: tournament.prizes.second },
@@ -751,6 +778,14 @@ router.post('/admin/:id/distribute-prizes', authMiddleware, async (req, res) => 
             tournamentId: req.params.id,
             description: `Reward for ${tournament.name}`,
             status: 'completed',
+          });
+
+          await Notification.create({
+            userId: result.userId,
+            tournamentId: tournament._id,
+            type: 'tournament_update',
+            title: 'Tournament Reward Credited',
+            message: `₹${rewardAmount} has been credited for ${tournament.name}.`,
           });
 
           // Mark prize as credited
@@ -1047,10 +1082,15 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
     });
 
     const userJoined = !!participant;
-    const roomCredentialsVisible = tournament.showRoomCredentials && userJoined;
+    const calculatedStatus = calculateTournamentStatus(tournament);
+    const roomCredentialsVisible =
+      (calculatedStatus === 'ongoing' || calculatedStatus === 'live') &&
+      userJoined &&
+      (tournament.roomId || tournament.roomPassword);
 
     res.json({
       ...tournament.toObject(),
+      status: calculatedStatus,
       userJoined,
       participantCount,
       showRoomCredentials: tournament.showRoomCredentials,
@@ -1104,12 +1144,23 @@ router.get('/my-tournaments', authMiddleware, async (req, res) => {
 router.get('/user/history', authMiddleware, async (req, res) => {
   try {
     const participants = await TournamentParticipant.find({ userId: req.userId })
-      .populate('tournamentId')
+      .populate({
+        path: 'tournamentId',
+        populate: [
+          { path: 'game', select: 'name' },
+          { path: 'gameMode', select: 'name' },
+        ],
+      })
       .sort({ joinedAt: -1 });
 
     const tournaments = participants.map(p => ({
       ...p.toObject(),
-      tournament: p.tournamentId,
+      tournament: p.tournamentId
+        ? {
+            ...p.tournamentId.toObject(),
+            status: calculateTournamentStatus(p.tournamentId),
+          }
+        : null,
     }));
 
     res.json(tournaments);
@@ -1191,9 +1242,11 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Account is not active' });
     }
 
-    if (user.wallet.balance < tournament.entryFee) {
+    const { bonusUsed, realMoneyRequired } = getEntryPaymentSplit(user, tournament.entryFee);
+
+    if (user.wallet.balance < realMoneyRequired) {
       return res.status(400).json({ 
-        error: `Insufficient balance! You need ₹${tournament.entryFee} but have ₹${user.wallet.balance}. Please add money to your wallet.` 
+        error: `Insufficient real balance! You need ₹${realMoneyRequired} real money and can use ₹${bonusUsed} bonus. Current real balance: ₹${user.wallet.balance}.` 
       });
     }
 
@@ -1253,8 +1306,10 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
     });
     await participant.save();
 
-    // Deduct entry fee
-    user.wallet.balance -= tournament.entryFee;
+    // Deduct entry fee with capped bonus usage (20% max from bonus)
+    user.wallet.balance -= realMoneyRequired;
+    user.wallet.bonusBalance = Math.max((user.wallet.bonusBalance || 0) - bonusUsed, 0);
+    user.wallet.bonusUsed = (user.wallet.bonusUsed || 0) + bonusUsed;
     user.tournament.participatedCount += 1;
     await user.save();
 
@@ -1264,10 +1319,18 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       type: 'tournament_entry',
       amount: tournament.entryFee,
       tournamentId: req.params.id,
-      description: `Entry fee for ${tournament.name}`,
+      description: `Entry fee for ${tournament.name} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired})`,
       status: 'completed',
     });
     await transaction.save();
+
+    await Notification.create({
+      userId: req.userId,
+      tournamentId: tournament._id,
+      type: 'tournament_update',
+      title: 'Tournament Joined',
+      message: `You joined ${tournament.name}. Entry paid: ₹${tournament.entryFee} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired}).`,
+    });
 
     // Add to tournament registeredPlayers array (for backward compatibility)
     tournament.registeredPlayers.push(req.userId);
@@ -1277,6 +1340,8 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       message: 'Successfully joined tournament',
       participant,
       walletBalance: user.wallet.balance,
+      bonusUsed,
+      realMoneyUsed: realMoneyRequired,
     });
   } catch (error) {
     console.error('Error joining tournament:', error);
@@ -1503,12 +1568,14 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
       });
     }
 
-    // Step 1: Check wallet balance
-    if (user.wallet.balance < tournament.entryFee) {
+    const { bonusUsed, realMoneyRequired, maxBonusAllowed } = getEntryPaymentSplit(user, tournament.entryFee);
+
+    // Step 1: Check real wallet balance after bonus cap
+    if (user.wallet.balance < realMoneyRequired) {
       return res.status(400).json({ 
         success: false,
         error: 'Insufficient balance',
-        message: `❌ Insufficient balance. You need ₹${tournament.entryFee} but have ₹${user.wallet.balance}. Please add money to join this tournament.`,
+        message: `❌ Insufficient real balance. For entry fee ₹${tournament.entryFee}, you can use up to ₹${maxBonusAllowed} bonus. Required real money: ₹${realMoneyRequired}, current real balance: ₹${user.wallet.balance}.`,
         requiredAmount: tournament.entryFee,
         currentBalance: user.wallet.balance,
       });
@@ -1536,8 +1603,10 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
     slot.bookedAt = new Date();
     slot.isBooked = true;
 
-    // Deduct entry fee from wallet
-    user.wallet.balance -= tournament.entryFee;
+    // Deduct entry fee from wallet with bonus cap
+    user.wallet.balance -= realMoneyRequired;
+    user.wallet.bonusBalance = Math.max((user.wallet.bonusBalance || 0) - bonusUsed, 0);
+    user.wallet.bonusUsed = (user.wallet.bonusUsed || 0) + bonusUsed;
     user.wallet.totalDeposited = (user.wallet.totalDeposited || 0);
     
     // Create transaction record
@@ -1546,7 +1615,7 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
       type: 'tournament_entry',
       amount: tournament.entryFee,
       tournamentId: req.params.id,
-      description: `Entry fee for ${tournament.name} - Slot ${slotNumber}`,
+      description: `Entry fee for ${tournament.name} - Slot ${slotNumber} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired})`,
       status: 'completed',
     });
 
@@ -1566,6 +1635,14 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
     });
     await participant.save();
 
+    await Notification.create({
+      userId: req.userId,
+      tournamentId: tournament._id,
+      type: 'tournament_update',
+      title: 'Slot Booked',
+      message: `Slot #${slotNumber} booked in ${tournament.name}. Entry paid: ₹${tournament.entryFee} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired}).`,
+    });
+
     res.json({
       success: true,
       message: '✅ Slot booked successfully!',
@@ -1575,6 +1652,8 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
         entryFee: tournament.entryFee,
         tournamentName: tournament.name,
         remainingBalance: user.wallet.balance,
+        bonusUsed,
+        realMoneyUsed: realMoneyRequired,
       },
     });
   } catch (error) {
@@ -1608,8 +1687,10 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'This slot is already booked' });
     }
 
+    const { bonusUsed, realMoneyRequired } = getEntryPaymentSplit(user, tournament.entryFee);
+
     // Final wallet check
-    if (user.wallet.balance < tournament.entryFee) {
+    if (user.wallet.balance < realMoneyRequired) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
@@ -1619,14 +1700,16 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
     slot.bookedAt = new Date();
     slot.isBooked = true;
 
-    user.wallet.balance -= tournament.entryFee;
+    user.wallet.balance -= realMoneyRequired;
+    user.wallet.bonusBalance = Math.max((user.wallet.bonusBalance || 0) - bonusUsed, 0);
+    user.wallet.bonusUsed = (user.wallet.bonusUsed || 0) + bonusUsed;
 
     const transaction = new WalletTransaction({
       userId: req.userId,
       type: 'tournament_entry',
       amount: tournament.entryFee,
       tournamentId: req.params.id,
-      description: `Entry fee for ${tournament.name} - Slot ${slotNumber}`,
+      description: `Entry fee for ${tournament.name} - Slot ${slotNumber} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired})`,
       status: 'completed',
     });
 
@@ -1644,6 +1727,14 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
     });
     await participant.save();
 
+    await Notification.create({
+      userId: req.userId,
+      tournamentId: tournament._id,
+      type: 'tournament_update',
+      title: 'Slot Booked',
+      message: `Slot #${slotNumber} booked in ${tournament.name}. Entry paid: ₹${tournament.entryFee} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired}).`,
+    });
+
     res.json({
       success: true,
       message: '✅ Slot booked successfully!',
@@ -1653,6 +1744,8 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
         entryFee: tournament.entryFee,
         tournamentName: tournament.name,
         remainingBalance: user.wallet.balance,
+        bonusUsed,
+        realMoneyUsed: realMoneyRequired,
       },
     });
   } catch (error) {
