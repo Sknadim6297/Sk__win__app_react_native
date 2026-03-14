@@ -5,17 +5,31 @@ import Constants from 'expo-constants';
 export const AuthContext = createContext();
 
 const DEFAULT_API_URLS = [
-  'http://192.168.31.216:5000/api',
   'http://localhost:5000/api',
   'http://127.0.0.1:5000/api',
+  'http://192.168.31.216:5000/api',
+  'http://172.20.10.3:5000/api',
 ];
+
+const getWebApiUrl = () => {
+  if (typeof window === 'undefined' || !window.location?.hostname) {
+    return null;
+  }
+
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return 'http://localhost:5000/api';
+  }
+
+  return `http://${host}:5000/api`;
+};
 
 const EXTRA_API_URL =
   Constants.expoConfig?.extra?.apiUrl ||
   Constants.manifest?.extra?.apiUrl ||
   null;
 
-const API_URL = EXTRA_API_URL || DEFAULT_API_URLS[0];
+const API_URL = EXTRA_API_URL || getWebApiUrl() || DEFAULT_API_URLS[0];
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -44,7 +58,6 @@ export const AuthProvider = ({ children }) => {
         const restoredRole = savedRole || parsedUser.role || 'user';
         setRole(restoredRole);
         setIsAuthenticated(true);
-        
         console.log(`Auth status restored - Role: ${restoredRole}, User: ${parsedUser.username}`);
       }
     } catch (error) {
@@ -102,7 +115,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (username, email, password) => {
+  const register = async (username, email, password, referralCode = '') => {
     try {
       const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
@@ -113,7 +126,8 @@ export const AuthProvider = ({ children }) => {
           username, 
           email, 
           password,
-          confirmPassword: password 
+          confirmPassword: password,
+          referralCode,
         }),
       });
 
@@ -123,14 +137,8 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: data.error };
       }
 
-      await AsyncStorage.setItem('token', data.token);
-      await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      
-      setToken(data.token);
-      setUser(data.user);
-      setIsAuthenticated(true);
-
-      return { success: true, user: data.user };
+      // Registration now requires explicit login after signup.
+      return { success: true, user: data.user, referralApplied: Boolean(data.referralApplied) };
     } catch (error) {
       console.error('Registration error:', error);
       return { success: false, error: 'Registration failed' };

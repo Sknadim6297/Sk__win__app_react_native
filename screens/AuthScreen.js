@@ -27,6 +27,7 @@ const AuthScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
   
@@ -103,12 +104,17 @@ const AuthScreen = ({ navigation }) => {
         return;
       }
 
-      const result = await register(username, email, password);
+      const result = await register(username, email, password, referralCode);
       if (result.success) {
-        showToast('Account created successfully!', 'success');
+        const referralText = result.referralApplied ? ' Referral applied successfully.' : '';
+        showToast(`Registration successful. Please login to continue.${referralText}`, 'success');
         setTimeout(() => {
-          navigation.replace('MainApp');
-        }, 500);
+          setIsLogin(true);
+          setUsername('');
+          setPassword('');
+          setConfirmPassword('');
+          setReferralCode('');
+        }, 600);
       } else {
         showToast(result.error || 'Registration failed', 'error');
       }
@@ -121,6 +127,7 @@ const AuthScreen = ({ navigation }) => {
     setEmail('');
     setPassword('');
     setConfirmPassword('');
+    setReferralCode('');
   };
 
   return (
@@ -176,6 +183,22 @@ const AuthScreen = ({ navigation }) => {
                       value={username}
                       onChangeText={setUsername}
                       autoCapitalize="none"
+                    />
+                  </View>
+                </View>
+              )}
+
+              {!isLogin && (
+                <View style={styles.inputGroup}>
+                  <View style={styles.inputContainer}>
+                    <MaterialCommunityIcons name="gift-outline" size={20} color={COLORS.gray} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Referral Code (Optional)"
+                      placeholderTextColor={COLORS.gray}
+                      value={referralCode}
+                      onChangeText={setReferralCode}
+                      autoCapitalize="characters"
                     />
                   </View>
                 </View>

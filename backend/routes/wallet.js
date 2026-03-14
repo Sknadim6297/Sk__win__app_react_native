@@ -1,6 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const WalletTransaction = require('../models/WalletTransaction');
+const Notification = require('../models/Notification');
 const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
 
@@ -15,6 +16,8 @@ router.get('/balance', authMiddleware, async (req, res) => {
     res.json({
       success: true,
       balance: user.wallet.balance || 0,
+      bonusBalance: user.wallet.bonusBalance || 0,
+      bonusUsed: user.wallet.bonusUsed || 0,
       totalDeposited: user.wallet.totalDeposited || 0,
       totalWithdrawn: user.wallet.totalWithdrawn || 0,
       totalWinnings: user.wallet.totalWinnings || 0,
@@ -60,6 +63,13 @@ router.post('/topup', authMiddleware, async (req, res) => {
     });
 
     await transaction.save();
+
+    await Notification.create({
+      userId: req.userId,
+      type: 'wallet',
+      title: 'Wallet Top-up Successful',
+      message: `₹${amountNum} added to your wallet. Current balance: ₹${user.wallet.balance}.`,
+    });
 
     // Update wallet
     user.wallet.balance += amountNum;
@@ -112,6 +122,13 @@ router.post('/withdraw', authMiddleware, async (req, res) => {
     });
 
     await transaction.save();
+
+    await Notification.create({
+      userId: req.userId,
+      type: 'wallet',
+      title: 'Withdrawal Requested',
+      message: `Withdrawal request of ₹${amountNum} submitted. Current balance: ₹${user.wallet.balance}.`,
+    });
 
     // Update wallet
     user.wallet.balance -= amountNum;

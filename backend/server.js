@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const cron = require('node-cron');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
@@ -11,6 +12,9 @@ const tournamentRoutes = require('./routes/tournaments');
 const gamesRoutes = require('./routes/games');
 const uploadRoutes = require('./routes/upload');
 const tutorialRoutes = require('./routes/tutorials');
+const notificationRoutes = require('./routes/notifications');
+const { initFcm } = require('./services/fcm');
+const { runTournamentNotifier } = require('./services/tournamentNotifier');
 
 const app = express();
 
@@ -63,6 +67,7 @@ app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/games', gamesRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/tutorials', tutorialRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Catch-all for API routes that don't exist
 app.use('/api/*', (req, res) => {
@@ -80,6 +85,15 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+  console.log(`Access from hotspot: http://172.20.10.3:${PORT}`);
+  initFcm();
+  cron.schedule('* * * * *', async () => {
+    try {
+      await runTournamentNotifier();
+    } catch (error) {
+      console.error('Tournament notifier error:', error.message);
+    }
+  });
 });

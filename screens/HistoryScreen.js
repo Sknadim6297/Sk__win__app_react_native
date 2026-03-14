@@ -40,16 +40,19 @@ const HistoryScreen = ({ navigation }) => {
 
             return {
               id: item._id,
+              tournamentId: tournament._id,
               tournamentName: tournament.name || 'Tournament',
-              gameMode: tournament.gameType || tournament.game || 'Tournament',
+              gameMode: tournament.gameMode?.name || tournament.game?.name || 'Tournament',
               joinedAt: item.joinedAt || item.createdAt,
               status,
+              tournamentStatus: tournament.status,
               rank: item.rank,
               prize: item.prizeAmount || 0,
               entryFee: tournament.entryFee || 0,
-              totalPlayers: tournament.maxPlayers || 0,
+              totalPlayers: tournament.maxParticipants || 0,
               slotNumber: item.slotNumber,
               gamingUsername: item.gamingUsername,
+              showRoomCredentials: tournament.showRoomCredentials,
             };
           })
         : [];
@@ -113,6 +116,11 @@ const HistoryScreen = ({ navigation }) => {
       date: date.toLocaleDateString(),
       time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
+  };
+
+  const goToTournament = (tournamentId) => {
+    if (!tournamentId) return;
+    navigation.navigate('TournamentDetails', { tournamentId });
   };
 
   const MatchCard = ({ match }) => (
@@ -185,6 +193,31 @@ const HistoryScreen = ({ navigation }) => {
           </View>
           <Text style={styles.timeText}>{formatDateTime(match.joinedAt).time}</Text>
         </View>
+      </View>
+
+      <View style={styles.actionRow}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => goToTournament(match.tournamentId)}
+        >
+          <Text style={styles.actionButtonText}>View</Text>
+        </TouchableOpacity>
+        {(match.tournamentStatus === 'ongoing' || match.tournamentStatus === 'live') && (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => goToTournament(match.tournamentId)}
+          >
+            <Text style={styles.actionButtonText}>Room Info</Text>
+          </TouchableOpacity>
+        )}
+        {match.tournamentStatus === 'completed' && (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => goToTournament(match.tournamentId)}
+          >
+            <Text style={styles.actionButtonText}>Results</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -489,6 +522,23 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.darkGray,
     paddingTop: 12,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: COLORS.darkGray,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '600',
   },
   slotInfoRow: {
     flexDirection: 'row',

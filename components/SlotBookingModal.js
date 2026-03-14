@@ -31,7 +31,16 @@ const SlotBookingModal = ({
   const [booking, setBooking] = useState(false);
   const [usernameMismatchData, setUsernameMismatchData] = useState(null);
   const [balance, setBalance] = useState(userBalance ?? null);
+  const [bonusBalance, setBonusBalance] = useState(0);
   const [balanceLoading, setBalanceLoading] = useState(false);
+
+  const getPaymentSplit = () => {
+    const entryFee = Number(tournament?.entryFee) || 0;
+    const maxBonusAllowed = Math.floor(entryFee * 0.2);
+    const usableBonus = Math.min(bonusBalance || 0, maxBonusAllowed);
+    const realRequired = Math.max(entryFee - usableBonus, 0);
+    return { entryFee, maxBonusAllowed, usableBonus, realRequired };
+  };
 
   useEffect(() => {
     if (visible && tournament) {
@@ -45,7 +54,6 @@ const SlotBookingModal = ({
   useEffect(() => {
     if (userBalance !== undefined && userBalance !== null) {
       setBalance(userBalance);
-      return;
     }
 
     if (visible) {
@@ -58,8 +66,10 @@ const SlotBookingModal = ({
       setBalanceLoading(true);
       const response = await walletService.getBalance();
       setBalance(response?.balance ?? 0);
+      setBonusBalance(response?.bonusBalance ?? 0);
     } catch (error) {
       setBalance(0);
+      setBonusBalance(0);
     } finally {
       setBalanceLoading(false);
     }
@@ -91,12 +101,14 @@ const SlotBookingModal = ({
       return;
     }
 
-    // Step 1: Check wallet balance
+    const { realRequired, usableBonus } = getPaymentSplit();
+
+    // Step 1: Check payable real-money balance after allowed bonus usage
     const effectiveBalance = balance ?? 0;
-    if (effectiveBalance < tournament.entryFee) {
+    if (effectiveBalance < realRequired) {
       Alert.alert(
         'Insufficient Balance',
-        `❌ Insufficient balance.\nYou need ₹${tournament.entryFee} but have ₹${effectiveBalance}.\nPlease add money to join this tournament.`,
+        `❌ Insufficient real balance.\nEntry fee: ₹${tournament.entryFee}\nBonus usable: ₹${usableBonus}\nRequired real balance: ₹${realRequired}\nYour real balance: ₹${effectiveBalance}`,
         [{ text: 'OK' }]
       );
       return;
@@ -342,21 +354,40 @@ const SlotBookingModal = ({
                 )}
 
                 <View style={styles.feeInfo}>
+                  {(() => {
+                    const split = getPaymentSplit();
+                    return (
+                      <>
                   <View style={styles.feeRow}>
                     <Text style={styles.feeLabel}>Entry Fee:</Text>
                     <Text style={styles.feeValue}>₹{tournament.entryFee}</Text>
+                  </View>
+                  <View style={styles.feeRow}>
+                    <Text style={styles.feeLabel}>Bonus Usable (20% max):</Text>
+                    <Text style={styles.feeValue}>₹{split.usableBonus}</Text>
+                  </View>
+                  <View style={styles.feeRow}>
+                    <Text style={styles.feeLabel}>Required Real Money:</Text>
+                    <Text style={styles.feeValue}>₹{split.realRequired}</Text>
                   </View>
                   <View style={styles.feeRow}>
                     <Text style={styles.feeLabel}>Your Balance:</Text>
                     <Text
                       style={[
                         styles.feeValue,
-                        (balance ?? 0) < tournament.entryFee && { color: COLORS.red },
+                        (balance ?? 0) < split.realRequired && { color: COLORS.red },
                       ]}
                     >
                       {balanceLoading ? 'Loading...' : `₹${balance ?? 0}`}
                     </Text>
                   </View>
+                  <View style={styles.feeRow}>
+                    <Text style={styles.feeLabel}>Your Bonus Balance:</Text>
+                    <Text style={styles.feeValue}>₹{bonusBalance ?? 0}</Text>
+                  </View>
+                    </>
+                    );
+                  })()}
                 </View>
               </View>
             </View>

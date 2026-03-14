@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
+const { ensureUserReferralCode } = require('../utils/referral');
 const router = express.Router();
 
 // Get user profile
@@ -11,6 +12,8 @@ router.get('/profile', authMiddleware, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    await ensureUserReferralCode(user);
     res.json(user);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch profile' });
@@ -126,6 +129,30 @@ router.post('/change-password', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Password change error:', error);
     res.status(500).json({ success: false, message: 'Failed to change password' });
+  }
+});
+
+// Save push notification token
+router.post('/push-token', authMiddleware, async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    if (!fcmToken) {
+      return res.status(400).json({ error: 'FCM token is required' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { fcmToken, updatedAt: Date.now() },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to save push token' });
   }
 });
 

@@ -2,24 +2,40 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // Backend API URL - Update this to your actual backend URL
-// For local testing: http://localhost:5000/api (Expo dev server) or http://192.168.31.216:5000/api (physical device)
+// For local testing: http://localhost:5000/api (Expo dev server) or http://172.20.10.3:5000/api (physical device)
 // For production: https://your-deployed-backend.com/api
 
 // Try multiple API URLs in case of network configuration changes
 const API_URLS = [
-  'http://192.168.31.216:5000/api',
   'http://localhost:5000/api',
   'http://127.0.0.1:5000/api',
+  'http://192.168.31.216:5000/api',
+  'http://172.20.10.3:5000/api',
 ];
+
+const getWebApiUrl = () => {
+  if (typeof window === 'undefined' || !window.location?.hostname) {
+    return null;
+  }
+
+  const host = window.location.hostname;
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return 'http://localhost:5000/api';
+  }
+
+  return `http://${host}:5000/api`;
+};
 
 const EXTRA_API_URL =
   Constants.expoConfig?.extra?.apiUrl ||
   Constants.manifest?.extra?.apiUrl ||
   null;
 
+const WEB_API_URL = getWebApiUrl();
+
 const RESOLVED_API_URLS = EXTRA_API_URL
-  ? [EXTRA_API_URL, ...API_URLS]
-  : API_URLS;
+  ? [EXTRA_API_URL, ...(WEB_API_URL ? [WEB_API_URL] : []), ...API_URLS]
+  : [...(WEB_API_URL ? [WEB_API_URL] : []), ...API_URLS];
 
 const API_URL = RESOLVED_API_URLS[0];
 
@@ -272,6 +288,18 @@ export const tutorialService = {
   }),
   remove: (id) => apiCall(`/tutorials/admin/${id}`, {
     method: 'DELETE',
+  }),
+};
+
+// Notification Services
+export const notificationService = {
+  getAll: () => apiCall('/notifications'),
+  getUnreadCount: () => apiCall('/notifications/unread/count'),
+  markRead: (id) => apiCall(`/notifications/${id}/read`, {
+    method: 'PUT',
+  }),
+  markAllRead: () => apiCall('/notifications/read/all', {
+    method: 'PUT',
   }),
 };
 

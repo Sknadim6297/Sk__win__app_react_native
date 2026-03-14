@@ -34,6 +34,22 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  fcmToken: {
+    type: String,
+    default: null,
+  },
+  referralCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    uppercase: true,
+    trim: true,
+  },
+  referredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
   role: {
     type: String,
     enum: ['user', 'admin'],
@@ -45,6 +61,14 @@ const userSchema = new mongoose.Schema({
   },
   wallet: {
     balance: {
+      type: Number,
+      default: 0,
+    },
+    bonusBalance: {
+      type: Number,
+      default: 0,
+    },
+    bonusUsed: {
       type: Number,
       default: 0,
     },

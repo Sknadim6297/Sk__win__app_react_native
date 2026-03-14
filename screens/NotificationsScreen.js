@@ -12,58 +12,59 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../styles/theme';
+import { notificationService } from '../services/api';
 
 const NotificationsScreen = ({ navigation }) => {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'tournament',
-      title: 'Tournament Started',
-      message: 'Pro Gaming Tournament has started. Join now!',
-      time: '2 hours ago',
-      read: false,
-    },
-    {
-      id: 2,
-      type: 'wallet',
-      title: 'Wallet Credited',
-      message: 'Prize money of ₹500 has been added to your wallet',
-      time: '5 hours ago',
-      read: false,
-    },
-    {
-      id: 3,
-      type: 'result',
-      title: 'Match Result',
-      message: 'You won the PUBG Tournament! Check your prizes.',
-      time: '1 day ago',
-      read: true,
-    },
-    {
-      id: 4,
-      type: 'announcement',
-      title: 'New Tournament',
-      message: 'New tournament has been added. Check details now.',
-      time: '2 days ago',
-      read: true,
-    },
-  ]);
+  const [notifications, setNotifications] = useState([]);
 
   useFocusEffect(
     useCallback(() => {
-      // Load notifications
+      loadNotifications();
     }, [])
   );
+
+  const loadNotifications = async () => {
+    try {
+      const response = await notificationService.getAll();
+      setNotifications(response.notifications || []);
+    } catch (error) {
+      setNotifications([]);
+    }
+  };
+
+  const markAsRead = async (id) => {
+    try {
+      await notificationService.markRead(id);
+      setNotifications(prev => prev.map(n => (n._id === id ? { ...n, isRead: true } : n)));
+    } catch (error) {
+      // ignore
+    }
+  };
+
+  const formatTime = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   const getIcon = (type) => {
     switch (type) {
       case 'tournament':
+      case 'tournament_reminder':
         return 'trophy';
+      case 'tournament_update':
+        return 'bell';
       case 'wallet':
         return 'wallet';
       case 'result':
         return 'check-circle';
       case 'announcement':
+      case 'system':
         return 'bell';
       default:
         return 'information-circle';
@@ -71,7 +72,10 @@ const NotificationsScreen = ({ navigation }) => {
   };
 
   const renderNotification = ({ item }) => (
-    <TouchableOpacity style={[styles.notificationCard, !item.read && styles.unread]}>
+    <TouchableOpacity
+      style={[styles.notificationCard, !item.isRead && styles.unread]}
+      onPress={() => markAsRead(item._id)}
+    >
       <View style={styles.iconContainer}>
         <MaterialCommunityIcons name={getIcon(item.type)} size={24} color={COLORS.accent} />
       </View>
@@ -79,10 +83,10 @@ const NotificationsScreen = ({ navigation }) => {
       <View style={styles.content}>
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.message}>{item.message}</Text>
-        <Text style={styles.time}>{item.time}</Text>
+        <Text style={styles.time}>{formatTime(item.createdAt)}</Text>
       </View>
 
-      {!item.read && <View style={styles.unreadDot} />}
+      {!item.isRead && <View style={styles.unreadDot} />}
     </TouchableOpacity>
   );
 
@@ -96,7 +100,7 @@ const NotificationsScreen = ({ navigation }) => {
           <Ionicons name="arrow-back" size={24} color={COLORS.accent} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => notificationService.markAllRead().then(loadNotifications)}>
           <MaterialCommunityIcons name="trash-can-outline" size={24} color={COLORS.gray} />
         </TouchableOpacity>
       </View>
@@ -104,7 +108,7 @@ const NotificationsScreen = ({ navigation }) => {
       <FlatList
         data={notifications}
         renderItem={renderNotification}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item._id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />

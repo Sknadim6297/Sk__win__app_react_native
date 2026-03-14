@@ -26,43 +26,18 @@ const AboutUsScreen = ({ navigation }) => {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
-          <Text style={styles.title}>SK Win Tournament Platform</Text>
-          
-          <Text style={styles.sectionTitle}>Our Mission</Text>
+          <Text style={styles.title}>SK Win</Text>
+
           <Text style={styles.text}>
-            SK Win is dedicated to creating a fair, secure, and exciting platform for gaming enthusiasts. 
-            We believe in bringing together players from around the world to compete, win, and celebrate their achievements.
+            SK Win is a competitive gaming platform where players can join exciting tournaments and compete with others to win real rewards.
           </Text>
 
-          <Text style={styles.sectionTitle}>What We Offer</Text>
-          <View style={styles.featureList}>
-            <Text style={styles.feature}>• Multiple tournaments with varying difficulty levels</Text>
-            <Text style={styles.feature}>• Transparent prize distribution system</Text>
-            <Text style={styles.feature}>• Secure wallet and payment system</Text>
-            <Text style={styles.feature}>• Real-time match tracking and updates</Text>
-            <Text style={styles.feature}>• Community features and leaderboards</Text>
-            <Text style={styles.feature}>• 24/7 customer support</Text>
-          </View>
-
-          <Text style={styles.sectionTitle}>Our Values</Text>
           <Text style={styles.text}>
-            <Text style={styles.bold}>Fair Play: </Text>
-            We maintain strict anti-cheating protocols to ensure a level playing field.
-          </Text>
-          <Text style={styles.text}>
-            <Text style={styles.bold}>Transparency: </Text>
-            All rules, scoring, and prizes are clearly communicated.
-          </Text>
-          <Text style={styles.text}>
-            <Text style={styles.bold}>Security: </Text>
-            Your data and funds are protected with industry-leading encryption.
+            Our mission is to create a fair and exciting gaming environment for all players.
           </Text>
 
-          <Text style={styles.sectionTitle}>Contact Information</Text>
           <Text style={styles.text}>
-            Email: support@skwin.com{'\n'}
-            Phone: +91 9876543210{'\n'}
-            Website: www.skwin.com
+            Join tournaments, compete with top players, and win exciting prizes.
           </Text>
 
           <Text style={styles.version}>Version 1.0.0</Text>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,50 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../styles/theme';
+import { AuthContext } from '../context/AuthContext';
+import { userService } from '../services/api';
 
 const ShareAppScreen = ({ navigation }) => {
+  const { user } = useContext(AuthContext);
+  const [referralCode, setReferralCode] = useState(user?.referralCode || 'Loading...');
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadReferralCode = async () => {
+      try {
+        if (user?.referralCode) {
+          setReferralCode(user.referralCode);
+          return;
+        }
+
+        const profile = await userService.getProfile();
+        if (mounted && profile?.referralCode) {
+          setReferralCode(profile.referralCode);
+          return;
+        }
+
+        if (mounted) {
+          setReferralCode('Not generated yet');
+        }
+      } catch (error) {
+        if (mounted && !user?.referralCode) {
+          setReferralCode('Unavailable');
+        }
+      }
+    };
+
+    loadReferralCode();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.referralCode]);
+
   const handleShare = async () => {
     try {
       const result = await Share.share({
-        message: 'Check out SK Win - the ultimate tournament gaming platform! Join now and start winning prizes. Download from: [Your App Link]',
+        message: `Join SK Win and play tournaments for real rewards! Use my referral code ${referralCode} during signup. I get ₹25 referral bonus when you register with my code. Bonus usage rule: only up to 20% of entry fee can be paid using bonus.` ,
         title: 'Share SK Win',
         url: 'https://your-app-download-link.com', // Update with your actual link
       });
@@ -36,6 +74,19 @@ const ShareAppScreen = ({ navigation }) => {
     { icon: 'facebook', label: 'Facebook', color: '#1877F2' },
     { icon: 'twitter', label: 'Twitter', color: '#1DA1F2' },
   ];
+
+  const handleCopyCode = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(referralCode);
+        Alert.alert('Copied', 'Referral code copied to clipboard');
+        return;
+      }
+      Alert.alert('Referral Code', referralCode);
+    } catch (error) {
+      Alert.alert('Referral Code', referralCode);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -77,13 +128,13 @@ const ShareAppScreen = ({ navigation }) => {
         <View style={styles.referralCode}>
           <Text style={styles.referralLabel}>Your Referral Code</Text>
           <View style={styles.codeContainer}>
-            <Text style={styles.code}>SK123456</Text>
-            <TouchableOpacity style={styles.copyButton}>
+            <Text style={styles.code}>{referralCode}</Text>
+            <TouchableOpacity style={styles.copyButton} onPress={handleCopyCode}>
               <Ionicons name="copy" size={18} color={COLORS.accent} />
             </TouchableOpacity>
           </View>
           <Text style={styles.referralInfo}>
-            Share your referral code to earn rewards when friends sign up!
+            Referral reward rule: the person who shared the code gets ₹25 bonus when a new user registers using it. Only up to 20% of any tournament entry fee can be paid from bonus balance. If your code is not generated yet, login again once.
           </Text>
         </View>
       </View>
