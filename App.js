@@ -1,9 +1,16 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
+import {
+  Orbitron_400Regular,
+  Orbitron_500Medium,
+  Orbitron_700Bold,
+  Orbitron_900Black,
+} from '@expo-google-fonts/orbitron';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
@@ -36,7 +43,9 @@ import TournamentManagement from './screens/admin/TournamentManagement';
 import TournamentLeaderboard from './screens/admin/TournamentLeaderboard';
 import GameManagement from './screens/admin/GameManagement';
 import TutorialManagement from './screens/admin/TutorialManagement';
-import { COLORS } from './styles/theme';
+import AppLoadingScreen from './components/AppLoadingScreen';
+import { applyGlobalTypography } from './styles/typography';
+import { COLORS, FONTS } from './styles/theme';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -78,7 +87,8 @@ function MainTabNavigator() {
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontFamily: FONTS.regular,
+          letterSpacing: 0.6,
           marginTop: 0,
         },
         headerShown: false,
@@ -117,6 +127,23 @@ function MainTabNavigator() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    'Orbitron-Regular': Orbitron_400Regular,
+    'Orbitron-Medium': Orbitron_500Medium,
+    'Orbitron-Bold': Orbitron_700Bold,
+    'Orbitron-Black': Orbitron_900Black,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      applyGlobalTypography();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) {
+    return <AppLoadingScreen subtitle="Loading game assets..." />;
+  }
+
   return (
     <SafeAreaProvider>
       <AuthProvider>
@@ -130,7 +157,7 @@ function AppNavigator() {
   const { isAuthenticated, isLoading, isAdmin } = useContext(AuthContext);
 
   if (isLoading) {
-    return null; // Show splash screen or loading indicator
+    return <AppLoadingScreen subtitle="Syncing your profile..." />;
   }
 
   return (

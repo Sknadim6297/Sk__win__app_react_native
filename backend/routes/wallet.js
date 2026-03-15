@@ -99,8 +99,8 @@ router.post('/withdraw', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid amount' });
     }
 
-    if (amountNum < 50) {
-      return res.status(400).json({ success: false, message: 'Minimum withdrawal amount is ₹50' });
+    if (amountNum < 25) {
+      return res.status(400).json({ success: false, message: 'Minimum withdrawal amount is ₹25' });
     }
 
     const user = await User.findById(req.userId);
@@ -109,7 +109,7 @@ router.post('/withdraw', authMiddleware, async (req, res) => {
     }
 
     if (user.wallet.balance < amountNum) {
-      return res.status(400).json({ success: false, message: 'Insufficient balance. You cannot withdraw more than your current balance.' });
+      return res.status(400).json({ success: false, message: 'Insufficient real balance. Bonus balance cannot be withdrawn.' });
     }
 
     // Create transaction

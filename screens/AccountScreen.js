@@ -83,6 +83,11 @@ const AccountScreen = ({ navigation }) => {
       screen: 'MyStatistics',
     },
     {
+      title: 'Match History',
+      icon: 'history',
+      screen: 'History',
+    },
+    {
       title: 'Top Players',
       icon: 'podium',
       screen: 'TopPlayers',

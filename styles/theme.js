@@ -20,8 +20,10 @@ export const COLORS = {
 };
 
 export const FONTS = {
-  regular: 'System',
-  bold: 'System',
+  regular: 'Orbitron-Regular',
+  medium: 'Orbitron-Regular',
+  bold: 'Orbitron-Regular',
+  black: 'Orbitron-Regular',
 };
 
 export const globalStyles = StyleSheet.create({

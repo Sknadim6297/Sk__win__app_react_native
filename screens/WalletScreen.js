@@ -32,6 +32,16 @@ const WalletScreen = ({ navigation }) => {
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
 
+  const sanitizeAmountInput = useCallback((value) => {
+    const cleaned = (value || '').replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length <= 1) {
+      return parts[0];
+    }
+
+    return `${parts[0]}.${parts.slice(1).join('').slice(0, 2)}`;
+  }, []);
+
   const loadWalletData = useCallback(async (silent = false) => {
     try {
       if (!silent) {
@@ -164,11 +174,11 @@ const WalletScreen = ({ navigation }) => {
       return;
     }
     if (parsedAmount > balance) {
-      Alert.alert('Insufficient Balance', 'You cannot withdraw more than your current balance');
+      Alert.alert('Insufficient Real Balance', 'Withdrawals are allowed only from real balance. Bonus balance cannot be withdrawn.');
       return;
     }
-    if (parsedAmount < 50) {
-      Alert.alert('Minimum Withdrawal', 'Minimum withdrawal amount is ₹50');
+    if (parsedAmount < 25) {
+      Alert.alert('Minimum Withdrawal', 'Minimum withdrawal amount is ₹25');
       return;
     }
 
@@ -293,8 +303,10 @@ const WalletScreen = ({ navigation }) => {
               placeholder="₹0"
               placeholderTextColor={COLORS.gray}
               value={depositAmount}
-              onChangeText={setDepositAmount}
+              onChangeText={(text) => setDepositAmount(sanitizeAmountInput(text))}
               keyboardType="numeric"
+              autoCorrect={false}
+              autoCapitalize="none"
             />
           </View>
 
@@ -341,6 +353,7 @@ const WalletScreen = ({ navigation }) => {
           <View style={styles.balanceInfo}>
             <Text style={styles.availableBalanceText}>Real Balance: ₹{balance}</Text>
             <Text style={styles.availableBalanceText}>Bonus Balance: ₹{bonusBalance}</Text>
+            <Text style={styles.withdrawInfoText}>Withdrawals are allowed from real balance only</Text>
           </View>
 
           <View style={styles.amountInput}>
@@ -350,9 +363,13 @@ const WalletScreen = ({ navigation }) => {
               placeholder="₹0"
               placeholderTextColor={COLORS.gray}
               value={withdrawAmount}
-              onChangeText={setWithdrawAmount}
+              onChangeText={(text) => setWithdrawAmount(sanitizeAmountInput(text))}
               keyboardType="numeric"
+              autoCorrect={false}
+              autoCapitalize="none"
             />
+
+            <Text style={styles.minimumText}>Minimum withdrawal: ₹25</Text>
           </View>
 
           <TouchableOpacity
@@ -471,8 +488,8 @@ const WalletScreen = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      <DepositModal />
-      <WithdrawModal />
+      {DepositModal()}
+      {WithdrawModal()}
     </SafeAreaView>
   );
 };
@@ -713,6 +730,12 @@ const styles = StyleSheet.create({
     color: COLORS.accent,
     textAlign: 'center',
   },
+  withdrawInfoText: {
+    fontSize: 12,
+    color: COLORS.gray,
+    textAlign: 'center',
+    marginTop: 6,
+  },
   amountInput: {
     marginBottom: 20,
   },
@@ -730,6 +753,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     borderWidth: 1,
     borderColor: COLORS.gray,
+  },
+  minimumText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: COLORS.gray,
+    textAlign: 'center',
   },
   quickAmounts: {
     flexDirection: 'row',

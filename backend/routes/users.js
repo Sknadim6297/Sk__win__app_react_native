@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const { authMiddleware } = require('../middleware/auth');
 const { ensureUserReferralCode } = require('../utils/referral');
 const router = express.Router();
@@ -49,6 +50,13 @@ router.put('/profile', authMiddleware, async (req, res) => {
     user.updatedAt = Date.now();
 
     await user.save();
+
+    await Notification.create({
+      userId: req.userId,
+      type: 'system',
+      title: 'Profile Updated',
+      message: 'Your profile details were updated successfully.',
+    });
 
     // Return updated user (without password)
     const updatedUser = await User.findById(req.userId).select('-password');

@@ -4,32 +4,30 @@ import Constants from 'expo-constants';
 
 export const AuthContext = createContext();
 
-const DEFAULT_API_URLS = [
-  'http://localhost:5000/api',
-  'http://127.0.0.1:5000/api',
-  'http://192.168.31.216:5000/api',
-  'http://172.20.10.3:5000/api',
-];
+const getApiUrl = () => {
+  // Explicit override from app.json extra
+  const extra =
+    Constants.expoConfig?.extra?.apiUrl ||
+    Constants.manifest?.extra?.apiUrl;
+  if (extra) return extra;
 
-const getWebApiUrl = () => {
-  if (typeof window === 'undefined' || !window.location?.hostname) {
-    return null;
+  // Web: derive from browser location
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    const host = window.location.hostname;
+    return `http://${host === '127.0.0.1' ? 'localhost' : host}:5000/api`;
   }
 
-  const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return 'http://localhost:5000/api';
+  // iOS/Android in Expo dev: use the Expo dev server host IP
+  const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
+  if (hostUri) {
+    const host = hostUri.split(':')[0];
+    return `http://${host}:5000/api`;
   }
 
-  return `http://${host}:5000/api`;
+  return 'http://localhost:5000/api';
 };
 
-const EXTRA_API_URL =
-  Constants.expoConfig?.extra?.apiUrl ||
-  Constants.manifest?.extra?.apiUrl ||
-  null;
-
-const API_URL = EXTRA_API_URL || getWebApiUrl() || DEFAULT_API_URLS[0];
+const API_URL = getApiUrl();
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

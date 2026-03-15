@@ -38,8 +38,19 @@ const MyWalletScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [showAddMoneyModal, setShowAddMoneyModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [amount, setAmount] = useState('');
+  const [addAmount, setAddAmount] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
   const [processing, setProcessing] = useState(false);
+
+  const sanitizeAmountInput = (value) => {
+    const cleaned = (value || '').replace(/[^0-9.]/g, '');
+    const parts = cleaned.split('.');
+    if (parts.length <= 1) {
+      return parts[0];
+    }
+
+    return `${parts[0]}.${parts.slice(1).join('').slice(0, 2)}`;
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -163,7 +174,7 @@ const MyWalletScreen = ({ navigation }) => {
   };
 
   const handleAddMoney = async () => {
-    const trimmedAmount = amount.trim();
+    const trimmedAmount = addAmount.trim();
     const amountNum = parseFloat(trimmedAmount);
     
     if (!trimmedAmount || isNaN(amountNum) || amountNum <= 0) {
@@ -193,7 +204,7 @@ const MyWalletScreen = ({ navigation }) => {
       if (response && response.success) {
         Alert.alert('Success', `₹${amountNum} added to your wallet successfully`);
         setShowAddMoneyModal(false);
-        setAmount('');
+        setAddAmount('');
         await loadWalletData(true);
       } else {
         const errorMsg = response?.message || 'Failed to add money. Please try again.';
@@ -208,7 +219,7 @@ const MyWalletScreen = ({ navigation }) => {
   };
 
   const handleWithdraw = async () => {
-    const trimmedAmount = amount.trim();
+    const trimmedAmount = withdrawAmount.trim();
     const amountNum = parseFloat(trimmedAmount);
     
     if (!trimmedAmount || isNaN(amountNum) || amountNum <= 0) {
@@ -217,12 +228,12 @@ const MyWalletScreen = ({ navigation }) => {
     }
 
     if (amountNum > walletData.balance) {
-      Alert.alert('Error', 'Insufficient balance. You cannot withdraw more than your current balance.');
+      Alert.alert('Error', 'Insufficient real balance. Bonus balance cannot be withdrawn.');
       return;
     }
 
-    if (amountNum < 50) {
-      Alert.alert('Error', 'Minimum withdrawal amount is ₹50');
+    if (amountNum < 25) {
+      Alert.alert('Error', 'Minimum withdrawal amount is ₹25');
       return;
     }
 
@@ -236,7 +247,7 @@ const MyWalletScreen = ({ navigation }) => {
       if (response && response.success) {
         Alert.alert('Success', `Withdrawal of ₹${amountNum} initiated successfully`);
         setShowWithdrawModal(false);
-        setAmount('');
+        setWithdrawAmount('');
         await loadWalletData(true);
       } else {
         const errorMsg = response?.message || 'Failed to process withdrawal. Please try again.';
@@ -283,14 +294,20 @@ const MyWalletScreen = ({ navigation }) => {
           <View style={styles.balanceActions}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => setShowAddMoneyModal(true)}
+              onPress={() => {
+                setAddAmount('');
+                setShowAddMoneyModal(true);
+              }}
             >
               <MaterialCommunityIcons name="plus-circle" size={20} color={COLORS.white} />
               <Text style={styles.actionText}>Add Money</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => setShowWithdrawModal(true)}
+              onPress={() => {
+                setWithdrawAmount('');
+                setShowWithdrawModal(true);
+              }}
             >
               <MaterialCommunityIcons name="minus-circle" size={20} color={COLORS.white} />
               <Text style={styles.actionText}>Withdraw</Text>
@@ -398,9 +415,11 @@ const MyWalletScreen = ({ navigation }) => {
                 placeholder="0.00"
                 placeholderTextColor="#666"
                 keyboardType="numeric"
-                value={amount}
-                onChangeText={setAmount}
+                value={addAmount}
+                onChangeText={(text) => setAddAmount(sanitizeAmountInput(text))}
                 editable={!processing}
+                autoCorrect={false}
+                autoCapitalize="none"
               />
             </View>
 
@@ -409,7 +428,7 @@ const MyWalletScreen = ({ navigation }) => {
                 <TouchableOpacity
                   key={val}
                   style={styles.quickAmountBtn}
-                  onPress={() => setAmount(val.toString())}
+                  onPress={() => setAddAmount(val.toString())}
                   disabled={processing}
                 >
                   <Text style={styles.quickAmountText}>₹{val}</Text>
@@ -422,7 +441,7 @@ const MyWalletScreen = ({ navigation }) => {
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setShowAddMoneyModal(false);
-                  setAmount('');
+                  setAddAmount('');
                 }}
                 disabled={processing}
               >
@@ -465,20 +484,22 @@ const MyWalletScreen = ({ navigation }) => {
                 placeholder="0.00"
                 placeholderTextColor="#666"
                 keyboardType="numeric"
-                value={amount}
-                onChangeText={setAmount}
+                value={withdrawAmount}
+                onChangeText={(text) => setWithdrawAmount(sanitizeAmountInput(text))}
                 editable={!processing}
+                autoCorrect={false}
+                autoCapitalize="none"
               />
             </View>
 
-            <Text style={styles.minAmountText}>Minimum withdrawal: ₹50</Text>
+            <Text style={styles.minAmountText}>Minimum withdrawal: ₹25 (real balance only)</Text>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setShowWithdrawModal(false);
-                  setAmount('');
+                  setWithdrawAmount('');
                 }}
                 disabled={processing}
               >
