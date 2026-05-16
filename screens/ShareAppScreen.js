@@ -13,9 +13,12 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../styles/theme';
 import { AuthContext } from '../context/AuthContext';
 import { userService } from '../services/api';
+import DynamicAppIcon from '../components/ui/DynamicAppIcon';
+import { useAppIcons } from '../hooks/useAppIcons';
 
 const ShareAppScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
+  const { appIcons } = useAppIcons();
   const [referralCode, setReferralCode] = useState(user?.referralCode || 'Loading...');
 
   useEffect(() => {
@@ -54,8 +57,8 @@ const ShareAppScreen = ({ navigation }) => {
   const handleShare = async () => {
     try {
       const result = await Share.share({
-        message: `Join SK Win and play tournaments for real rewards! Use my referral code ${referralCode} during signup. I get ₹25 referral bonus when you register with my code. Bonus usage rule: only up to 20% of entry fee can be paid using bonus.` ,
-        title: 'Share SK Win',
+        message: `Join WarZone Free Fire Tournament and play for real rewards! Use my referral code ${referralCode} during signup. I get ₹25 referral bonus when you register with my code. Bonus usage rule: only up to 20% of entry fee can be paid using bonus.`,
+        title: 'Share WarZone Free Fire Tournament',
         url: 'https://your-app-download-link.com', // Update with your actual link
       });
 
@@ -102,8 +105,8 @@ const ShareAppScreen = ({ navigation }) => {
 
       <View style={styles.content}>
         <View style={styles.sharePrompt}>
-          <MaterialCommunityIcons name="share-variant" size={48} color={COLORS.accent} />
-          <Text style={styles.promptText}>Share SK Win with your friends</Text>
+          <DynamicAppIcon iconKey="share" icons={appIcons} name="share-variant" size={48} color={COLORS.accent} />
+          <Text style={styles.promptText}>Share WarZone with your friends</Text>
           <Text style={styles.promptSubText}>
             Help your friends discover the ultimate tournament gaming experience
           </Text>

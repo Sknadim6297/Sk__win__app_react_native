@@ -7,799 +7,575 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
-  TextInput,
   Modal,
   RefreshControl,
+  ActivityIndicator,
+  Dimensions,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { COLORS } from '../styles/theme';
-import SKWinLogo from '../components/SKWinLogo';
-import { userService, walletService } from '../services/api';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import DynamicAppIcon from '../components/ui/DynamicAppIcon';
+import { walletService, configService } from '../services/api';
+import { useAppIcons } from '../hooks/useAppIcons';
+import { EMPTY_APP_ICONS } from '../constants/appIconSlots';
+
+const { width } = Dimensions.get('window');
+const PACK_WIDTH = width * 0.42;
 
 const WalletScreen = ({ navigation }) => {
-  const [balance, setBalance] = useState(0);
-  const [bonusBalance, setBonusBalance] = useState(0);
-  const [totals, setTotals] = useState({ totalDeposited: 0, totalWithdrawn: 0 });
-  const [stats, setStats] = useState({ totalWinnings: 0, tournamentsJoined: 0, tournamentsWon: 0 });
+  const { appIcons } = useAppIcons();
+  const [balance, setBalance] = useState({
+    totalBalance: 0,
+    balance: 0,
+    bonusBalance: 0,
+    totalDeposited: 0,
+    totalWinnings: 0,
+  });
+  const [coinPacks, setCoinPacks] = useState([]);
+  const [footerNote, setFooterNote] = useState('Only winnings can be redeemed.');
+  const [securityNote, setSecurityNote] = useState('Coins Ki Suraksha Bilkul Bank Jaisa!');
   const [transactions, setTransactions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showDepositModal, setShowDepositModal] = useState(false);
-  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [depositAmount, setDepositAmount] = useState('');
+  const [buyingPackId, setBuyingPackId] = useState(null);
+  const [showTransactions, setShowTransactions] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
 
-  const sanitizeAmountInput = useCallback((value) => {
-    const cleaned = (value || '').replace(/[^0-9.]/g, '');
-    const parts = cleaned.split('.');
-    if (parts.length <= 1) {
-      return parts[0];
-    }
-
-    return `${parts[0]}.${parts.slice(1).join('').slice(0, 2)}`;
-  }, []);
-
-  const loadWalletData = useCallback(async (silent = false) => {
+  const loadData = useCallback(async (silent = false) => {
     try {
-      if (!silent) {
-        setIsLoading(true);
-      }
+      if (!silent) setLoading(true);
+      const [bal, ui, history] = await Promise.all([
+        walletService.getBalance().catch(() => ({})),
+        configService.getWalletUi().catch(() => ({ coinPacks: [] })),
+        walletService.getHistory().catch(() => ({ transactions: [] })),
+      ]);
 
-      console.log('Loading wallet data...');
-
-      // Load each service separately for better error isolation
-      let balanceData = { balance: 0, bonusBalance: 0, totalDeposited: 0, totalWithdrawn: 0 };
-      let historyData = { transactions: [] };
-      let profileData = { tournament: {} };
-
-      try {
-        console.log('Fetching balance...');
-        balanceData = await walletService.getBalance();
-        console.log('Balance fetched:', balanceData);
-      } catch (error) {
-        console.error('Error fetching balance:', error.message);
-      }
-
-      try {
-        console.log('Fetching history...');
-        historyData = await walletService.getHistory();
-        console.log('History fetched successfully:', historyData);
-      } catch (error) {
-        console.error('Error fetching history:', error.message);
-        historyData = { transactions: [] };
-      }
-
-      try {
-        console.log('Fetching profile...');
-        profileData = await userService.getProfile();
-        console.log('Profile fetched:', profileData);
-      } catch (error) {
-        console.error('Error fetching profile:', error.message);
-        profileData = { tournament: {} };
-      }
-
-      setBalance(balanceData?.balance ?? 0);
-      setBonusBalance(balanceData?.bonusBalance ?? 0);
-      setTotals({
-        totalDeposited: balanceData?.totalDeposited ?? 0,
-        totalWithdrawn: balanceData?.totalWithdrawn ?? 0,
+      setBalance({
+        totalBalance: bal.totalBalance ?? (bal.balance || 0) + (bal.bonusBalance || 0),
+        balance: bal.balance || 0,
+        bonusBalance: bal.bonusBalance || 0,
+        totalDeposited: bal.totalDeposited || 0,
+        totalWinnings: bal.totalWinnings || 0,
       });
-
-      const tournamentStats = profileData?.tournament || {};
-      setStats({
-        totalWinnings: tournamentStats.earnings ?? 0,
-        tournamentsJoined: tournamentStats.participatedCount ?? 0,
-        tournamentsWon: tournamentStats.wins ?? 0,
-      });
-
-      // Handle transaction history
-      if (historyData && Array.isArray(historyData.transactions)) {
-        setTransactions(historyData.transactions);
-      } else {
-        setTransactions([]);
-      }
-
-      console.log('Wallet data loaded successfully');
-    } catch (error) {
-      console.error('Unexpected error loading wallet:', error);
-      Alert.alert('Wallet Error', error.message || 'Failed to load wallet data');
+      setCoinPacks(ui.coinPacks || []);
+      setFooterNote(ui.footerNote || 'Only winnings can be redeemed.');
+      setSecurityNote(ui.securityNote || 'Coins Ki Suraksha Bilkul Bank Jaisa!');
+      setTransactions(history.transactions || []);
+    } catch (e) {
+      console.error('Wallet load error:', e);
     } finally {
-      if (!silent) {
-        setIsLoading(false);
-      }
+      setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadWalletData(true);
-  }, [loadWalletData]);
-
   useFocusEffect(
     useCallback(() => {
-      loadWalletData();
-    }, [loadWalletData])
+      loadData();
+    }, [loadData])
   );
 
-  const handleDeposit = async () => {
-    const trimmedAmount = depositAmount.trim();
-    const parsedAmount = parseFloat(trimmedAmount);
-    if (!trimmedAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount');
-      return;
-    }
-    if (parsedAmount < 10) {
-      Alert.alert('Minimum Deposit', 'Minimum deposit amount is ₹10');
-      return;
-    }
-    if (parsedAmount > 10000) {
-      Alert.alert('Maximum Deposit', 'Maximum deposit amount is ₹10,000 per transaction');
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const transactionId = `MANUAL-${Date.now()}`;
-      const response = await walletService.topup({
-        amount: parsedAmount,
-        paymentMethod: 'manual',
-        transactionId: transactionId
-      });
-
-      if (response && response.success) {
-        setShowDepositModal(false);
-        setDepositAmount('');
-        await loadWalletData(true);
-        Alert.alert('Success!', `₹${parsedAmount} has been added to your wallet`);
-      } else {
-        const errorMsg = response?.message || 'Failed to add money. Please try again.';
-        Alert.alert('Deposit Failed', errorMsg);
-      }
-    } catch (error) {
-      Alert.alert('Deposit Failed', error.message || 'Unable to add money right now');
-    } finally {
-      setIsSubmitting(false);
-    }
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData(true);
   };
 
-  const handleWithdraw = async () => {
-    const trimmedAmount = withdrawAmount.trim();
-    const parsedAmount = parseFloat(trimmedAmount);
-    if (!trimmedAmount || isNaN(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount');
-      return;
-    }
-    if (parsedAmount > balance) {
-      Alert.alert('Insufficient Real Balance', 'Withdrawals are allowed only from real balance. Bonus balance cannot be withdrawn.');
-      return;
-    }
-    if (parsedAmount < 25) {
-      Alert.alert('Minimum Withdrawal', 'Minimum withdrawal amount is ₹25');
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const response = await walletService.withdraw({
-        amount: parsedAmount,
-        bankDetails: {}
-      });
-
-      if (response && response.success) {
-        setShowWithdrawModal(false);
-        setWithdrawAmount('');
-        await loadWalletData(true);
-        Alert.alert('Success!', `₹${parsedAmount} withdrawal request has been submitted`);
-      } else {
-        const errorMsg = response?.message || 'Failed to process withdrawal. Please try again.';
-        Alert.alert('Withdrawal Failed', errorMsg);
-      }
-    } catch (error) {
-      Alert.alert('Withdrawal Failed', error.message || 'Unable to withdraw right now');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const getTransactionIcon = (type) => {
-    switch (type) {
-      case 'tournament_reward': return 'trophy';
-      case 'referral_bonus': return 'gift';
-      case 'deposit': return 'add-circle';
-      case 'tournament_entry': return 'game-controller';
-      case 'withdraw': return 'remove-circle';
-      case 'refund': return 'refresh-circle';
-      default: return 'cash';
-    }
-  };
-
-  const getTransactionColor = (type) => {
-    switch (type) {
-      case 'tournament_reward': return '#FFD700';
-      case 'referral_bonus': return '#9C27B0';
-      case 'deposit': return COLORS.success;
-      case 'tournament_entry': return COLORS.error;
-      case 'withdraw': return COLORS.error;
-      case 'refund': return COLORS.accent;
-      default: return COLORS.gray;
-    }
-  };
-
-  const isCreditTransaction = (type) => {
-    return ['deposit', 'tournament_reward', 'refund', 'referral_bonus'].includes(type);
-  };
-
-  const formatDateTime = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return '';
-
-    const dateText = date.toLocaleDateString();
-    const timeText = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return `${dateText} • ${timeText}`;
-  };
-
-  const TransactionItem = ({ transaction }) => {
-    const signedAmount = isCreditTransaction(transaction.type)
-      ? transaction.amount
-      : -transaction.amount;
-
-    return (
-    <View style={styles.transactionItem}>
-      <View style={styles.transactionLeft}>
-        <View style={[styles.transactionIcon, { backgroundColor: getTransactionColor(transaction.type) + '20' }]}>
-          <Ionicons 
-            name={getTransactionIcon(transaction.type)} 
-            size={20} 
-            color={getTransactionColor(transaction.type)} 
-          />
-        </View>
-        <View style={styles.transactionDetails}>
-          <Text style={styles.transactionDescription}>
-            {transaction.description || 'Wallet transaction'}
-          </Text>
-          <Text style={styles.transactionDate}>{formatDateTime(transaction.createdAt)}</Text>
-        </View>
-      </View>
-      <View style={styles.transactionRight}>
-        <Text style={[
-          styles.transactionAmount,
-          { color: signedAmount >= 0 ? COLORS.success : COLORS.error }
-        ]}>
-          {signedAmount >= 0 ? '+' : ''}₹{Math.abs(signedAmount)}
-        </Text>
-        <Text style={styles.transactionStatus}>
-          {(transaction.status || 'completed').toUpperCase()}
-        </Text>
-      </View>
-    </View>
+  const handleBuyPack = async (pack) => {
+    Alert.alert(
+      'Buy Coins',
+      `Purchase ${pack.label} for ₹${pack.priceInr}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Buy',
+          onPress: async () => {
+            try {
+              setBuyingPackId(pack.id);
+              const res = await walletService.buyPack(pack.id);
+              Alert.alert('Success', res.message || 'Coins added!');
+              await loadData(true);
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Purchase failed');
+            } finally {
+              setBuyingPackId(null);
+            }
+          },
+        },
+      ]
     );
   };
 
-  const DepositModal = () => (
-    <Modal
-      visible={showDepositModal}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => setShowDepositModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add Money</Text>
-            <TouchableOpacity onPress={() => setShowDepositModal(false)}>
-              <Ionicons name="close" size={24} color={COLORS.gray} />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.amountInput}>
-            <Text style={styles.inputLabel}>Enter Amount</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="₹0"
-              placeholderTextColor={COLORS.gray}
-              value={depositAmount}
-              onChangeText={(text) => setDepositAmount(sanitizeAmountInput(text))}
-              keyboardType="numeric"
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-          </View>
+  const handleWithdraw = async () => {
+    const amount = parseFloat(withdrawAmount);
+    if (!amount || amount <= 0) {
+      Alert.alert('Invalid', 'Enter a valid amount');
+      return;
+    }
+    if (amount > balance.totalWinnings) {
+      Alert.alert('Error', 'Only winnings can be withdrawn');
+      return;
+    }
+    try {
+      setWithdrawing(true);
+      await walletService.withdraw({ amount, method: 'upi' });
+      Alert.alert('Success', 'Withdrawal request submitted');
+      setShowWithdraw(false);
+      setWithdrawAmount('');
+      await loadData(true);
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Withdrawal failed');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
-          <View style={styles.quickAmounts}>
-            {[100, 500, 1000, 2000].map((quickAmount) => (
-              <TouchableOpacity
-                key={quickAmount}
-                style={styles.quickAmountButton}
-                onPress={() => setDepositAmount(quickAmount.toString())}
-              >
-                <Text style={styles.quickAmountText}>₹{quickAmount}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+  const scrollToPacks = () => {
+    // packs are below — user scrolls manually; optional haptic
+  };
 
-          <TouchableOpacity
-            style={[styles.depositButton, isSubmitting && { opacity: 0.7 }]}
-            onPress={handleDeposit}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.depositButtonText}>Add Money</Text>
-          </TouchableOpacity>
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={COLORS.purple} />
         </View>
-      </View>
-    </Modal>
-  );
-
-  const WithdrawModal = () => (
-    <Modal
-      visible={showWithdrawModal}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => setShowWithdrawModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Withdraw Money</Text>
-            <TouchableOpacity onPress={() => setShowWithdrawModal(false)}>
-              <Ionicons name="close" size={24} color={COLORS.gray} />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.balanceInfo}>
-            <Text style={styles.availableBalanceText}>Real Balance: ₹{balance}</Text>
-            <Text style={styles.availableBalanceText}>Bonus Balance: ₹{bonusBalance}</Text>
-            <Text style={styles.withdrawInfoText}>Withdrawals are allowed from real balance only</Text>
-          </View>
-
-          <View style={styles.amountInput}>
-            <Text style={styles.inputLabel}>Enter Amount</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="₹0"
-              placeholderTextColor={COLORS.gray}
-              value={withdrawAmount}
-              onChangeText={(text) => setWithdrawAmount(sanitizeAmountInput(text))}
-              keyboardType="numeric"
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-
-            <Text style={styles.minimumText}>Minimum withdrawal: ₹25</Text>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.withdrawButton, isSubmitting && { opacity: 0.7 }]}
-            onPress={handleWithdraw}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.withdrawButtonText}>Withdraw</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
-      
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B0E1E" />
+
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <SKWinLogo size={110} />
-          <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>Wallet</Text>
-            <Text style={styles.headerSubtitle}>Manage your funds</Text>
-          </View>
-        </View>
+        <View style={styles.headerSide} />
+        <Text style={styles.headerTitle}>My Wallet</Text>
+        <TouchableOpacity
+          style={styles.headerSide}
+          onPress={() => navigation.navigate('SupportTickets')}
+        >
+          <DynamicAppIcon
+            iconKey="support"
+            icons={appIcons || EMPTY_APP_ICONS}
+            name="headset"
+            size="md"
+            color={COLORS.white}
+          />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={COLORS.accent}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />}
+        contentContainerStyle={styles.scroll}
       >
-        {/* Balance Card */}
         <View style={styles.balanceCard}>
-          <View style={styles.balanceHeader}>
-            <MaterialCommunityIcons name="wallet" size={32} color={COLORS.accent} />
-            <Text style={styles.balanceLabel}>Real Wallet Balance</Text>
-          </View>
-          <Text style={styles.balanceAmount}>₹{balance.toLocaleString()}</Text>
-
-          <View style={styles.balanceBreakdownContainer}>
-            <View style={styles.balanceBreakdownRow}>
-              <Text style={styles.balanceBreakdownLabel}>Referral Bonus Balance</Text>
-              <Text style={styles.balanceBreakdownValue}>₹{bonusBalance.toLocaleString()}</Text>
+          <View style={styles.balanceRow}>
+            <View>
+              <Text style={styles.balanceLabel}>Total Balance</Text>
+              <Text style={styles.balanceValue}>{balance.totalBalance.toFixed(0)}</Text>
             </View>
-            <View style={styles.balanceBreakdownRow}>
-              <Text style={styles.balanceBreakdownLabel}>Total Wallet (Real + Bonus)</Text>
-              <Text style={styles.balanceBreakdownValue}>₹{(balance + bonusBalance).toLocaleString()}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.actionButtons}>
-            <TouchableOpacity 
-              style={styles.depositActionButton}
-              onPress={() => {
-                setDepositAmount('');
-                setShowDepositModal(true);
-              }}
-            >
-              <Ionicons name="add" size={20} color={COLORS.white} />
-              <Text style={styles.actionButtonText}>Deposit</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.withdrawActionButton}
-              onPress={() => {
-                setWithdrawAmount('');
-                setShowWithdrawModal(true);
-              }}
-            >
-              <Ionicons name="remove" size={20} color={COLORS.white} />
-              <Text style={styles.actionButtonText}>Withdraw</Text>
+            <TouchableOpacity style={styles.btnPurple} onPress={() => setShowTransactions(true)}>
+              <MaterialCommunityIcons name="history" size={16} color={COLORS.white} />
+              <Text style={styles.btnPurpleText}>Transaction</Text>
             </TouchableOpacity>
           </View>
-        </View>
 
-        {/* Quick Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <MaterialCommunityIcons name="trending-up" size={24} color={COLORS.success} />
-            <Text style={styles.statValue}>₹{stats.totalWinnings.toLocaleString()}</Text>
-            <Text style={styles.statLabel}>Total Winnings</Text>
-          </View>
-          <View style={styles.statItem}>
-            <MaterialCommunityIcons name="tournament" size={24} color={COLORS.accent} />
-            <Text style={styles.statValue}>{stats.tournamentsJoined}</Text>
-            <Text style={styles.statLabel}>Tournaments Joined</Text>
-          </View>
-          <View style={styles.statItem}>
-            <MaterialCommunityIcons name="trophy-award" size={24} color="#FFD700" />
-            <Text style={styles.statValue}>{stats.tournamentsWon}</Text>
-            <Text style={styles.statLabel}>Tournaments Won</Text>
-          </View>
-        </View>
+          <View style={styles.divider} />
 
-        {/* Transaction History */}
-        <View style={styles.historySection}>
-          <Text style={styles.historyTitle}>Transaction History</Text>
-          {transactions.length === 0 ? (
-            <View style={styles.emptyHistory}>
-              <Text style={styles.emptyHistoryText}>No transactions yet</Text>
+          <View style={styles.balanceRow}>
+            <View>
+              <Text style={styles.balanceLabel}>Deposited</Text>
+              <Text style={styles.balanceValue}>{balance.totalDeposited.toFixed(0)}</Text>
             </View>
-          ) : (
-            transactions.map((transaction) => (
-              <TransactionItem key={transaction._id || transaction.id} transaction={transaction} />
-            ))
-          )}
+            <TouchableOpacity style={styles.btnGreen} onPress={scrollToPacks}>
+              <MaterialCommunityIcons name="wallet-plus" size={16} color={COLORS.white} />
+              <Text style={styles.btnGreenText}>Add Coins</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.balanceRow}>
+            <View>
+              <Text style={styles.balanceLabel}>Winning</Text>
+              <Text style={styles.balanceValue}>{balance.totalWinnings.toFixed(0)}</Text>
+            </View>
+            <TouchableOpacity style={styles.btnPurple} onPress={() => setShowWithdraw(true)}>
+              <MaterialCommunityIcons name="export" size={16} color={COLORS.white} />
+              <Text style={styles.btnPurpleText}>Withdraw</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.balanceRow}>
+            <View>
+              <Text style={styles.balanceLabel}>Bonus</Text>
+              <Text style={styles.balanceValue}>{balance.bonusBalance.toFixed(0)}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.footerNote}>{footerNote}</Text>
+          <Text style={styles.securityNote}>{securityNote}</Text>
         </View>
+
+        <Text style={styles.packsTitle}>Buy Coins</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.packsRow}
+        >
+          {coinPacks.map((pack) => (
+            <View key={pack.id} style={styles.packCard}>
+              {pack.isBest && (
+                <View style={styles.bestRibbon}>
+                  <Text style={styles.bestText}>BEST</Text>
+                </View>
+              )}
+              <MaterialCommunityIcons name="circle-multiple" size={56} color="#FBBF24" />
+              <Text style={styles.packLabel}>{pack.label}</Text>
+              {pack.bonusCoins > 0 && (
+                <View style={styles.extraBadge}>
+                  <Text style={styles.extraText}>Includes +{pack.bonusCoins} Extra</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={styles.priceBtn}
+                onPress={() => handleBuyPack(pack)}
+                disabled={buyingPackId === pack.id}
+              >
+                {buyingPackId === pack.id ? (
+                  <ActivityIndicator color={COLORS.white} size="small" />
+                ) : (
+                  <Text style={styles.priceText}>₹ {pack.priceInr}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
       </ScrollView>
 
-      {DepositModal()}
-      {WithdrawModal()}
+      <Modal visible={showTransactions} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Transactions</Text>
+              <TouchableOpacity onPress={() => setShowTransactions(false)}>
+                <MaterialCommunityIcons name="close" size={24} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScroll}>
+              {transactions.length === 0 ? (
+                <Text style={styles.emptyText}>No transactions yet</Text>
+              ) : (
+                transactions.map((tx) => (
+                  <View key={tx._id || tx.id} style={styles.txRow}>
+                    <View>
+                      <Text style={styles.txDesc}>{tx.description || tx.type}</Text>
+                      <Text style={styles.txDate}>
+                        {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : ''}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.txAmount,
+                        tx.type === 'withdraw' ? styles.txNeg : styles.txPos,
+                      ]}
+                    >
+                      {tx.type === 'withdraw' ? '-' : '+'}₹{tx.amount}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showWithdraw} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Withdraw Winnings</Text>
+            <Text style={styles.withdrawHint}>
+              Available: ₹{balance.totalWinnings.toFixed(0)}
+            </Text>
+            <TextInput
+              style={styles.withdrawInput}
+              placeholder="Amount"
+              placeholderTextColor="#64748B"
+              keyboardType="numeric"
+              value={withdrawAmount}
+              onChangeText={setWithdrawAmount}
+            />
+            <TouchableOpacity
+              style={[styles.priceBtn, { marginTop: 16, width: '100%' }]}
+              onPress={handleWithdraw}
+              disabled={withdrawing}
+            >
+              {withdrawing ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.priceText}>Request Withdrawal</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowWithdraw(false)}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
 
+export default WalletScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#0B0E1E',
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
-  },
-  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  headerText: {
-    marginLeft: 12,
-    flex: 1,
+  headerSide: {
+    width: 40,
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    ...TEXT.h3,
     color: COLORS.white,
-    marginBottom: 2,
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: COLORS.gray,
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  scrollContent: {
+  scroll: {
+    paddingHorizontal: 16,
     paddingBottom: 100,
   },
   balanceCard: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 20,
+    backgroundColor: '#121B33',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 24,
     borderWidth: 1,
-    borderColor: COLORS.darkGray,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  balanceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  balanceLabel: {
-    fontSize: 16,
-    color: COLORS.gray,
-    marginLeft: 12,
-  },
-  balanceAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 12,
-  },
-  balanceBreakdownContainer: {
-    backgroundColor: COLORS.darkGray,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 16,
-  },
-  balanceBreakdownRow: {
+  balanceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    alignItems: 'center',
+    paddingVertical: 6,
   },
-  balanceBreakdownLabel: {
+  balanceLabel: {
+    ...TEXT.label,
     color: COLORS.gray,
-    fontSize: 12,
   },
-  balanceBreakdownValue: {
+  balanceValue: {
+    ...TEXT.stat,
     color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '700',
+    marginTop: 6,
   },
-  actionButtons: {
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginVertical: 10,
+  },
+  btnPurple: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  depositActionButton: {
-    flex: 1,
-    backgroundColor: COLORS.success,
+    alignItems: 'center',
+    backgroundColor: '#5B39A8',
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 22,
+    gap: 8,
+    minHeight: 44,
+  },
+  btnPurpleText: {
+    ...TEXT.labelSm,
+    fontFamily: FONTS.semiBold,
+    color: COLORS.white,
+  },
+  btnGreen: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  withdrawActionButton: {
-    flex: 1,
-    backgroundColor: COLORS.error,
+    backgroundColor: '#00B368',
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 22,
+    gap: 8,
+    minHeight: 44,
   },
-  actionButtonText: {
+  btnGreenText: {
+    ...TEXT.labelSm,
+    fontFamily: FONTS.semiBold,
     color: COLORS.white,
-    fontWeight: 'bold',
-    marginLeft: 8,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    gap: 12,
-  },
-  statItem: {
-    flex: 1,
-    backgroundColor: COLORS.lightGray,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  footerNote: {
+    ...TEXT.body,
     color: COLORS.white,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 10,
-    color: COLORS.gray,
+    marginTop: 16,
     textAlign: 'center',
   },
-  historySection: {
-    marginBottom: 20,
+  securityNote: {
+    ...TEXT.label,
+    color: '#4FD1C5',
+    marginTop: 8,
+    textAlign: 'center',
   },
-  historyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  packsTitle: {
+    ...TEXT.h3,
     color: COLORS.white,
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  emptyHistory: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
-    paddingVertical: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
+  packsRow: {
+    gap: 12,
+    paddingRight: 16,
   },
-  emptyHistoryText: {
-    color: COLORS.gray,
-    fontSize: 13,
-  },
-  transactionItem: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.lightGray,
+  packCard: {
+    width: PACK_WIDTH,
+    backgroundColor: '#121B33',
+    borderRadius: 16,
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.darkGray,
+    borderColor: 'rgba(255,255,255,0.06)',
+    position: 'relative',
   },
-  transactionLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+  bestRibbon: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 8,
   },
-  transactionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  transactionDetails: {
-    flex: 1,
-  },
-  transactionDescription: {
-    fontSize: 14,
-    fontWeight: '600',
+  bestText: {
+    ...TEXT.overline,
+    fontSize: 11,
     color: COLORS.white,
-    marginBottom: 4,
+    letterSpacing: 0.5,
   },
-  transactionDate: {
-    fontSize: 12,
-    color: COLORS.gray,
+  packLabel: {
+    ...TEXT.buttonSm,
+    color: COLORS.white,
+    marginTop: 10,
+    textAlign: 'center',
   },
-  transactionRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
+  extraBadge: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#00B368',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
+  extraText: {
+    ...TEXT.labelSm,
+    color: '#4ADE80',
   },
-  transactionStatus: {
-    fontSize: 12,
-    color: COLORS.gray,
+  priceBtn: {
+    marginTop: 14,
+    backgroundColor: '#00B368',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  priceText: {
+    ...TEXT.buttonSm,
+    color: COLORS.white,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
   },
-  modalContent: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 20,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
+  modalBox: {
+    backgroundColor: '#121B33',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: '70%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  balanceInfo: {
     marginBottom: 16,
   },
-  availableBalanceText: {
-    fontSize: 14,
-    color: COLORS.accent,
-    textAlign: 'center',
-  },
-  withdrawInfoText: {
-    fontSize: 12,
-    color: COLORS.gray,
-    textAlign: 'center',
-    marginTop: 6,
-  },
-  amountInput: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: COLORS.darkGray,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 18,
+  modalTitle: {
+    ...TEXT.h3,
     color: COLORS.white,
-    textAlign: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.gray,
   },
-  minimumText: {
-    marginTop: 8,
-    fontSize: 12,
-    color: COLORS.gray,
-    textAlign: 'center',
+  modalScroll: {
+    maxHeight: 400,
   },
-  quickAmounts: {
+  txRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  quickAmountButton: {
-    backgroundColor: COLORS.darkGray,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+  txDesc: {
+    ...TEXT.bodyMedium,
+    color: COLORS.white,
+  },
+  txDate: {
+    ...TEXT.caption,
+    color: COLORS.grayDim,
+    marginTop: 4,
+  },
+  txAmount: {
+    ...TEXT.buttonSm,
+    fontFamily: FONTS.bold,
+  },
+  txPos: { color: '#4ADE80' },
+  txNeg: { color: '#F87171' },
+  emptyText: {
+    ...TEXT.body,
+    color: COLORS.gray,
+    textAlign: 'center',
+    paddingVertical: 24,
+  },
+  withdrawHint: {
+    ...TEXT.body,
+    color: COLORS.gray,
+    marginTop: 8,
+  },
+  withdrawInput: {
+    marginTop: 12,
+    backgroundColor: '#0B0E1E',
+    borderRadius: 10,
+    padding: 16,
+    color: COLORS.white,
+    ...TEXT.bodyLg,
     borderWidth: 1,
-    borderColor: COLORS.darkGray,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  quickAmountText: {
-    color: COLORS.accent,
-    fontWeight: '600',
-  },
-  depositButton: {
-    backgroundColor: COLORS.success,
-    paddingVertical: 16,
-    borderRadius: 12,
+  cancelBtn: {
+    marginTop: 12,
     alignItems: 'center',
+    padding: 12,
   },
-  depositButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  withdrawButton: {
-    backgroundColor: COLORS.error,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  withdrawButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: 'bold',
+  cancelText: {
+    ...TEXT.label,
+    color: COLORS.gray,
   },
 });
-
-export default WalletScreen;

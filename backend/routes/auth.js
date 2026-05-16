@@ -96,7 +96,7 @@ router.post('/register', async (req, res) => {
     await Notification.create({
       userId: user._id,
       type: 'system',
-      title: 'Welcome to SK Win',
+      title: 'Welcome to WarZone Free Fire Tournament',
       message: 'Registration successful. Login to start playing tournaments.',
     });
 
@@ -122,7 +122,16 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ error: 'Registration failed', message: error.message });
+    const isDbError =
+      error.name === 'MongooseError' ||
+      error.message?.includes('buffering timed out') ||
+      error.message?.includes('ECONNREFUSED');
+    res.status(isDbError ? 503 : 500).json({
+      error: isDbError
+        ? 'Database unavailable. Start MongoDB and restart the backend server.'
+        : 'Registration failed',
+      message: error.message,
+    });
   }
 });
 
@@ -136,8 +145,12 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Please provide email and password' });
     }
 
-    // Find user
-    const user = await User.findOne({ email });
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    // Find user (case-insensitive email)
+    const user = await User.findOne({
+      email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+    });
     if (!user) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
@@ -182,7 +195,16 @@ router.post('/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed', message: error.message });
+    const isDbError =
+      error.name === 'MongooseError' ||
+      error.message?.includes('buffering timed out') ||
+      error.message?.includes('ECONNREFUSED');
+    res.status(isDbError ? 503 : 500).json({
+      error: isDbError
+        ? 'Database unavailable. Start MongoDB and restart the backend server.'
+        : 'Login failed',
+      message: error.message,
+    });
   }
 });
 

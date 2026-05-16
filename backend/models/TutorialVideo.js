@@ -29,6 +29,25 @@ const tutorialVideoSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  showOnHome: {
+    type: Boolean,
+    default: true,
+  },
+  ctaText: {
+    type: String,
+    default: 'CLICK HERE',
+    trim: true,
+  },
+  carouselAction: {
+    type: String,
+    enum: ['video', 'wallet', 'link'],
+    default: 'video',
+  },
+  linkUrl: {
+    type: String,
+    default: '',
+    trim: true,
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

@@ -1,42 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
-
-// Backend API URL - Update this to your actual backend URL
-// For local testing: http://localhost:5000/api (Expo dev server) or http://172.20.10.3:5000/api (physical device)
-// For production: https://your-deployed-backend.com/api
-
-const getApiUrl = () => {
-  // Explicit override from app.json extra
-  const extra =
-    Constants.expoConfig?.extra?.apiUrl ||
-    Constants.manifest?.extra?.apiUrl;
-  if (extra) return extra;
-
-  // Web: derive from browser location
-  if (typeof window !== 'undefined' && window.location?.hostname) {
-    const host = window.location.hostname;
-    return `http://${host === '127.0.0.1' ? 'localhost' : host}:5000/api`;
-  }
-
-  // iOS/Android in Expo dev: use the Expo dev server host IP
-  const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
-  if (hostUri) {
-    const host = hostUri.split(':')[0];
-    return `http://${host}:5000/api`;
-  }
-
-  return 'http://localhost:5000/api';
-};
-
-const API_URL = getApiUrl();
+import { getApiUrl } from '../utils/apiConfig';
 
 // Test API connectivity
 export const testAPIConnection = async () => {
   try {
     const response = await fetch(`${API_URL}/health`, { timeout: 3000 });
-    if (response.ok) return API_URL;
+    if (response.ok) return getApiUrl();
   } catch (error) {
-    console.log(`Failed to connect to ${API_URL}:`, error.message);
+    console.log(`Failed to connect to ${getApiUrl()}:`, error.message);
   }
   return null;
 };
@@ -72,7 +43,7 @@ export const apiCall = async (endpoint, options = {}) => {
       setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000)
     );
 
-    const fetchPromise = fetch(`${API_URL}${endpoint}`, fetchOptions);
+    const fetchPromise = fetch(`${getApiUrl()}${endpoint}`, fetchOptions);
     const response = await Promise.race([fetchPromise, timeoutPromise]);
 
     // Check if response is JSON
@@ -84,9 +55,11 @@ export const apiCall = async (endpoint, options = {}) => {
     const data = await response.json();
 
     if (!response.ok) {
-      // Return error response with message
       const errorMessage = data.message || data.error || 'API Error';
-      throw new Error(errorMessage);
+      const err = new Error(errorMessage);
+      err.code = data.code;
+      err.status = response.status;
+      throw err;
     }
 
     return data;
@@ -94,10 +67,11 @@ export const apiCall = async (endpoint, options = {}) => {
     // Enhanced error logging for debugging
     console.log('API Call Error Details:');
     console.log('Endpoint:', endpoint);
-    console.log('API URL:', API_URL);
-    console.log('Error:', error.message);
-    console.log('Error Type:', error.constructor.name);
-    
+    if (__DEV__ && error.code !== 'USER_NOT_FOUND') {
+      console.log('API URL:', getApiUrl());
+      console.log('Error:', error.message);
+    }
+
     if (error.message.includes('Network request failed') || error.message.includes('timeout')) {
       throw new Error('Unable to connect to server. Please check your internet connection and ensure the server is running.');
     }
@@ -136,7 +110,7 @@ export const uploadImageFile = async (fileUri) => {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
-    const response = await fetch(`${API_URL}/upload`, {
+    const response = await fetch(`${getApiUrl()}/upload`, {
       method: 'POST',
       headers,
       body: formData,
@@ -178,13 +152,58 @@ export const walletService = {
   getBalance: () => apiCall('/wallet/balance'),
   topup: (topupData) => apiCall('/wallet/topup', {
     method: 'POST',
-    body: topupData, // Let apiCall handle stringify
+    body: topupData,
   }),
   withdraw: (withdrawData) => apiCall('/wallet/withdraw', {
     method: 'POST',
-    body: withdrawData, // Let apiCall handle stringify
+    body: withdrawData,
   }),
   getHistory: () => apiCall('/wallet/history'),
+  buyPack: (packId) => apiCall('/wallet/buy-pack', {
+    method: 'POST',
+    body: { packId },
+  }),
+};
+
+// App config (home + wallet UI)
+export const configService = {
+  getHome: () => apiCall('/config/home'),
+  getWalletUi: () => apiCall('/config/wallet-ui'),
+};
+
+export const sliderService = {
+  getActive: () => apiCall('/sliders'),
+  getAdminList: () => apiCall('/sliders/admin/list'),
+  create: (data) => apiCall('/sliders/admin', { method: 'POST', body: data }),
+  update: (id, data) => apiCall(`/sliders/admin/${id}`, { method: 'PUT', body: data }),
+  delete: (id) => apiCall(`/sliders/admin/${id}`, { method: 'DELETE' }),
+};
+
+export const announcementService = {
+  getActive: () => apiCall('/announcements'),
+  getById: (id) => apiCall(`/announcements/${id}`),
+  getAdminList: () => apiCall('/announcements/admin/list'),
+  create: (data) => apiCall('/announcements/admin', { method: 'POST', body: data }),
+  update: (id, data) => apiCall(`/announcements/admin/${id}`, { method: 'PUT', body: data }),
+  delete: (id) => apiCall(`/announcements/admin/${id}`, { method: 'DELETE' }),
+};
+
+export const supportService = {
+  getCategories: () => apiCall('/support/categories'),
+  getMyTickets: () => apiCall('/support/my-tickets'),
+  createTicket: (data) =>
+    apiCall('/support/tickets', { method: 'POST', body: data }),
+  getAdminCategories: () => apiCall('/support/admin/categories'),
+  createCategory: (data) =>
+    apiCall('/support/admin/categories', { method: 'POST', body: data }),
+  updateCategory: (id, data) =>
+    apiCall(`/support/admin/categories/${id}`, { method: 'PUT', body: data }),
+  deleteCategory: (id) =>
+    apiCall(`/support/admin/categories/${id}`, { method: 'DELETE' }),
+  getAdminTickets: (status) =>
+    apiCall(status ? `/support/admin/tickets?status=${status}` : '/support/admin/tickets'),
+  updateTicket: (id, data) =>
+    apiCall(`/support/admin/tickets/${id}`, { method: 'PUT', body: data }),
 };
 
 // Tournament Services
@@ -296,6 +315,16 @@ export const notificationService = {
 export const adminService = {
   getAllUsers: () => apiCall('/admin/all'),
   getStats: () => apiCall('/admin/stats'),
+  getTransactions: (params = {}) => {
+    const searchParams = new URLSearchParams();
+
+    if (params.type) searchParams.append('type', params.type);
+    if (params.status) searchParams.append('status', params.status);
+    if (params.limit) searchParams.append('limit', String(params.limit));
+
+    const query = searchParams.toString();
+    return apiCall(`/admin/transactions${query ? `?${query}` : ''}`);
+  },
   getUserDetails: (userId) => apiCall(`/admin/user/${userId}/details`),
   suspendUser: (userId) => apiCall(`/admin/suspend/${userId}`, {
     method: 'POST',
@@ -317,6 +346,23 @@ export const adminService = {
   }),
   completeTournament: (tournamentId) => apiCall(`/admin/tournaments/${tournamentId}/complete`, {
     method: 'POST',
+  }),
+  getHomeConfig: () => apiCall('/admin/home-config'),
+  updateHomeConfig: (data) => apiCall('/admin/home-config', {
+    method: 'PUT',
+    body: data,
+  }),
+  getCoinPacks: () => apiCall('/admin/coin-packs'),
+  createCoinPack: (data) => apiCall('/admin/coin-packs', {
+    method: 'POST',
+    body: data,
+  }),
+  updateCoinPack: (id, data) => apiCall(`/admin/coin-packs/${id}`, {
+    method: 'PUT',
+    body: data,
+  }),
+  deleteCoinPack: (id) => apiCall(`/admin/coin-packs/${id}`, {
+    method: 'DELETE',
   }),
 };
 // Games Services

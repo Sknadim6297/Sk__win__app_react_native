@@ -1,29 +1,38 @@
 import React from 'react';
 import { View, Image, StyleSheet } from 'react-native';
-import { COLORS } from '../styles/theme';
+import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 
-const SKWinLogo = ({ size = 140, style }) => {
+const GAME_LOGO = require('../assets/logo/game_logo.png');
+
+const SKWinLogo = ({ size = 140, style, logoUrl, rounded }) => {
+  const height = size * 1.15;
+  const remote = logoUrl ? resolveMediaUrl(logoUrl) : '';
+
   return (
-    <View style={[styles.logoContainer(size), style]}>
+    <View style={[styles.logoContainer(size, height), style]}>
       <Image
-        source={require('../assets/logo/App_logo.png')}
-        style={styles.logoImage(size)}
+        source={remote ? { uri: remote } : GAME_LOGO}
+        style={[
+          styles.logoImage(size, height),
+          rounded && { borderRadius: size / 2 },
+        ]}
         resizeMode="contain"
+        accessibilityLabel="WarZone Free Fire Tournament logo"
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  logoContainer: (size) => ({
-    width: size,
-    height: size,
+  logoContainer: (width, height) => ({
+    width,
+    height,
     justifyContent: 'center',
     alignItems: 'center',
   }),
-  logoImage: (size) => ({
-    width: size,
-    height: size,
+  logoImage: (width, height) => ({
+    width,
+    height,
   }),
 });
 

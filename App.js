@@ -1,4 +1,10 @@
 import React, { useContext, useEffect } from 'react';
+import { View, StyleSheet, LogBox } from 'react-native';
+
+LogBox.ignoreLogs([
+  "Codegen didn't run",
+  'is not a valid icon name for family',
+]);
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -6,13 +12,19 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import {
-  Orbitron_400Regular,
-  Orbitron_500Medium,
-  Orbitron_700Bold,
-  Orbitron_900Black,
-} from '@expo-google-fonts/orbitron';
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+} from '@expo-google-fonts/poppins';
+import {
+  Rajdhani_500Medium,
+  Rajdhani_600SemiBold,
+  Rajdhani_700Bold,
+} from '@expo-google-fonts/rajdhani';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import LandingScreen from './screens/LandingScreen';
+import WelcomeOnboardingScreen from './screens/WelcomeOnboardingScreen';
 import AuthScreen from './screens/AuthScreen';
 import HomeScreen from './screens/HomeScreen';
 import TournamentScreen from './screens/TournamentScreen';
@@ -28,6 +40,11 @@ import MyStatisticsScreen from './screens/MyStatisticsScreen';
 import TopPlayersScreen from './screens/TopPlayersScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 import ContactUsScreen from './screens/ContactUsScreen';
+import SupportTicketsScreen from './screens/SupportTicketsScreen';
+import CreateSupportTicketScreen from './screens/CreateSupportTicketScreen';
+import SupportTicketDetailScreen from './screens/SupportTicketDetailScreen';
+import ImportantUpdatesScreen from './screens/ImportantUpdatesScreen';
+import AnnouncementDetailScreen from './screens/AnnouncementDetailScreen';
 import FAQScreen from './screens/FAQScreen';
 import AboutUsScreen from './screens/AboutUsScreen';
 import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen';
@@ -35,6 +52,7 @@ import TermsAndConditionsScreen from './screens/TermsAndConditionsScreen';
 import ShareAppScreen from './screens/ShareAppScreen';
 import GameModesScreen from './screens/GameModesScreen';
 import GameDetailsScreen from './screens/GameDetailsScreen';
+import TutorialDetailScreen from './screens/TutorialDetailScreen';
 import AdminDashboard from './screens/admin/AdminDashboard';
 import UserManagement from './screens/admin/UserManagement';
 import UserDetails from './screens/admin/UserDetails';
@@ -43,9 +61,16 @@ import TournamentManagement from './screens/admin/TournamentManagement';
 import TournamentLeaderboard from './screens/admin/TournamentLeaderboard';
 import GameManagement from './screens/admin/GameManagement';
 import TutorialManagement from './screens/admin/TutorialManagement';
+import PaymentManagement from './screens/admin/PaymentManagement';
+import ReportedIssues from './screens/admin/ReportedIssues';
+import SupportManagement from './screens/admin/SupportManagement';
+import AnnouncementManagement from './screens/admin/AnnouncementManagement';
+import Analytics from './screens/admin/Analytics';
+import AppContentManagement from './screens/admin/AppContentManagement';
+import SliderManagement from './screens/admin/SliderManagement';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { applyGlobalTypography } from './styles/typography';
-import { COLORS, FONTS } from './styles/theme';
+import { COLORS, TYPO } from './styles/theme';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -53,85 +78,111 @@ const Tab = createBottomTabNavigator();
 function MainTabNavigator() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-          let IconComponent = MaterialCommunityIcons;
-
-          if (route.name === 'HomeTab') {
-            iconName = focused ? 'home' : 'home-outline';
-            IconComponent = MaterialCommunityIcons;
-          } else if (route.name === 'LeaderboardTab') {
-            iconName = focused ? 'podium' : 'podium';
-            IconComponent = MaterialCommunityIcons;
-          } else if (route.name === 'WalletTab') {
-            iconName = focused ? 'wallet' : 'wallet-outline';
-            IconComponent = MaterialCommunityIcons;
-          } else if (route.name === 'AccountTab') {
-            iconName = focused ? 'account-circle' : 'account-circle-outline';
-            IconComponent = MaterialCommunityIcons;
-          }
-
-          return <IconComponent name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: COLORS.accent,
-        tabBarInactiveTintColor: COLORS.gray,
-        tabBarStyle: {
-          backgroundColor: COLORS.lightGray,
-          borderTopColor: COLORS.darkGray,
-          borderTopWidth: 1,
-          height: 85,
-          paddingBottom: 10,
-          paddingTop: 8,
-          paddingHorizontal: 5,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontFamily: FONTS.regular,
-          letterSpacing: 0.6,
-          marginTop: 0,
-        },
+      screenOptions={{
         headerShown: false,
-      })}
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: COLORS.white,
+        tabBarInactiveTintColor: COLORS.grayDim,
+        tabBarLabelStyle: tabStyles.tabLabel,
+        tabBarStyle: tabStyles.bar,
+      }}
     >
-      <Tab.Screen 
-        name="HomeTab" 
-        component={HomeScreen}
+      <Tab.Screen
+        name="StatsTab"
+        component={MyStatisticsScreen}
         options={{
-          tabBarLabel: 'Home',
+          tabBarLabel: 'Stats',
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="chart-timeline-variant" size={28} color={color} />
+          ),
         }}
       />
-      <Tab.Screen 
-        name="LeaderboardTab" 
+      <Tab.Screen
+        name="LeaderboardTab"
         component={LeaderboardScreen}
         options={{
-          tabBarLabel: 'Leaderboard',
+          tabBarLabel: 'Ranks',
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="trophy-outline" size={28} color={color} />
+          ),
         }}
       />
-      <Tab.Screen 
-        name="WalletTab" 
+      <Tab.Screen
+        name="HomeTab"
+        component={HomeScreen}
+        options={{
+          tabBarLabel: '',
+          tabBarIcon: ({ focused }) => (
+            <View style={[tabStyles.homeFab, focused && tabStyles.homeFabActive]}>
+              <MaterialCommunityIcons name="home-variant" size={30} color={COLORS.white} />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="WalletTab"
         component={WalletScreen}
         options={{
           tabBarLabel: 'Wallet',
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="wallet-plus-outline" size={28} color={color} />
+          ),
         }}
       />
-      <Tab.Screen 
-        name="AccountTab" 
+      <Tab.Screen
+        name="AccountTab"
         component={AccountScreen}
         options={{
           tabBarLabel: 'Account',
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="account-circle-outline" size={28} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>
   );
 }
 
+const tabStyles = StyleSheet.create({
+  bar: {
+    backgroundColor: '#0D1025',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopWidth: 1,
+    height: 88,
+    paddingBottom: 8,
+    paddingTop: 8,
+    elevation: 0,
+  },
+  tabLabel: {
+    ...TYPO.tabLabel,
+    marginTop: 2,
+  },
+  homeFab: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#12162B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 32,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  homeFabActive: {
+    backgroundColor: '#1E2440',
+    borderColor: COLORS.purple,
+  },
+});
+
 export default function App() {
   const [fontsLoaded] = useFonts({
-    'Orbitron-Regular': Orbitron_400Regular,
-    'Orbitron-Medium': Orbitron_500Medium,
-    'Orbitron-Bold': Orbitron_700Bold,
-    'Orbitron-Black': Orbitron_900Black,
+    'Poppins-Regular': Poppins_400Regular,
+    'Poppins-Medium': Poppins_500Medium,
+    'Poppins-SemiBold': Poppins_600SemiBold,
+    'Poppins-Bold': Poppins_700Bold,
+    'Rajdhani-Medium': Rajdhani_500Medium,
+    'Rajdhani-SemiBold': Rajdhani_600SemiBold,
+    'Rajdhani-Bold': Rajdhani_700Bold,
   });
 
   useEffect(() => {
@@ -160,19 +211,25 @@ function AppNavigator() {
     return <AppLoadingScreen subtitle="Syncing your profile..." />;
   }
 
+  const navKey = isAuthenticated ? (isAdmin() ? 'admin' : 'user') : 'guest';
+
   return (
-    <NavigationContainer>
+    <NavigationContainer key={navKey}>
       <Stack.Navigator
-        initialRouteName={isAuthenticated ? (isAdmin() ? 'AdminDashboard' : 'MainApp') : 'Landing'}
+        key={navKey}
+        initialRouteName={
+          isAuthenticated ? (isAdmin() ? 'AdminDashboard' : 'MainApp') : 'Welcome'
+        }
         screenOptions={{
           headerShown: false,
           gestureEnabled: false,
-          cardStyle: { backgroundColor: '#0a0e27' },
+          cardStyle: { backgroundColor: '#050510' },
         }}
       >
         {/* Non-authenticated screens */}
         {!isAuthenticated ? (
           <>
+            <Stack.Screen name="Welcome" component={WelcomeOnboardingScreen} />
             <Stack.Screen name="Landing" component={LandingScreen} />
             <Stack.Screen name="Auth" component={AuthScreen} />
           </>
@@ -189,6 +246,13 @@ function AppNavigator() {
                 <Stack.Screen name="TournamentLeaderboard" component={TournamentLeaderboard} />
                 <Stack.Screen name="GameManagement" component={GameManagement} />
                 <Stack.Screen name="TutorialManagement" component={TutorialManagement} />
+                <Stack.Screen name="PaymentManagement" component={PaymentManagement} />
+                <Stack.Screen name="ReportedIssues" component={ReportedIssues} />
+                <Stack.Screen name="SupportManagement" component={SupportManagement} />
+                <Stack.Screen name="AnnouncementManagement" component={AnnouncementManagement} />
+                <Stack.Screen name="Analytics" component={Analytics} />
+                <Stack.Screen name="AppContentManagement" component={AppContentManagement} />
+                <Stack.Screen name="SliderManagement" component={SliderManagement} />
               </>
             ) : (
               <>
@@ -203,6 +267,11 @@ function AppNavigator() {
                 <Stack.Screen name="TopPlayers" component={TopPlayersScreen} />
                 <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 <Stack.Screen name="ContactUs" component={ContactUsScreen} />
+                <Stack.Screen name="SupportTickets" component={SupportTicketsScreen} />
+                <Stack.Screen name="CreateSupportTicket" component={CreateSupportTicketScreen} />
+                <Stack.Screen name="SupportTicketDetail" component={SupportTicketDetailScreen} />
+                <Stack.Screen name="ImportantUpdates" component={ImportantUpdatesScreen} />
+                <Stack.Screen name="AnnouncementDetail" component={AnnouncementDetailScreen} />
                 <Stack.Screen name="FAQ" component={FAQScreen} />
                 <Stack.Screen name="AboutUs" component={AboutUsScreen} />
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
@@ -212,6 +281,7 @@ function AppNavigator() {
                 {/* Game Modes */}
                 <Stack.Screen name="GameModes" component={GameModesScreen} />
                 <Stack.Screen name="GameDetails" component={GameDetailsScreen} />
+                <Stack.Screen name="TutorialDetail" component={TutorialDetailScreen} />
               </>
             )}
             

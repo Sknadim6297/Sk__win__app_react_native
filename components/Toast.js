@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../styles/theme';
+import { COLORS, TYPO, ICON } from '../styles/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -92,7 +92,7 @@ const Toast = ({ visible, message, type = 'error', onHide }) => {
         },
       ]}
     >
-      <Ionicons name={getIcon()} size={24} color={COLORS.white} style={styles.icon} />
+      <Ionicons name={getIcon()} size={ICON.md} color={COLORS.white} style={styles.icon} />
       <Text style={styles.message}>{message}</Text>
     </Animated.View>
   );
@@ -128,9 +128,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   message: {
+    ...TYPO.bodyMedium,
     color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '600',
     flex: 1,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useState, useEffect } from 'react';
+import React, { useCallback, useContext, useState } from 'react';
 import {
   View,
   Text,
@@ -7,214 +7,111 @@ import {
   StatusBar,
   ScrollView,
   Image,
-  ActivityIndicator,
+  Share,
   Linking,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AuthContext } from '../context/AuthContext';
-import { COLORS } from '../styles/theme';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import AppIcon from '../components/ui/AppIcon';
+import DynamicAppIcon from '../components/ui/DynamicAppIcon';
 import SKWinLogo from '../components/SKWinLogo';
-import { tournamentService, userService, walletService, gameService, tutorialService, notificationService } from '../services/api';
+import { EMPTY_APP_ICONS } from '../constants/appIconSlots';
+import { BRAND } from '../constants/branding';
+import {
+  tournamentService,
+  userService,
+  walletService,
+  gameService,
+  notificationService,
+  configService,
+  sliderService,
+  supportService,
+} from '../services/api';
+import HomeImageSlider from '../components/home/HomeImageSlider';
 
-const HomeScreen = ({ navigation }) => {
-  const { user, logout } = useContext(AuthContext);
+const { width } = Dimensions.get('window');
+const FF_IMAGE = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
+const BGMI_IMAGE = require('../assets/images/87904deacf9b547a95f019e0a322152a.jpg');
+
+const QUICK_LINKS = [
+  { id: 'support', label: 'Support', iconKey: 'support', fallback: 'headset', route: 'SupportTickets' },
+  { id: 'whatsapp', label: 'Whatsapp', iconKey: 'whatsapp', fallback: 'whatsapp', action: 'whatsapp' },
+  { id: 'telegram', label: 'Telegram', iconKey: 'telegram', fallback: 'telegram', action: 'telegram' },
+  { id: 'wallet', label: 'My Wallet', iconKey: 'wallet', fallback: 'wallet', route: 'WalletTab' },
+];
+
+export default function HomeScreen({ navigation }) {
+  const { user } = useContext(AuthContext);
   const [walletBalance, setWalletBalance] = useState(0);
-  const [tournamentStats, setTournamentStats] = useState({ joined: 0, won: 0 });
-  const [upcomingTournaments, setUpcomingTournaments] = useState([]);
-  const [ongoingTournaments, setOngoingTournaments] = useState([]);
-  const [completedTournaments, setCompletedTournaments] = useState([]);
   const [popularGames, setPopularGames] = useState([]);
-  const [gamesLoading, setGamesLoading] = useState(false);
-  const [contestTab, setContestTab] = useState('incoming'); // incoming, ongoing, completed
-  const [selectedMatchType, setSelectedMatchType] = useState(null); // null = all, 'solo', 'duo', 'squad'
-  const [sliderIndex, setSliderIndex] = useState(0);
-  const [countdowns, setCountdowns] = useState({}); // Store countdown for each tournament
-  const [tutorials, setTutorials] = useState([]);
-  const [tutorialsLoading, setTutorialsLoading] = useState(false);
+  const [upcomingCount, setUpcomingCount] = useState(0);
+  const [ongoingCount, setOngoingCount] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-
-  const getDefaultTutorials = () => [
-    {
-      _id: 'local-1',
-      title: 'How to Join Tournament',
-      description: 'Learn step by step how to join any tournament',
-      videoLink: 'https://youtu.be/tutorial-join-tournament',
-      color: COLORS.accent,
-      thumbnail: '',
-    },
-    {
-      _id: 'local-2',
-      title: 'Wallet Guide',
-      description: 'Add money and manage your wallet',
-      videoLink: 'https://youtu.be/tutorial-wallet',
-      color: '#4CAF50',
-      thumbnail: '',
-    },
-  ];
-
-  const handleLogout = async () => {
-    await logout();
-  };
-
-  const announcements = [];
-  const featuredMatches = [];
-
-  const getDefaultGames = () => [
-    {
-      _id: '1',
-      name: 'Free Fire',
-      image: require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg'),
-      rating: 4.8,
-      players: '2.5M Players',
-    },
-    {
-      _id: '2',
-      name: 'PUBG Mobile',
-      image: require('../assets/images/87904deacf9b547a95f019e0a322152a.jpg'),
-      rating: 4.7,
-      players: '1.8M Players',
-    },
-    {
-      _id: '3',
-      name: 'Call of Duty',
-      image: require('../assets/images/87904deacf9b547a95f019e0a322152a77.jpg'),
-      rating: 4.6,
-      players: '950K Players',
-    },
-  ];
-
-  const getTimeRemaining = (startDate) => {
-    const now = new Date();
-    const start = new Date(startDate);
-    const diff = start - now;
-
-    if (diff <= 0) return 'Live';
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-    const minutes = Math.floor((diff / 1000 / 60) % 60);
-
-    if (days > 0) return `${days}d ${hours}h`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-  };
-
-  const getCountdownTimer = (startDate) => {
-    const now = new Date();
-    const start = new Date(startDate);
-    const diff = start - now;
-
-    if (diff <= 0) return null; // Tournament started
-
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff / 1000 / 60) % 60);
-    const seconds = Math.floor((diff / 1000) % 60);
-
-    return {
-      hours: hours.toString().padStart(2, '0'),
-      minutes: minutes.toString().padStart(2, '0'),
-      seconds: seconds.toString().padStart(2, '0'),
-      total: diff
-    };
-  };
-
-  const formatStartDate = (startDate) => {
-    const date = new Date(startDate);
-    const options = { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    };
-    return date.toLocaleDateString('en-GB', options);
-  };
-
-  const getFilteredTournaments = (tournaments) => {
-    if (!selectedMatchType) {
-      return tournaments; // Return all if no filter selected
-    }
-    return tournaments.filter((t) => t.mode === selectedMatchType);
-  };
+  const [openSupportTickets, setOpenSupportTickets] = useState(0);
+  const [latestNews, setLatestNews] = useState({ text: '🏆 Tournaments Are Back! 🎮', isActive: true });
+  const [supportLinks, setSupportLinks] = useState({});
+  const [homeSliders, setHomeSliders] = useState([]);
+  const [slidersLoading, setSlidersLoading] = useState(true);
+  const [appIcons, setAppIcons] = useState(EMPTY_APP_ICONS);
 
   const loadHomeData = useCallback(async () => {
     try {
-      // Load games first (public endpoint, doesn't require auth)
-      const gamesData = await gameService.getPopularGames().catch(() => []);
-      const games = Array.isArray(gamesData) && gamesData.length > 0 
-        ? gamesData 
-        : getDefaultGames();
-      setPopularGames(games);
-
-      setTutorialsLoading(true);
-      const tutorialData = await tutorialService.getPublicList().catch(() => []);
-      const normalizedTutorials = Array.isArray(tutorialData) ? tutorialData : [];
-      setTutorials(normalizedTutorials.length > 0 ? normalizedTutorials : getDefaultTutorials());
-
-      // Only load user-specific data if user is logged in
-      if (user) {
-        const [balanceData, profileData, myTournamentsData] = await Promise.all([
-          walletService.getBalance().catch(() => ({ balance: 0 })),
-          userService.getProfile().catch(() => ({ tournament: {} })),
-          tournamentService.getMyTournaments().catch(() => []),
-        ]);
-
-        const notificationsResponse = await notificationService.getAll().catch(() => ({ notifications: [] }));
-        const unreadCount = (notificationsResponse?.notifications || []).filter((item) => !item?.isRead).length;
-        setUnreadNotifications(unreadCount);
-
-        setWalletBalance(balanceData?.balance ?? 0);
-
-        const tournament = profileData?.tournament || {};
-        setTournamentStats({
-          joined: tournament.participatedCount ?? 0,
-          won: tournament.wins ?? 0,
-        });
-
-        // Filter my tournaments by status
-        const myTournaments = Array.isArray(myTournamentsData) ? myTournamentsData : [];
-        const upcoming = myTournaments
-          .filter((t) => t.status === 'incoming' || t.status === 'upcoming')
-          .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-        const ongoing = myTournaments
-          .filter((t) => t.status === 'ongoing' || t.status === 'live')
-          .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-        const completed = myTournaments
-          .filter((t) => t.status === 'completed')
-          .sort((a, b) => new Date(b.endDate || b.startDate) - new Date(a.endDate || a.startDate));
-
-        setUpcomingTournaments(upcoming);
-        setOngoingTournaments(ongoing);
-        setCompletedTournaments(completed);
+      setSlidersLoading(true);
+      const [gamesData, homeConfig, slidersData] = await Promise.all([
+        gameService.getPopularGames().catch(() => []),
+        configService.getHome().catch(() => ({})),
+        sliderService.getActive().catch(() => []),
+      ]);
+      const sliderList = Array.isArray(slidersData) ? slidersData : [];
+      setHomeSliders(sliderList);
+      setSlidersLoading(false);
+      if (__DEV__) {
+        console.log('[Home] sliders loaded:', sliderList.length, sliderList[0]?.image?.slice?.(0, 60));
       }
-    } catch (error) {
-      console.error('Failed to load home data:', error);
-      // Fallback to default games if API fails
-      setPopularGames(getDefaultGames());
-      setTutorials(getDefaultTutorials());
-    } finally {
-      setTutorialsLoading(false);
+      setPopularGames(Array.isArray(gamesData) && gamesData.length > 0 ? gamesData : []);
+      if (homeConfig.latestNews) {
+        const tickerText =
+          homeConfig.latestAnnouncementTitle?.trim() ||
+          homeConfig.latestNews.text;
+        setLatestNews({
+          ...homeConfig.latestNews,
+          text: tickerText || homeConfig.latestNews.text,
+        });
+      }
+      setSupportLinks(homeConfig.supportLinks || {});
+      setAppIcons({ ...EMPTY_APP_ICONS, ...(homeConfig.appIcons || {}) });
+
+      if (!user) return;
+
+      const [balanceData, myTournamentsData, notificationsResponse, myTickets] = await Promise.all([
+        walletService.getBalance().catch(() => ({ balance: 0 })),
+        tournamentService.getMyTournaments().catch(() => []),
+        notificationService.getAll().catch(() => ({ notifications: [] })),
+        supportService.getMyTickets().catch(() => []),
+      ]);
+
+      setWalletBalance(balanceData?.balance ?? 0);
+      const tournamentList = Array.isArray(myTournamentsData) ? myTournamentsData : [];
+      setUpcomingCount(tournamentList.filter((t) => t.status === 'incoming' || t.status === 'upcoming').length);
+      setOngoingCount(tournamentList.filter((t) => t.status === 'ongoing' || t.status === 'live').length);
+      setCompletedCount(tournamentList.filter((t) => t.status === 'completed').length);
+      setUnreadNotifications(
+        (notificationsResponse?.notifications || []).filter((n) => !n?.isRead).length
+      );
+      const tickets = Array.isArray(myTickets) ? myTickets : [];
+      setOpenSupportTickets(
+        tickets.filter((t) => t.status === 'open' || t.status === 'in_progress').length
+      );
+    } catch (e) {
+      console.error('Home load error:', e);
+      setSlidersLoading(false);
     }
   }, [user]);
-
-  // Countdown timer effect
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const newCountdowns = {};
-      [...upcomingTournaments, ...ongoingTournaments].forEach(tournament => {
-        const timer = getCountdownTimer(tournament.startDate);
-        if (timer) {
-          newCountdowns[tournament._id] = timer;
-        }
-      });
-      setCountdowns(newCountdowns);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [upcomingTournaments, ongoingTournaments]);
 
   useFocusEffect(
     useCallback(() => {
@@ -222,1204 +119,592 @@ const HomeScreen = ({ navigation }) => {
     }, [loadHomeData])
   );
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
-      
-      {/* Header with Wallet, Notifications, and Support Icons */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <SKWinLogo size={50} />
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.userName}>{user?.name || 'Player'}</Text>
-          </View>
-        </View>
-        <View style={styles.headerActions}>
-          {/* Wallet Balance Icon */}
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={() => navigation.navigate('WalletTab')}
-          >
-            <View style={styles.walletBadge}>
-              <MaterialCommunityIcons name="wallet" size={18} color={COLORS.white} />
-              <Text style={styles.walletText}>₹{walletBalance.toFixed(0)}</Text>
-            </View>
-          </TouchableOpacity>
+  const displayName = user?.username || user?.name || 'Player';
+  const exclusiveGames = [
+    {
+      id: popularGames[0]?._id || 'ff',
+      name: popularGames[0]?.name || 'Free Fire',
+      image: popularGames[0]?.image
+        ? typeof popularGames[0].image === 'string'
+          ? { uri: popularGames[0].image }
+          : popularGames[0].image
+        : FF_IMAGE,
+      gradient: ['#FF6B00', '#E55A00'],
+    },
+    {
+      id: popularGames[1]?._id || 'bgmi',
+      name: popularGames[1]?.name || 'BGMI',
+      image: popularGames[1]?.image
+        ? typeof popularGames[1].image === 'string'
+          ? { uri: popularGames[1].image }
+          : popularGames[1].image
+        : BGMI_IMAGE,
+      gradient: ['#22C55E', '#16A34A'],
+    },
+  ];
 
-          {/* Notifications Icon */}
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <View style={styles.notificationBell}>
-              <MaterialCommunityIcons name="bell-outline" size={20} color={COLORS.accent} />
-              {unreadNotifications > 0 && (
-                <View style={styles.notificationDot}>
-                  <Text style={styles.notificationDotText}>
-                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+  const handleQuickLink = (item) => {
+    if (item.route) {
+      navigation.navigate(item.route);
+      return;
+    }
+    if (item.action === 'whatsapp') {
+      const url = supportLinks.whatsapp || 'https://wa.me/';
+      Linking.openURL(url.startsWith('http') ? url : `https://wa.me/${url}`).catch(() => {});
+      return;
+    }
+    if (item.action === 'telegram') {
+      const url = supportLinks.telegram || 'https://t.me/';
+      Linking.openURL(url.startsWith('http') ? url : `https://t.me/${url}`).catch(() => {});
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Join ${BRAND.fullName} — compete in Free Fire tournaments and win real prizes!`,
+        title: BRAND.name,
+      });
+    } catch (e) {
+      /* dismissed */
+    }
+  };
+
+  const openGame = (gameId) => {
+    if (gameId && gameId !== 'ff' && gameId !== 'bgmi') {
+      navigation.navigate('GameModes', { gameId });
+    } else {
+      navigation.navigate('GameModes', { gameId: popularGames[0]?._id });
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.backgroundDark} />
+      <View style={styles.glowPurple} pointerEvents="none" />
+      <View style={styles.glowOrange} pointerEvents="none" />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        contentContainerStyle={styles.scroll}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.profileRow}>
+            <View style={styles.avatar}>
+              {appIcons.appLogo ? (
+                <SKWinLogo size={44} logoUrl={appIcons.appLogo} rounded />
+              ) : (
+                <SKWinLogo size={44} />
+              )}
+            </View>
+            <View>
+              <Text style={styles.username}>{displayName}</Text>
+              <Text style={styles.brandTag}>{BRAND.name}</Text>
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.supportIconBtn}
+              onPress={() => navigation.navigate('SupportTickets')}
+            >
+              <AppIcon name="headset" size="md" color={COLORS.white} />
+              {openSupportTickets > 0 && (
+                <View style={styles.badge99}>
+                  <Text style={styles.badge99Text}>
+                    {openSupportTickets > 99 ? '99' : openSupportTickets}
                   </Text>
                 </View>
               )}
-            </View>
-          </TouchableOpacity>
-
-          {/* Support/Help Icon */}
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={() => navigation.navigate('ContactUs')}
-          >
-            <MaterialCommunityIcons name="headset" size={20} color={COLORS.white} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
-        {/* Tutorial Slider */}
-        <View style={styles.sliderSection}>
-          <View style={styles.sliderHeader}>
-            <View style={styles.sectionTitleRow}>
-              <MaterialCommunityIcons name="play-circle-outline" size={20} color={COLORS.accent} />
-              <Text style={styles.sectionTitle}>How To Play</Text>
-            </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.coinPill}
+              onPress={() => navigation.navigate('WalletTab')}
+            >
+              <AppIcon name="circle-multiple" size="sm" color="#FBBF24" />
+              <Text style={styles.coinText}>{walletBalance.toFixed(0)}</Text>
+            </TouchableOpacity>
           </View>
+        </View>
 
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            scrollEventThrottle={16}
-            style={styles.sliderContainer}
-            onScroll={(event) => {
-              const contentOffsetX = event.nativeEvent.contentOffset.x;
-              const index = Math.round(contentOffsetX / (300 + 12));
-              setSliderIndex(index);
-            }}
+        {latestNews?.isActive !== false && (
+          <TouchableOpacity
+            style={styles.newsBar}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('ImportantUpdates')}
           >
-            {tutorialsLoading ? (
-              <View style={styles.tutorialsLoading}>
-                <ActivityIndicator size="small" color={COLORS.accent} />
-                <Text style={styles.loadingText}>Loading videos...</Text>
-              </View>
-            ) : (
-              tutorials.map((tutorial) => (
-                <TouchableOpacity 
-                  key={tutorial._id || tutorial.id} 
-                  style={styles.sliderCard}
-                >
-                  <View style={styles.sliderCardHeader}>
-                    <Image
-                      source={tutorial.thumbnail ? { uri: tutorial.thumbnail } : require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg')}
-                      style={styles.sliderCardImage}
-                      resizeMode="cover"
-                    />
-                    <View style={styles.sliderCardImageOverlay} />
-                  </View>
-                  <View style={styles.sliderCardContent}>
-                    <Text style={styles.sliderTitle}>{tutorial.title}</Text>
-                    <Text style={styles.sliderDescription}>{tutorial.description}</Text>
-                    <TouchableOpacity 
-                      style={styles.videoButton}
-                      onPress={() => {
-                        if (tutorial.videoLink) {
-                          Linking.openURL(tutorial.videoLink);
-                        }
-                      }}
-                    >
-                      <MaterialCommunityIcons name="play" size={16} color={COLORS.white} />
-                      <Text style={styles.videoButtonText}>Watch Video</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
-          </ScrollView>
+            <View style={styles.newsTag}>
+              <Text style={styles.newsTagText}>LATEST</Text>
+            </View>
+            <Text style={styles.newsText} numberOfLines={1}>
+              {latestNews.text || '🏆 Tournaments Are Back! 🎮'}
+            </Text>
+            <AppIcon name="chevron-right" size="sm" color="#38BDF8" />
+          </TouchableOpacity>
+        )}
 
-          {/* Slider Dots */}
-          <View style={styles.dotsContainer}>
-            {tutorials.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.dot,
-                  sliderIndex === index && styles.dotActive,
-                ]}
+        <HomeImageSlider sliders={homeSliders} loading={slidersLoading} />
+
+        {/* Quick links */}
+        <View style={styles.quickRow}>
+          {QUICK_LINKS.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.quickTile}
+              activeOpacity={0.85}
+              onPress={() => handleQuickLink(item)}
+            >
+              <DynamicAppIcon
+                iconKey={item.iconKey}
+                icons={appIcons}
+                name={item.fallback}
+                size="md"
+                color={COLORS.white}
               />
-            ))}
-          </View>
-        </View>
-
-        {/* Announcements */}
-        {false && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <MaterialCommunityIcons name="bullhorn-outline" size={20} color={COLORS.accent} />
-              <Text style={styles.sectionTitle}>Announcements</Text>
-            </View>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
+              <Text style={styles.quickLabel}>{item.label}</Text>
             </TouchableOpacity>
-          </View>
-          
-          {announcements.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No announcements yet</Text>
-            </View>
-          ) : (
-            announcements.map((announcement) => (
-              <View key={announcement.id} style={styles.announcementCard}>
-                <View style={styles.announcementHeader}>
-                  <Text style={styles.announcementTitle}>{announcement.title}</Text>
-                  <Text style={styles.announcementTime}>{announcement.time}</Text>
-                </View>
-                <Text style={styles.announcementMessage}>{announcement.message}</Text>
-              </View>
-            ))
-          )}
+          ))}
         </View>
-        )}
 
-        {/* Featured Matches */}
-        {false && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <MaterialCommunityIcons name="fire" size={20} color={COLORS.accent} />
-              <Text style={styles.sectionTitle}>Featured Matches</Text>
+        {/* Exclusive */}
+        <View style={styles.sectionHead}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>Exclusive</Text>
+            <View style={styles.liveBadge}>
+              <Text style={styles.liveText}>LIVE</Text>
             </View>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>Watch All</Text>
+          </View>
+          <Text style={styles.sectionSub}>Big Winnings For ALL</Text>
+        </View>
+
+        <View style={styles.gamesRow}>
+          {exclusiveGames.map((game) => (
+            <TouchableOpacity
+              key={game.id}
+              style={styles.gameCard}
+              activeOpacity={0.9}
+              onPress={() => openGame(game.id)}
+            >
+              <Image source={game.image} style={styles.gameCardImage} resizeMode="cover" />
+              <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.gameOverlay} />
+              <View style={styles.fairPlayBadge}>
+                <AppIcon name="shield-check" size="xs" color="#4ADE80" />
+                <Text style={styles.fairPlayText}>FairPlay : ON</Text>
+              </View>
+              <Text style={styles.gameCardTitle}>{game.name}</Text>
             </TouchableOpacity>
-          </View>
-          
-          {featuredMatches.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No featured matches right now</Text>
-            </View>
-          ) : (
-            featuredMatches.map((match) => (
-              <TouchableOpacity key={match.id} style={styles.featuredMatchCard}>
-                <View style={styles.matchInfo}>
-                  <Text style={styles.matchTitle}>{match.title}</Text>
-                  <View style={styles.matchDetails}>
-                    <View style={styles.matchStatus}>
-                      <View style={[
-                        styles.statusDot, 
-                        { backgroundColor: match.status === 'Live' ? COLORS.error : COLORS.accent }
-                      ]} />
-                      <Text style={styles.statusText}>{match.status}</Text>
-                    </View>
-                    <View style={styles.viewerCount}>
-                      <Ionicons name="eye" size={14} color={COLORS.gray} />
-                      <Text style={styles.viewerText}>{match.viewers} watching</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.matchPrize}>
-                  <Text style={styles.prizeText}>{match.prize}</Text>
-                  <Ionicons name="play-circle" size={32} color={COLORS.accent} />
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
+          ))}
         </View>
-        )}
-        {/* Games Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <MaterialCommunityIcons name="gamepad-variant" size={20} color={COLORS.accent} />
-              <Text style={styles.sectionTitle}>Popular Games</Text>
-            </View>
-          </View>
 
-          {popularGames.length > 0 ? (
-            popularGames.map((game) => (
-              <TouchableOpacity 
-                key={game._id} 
-                style={styles.gameCard}
-                onPress={() => navigation.navigate('GameModes', { gameId: game._id })}
-                activeOpacity={0.8}
-              >
-                {/* Game Image */}
-                <View style={styles.gameImageContainer}>
-                  {game.image ? (
-                    <Image
-                      source={typeof game.image === 'string' ? { uri: game.image } : game.image}
-                      style={styles.gameImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[styles.gameImage, { backgroundColor: COLORS.darkGray }]}>
-                      <MaterialCommunityIcons name="gamepad-variant" size={40} color={COLORS.gray} />
-                    </View>
-                  )}
-                  <View style={styles.gameInfo}>
-                    <Text style={styles.gameName}>{game.name}</Text>
-                    <View style={styles.ratingContainer}>
-                      <MaterialCommunityIcons name="star" size={14} color="#FFD700" />
-                      <Text style={styles.ratingText}>{game.rating} • {game.players}</Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No games available</Text>
-            </View>
-          )}
+        {/* My Contests */}
+        <View style={styles.sectionHead}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>My Contests</Text>
+            <AppIcon name="check-decagram" size="sm" color="#38BDF8" />
+          </View>
+          <Text style={styles.sectionSub}>Your Tournaments Journey</Text>
         </View>
-                {/* My Contests */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <MaterialCommunityIcons name="trophy-outline" size={20} color={COLORS.accent} />
-              <Text style={styles.sectionTitle}>My Contests</Text>
-            </View>
-          </View>
 
-          {/* Match Type Filter */}
-          <View style={styles.matchTypeFilterContainer}>
-            {['All', 'Solo', 'Duo', 'Squad'].map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={[
-                  styles.matchTypeFilterButton,
-                  (type === 'All' ? selectedMatchType === null : selectedMatchType === type.toLowerCase()) && styles.matchTypeFilterButtonActive,
-                ]}
-                onPress={() => setSelectedMatchType(type === 'All' ? null : type.toLowerCase())}
-              >
-                <Text
-                  style={[
-                    styles.matchTypeFilterText,
-                    (type === 'All' ? selectedMatchType === null : selectedMatchType === type.toLowerCase()) && styles.matchTypeFilterTextActive,
-                  ]}
-                >
-                  {type}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        <View style={styles.contestsRow}>
+          {[
+            { key: 'upcoming', label: 'Upcoming', iconKey: 'upcoming', fallback: 'clock-outline', count: upcomingCount },
+            { key: 'ongoing', label: 'Ongoing', iconKey: 'ongoing', fallback: 'broadcast', count: ongoingCount },
+            { key: 'completed', label: 'Completed', iconKey: 'completed', fallback: 'check-circle-outline', count: completedCount },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.key}
+              style={styles.contestCard}
+              onPress={() => navigation.navigate('History')}
+              activeOpacity={0.85}
+            >
+              <DynamicAppIcon
+                iconKey={item.iconKey}
+                icons={appIcons}
+                name={item.fallback}
+                size="lg"
+                color="#22D3EE"
+              />
+              <Text style={styles.contestLabel}>{item.label}</Text>
+              {item.count > 0 && <Text style={styles.contestCount}>{item.count}</Text>}
+            </TouchableOpacity>
+          ))}
+        </View>
 
-          {/* Contest Tabs */}
-          <View style={styles.tabsContainer}>
-            {['incoming', 'ongoing', 'completed'].map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                style={[
-                  styles.tabButton,
-                  contestTab === tab && styles.tabButtonActive,
-                ]}
-                onPress={() => setContestTab(tab)}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    contestTab === tab && styles.tabTextActive,
-                  ]}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        {/* Share + WhatsApp */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShare} activeOpacity={0.9}>
+            <DynamicAppIcon iconKey="share" icons={appIcons} name="share-variant" size="md" color={COLORS.white} />
+            <Text style={styles.shareBtnText}>Share</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.whatsappBtn}
+            onPress={() => {
+              const url = supportLinks.whatsapp || 'https://wa.me/';
+              Linking.openURL(url.startsWith('http') ? url : `https://wa.me/${url}`).catch(() => {});
+            }}
+            activeOpacity={0.9}
+          >
+            <DynamicAppIcon iconKey="whatsapp" icons={appIcons} name="whatsapp" size="md" color={COLORS.white} />
+            <Text style={styles.whatsappBtnText}>Join on Whatsapp</Text>
+          </TouchableOpacity>
+        </View>
 
-          {/* Contest Content */}
-          {contestTab === 'incoming' && (
-            getFilteredTournaments(upcomingTournaments).length === 0 ? (
-              <View style={styles.emptyCard}>
-                <MaterialCommunityIcons name="trophy-outline" size={40} color={COLORS.gray} />
-                <Text style={styles.emptyText}>No tournaments available.</Text>
-                <Text style={styles.emptySubtext}>{selectedMatchType ? `No ${selectedMatchType} tournaments found` : 'Join a tournament to see it here!'}</Text>
-              </View>
-            ) : (
-              getFilteredTournaments(upcomingTournaments).map((tournament) => (
-                <TouchableOpacity 
-                  key={tournament._id} 
-                  style={styles.tournamentCard}
-                  onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
-                >
-                  {/* Start Date Display */}
-                  <View style={styles.startDateContainer}>
-                    <MaterialCommunityIcons name="calendar-clock" size={16} color={COLORS.accent} />
-                    <Text style={styles.startDateText}>Starts on: {formatStartDate(tournament.startDate)}</Text>
-                  </View>
-                  
-                  {/* Countdown Timer - Only show if user joined */}
-                  {countdowns[tournament._id] && (
-                    <View style={styles.countdownContainer}>
-                      <Text style={styles.countdownLabel}>Starts in:</Text>
-                      <View style={styles.countdownTimer}>
-                        <View style={styles.timeBox}>
-                          <Text style={styles.timeNumber}>{countdowns[tournament._id].hours}</Text>
-                          <Text style={styles.timeLabel}>H</Text>
-                        </View>
-                        <Text style={styles.timeSeparator}>:</Text>
-                        <View style={styles.timeBox}>
-                          <Text style={styles.timeNumber}>{countdowns[tournament._id].minutes}</Text>
-                          <Text style={styles.timeLabel}>M</Text>
-                        </View>
-                        <Text style={styles.timeSeparator}>:</Text>
-                        <View style={styles.timeBox}>
-                          <Text style={styles.timeNumber}>{countdowns[tournament._id].seconds}</Text>
-                          <Text style={styles.timeLabel}>S</Text>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
-                  <View style={styles.tournamentHeader}>
-                    <Text style={styles.tournamentTitle}>{tournament.name}</Text>
-                    <View style={styles.timeTag}>
-                      <Ionicons name="time" size={12} color={COLORS.white} />
-                      <Text style={styles.timeText}>{getTimeRemaining(tournament.startDate)}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.tournamentDetails}>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
-                    </View>
-                    {Number(tournament.prizePool) > 0 && (
-                      <View style={styles.detailItem}>
-                        <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                        <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
-                      </View>
-                    )}
-                    <View style={styles.detailItem}>
-                      <Ionicons name="people" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>
-                        {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxParticipants ?? tournament.maxPlayers}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.tournamentDetails}>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="sword" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.perKill ?? 0} / kill</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="account-group" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>{tournament.mode || '-'}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="map" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>{tournament.map || '-'}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.joinedBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-                    <Text style={styles.joinedBadgeText}>Joined</Text>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )
-          )}
-
-          {contestTab === 'ongoing' && (
-            getFilteredTournaments(ongoingTournaments).length === 0 ? (
-              <View style={styles.emptyCard}>
-                <MaterialCommunityIcons name="tournament" size={40} color={COLORS.gray} />
-                <Text style={styles.emptyText}>No ongoing contests</Text>
-              </View>
-            ) : (
-              getFilteredTournaments(ongoingTournaments).map((tournament) => (
-                <TouchableOpacity 
-                  key={tournament._id} 
-                  style={styles.tournamentCard}
-                  onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
-                >
-                  <View style={styles.tournamentHeader}>
-                    <Text style={styles.tournamentTitle}>{tournament.name}</Text>
-                    <View style={styles.timeTag}>
-                      <Ionicons name="time" size={12} color={COLORS.white} />
-                      <Text style={styles.timeText}>Ongoing</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.tournamentDetails}>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
-                    </View>
-                    {Number(tournament.prizePool) > 0 && (
-                      <View style={styles.detailItem}>
-                        <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                        <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
-                      </View>
-                    )}
-                    <View style={styles.detailItem}>
-                      <Ionicons name="people" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>
-                        {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxParticipants ?? tournament.maxPlayers}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.tournamentDetails}>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="sword" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.perKill ?? 0} / kill</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="account-group" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>{tournament.mode || '-'}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="map" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>{tournament.map || '-'}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.joinedBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-                    <Text style={styles.joinedBadgeText}>Joined</Text>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )
-          )}
-
-          {contestTab === 'completed' && (
-            getFilteredTournaments(completedTournaments).length === 0 ? (
-              <View style={styles.emptyCard}>
-                <MaterialCommunityIcons name="trophy" size={40} color={COLORS.gray} />
-                <Text style={styles.emptyText}>No completed contests</Text>
-              </View>
-            ) : (
-              getFilteredTournaments(completedTournaments).map((tournament) => (
-                <TouchableOpacity 
-                  key={tournament._id} 
-                  style={styles.tournamentCard}
-                  onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
-                >
-                  <View style={styles.tournamentHeader}>
-                    <Text style={styles.tournamentTitle}>{tournament.name}</Text>
-                    <View style={styles.timeTag}>
-                      <Ionicons name="trophy" size={12} color={COLORS.white} />
-                      <Text style={styles.timeText}>Completed</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.tournamentDetails}>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="currency-inr" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
-                    </View>
-                    {Number(tournament.prizePool) > 0 && (
-                      <View style={styles.detailItem}>
-                        <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                        <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
-                      </View>
-                    )}
-                    <View style={styles.detailItem}>
-                      <Ionicons name="people" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>
-                        {(tournament.participantCount ?? tournament.registeredPlayers?.length ?? 0)}/{tournament.maxParticipants ?? tournament.maxPlayers}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.tournamentDetails}>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="sword" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>₹{tournament.perKill ?? 0} / kill</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="account-group" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>{tournament.mode || '-'}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <MaterialCommunityIcons name="map" size={16} color={COLORS.accent} />
-                      <Text style={styles.detailText}>{tournament.map || '-'}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.joinedBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-                    <Text style={styles.joinedBadgeText}>Joined</Text>
-                  </View>
-                </TouchableOpacity>
-              ))
-            )
-          )}
+        <View style={styles.socialRow}>
+          {[
+            { key: 'instagram', action: 'instagram', fallback: 'instagram' },
+            { key: 'telegram', action: 'telegram', fallback: 'telegram' },
+            { key: 'whatsapp', action: 'whatsapp', fallback: 'whatsapp' },
+          ].map((icon) => (
+            <TouchableOpacity
+              key={icon.key}
+              style={styles.socialCircle}
+              onPress={() => {
+                if (icon.action === 'whatsapp') {
+                  const url = supportLinks.whatsapp || 'https://wa.me/';
+                  Linking.openURL(url.startsWith('http') ? url : `https://wa.me/${url}`).catch(() => {});
+                } else if (icon.action === 'telegram') {
+                  const url = supportLinks.telegram || 'https://t.me/';
+                  Linking.openURL(url.startsWith('http') ? url : `https://t.me/${url}`).catch(() => {});
+                } else if (icon.action === 'instagram') {
+                  const url = supportLinks.instagram || 'https://instagram.com/';
+                  Linking.openURL(url.startsWith('http') ? url : `https://instagram.com/${url}`).catch(() => {});
+                }
+              }}
+            >
+              <DynamicAppIcon
+                iconKey={icon.key}
+                icons={appIcons}
+                name={icon.fallback}
+                size="md"
+                color={COLORS.white}
+              />
+            </TouchableOpacity>
+          ))}
         </View>
       </ScrollView>
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('SupportTickets')}
+        activeOpacity={0.9}
+      >
+        <DynamicAppIcon iconKey="support" icons={appIcons} name="headset" size="lg" color={COLORS.white} />
+      </TouchableOpacity>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.backgroundDark,
+  },
+  glowPurple: {
+    position: 'absolute',
+    top: -40,
+    right: -30,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(123, 97, 255, 0.15)',
+  },
+  glowOrange: {
+    position: 'absolute',
+    top: 200,
+    left: -50,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255, 107, 0, 0.08)',
+  },
+  scroll: {
+    paddingHorizontal: 16,
+    paddingBottom: 120,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    backgroundColor: COLORS.darkGray,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
+    marginBottom: 20,
+    paddingTop: 4,
   },
-  loadingText: {
-    color: COLORS.gray,
-    marginTop: 12,
-    fontSize: 14,
-  },
-  headerLeft: {
+  profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flex: 1,
   },
-  headerTextContainer: {
-    flexDirection: 'column',
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.surfaceDark,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  welcomeText: {
-    fontSize: 11,
-    color: COLORS.gray,
-    fontWeight: '400',
-  },
-  userName: {
-    fontSize: 16,
+  username: {
+    ...TEXT.h3,
     color: COLORS.white,
-    fontWeight: 'bold',
-    marginTop: 2,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.accent,
+  brandTag: {
+    ...TEXT.label,
+    color: '#FBBF24',
+    marginTop: 4,
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: COLORS.white,
-    fontWeight: '500',
-  },
-  headerActions: {
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
-  iconButton: {
-    padding: 8,
-    borderRadius: 10,
-  },
-  walletBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
-  },
-  walletText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  notificationBell: {
+  supportIconBtn: {
     position: 'relative',
+    padding: 4,
   },
-  notificationDot: {
+  badge99: {
     position: 'absolute',
-    top: -6,
+    top: -4,
     right: -8,
-    minWidth: 16,
-    height: 16,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.background,
-    justifyContent: 'center',
+    minWidth: 22,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
     alignItems: 'center',
-    paddingHorizontal: 3,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  notificationDotText: {
+  badge99Text: {
+    ...TEXT.overline,
+    fontSize: 11,
     color: COLORS.white,
-    fontSize: 9,
-    fontWeight: '700',
+    letterSpacing: 0,
+    textTransform: 'none',
   },
-  headerLeft: {
+  coinPill: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  logoSmall: {
-    width: 50,
-    height: 50,
-    backgroundColor: COLORS.primary,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  welcomeText: {
-    fontSize: 14,
-    color: COLORS.gray,
-  },
-  usernameText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  logoutButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: COLORS.lightGray,
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  scrollContent: {
-    paddingBottom: 100,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginVertical: 20,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.lightGray,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
+    backgroundColor: COLORS.surfaceDark,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
     borderWidth: 1,
-    borderColor: COLORS.darkGray,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  coinText: {
+    ...TEXT.label,
+    fontFamily: FONTS.bold,
     color: COLORS.white,
-    marginTop: 8,
-    marginBottom: 4,
   },
-  statLabel: {
-    fontSize: 10,
-    color: COLORS.gray,
-    textAlign: 'center',
+  newsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#121B33',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  section: {
-    marginBottom: 24,
+  newsTag: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  sectionHeader: {
+  newsTagText: {
+    ...TEXT.overline,
+    fontSize: 11,
+    color: COLORS.white,
+    letterSpacing: 0.5,
+  },
+  newsText: {
+    flex: 1,
+    ...TEXT.bodyMedium,
+    color: COLORS.white,
+  },
+  quickRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 24,
+    gap: 8,
+  },
+  quickTile: {
+    flex: 1,
+    backgroundColor: 'rgba(88, 70, 140, 0.45)',
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 16,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  quickLabel: {
+    ...TEXT.labelSm,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  sectionHead: {
+    marginBottom: 12,
   },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  emptyCard: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-  },
-  emptyText: {
-    color: COLORS.gray,
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  emptySubtext: {
-    color: COLORS.gray,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 4,
-    opacity: 0.7,
-  },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    ...TEXT.h2,
     color: COLORS.white,
   },
-  seeAllText: {
-    fontSize: 14,
-    color: COLORS.accent,
-    fontWeight: '600',
-  },
-  announcementCard: {
-    backgroundColor: COLORS.lightGray,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-  },
-  announcementHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  announcementTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    flex: 1,
-  },
-  announcementTime: {
-    fontSize: 12,
+  sectionSub: {
+    ...TEXT.caption,
     color: COLORS.gray,
+    marginTop: 6,
   },
-  announcementMessage: {
-    fontSize: 13,
-    color: COLORS.gray,
-    lineHeight: 18,
-  },
-  featuredMatchCard: {
-    backgroundColor: COLORS.lightGray,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-  },
-  matchInfo: {
-    flex: 1,
-  },
-  matchTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 8,
-  },
-  matchDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  matchStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    color: COLORS.gray,
-    fontWeight: '600',
-  },
-  viewerCount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  viewerText: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginLeft: 4,
-  },
-  matchPrize: {
-    alignItems: 'center',
-  },
-  prizeText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.success,
-    marginBottom: 4,
-  },
-  tournamentCard: {
-    backgroundColor: COLORS.lightGray,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-  },
-  tournamentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  tournamentTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    flex: 1,
-  },
-  timeTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.accent,
+  liveBadge: {
+    backgroundColor: '#2563EB',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 6,
   },
-  timeText: {
-    fontSize: 12,
-    color: COLORS.white,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  tournamentDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  detailText: {
-    fontSize: 12,
-    color: COLORS.white,
-    marginLeft: 4,
-    fontWeight: '600',
-  },
-  joinButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  joinButtonText: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  joinedBadge: {
-    backgroundColor: `${COLORS.success}20`,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.success,
-  },
-  joinedBadgeText: {
-    color: COLORS.success,
-    fontWeight: 'bold',
-    marginLeft: 6,
-  },
-  startDateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    backgroundColor: COLORS.darkGray,
-    padding: 8,
-    borderRadius: 8,
-  },
-  startDateText: {
-    fontSize: 13,
-    color: COLORS.white,
-    fontWeight: '600',
-    marginLeft: 6,
-  },
-  countdownContainer: {
-    backgroundColor: COLORS.darkGray,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  countdownLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  countdownTimer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timeBox: {
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    minWidth: 35,
-    alignItems: 'center',
-  },
-  timeNumber: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  liveText: {
+    ...TEXT.overline,
+    fontSize: 11,
     color: COLORS.white,
   },
-  timeLabel: {
-    fontSize: 10,
-    color: COLORS.white,
-    opacity: 0.8,
-    marginTop: -2,
-  },
-  timeSeparator: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.accent,
-    marginHorizontal: 4,
-  },
-  tabsContainer: {
+  gamesRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: COLORS.lightGray,
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-    alignItems: 'center',
-  },
-  tabButtonActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
-  },
-  tabText: {
-    color: COLORS.gray,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  tabTextActive: {
-    color: COLORS.white,
+    gap: 12,
+    marginBottom: 26,
   },
   gameCard: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-  },
-  gameImageContainer: {
-    backgroundColor: COLORS.darkGray,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  gameImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-  },
-  gameImagePlaceholder: {
-    width: 80,
-    height: 80,
-    backgroundColor: COLORS.background,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-  },
-  gameInfo: {
     flex: 1,
-  },
-  gameName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 4,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    color: COLORS.gray,
-    fontSize: 12,
-  },
-  gameButtonsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 12,
-    gap: 8,
-  },
-  gameActionButton: {
-    width: '48%',
-    backgroundColor: COLORS.darkGray,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gameActionText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  sliderSection: {
-    marginVertical: 24,
-  },
-  sliderHeader: {
-    marginBottom: 12,
-  },
-  sliderContainer: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-  },
-  sliderCard: {
-    width: 300,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
+    height: width * 0.52,
+    borderRadius: 16,
     overflow: 'hidden',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
+    backgroundColor: COLORS.surfaceDark,
   },
-  sliderCardHeader: {
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  sliderCardImage: {
+  gameCardImage: {
     width: '100%',
     height: '100%',
-    position: 'absolute',
   },
-  sliderCardImageOverlay: {
+  gameOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
-  sliderCardContent: {
-    padding: 14,
-  },
-  sliderTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 4,
-  },
-  sliderDescription: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 10,
-    lineHeight: 16,
-  },
-  videoButton: {
-    backgroundColor: COLORS.accent,
+  fairPlayBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 6,
-    gap: 6,
+    backgroundColor: 'rgba(88, 50, 140, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
   },
-  videoButtonText: {
+  fairPlayText: {
+    ...TEXT.labelSm,
+    fontFamily: FONTS.semiBold,
     color: COLORS.white,
-    fontWeight: '600',
-    fontSize: 12,
   },
-  tutorialsLoading: {
-    width: 300,
-    height: 240,
-    borderRadius: 16,
-    backgroundColor: COLORS.lightGray,
+  gameCardTitle: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    ...TEXT.h3,
+    color: COLORS.white,
+  },
+  contestsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 22,
+  },
+  contestCard: {
+    flex: 1,
+    backgroundColor: COLORS.surfaceDark,
+    borderRadius: 14,
+    paddingVertical: 18,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 211, 238, 0.2)',
     gap: 8,
   },
-  dotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
+  contestLabel: {
+    ...TEXT.label,
+    color: COLORS.gray,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.darkGray,
+  contestCount: {
+    ...TEXT.label,
+    fontFamily: FONTS.bold,
+    color: '#22D3EE',
   },
-  dotActive: {
-    backgroundColor: COLORS.accent,
-    width: 24,
-  },
-  quickActions: {
+  actionRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
+    marginBottom: 16,
   },
-  actionButton: {
+  shareBtn: {
     flex: 1,
-    backgroundColor: COLORS.lightGray,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-  },
-  actionText: {
-    fontSize: 12,
-    color: COLORS.white,
-    fontWeight: '600',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  matchTypeFilterContainer: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-    paddingHorizontal: 0,
-  },
-  matchTypeFilterButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: COLORS.darkGray,
-    borderWidth: 1,
-    borderColor: COLORS.gray,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: COLORS.purple,
+    borderRadius: 12,
+    paddingVertical: 14,
+    gap: 8,
   },
-  matchTypeFilterButtonActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
-  },
-  matchTypeFilterText: {
-    fontSize: 12,
-    color: COLORS.gray,
-    fontWeight: '600',
-  },
-  matchTypeFilterTextActive: {
+  shareBtnText: {
+    ...TEXT.buttonSm,
     color: COLORS.white,
   },
+  whatsappBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#22C55E',
+    borderRadius: 12,
+    paddingVertical: 14,
+    gap: 8,
+  },
+  whatsappBtnText: {
+    ...TEXT.buttonSm,
+    color: COLORS.white,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 8,
+  },
+  socialCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 22,
+    backgroundColor: COLORS.surfaceDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 100,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#22C55E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
 });
-
-export default HomeScreen;

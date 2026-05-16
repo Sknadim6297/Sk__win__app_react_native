@@ -1,28 +1,23 @@
 /**
- * Themed react-native wrapper.
- * Re-exports everything from react-native but overrides Text and TextInput
- * to always prepend the global app font (Orbitron) so no individual screen
- * needs to specify fontFamily.
- *
- * This file is excluded from Metro's redirect loop (see metro.config.js).
+ * Themed react-native wrapper — Poppins base + readable default size.
  */
 const RN = require('react-native');
 const React = require('react');
 
-// Font constant is inlined here to avoid a require cycle:
-// themed-react-native → styles/theme → (react-native redirect) → themed-react-native
-const ORBITRON = 'Orbitron-Regular';
+const APP_FONT = 'Poppins-Regular';
+const BASE_TEXT = {
+  fontFamily: APP_FONT,
+  fontWeight: 'normal',
+  fontSize: 16,
+  lineHeight: 24,
+};
 
 function wrapWithFont(Component) {
-  const Wrapped = React.forwardRef(function ThemedTextComponent(
-    { style, ...props },
-    ref,
-  ) {
-    const base = [{ fontFamily: ORBITRON, fontWeight: 'normal', letterSpacing: 0.2 }];
+  const Wrapped = React.forwardRef(function ThemedTextComponent({ style, ...props }, ref) {
     const extra = Array.isArray(style) ? style : style ? [style] : [];
     return React.createElement(Component, {
       ref,
-      style: [...extra, ...base],
+      style: [...extra, BASE_TEXT],
       ...props,
     });
   });
@@ -33,11 +28,6 @@ function wrapWithFont(Component) {
 const Text = wrapWithFont(RN.Text);
 const TextInput = wrapWithFont(RN.TextInput);
 
-// Use a Proxy instead of { ...RN, Text, TextInput } spread.
-// Spreading forces all of react-native's lazy property getters to evaluate
-// immediately, including deprecated APIs (PushNotificationIOS, Clipboard, etc.)
-// that try to access native modules unavailable in Expo Go — causing
-// "Invariant Violation: native module doesn't exist" at startup.
 const overrides = { Text, TextInput };
 module.exports = new Proxy(overrides, {
   get(target, key) {

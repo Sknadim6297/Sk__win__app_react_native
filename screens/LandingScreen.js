@@ -12,6 +12,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
+import { BRAND } from '../constants/branding';
 import SKWinLogo from '../components/SKWinLogo';
 
 const { width, height } = Dimensions.get('window');
@@ -144,10 +145,10 @@ const LandingScreen = ({ navigation }) => {
             },
           ]}
         >
-          <Text style={styles.title}>SK Win</Text>
-          <Text style={styles.subtitle}>Free Fire Tournaments</Text>
+          <Text style={styles.title}>{BRAND.name}</Text>
+          <Text style={styles.subtitle}>{BRAND.tagline}</Text>
           <View style={styles.divider} />
-          <Text style={styles.tagline}>Compete. Conquer. Win Big.</Text>
+          <Text style={styles.tagline}>{BRAND.motto}</Text>
         </Animated.View>
 
         {/* Features */}

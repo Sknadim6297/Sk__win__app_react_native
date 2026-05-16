@@ -1,7 +1,7 @@
 const User = require('../models/User');
 
 const generateReferralCode = (username) => {
-  const base = (username || 'SKWIN').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4) || 'SKWN';
+  const base = (username || 'WARZ').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4) || 'WARZ';
   const random = Math.random().toString(16).slice(2, 6).toUpperCase();
   return `SK${base}${random}`;
 };
