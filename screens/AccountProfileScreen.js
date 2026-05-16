@@ -16,9 +16,11 @@ import { AuthContext } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
 import { userService } from '../services/api';
 import SKWinLogo from '../components/SKWinLogo';
+import { useAppIcons } from '../hooks/useAppIcons';
 
 const AccountProfileScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
+  const { appIcons } = useAppIcons();
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,7 +101,7 @@ const AccountProfileScreen = ({ navigation }) => {
         {/* Profile Picture */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
-            <SKWinLogo size={100} />
+            <SKWinLogo size={100} logoUrl={appIcons.appLogo} />
           </View>
           <Text style={styles.userName}>
             {stats.name || stats.username || 'User'}

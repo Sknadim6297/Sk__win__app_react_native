@@ -30,7 +30,7 @@ const PrivacyPolicyScreen = ({ navigation }) => {
 
           <Text style={styles.sectionTitle}>Introduction</Text>
           <Text style={styles.text}>
-            SK Win ("we" or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application.
+            WarZone Free Fire Tournament ("we" or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application.
           </Text>
 
           <Text style={styles.sectionTitle}>Information We Collect</Text>
@@ -74,7 +74,7 @@ const PrivacyPolicyScreen = ({ navigation }) => {
           <Text style={styles.text}>
             If you have questions about this Privacy Policy, please contact us at:
             {'\n\n'}
-            Email: privacy@skwin.com
+            Email: privacy@warzoneff.com
           </Text>
         </View>
       </ScrollView>

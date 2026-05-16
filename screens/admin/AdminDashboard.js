@@ -79,7 +79,7 @@ const AdminDashboard = ({ navigation }) => {
               <MaterialCommunityIcons name="shield-crown" size={28} color={COLORS.accent} />
             </View>
             <View>
-              <Text style={styles.headerTitle}>SK ADMIN</Text>
+              <Text style={styles.headerTitle}>WARZONE ADMIN</Text>
               <Text style={styles.headerSubtitle}>@{user?.username || 'Admin'}</Text>
             </View>
           </View>
@@ -187,7 +187,7 @@ const AdminDashboard = ({ navigation }) => {
                   </View>
                   <View style={styles.actionCardText}>
                     <Text style={styles.actionCardTitle}>How To Play</Text>
-                    <Text style={styles.actionCardSubtitle}>Manage tutorial videos</Text>
+                    <Text style={styles.actionCardSubtitle}>Home carousel thumbnails & videos</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={24} color="#00BCD4" />
                 </View>
@@ -266,12 +266,12 @@ const AdminDashboard = ({ navigation }) => {
 
             <TouchableOpacity 
               style={[styles.secondaryBtn, { borderLeftColor: COLORS.error }]}
-              onPress={() => navigateTo('ReportedIssues')}
+              onPress={() => navigateTo('SupportManagement')}
             >
-              <Ionicons name="warning" size={24} color={COLORS.error} style={styles.secondaryIcon} />
+              <Ionicons name="headset" size={24} color={COLORS.error} style={styles.secondaryIcon} />
               <View style={styles.secondaryContent}>
-                <Text style={styles.secondaryTitle}>Reported Issues</Text>
-                <Text style={styles.secondarySubtitle}>View user reports</Text>
+                <Text style={styles.secondaryTitle}>Support Tickets</Text>
+                <Text style={styles.secondarySubtitle}>Categories & user tickets</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
             </TouchableOpacity>
@@ -284,6 +284,42 @@ const AdminDashboard = ({ navigation }) => {
               <View style={styles.secondaryContent}>
                 <Text style={styles.secondaryTitle}>Analytics</Text>
                 <Text style={styles.secondarySubtitle}>View statistics</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.secondaryBtn, { borderLeftColor: '#38BDF8' }]}
+              onPress={() => navigateTo('SliderManagement')}
+            >
+              <MaterialCommunityIcons name="view-carousel" size={24} color="#38BDF8" style={styles.secondaryIcon} />
+              <View style={styles.secondaryContent}>
+                <Text style={styles.secondaryTitle}>Home Banners</Text>
+                <Text style={styles.secondarySubtitle}>Image-only slides + redirect link</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.secondaryBtn, { borderLeftColor: '#2DD4BF' }]}
+              onPress={() => navigateTo('AnnouncementManagement')}
+            >
+              <MaterialCommunityIcons name="bullhorn" size={24} color="#2DD4BF" style={styles.secondaryIcon} />
+              <View style={styles.secondaryContent}>
+                <Text style={styles.secondaryTitle}>Important Updates</Text>
+                <Text style={styles.secondarySubtitle}>News list, links & descriptions</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.secondaryBtn, { borderLeftColor: '#00B368' }]}
+              onPress={() => navigateTo('AppContentManagement')}
+            >
+              <MaterialCommunityIcons name="cellphone-cog" size={24} color="#00B368" style={styles.secondaryIcon} />
+              <View style={styles.secondaryContent}>
+                <Text style={styles.secondaryTitle}>App Content</Text>
+                <Text style={styles.secondarySubtitle}>Home, wallet & coin packs</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
             </TouchableOpacity>

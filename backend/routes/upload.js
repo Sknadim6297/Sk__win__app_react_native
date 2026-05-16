@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { authMiddleware } = require('../middleware/auth');
+const { getPublicBaseUrl } = require('../utils/publicUrl');
 
 const router = express.Router();
 
@@ -32,8 +33,10 @@ router.post('/', authMiddleware, upload.single('image'), (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-  res.status(201).json({ url: fileUrl, filename: req.file.filename });
+  const base = getPublicBaseUrl(req);
+  const relativePath = `/uploads/${req.file.filename}`;
+  const fileUrl = `${base}${relativePath}`;
+  res.status(201).json({ url: fileUrl, path: relativePath, filename: req.file.filename });
 });
 
 module.exports = router;

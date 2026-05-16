@@ -49,7 +49,18 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
     const admin = await ensureAdmin(req, res);
     if (!admin) return;
 
-    const { title, description, videoLink, thumbnail, order, isActive } = req.body;
+    const {
+      title,
+      description,
+      videoLink,
+      thumbnail,
+      order,
+      isActive,
+      showOnHome,
+      ctaText,
+      carouselAction,
+      linkUrl,
+    } = req.body;
 
     if (!title || !videoLink || !thumbnail) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -62,6 +73,10 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       thumbnail,
       order: Number(order) || 0,
       isActive: typeof isActive === 'boolean' ? isActive : true,
+      showOnHome: typeof showOnHome === 'boolean' ? showOnHome : true,
+      ctaText: ctaText || 'CLICK HERE',
+      carouselAction: carouselAction || 'video',
+      linkUrl: linkUrl || '',
       createdBy: req.userId,
       updatedAt: new Date(),
     });

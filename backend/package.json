@@ -1,7 +1,7 @@
 {
   "name": "sk-win-backend",
   "version": "1.0.0",
-  "description": "SK Win Backend API",
+  "description": "WarZone Free Fire Tournament Backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -2,6 +2,7 @@ const express = require('express');
 const User = require('../models/User');
 const WalletTransaction = require('../models/WalletTransaction');
 const Notification = require('../models/Notification');
+const CoinPack = require('../models/CoinPack');
 const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
 
@@ -10,13 +11,21 @@ router.get('/balance', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired — please log in again',
+        code: 'USER_NOT_FOUND',
+      });
     }
+
+    const balance = user.wallet.balance || 0;
+    const bonusBalance = user.wallet.bonusBalance || 0;
 
     res.json({
       success: true,
-      balance: user.wallet.balance || 0,
-      bonusBalance: user.wallet.bonusBalance || 0,
+      balance,
+      bonusBalance,
+      totalBalance: balance + bonusBalance,
       bonusUsed: user.wallet.bonusUsed || 0,
       totalDeposited: user.wallet.totalDeposited || 0,
       totalWithdrawn: user.wallet.totalWithdrawn || 0,
@@ -48,7 +57,11 @@ router.post('/topup', authMiddleware, async (req, res) => {
 
     const user = await User.findById(req.userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired — please log in again',
+        code: 'USER_NOT_FOUND',
+      });
     }
 
     // Create transaction
@@ -105,7 +118,11 @@ router.post('/withdraw', authMiddleware, async (req, res) => {
 
     const user = await User.findById(req.userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired — please log in again',
+        code: 'USER_NOT_FOUND',
+      });
     }
 
     if (user.wallet.balance < amountNum) {
@@ -143,6 +160,67 @@ router.post('/withdraw', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Withdrawal failed: ' + error.message });
+  }
+});
+
+// Buy coin pack (admin-configured)
+router.post('/buy-pack', authMiddleware, async (req, res) => {
+  try {
+    const { packId } = req.body;
+    if (!packId) {
+      return res.status(400).json({ success: false, message: 'Pack ID required' });
+    }
+
+    const pack = await CoinPack.findOne({ _id: packId, isActive: true });
+    if (!pack) {
+      return res.status(404).json({ success: false, message: 'Coin pack not available' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired — please log in again',
+        code: 'USER_NOT_FOUND',
+      });
+    }
+
+    const coinsAdded = pack.coins + (pack.bonusCoins || 0);
+
+    const transaction = new WalletTransaction({
+      userId: req.userId,
+      type: 'deposit',
+      amount: pack.priceInr,
+      paymentMethod: 'coin_pack',
+      transactionId: `PACK-${Date.now()}`,
+      description: `Purchased ${pack.label} (+${coinsAdded} coins)`,
+      status: 'completed',
+    });
+    await transaction.save();
+
+    user.wallet.balance += coinsAdded;
+    user.wallet.totalDeposited += pack.priceInr;
+    await user.save();
+
+    await Notification.create({
+      userId: req.userId,
+      type: 'wallet',
+      title: 'Coins Added',
+      message: `${coinsAdded} coins added to your wallet.`,
+    });
+
+    res.json({
+      success: true,
+      message: 'Coins purchased successfully',
+      coinsAdded,
+      balance: user.wallet.balance,
+      bonusBalance: user.wallet.bonusBalance,
+      totalBalance: user.wallet.balance + user.wallet.bonusBalance,
+      totalDeposited: user.wallet.totalDeposited,
+    });
+  } catch (error) {
+    console.error('Buy pack error:', error);
+    res.status(500).json({ success: false, message: 'Purchase failed' });
   }
 });
 

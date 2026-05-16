@@ -1,4 +1,4 @@
-# SK Win Backend Setup Guide
+# WarZone Free Fire Tournament — Backend Setup Guide
 
 ## Prerequisites
 - Node.js (v14 or higher)

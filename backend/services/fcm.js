@@ -9,7 +9,9 @@ const initFcm = () => {
   const serviceAccountPath = process.env.FCM_SERVICE_ACCOUNT_PATH;
 
   if (!serviceAccountJson && !serviceAccountPath) {
-    console.warn('FCM not initialized: missing service account env vars');
+    if (process.env.FCM_VERBOSE === 'true') {
+      console.warn('FCM not initialized: missing service account env vars (push disabled)');
+    }
     return;
   }
 

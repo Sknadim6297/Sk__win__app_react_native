@@ -30,8 +30,8 @@ const FAQScreen = ({ navigation }) => {
       answer: 'If you encounter inappropriate behavior, contact our support team with details and screenshot evidence.',
     },
     {
-      question: 'Is SK Win available in my region?',
-      answer: 'SK Win is available in most regions. Check your app store or contact support for regional availability.',
+      question: 'Is WarZone Free Fire Tournament available in my region?',
+      answer: 'WarZone Free Fire Tournament is available in most regions. Check your app store or contact support for regional availability.',
     },
   ];
 

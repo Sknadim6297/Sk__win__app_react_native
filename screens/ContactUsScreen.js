@@ -15,7 +15,7 @@ import { COLORS } from '../styles/theme';
 
 const ContactUsScreen = ({ navigation }) => {
   const contacts = [
-    { type: 'email', label: 'Email Support', value: 'support@skwin.com', icon: 'email' },
+    { type: 'email', label: 'Email Support', value: 'support@warzoneff.com', icon: 'email' },
     { type: 'phone', label: 'Phone', value: '+91 6297616918', icon: 'phone' },
     { type: 'whatsapp', label: 'WhatsApp', value: '+91 6297616918', icon: 'whatsapp' },
   ];

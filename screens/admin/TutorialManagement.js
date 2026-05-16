@@ -38,6 +38,10 @@ const TutorialManagement = ({ navigation }) => {
     thumbnail: '',
     order: '0',
     isActive: true,
+    showOnHome: true,
+    ctaText: 'CLICK HERE',
+    carouselAction: 'video',
+    linkUrl: '',
   });
 
   useEffect(() => {
@@ -78,6 +82,10 @@ const TutorialManagement = ({ navigation }) => {
       thumbnail: '',
       order: '0',
       isActive: true,
+      showOnHome: true,
+      ctaText: 'CLICK HERE',
+      carouselAction: 'video',
+      linkUrl: '',
     });
   };
 
@@ -98,6 +106,10 @@ const TutorialManagement = ({ navigation }) => {
       thumbnail: tutorial.thumbnail || '',
       order: tutorial.order?.toString() || '0',
       isActive: tutorial.isActive !== false,
+      showOnHome: tutorial.showOnHome !== false,
+      ctaText: tutorial.ctaText || 'CLICK HERE',
+      carouselAction: tutorial.carouselAction || 'video',
+      linkUrl: tutorial.linkUrl || '',
     });
     setShowModal(true);
   };
@@ -150,6 +162,10 @@ const TutorialManagement = ({ navigation }) => {
       thumbnail: form.thumbnail,
       order: parseInt(form.order, 10) || 0,
       isActive: form.isActive,
+      showOnHome: form.showOnHome,
+      ctaText: form.ctaText.trim() || 'CLICK HERE',
+      carouselAction: form.carouselAction,
+      linkUrl: form.linkUrl.trim(),
     };
 
     try {
@@ -225,7 +241,7 @@ const TutorialManagement = ({ navigation }) => {
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="play-circle-outline" size={64} color={COLORS.gray} />
             <Text style={styles.emptyText}>No tutorials yet</Text>
-            <Text style={styles.emptySubtext}>Add your first tutorial video</Text>
+            <Text style={styles.emptySubtext}>Upload thumbnails for the scrolling home banner</Text>
           </View>
         ) : (
           tutorials.map((tutorial) => (
@@ -327,6 +343,60 @@ const TutorialManagement = ({ navigation }) => {
                 )}
               </View>
 
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Button text on banner (e.g. CLICK HERE)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={form.ctaText}
+                  onChangeText={(text) => setForm(prev => ({ ...prev, ctaText: text }))}
+                  placeholder="CLICK HERE"
+                  placeholderTextColor={COLORS.gray}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>On tap action</Text>
+                <View style={styles.actionRow}>
+                  {[
+                    { key: 'video', label: 'Open tutorial' },
+                    { key: 'wallet', label: 'Go to wallet' },
+                    { key: 'link', label: 'Open link' },
+                  ].map((opt) => (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.actionChip,
+                        form.carouselAction === opt.key && styles.actionChipActive,
+                      ]}
+                      onPress={() => setForm(prev => ({ ...prev, carouselAction: opt.key }))}
+                    >
+                      <Text
+                        style={[
+                          styles.actionChipText,
+                          form.carouselAction === opt.key && styles.actionChipTextActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {form.carouselAction === 'link' && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>External link URL</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.linkUrl}
+                    onChangeText={(text) => setForm(prev => ({ ...prev, linkUrl: text }))}
+                    placeholder="https://..."
+                    placeholderTextColor={COLORS.gray}
+                    autoCapitalize="none"
+                  />
+                </View>
+              )}
+
               <View style={styles.formRow}>
                 <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
                   <Text style={styles.label}>Order</Text>
@@ -349,6 +419,21 @@ const TutorialManagement = ({ navigation }) => {
                       thumbColor={form.isActive ? COLORS.white : COLORS.gray}
                     />
                   </View>
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Show on home scrolling banner</Text>
+                <View style={styles.switchRow}>
+                  <Switch
+                    value={form.showOnHome}
+                    onValueChange={(value) => setForm(prev => ({ ...prev, showOnHome: value }))}
+                    trackColor={{ false: COLORS.darkGray, true: '#00B368' }}
+                    thumbColor={form.showOnHome ? COLORS.white : COLORS.gray}
+                  />
+                  <Text style={styles.switchHint}>
+                    {form.showOnHome ? 'Visible in carousel' : 'Hidden from home'}
+                  </Text>
                 </View>
               </View>
 
@@ -552,8 +637,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   switchRow: {
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingTop: 6,
+  },
+  switchHint: {
+    color: COLORS.gray,
+    fontSize: 12,
+    flex: 1,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  actionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    backgroundColor: COLORS.darkGray,
+  },
+  actionChipActive: {
+    borderColor: COLORS.accent,
+    backgroundColor: `${COLORS.accent}30`,
+  },
+  actionChipText: {
+    color: COLORS.gray,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  actionChipTextActive: {
+    color: COLORS.white,
   },
   modalActions: {
     flexDirection: 'row',

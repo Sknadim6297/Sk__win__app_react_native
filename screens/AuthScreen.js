@@ -1,28 +1,36 @@
-import React, { useState, useContext, useRef, useEffect } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Animated,
-  Dimensions,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import { AuthContext } from '../context/AuthContext';
-import { COLORS } from '../styles/theme';
-import SKWinLogo from '../components/SKWinLogo';
+import { COLORS, TYPO, FONTS } from '../styles/theme';
 import Toast from '../components/Toast';
+import AuthBackground from '../components/auth/AuthBackground';
+import AuthTextField from '../components/auth/AuthTextField';
+import PrimaryButton from '../components/auth/PrimaryButton';
+import GoogleLoginButton from '../components/auth/GoogleLoginButton';
+import OrDivider from '../components/auth/OrDivider';
 
-const { width, height } = Dimensions.get('window');
-
-const AuthScreen = ({ navigation }) => {
+export default function AuthScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const { login, register } = useContext(AuthContext);
-  const [isLogin, setIsLogin] = useState(true);
+  const initialLogin = route.params?.mode !== 'register';
+  const [isLogin, setIsLogin] = useState(initialLogin);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,51 +38,53 @@ const AuthScreen = ({ navigation }) => {
   const [referralCode, setReferralCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
-  
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const [submitting, setSubmitting] = useState(false);
+
+  const screenOpacity = useSharedValue(0);
+  const contentY = useSharedValue(24);
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+    screenOpacity.value = withTiming(1, { duration: 550, easing: Easing.out(Easing.cubic) });
+    contentY.value = withDelay(60, withTiming(0, { duration: 500, easing: Easing.out(Easing.cubic) }));
+  }, [contentY, screenOpacity]);
 
-  const showToast = (message, type = 'error') => {
-    setToast({ visible: true, message, type });
-  };
+  useEffect(() => {
+    if (route.params?.mode === 'register') setIsLogin(false);
+    else if (route.params?.mode === 'login') setIsLogin(true);
+  }, [route.params?.mode]);
 
-  const hideToast = () => {
-    setToast({ visible: false, message: '', type: 'error' });
-  };
+  const animatedContent = useAnimatedStyle(() => ({
+    opacity: screenOpacity.value,
+    transform: [{ translateY: contentY.value }],
+  }));
+
+  const showToast = (message, type = 'error') => setToast({ visible: true, message, type });
+  const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
 
   const handleAuth = async () => {
+    if (submitting) return;
+
     if (isLogin) {
       if (!email || !password) {
         showToast('Please enter email and password', 'warning');
         return;
       }
-
       if (!email.includes('@')) {
         showToast('Please enter a valid email', 'warning');
         return;
       }
-      
+      setSubmitting(true);
       const result = await login(email, password);
+      setSubmitting(false);
       if (result.success) {
-        showToast('Welcome back!', 'success');
-        setTimeout(() => {
-          navigation.replace(result.user?.role === 'admin' ? 'AdminDashboard' : 'MainApp');
-        }, 500);
+        const isAdminUser = result.user?.role === 'admin' || result.role === 'admin';
+        if (__DEV__) {
+          console.log('[AuthScreen] login success', {
+            role: result.user?.role,
+            isAdmin: isAdminUser,
+          });
+        }
+        showToast(isAdminUser ? 'Welcome, Admin!' : 'Welcome back!', 'success');
       } else {
         showToast(result.error || 'Invalid credentials', 'error');
       }
@@ -83,38 +93,36 @@ const AuthScreen = ({ navigation }) => {
         showToast('Please fill all fields', 'warning');
         return;
       }
-
       if (username.length < 3) {
         showToast('Username must be at least 3 characters', 'warning');
         return;
       }
-
       if (!email.includes('@')) {
         showToast('Please enter a valid email', 'warning');
         return;
       }
-
       if (password.length < 6) {
         showToast('Password must be at least 6 characters', 'warning');
         return;
       }
-
       if (password !== confirmPassword) {
         showToast('Passwords do not match', 'warning');
         return;
       }
-
+      setSubmitting(true);
       const result = await register(username, email, password, referralCode);
+      setSubmitting(false);
       if (result.success) {
-        const referralText = result.referralApplied ? ' Referral applied successfully.' : '';
-        showToast(`Registration successful. Please login to continue.${referralText}`, 'success');
-        setTimeout(() => {
+        const referralText = result.referralApplied ? ' Referral bonus applied.' : '';
+        if (result.autoLogin) {
+          showToast(`Account created!${referralText}`, 'success');
+        } else {
+          showToast(`Registration successful.${referralText} Please login.`, 'success');
           setIsLogin(true);
-          setUsername('');
           setPassword('');
           setConfirmPassword('');
           setReferralCode('');
-        }, 600);
+        }
       } else {
         showToast(result.error || 'Registration failed', 'error');
       }
@@ -130,255 +138,158 @@ const AuthScreen = ({ navigation }) => {
     setReferralCode('');
   };
 
+  const handleGoogleLogin = () => showToast('Google sign-in coming soon', 'warning');
+  const handleForgotPassword = () => showToast('Password reset coming soon', 'warning');
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
-      
-      <Toast
-        visible={toast.visible}
-        message={toast.message}
-        type={toast.type}
-        onHide={hideToast}
-      />
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.backgroundDark} />
+      <AuthBackground />
+
+      <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hideToast} />
 
       <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingTop: insets.top + 28, paddingBottom: insets.bottom + 28 },
+          ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View
-            style={[
-              styles.content,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            {/* Logo */}
-            <View style={styles.logoContainer}>
-              <SKWinLogo size={width * 0.39} />
-            </View>
+          <Animated.View style={[styles.content, animatedContent]}>
+            <Text style={styles.welcomeLine}>Welcome to,</Text>
+            <Text style={styles.title}>{isLogin ? 'Login' : 'Sign Up'}</Text>
 
-            {/* Title */}
-            <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Create Account'}</Text>
-            <Text style={styles.subtitle}>
-              {isLogin ? 'Login to continue your journey' : 'Join the ultimate gaming platform'}
-            </Text>
+            {!isLogin && (
+              <AuthTextField
+                icon="account-outline"
+                placeholder="Username"
+                value={username}
+                onChangeText={setUsername}
+              />
+            )}
 
-            {/* Form */}
-            <View style={styles.form}>
-              {!isLogin && (
-                <View style={styles.inputGroup}>
-                  <View style={styles.inputContainer}>
-                    <MaterialCommunityIcons name="account" size={20} color={COLORS.gray} />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Username"
-                      placeholderTextColor={COLORS.gray}
-                      value={username}
-                      onChangeText={setUsername}
-                      autoCapitalize="none"
-                    />
-                  </View>
-                </View>
-              )}
+            <AuthTextField
+              icon="at"
+              placeholder="Email/Mobile No/Username"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+            />
 
-              {!isLogin && (
-                <View style={styles.inputGroup}>
-                  <View style={styles.inputContainer}>
-                    <MaterialCommunityIcons name="gift-outline" size={20} color={COLORS.gray} />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Referral Code (Optional)"
-                      placeholderTextColor={COLORS.gray}
-                      value={referralCode}
-                      onChangeText={setReferralCode}
-                      autoCapitalize="characters"
-                    />
-                  </View>
-                </View>
-              )}
+            <AuthTextField
+              icon="lock-outline"
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              rightLabel={showPassword ? 'Hide' : 'Show'}
+              onRightPress={() => setShowPassword(!showPassword)}
+            />
 
-              <View style={styles.inputGroup}>
-                <View style={styles.inputContainer}>
-                  <MaterialCommunityIcons name="email" size={20} color={COLORS.gray} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    placeholderTextColor={COLORS.gray}
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <View style={styles.inputContainer}>
-                  <MaterialCommunityIcons name="lock" size={20} color={COLORS.gray} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Password"
-                    placeholderTextColor={COLORS.gray}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                    <MaterialCommunityIcons 
-                      name={showPassword ? 'eye-off' : 'eye'} 
-                      size={20} 
-                      color={COLORS.gray} 
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {!isLogin && (
-                <View style={styles.inputGroup}>
-                  <View style={styles.inputContainer}>
-                    <MaterialCommunityIcons name="lock-check" size={20} color={COLORS.gray} />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Confirm Password"
-                      placeholderTextColor={COLORS.gray}
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      secureTextEntry={!showPassword}
-                      autoCapitalize="none"
-                    />
-                  </View>
-                </View>
-              )}
-
-              {/* Auth Button */}
-              <TouchableOpacity
-                style={styles.authButton}
-                onPress={handleAuth}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.authButtonText}>
-                  {isLogin ? 'Login' : 'Sign Up'}
-                </Text>
-                <MaterialCommunityIcons 
-                  name={isLogin ? 'login' : 'account-plus'} 
-                  size={20} 
-                  color={COLORS.black} 
+            {!isLogin && (
+              <>
+                <AuthTextField
+                  icon="lock-check-outline"
+                  placeholder="Confirm Password"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showPassword}
                 />
-              </TouchableOpacity>
+                <AuthTextField
+                  icon="gift-outline"
+                  placeholder="Promo Code (Optional)"
+                  value={referralCode}
+                  onChangeText={setReferralCode}
+                  autoCapitalize="characters"
+                />
+              </>
+            )}
 
-              {/* Switch Mode */}
-              <TouchableOpacity
-                style={styles.switchButton}
-                onPress={toggleAuthMode}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.switchText}>
-                  {isLogin ? "Don't have an account? " : 'Already have an account? '}
-                  <Text style={styles.switchTextBold}>
-                    {isLogin ? 'Sign Up' : 'Login'}
-                  </Text>
-                </Text>
+            {isLogin && (
+              <TouchableOpacity style={styles.forgotWrap} onPress={handleForgotPassword}>
+                <Text style={styles.forgotText}>Forgot Password?</Text>
               </TouchableOpacity>
-            </View>
+            )}
+
+            <PrimaryButton
+              label={submitting ? 'PLEASE WAIT...' : isLogin ? 'LOGIN' : 'SIGN UP'}
+              onPress={handleAuth}
+              disabled={submitting}
+            />
+
+            <OrDivider label={isLogin ? 'or Login' : 'or SignUp'} />
+            <GoogleLoginButton onPress={handleGoogleLogin} />
+
+            <TouchableOpacity style={styles.switchRow} onPress={toggleAuthMode} activeOpacity={0.8}>
+              <Text style={styles.switchMuted}>
+                {isLogin ? "Don't have an account? " : 'Already have an account? '}
+              </Text>
+              <Text style={styles.switchBold}>{isLogin ? 'Sign Up' : 'LOGIN'}</Text>
+            </TouchableOpacity>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
   );
-};
+}
+
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.backgroundDark,
   },
-  keyboardView: {
+  flex: {
     flex: 1,
   },
-  scrollContent: {
+  scroll: {
     flexGrow: 1,
-    paddingVertical: height * 0.06,
-    paddingHorizontal: 24,
+    paddingHorizontal: 26,
   },
   content: {
-    alignItems: 'center',
     width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
   },
-  logoContainer: {
-    marginBottom: height * 0.03,
+  welcomeLine: {
+    ...TYPO.h3,
+    color: COLORS.white,
+    marginBottom: 4,
   },
   title: {
-    fontSize: width * 0.08,
-    fontWeight: '700',
+    ...TYPO.display,
     color: COLORS.white,
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: 28,
   },
-  subtitle: {
-    fontSize: width * 0.038,
-    color: COLORS.gray,
-    marginBottom: height * 0.04,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  form: {
-    width: '100%',
-    maxWidth: 400,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
-    paddingHorizontal: 16,
+  forgotWrap: {
+    alignSelf: 'flex-end',
+    marginTop: -6,
+    marginBottom: 4,
     paddingVertical: 4,
-    gap: 12,
   },
-  input: {
-    flex: 1,
-    fontSize: width * 0.04,
+  forgotText: {
+    ...TYPO.label,
     color: COLORS.white,
-    paddingVertical: 14,
   },
-  authButton: {
-    backgroundColor: COLORS.accent,
-    borderRadius: 12,
-    paddingVertical: 16,
+  switchRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 24,
+    flexWrap: 'wrap',
+    marginTop: 28,
+    paddingVertical: 8,
   },
-  authButtonText: {
-    fontSize: width * 0.042,
-    fontWeight: '700',
-    color: COLORS.black,
-    letterSpacing: 0.5,
-  },
-  switchButton: {
-    marginTop: 24,
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  switchText: {
-    fontSize: width * 0.036,
+  switchMuted: {
+    ...TYPO.body,
     color: COLORS.gray,
   },
-  switchTextBold: {
-    color: COLORS.accent,
-    fontWeight: '700',
+  switchBold: {
+    ...TYPO.bodyMedium,
+    fontFamily: FONTS.bold,
+    color: COLORS.primary,
   },
 });
-
-export default AuthScreen;

@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../styles/theme';
+import { BRAND } from '../constants/branding';
 
 const AboutUsScreen = ({ navigation }) => {
   return (
@@ -26,10 +27,10 @@ const AboutUsScreen = ({ navigation }) => {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
-          <Text style={styles.title}>SK Win</Text>
+          <Text style={styles.title}>{BRAND.fullName}</Text>
 
           <Text style={styles.text}>
-            SK Win is a competitive gaming platform where players can join exciting tournaments and compete with others to win real rewards.
+            {BRAND.fullName} is a competitive Free Fire gaming platform where players join exciting tournaments and compete with others to win real rewards.
           </Text>
 
           <Text style={styles.text}>

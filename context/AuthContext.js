@@ -1,68 +1,101 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import { getApiUrl } from '../utils/apiConfig';
 
 export const AuthContext = createContext();
 
-const getApiUrl = () => {
-  // Explicit override from app.json extra
-  const extra =
-    Constants.expoConfig?.extra?.apiUrl ||
-    Constants.manifest?.extra?.apiUrl;
-  if (extra) return extra;
-
-  // Web: derive from browser location
-  if (typeof window !== 'undefined' && window.location?.hostname) {
-    const host = window.location.hostname;
-    return `http://${host === '127.0.0.1' ? 'localhost' : host}:5000/api`;
+async function parseJsonResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Server returned an invalid response. Is the backend running?');
   }
+}
 
-  // iOS/Android in Expo dev: use the Expo dev server host IP
-  const hostUri = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost;
-  if (hostUri) {
-    const host = hostUri.split(':')[0];
-    return `http://${host}:5000/api`;
-  }
+async function persistSession(data) {
+  const userRole = data.user?.role || 'user';
+  await AsyncStorage.setItem('token', data.token);
+  await AsyncStorage.setItem('user', JSON.stringify(data.user));
+  await AsyncStorage.setItem('userRole', userRole);
+  return userRole;
+}
 
-  return 'http://localhost:5000/api';
-};
-
-const API_URL = getApiUrl();
+async function clearStoredSession() {
+  await AsyncStorage.multiRemove(['token', 'user', 'userRole']);
+}
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  const [role, setRole] = useState(null); // Track role separately for persistence
+  const [role, setRole] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user is already logged in on app start
   useEffect(() => {
     checkAuthStatus();
   }, []);
+
+  const resetSessionState = () => {
+    setUser(null);
+    setToken(null);
+    setRole(null);
+    setIsAuthenticated(false);
+  };
 
   const checkAuthStatus = async () => {
     try {
       const savedToken = await AsyncStorage.getItem('token');
       const savedUser = await AsyncStorage.getItem('user');
-      const savedRole = await AsyncStorage.getItem('userRole'); // Restore role from storage
-      
-      if (savedToken && savedUser) {
-        setToken(savedToken);
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
-        
-        // Restore role from storage or from user object
-        const restoredRole = savedRole || parsedUser.role || 'user';
-        setRole(restoredRole);
-        setIsAuthenticated(true);
-        console.log(`Auth status restored - Role: ${restoredRole}, User: ${parsedUser.username}`);
+      const savedRole = await AsyncStorage.getItem('userRole');
+
+      if (!savedToken || !savedUser) {
+        return;
       }
+
+      const apiUrl = getApiUrl();
+      const profileRes = await fetch(`${apiUrl}/users/profile`, {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      });
+
+      if (!profileRes.ok) {
+        if (__DEV__) {
+          console.log('[Auth] Stored session invalid — clearing (DB reset or user deleted)');
+        }
+        await clearStoredSession();
+        resetSessionState();
+        return;
+      }
+
+      const profile = await parseJsonResponse(profileRes);
+      const parsedUser = JSON.parse(savedUser);
+      const mergedUser = { ...parsedUser, ...profile, role: profile.role || parsedUser.role };
+      const restoredRole = profile.role || savedRole || mergedUser.role || 'user';
+
+      await AsyncStorage.setItem('user', JSON.stringify(mergedUser));
+      await AsyncStorage.setItem('userRole', restoredRole);
+
+      setToken(savedToken);
+      setUser(mergedUser);
+      setRole(restoredRole);
+      setIsAuthenticated(true);
     } catch (error) {
       console.error('Error checking auth status:', error);
+      await clearStoredSession().catch(() => {});
+      resetSessionState();
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const applySession = (data) => {
+    const userRole = data.user?.role || 'user';
+    setToken(data.token);
+    setUser(data.user);
+    setRole(userRole);
+    setIsAuthenticated(true);
+    return userRole;
   };
 
   const updateUser = async (userData) => {
@@ -78,90 +111,117 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password) => {
+    const apiUrl = getApiUrl();
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
 
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
 
       if (!response.ok) {
-        return { success: false, error: data.error };
+        return {
+          success: false,
+          error: data.error || data.message || 'Login failed',
+          status: response.status,
+        };
       }
 
-      const userRole = data.user.role || 'user';
-      
-      // Store token, user, and role persistently
-      await AsyncStorage.setItem('token', data.token);
-      await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      await AsyncStorage.setItem('userRole', userRole); // Persist role explicitly
-      
-      setToken(data.token);
-      setUser(data.user);
-      setRole(userRole); // Set role in state
-      setIsAuthenticated(true);
+      if (!data.token || !data.user) {
+        return { success: false, error: 'Invalid server response' };
+      }
 
-      console.log(`Login successful - Role: ${userRole}, Email: ${email}`);
-      return { success: true, user: data.user };
+      const userRole = data.user?.role || 'user';
+      await persistSession(data);
+      applySession(data);
+
+      if (__DEV__) {
+        console.log('[Auth] Login OK', {
+          email: data.user?.email,
+          role: userRole,
+          api: apiUrl,
+          hasToken: Boolean(data.token),
+        });
+      }
+
+      return { success: true, user: data.user, role: userRole };
     } catch (error) {
       console.error('Login error:', error);
-      return { success: false, error: 'Login failed' };
+      const message =
+        error.message?.includes('Network request failed') ||
+        error.message?.includes('Failed to fetch')
+          ? `Cannot reach server at ${apiUrl}. Start backend (npm run dev in /backend) and use the same Wi‑Fi.`
+          : error.message || 'Login failed';
+      return { success: false, error: message };
     }
   };
 
   const register = async (username, email, password, referralCode = '') => {
+    const apiUrl = getApiUrl();
     try {
-      const response = await fetch(`${API_URL}/auth/register`, {
+      const response = await fetch(`${apiUrl}/auth/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          username, 
-          email, 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: username.trim(),
+          email: email.trim().toLowerCase(),
           password,
           confirmPassword: password,
-          referralCode,
+          referralCode: referralCode.trim(),
         }),
       });
 
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
 
       if (!response.ok) {
-        return { success: false, error: data.error };
+        return {
+          success: false,
+          error: data.error || data.message || 'Registration failed',
+          status: response.status,
+        };
       }
 
-      // Registration now requires explicit login after signup.
-      return { success: true, user: data.user, referralApplied: Boolean(data.referralApplied) };
+      if (data.token && data.user) {
+        const userRole = await persistSession(data);
+        applySession(data);
+        return {
+          success: true,
+          user: data.user,
+          referralApplied: Boolean(data.referralApplied),
+          autoLogin: true,
+        };
+      }
+
+      return {
+        success: true,
+        user: data.user,
+        referralApplied: Boolean(data.referralApplied),
+        autoLogin: false,
+      };
     } catch (error) {
       console.error('Registration error:', error);
-      return { success: false, error: 'Registration failed' };
+      const message =
+        error.message?.includes('Network request failed') ||
+        error.message?.includes('Failed to fetch')
+          ? `Cannot reach server at ${apiUrl}. Start backend and check your network.`
+          : error.message || 'Registration failed';
+      return { success: false, error: message };
     }
   };
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('token');
-      await AsyncStorage.removeItem('user');
-      await AsyncStorage.removeItem('userRole'); // Clear role on logout
-      setUser(null);
-      setToken(null);
-      setRole(null); // Clear role from state
-      setIsAuthenticated(false);
-      console.log('Logout successful');
+      await clearStoredSession();
+      resetSessionState();
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
 
   const getAuthToken = () => token;
-
-  // Helper function to check if user is admin
-  const isAdmin = () => role === 'admin';
+  const isAdmin = () => role === 'admin' || user?.role === 'admin';
 
   return (
     <AuthContext.Provider
@@ -176,7 +236,8 @@ export const AuthProvider = ({ children }) => {
         logout,
         getAuthToken,
         updateUser,
-        isAdmin, // Expose admin check function
+        isAdmin,
+        getApiUrl,
       }}
     >
       {children}

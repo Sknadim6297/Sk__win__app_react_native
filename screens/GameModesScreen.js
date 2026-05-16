@@ -1,363 +1,277 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  ScrollView,
-  Image,
+  FlatList,
+  ImageBackground,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import { COLORS } from '../styles/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { gameService } from '../services/api';
+import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 
-const GameModesScreen = ({ navigation, route }) => {
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const GRID_PADDING = 12;
+const GRID_GAP = 10;
+const NUM_COLUMNS = 3;
+const CARD_WIDTH =
+  (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+const CARD_HEIGHT = CARD_WIDTH * 1.22;
+
+const DEFAULT_IMAGE = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
+const ALT_IMAGE = require('../assets/images/87904deacf9b547a95f019e0a322152a.jpg');
+
+const FALLBACK_MODES = [
+  { id: '1', name: 'FF SURVIVAL', liveCount: 6 },
+  { id: '2', name: 'FF FULL MAP', liveCount: 45 },
+  { id: '3', name: 'FF FULL MAP 2', liveCount: 51 },
+  { id: '4', name: 'LONE WOLF', liveCount: 12 },
+  { id: '5', name: 'LW HEADSHOT', liveCount: 8 },
+  { id: '6', name: 'LW LOSS TO WIN', liveCount: 22 },
+  { id: '7', name: 'FF CS-NEW', liveCount: 15 },
+  { id: '8', name: 'ONE TAP CS', liveCount: 9 },
+  { id: '9', name: 'GIVEAWAYS', liveCount: 3 },
+];
+
+function hashCount(seed) {
+  const s = String(seed || '');
+  let n = 0;
+  for (let i = 0; i < s.length; i += 1) n += s.charCodeAt(i);
+  return (n % 90) + 1;
+}
+
+const mapMode = (mode, index) => {
+  const id = mode._id || mode.id || String(index);
+  const imageUri =
+    mode.image && typeof mode.image === 'string' ? resolveMediaUrl(mode.image) : null;
+
+  return {
+    id,
+    name: (mode.name || 'GAME MODE').toUpperCase(),
+    description: mode.description,
+    liveCount: mode.liveCount ?? mode.activeTournaments ?? hashCount(id),
+    image: imageUri ? { uri: imageUri } : index % 2 === 0 ? DEFAULT_IMAGE : ALT_IMAGE,
+  };
+};
+
+function GameModeCard({ item, onPress }) {
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.88}
+      onPress={() => onPress(item)}
+    >
+      <ImageBackground source={item.image} style={styles.cardImage} resizeMode="cover">
+        <View style={styles.liveBadge}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveCount}>{item.liveCount}</Text>
+        </View>
+        <View style={styles.titleBar}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {item.name}
+          </Text>
+        </View>
+      </ImageBackground>
+    </TouchableOpacity>
+  );
+}
+
+export default function GameModesScreen({ navigation, route }) {
   const gameId = route?.params?.gameId;
   const [gameModes, setGameModes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [game, setGame] = useState(null);
 
-  const defaultModes = [
-    {
-      id: 1,
-      name: 'FF Full Match',
-      description: 'Play the classic Free Fire battle royale mode with up to 50 players',
-      icon: 'fire',
-      players: '50 players',
-      duration: '10-20 mins',
-      color: '#FF6B6B',
-      backgroundColor: 'rgba(255, 107, 107, 0.1)',
-      joinText: 'Join Now',
-      image: require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg'),
-    },
-    {
-      id: 2,
-      name: 'Only Headshot',
-      description: 'Prove your aiming skills! Only headshots count, one hit K/O',
-      icon: 'target',
-      players: '32 players',
-      duration: '5-8 mins',
-      color: '#FFD700',
-      backgroundColor: 'rgba(255, 215, 0, 0.1)',
-      joinText: 'Join Now',
-      image: require('../assets/images/87904deacf9b547a95f019e0a322152a.jpg'),
-    },
-    {
-      id: 3,
-      name: 'Clash Squad',
-      description: 'Competitive squad-based mode with intense team battles',
-      icon: 'sword',
-      players: '4v4',
-      duration: '8-12 mins',
-      color: '#4CAF50',
-      backgroundColor: 'rgba(76, 175, 80, 0.1)',
-      joinText: 'Join Now',
-      image: require('../assets/images/87904deacf9b547a95f019e0a322152a77.jpg'),
-    },
-    {
-      id: 4,
-      name: 'Power Squad',
-      description: 'Fast-paced squad battles with special power-ups and abilities',
-      icon: 'lightning-bolt',
-      players: '4v4',
-      duration: '6-10 mins',
-      color: '#00BCD4',
-      backgroundColor: 'rgba(0, 188, 212, 0.1)',
-      joinText: 'Join Now',
-      image: require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg'),
-    },
-  ];
+  const loadGameModes = useCallback(async () => {
+    if (!gameId) {
+      setGameModes(FALLBACK_MODES.map((m, i) => mapMode(m, i)));
+      setLoading(false);
+      return;
+    }
 
-  useEffect(() => {
-    if (gameId) {
-      loadGameModes();
-    } else {
-      // If no gameId provided, use defaults
-      setGameModes(defaultModes);
+    try {
+      setLoading(true);
+      const modesData = await gameService.getGameModes(gameId).catch(() => []);
+
+      if (Array.isArray(modesData) && modesData.length > 0) {
+        setGameModes(modesData.map(mapMode));
+      } else {
+        setGameModes(FALLBACK_MODES.map((m, i) => mapMode(m, i)));
+      }
+    } catch (error) {
+      console.error('Failed to load game modes:', error);
+      setGameModes(FALLBACK_MODES.map((m, i) => mapMode(m, i)));
+    } finally {
       setLoading(false);
     }
   }, [gameId]);
 
-  const loadGameModes = async () => {
-    try {
-      setLoading(true);
-      const [gameData, modesData] = await Promise.all([
-        gameService.getGameDetails(gameId).catch(() => null),
-        gameService.getGameModes(gameId).catch(() => []),
-      ]);
+  useEffect(() => {
+    loadGameModes();
+  }, [loadGameModes]);
 
-      setGame(gameData);
-      
-      if (Array.isArray(modesData) && modesData.length > 0) {
-        // Map API data to display format
-        const modes = modesData.map((mode, index) => ({
-          id: mode._id || index,
-          name: mode.name,
-          description: mode.description || 'Join this game mode to play',
-          icon: 'gamepad-variant',
-          players: '32+ players',
-          duration: '5-20 mins',
-          color: ['#FF6B6B', '#FFD700', '#4CAF50', '#00BCD4'][index % 4],
-          backgroundColor: ['rgba(255, 107, 107, 0.1)', 'rgba(255, 215, 0, 0.1)', 'rgba(76, 175, 80, 0.1)', 'rgba(0, 188, 212, 0.1)'][index % 4],
-          joinText: 'Join Now',
-          image: mode.image || require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg'),
-        }));
-        setGameModes(modes);
-      } else {
-        setGameModes(defaultModes);
-      }
-    } catch (error) {
-      console.error('Failed to load game modes:', error);
-      setGameModes(defaultModes);
-    } finally {
-      setLoading(false);
-    }
+  const handleModePress = (mode) => {
+    navigation.navigate('GameDetails', { gameMode: mode, gameId });
   };
+
+  const columnWrapperStyle = useMemo(
+    () => ({ gap: GRID_GAP, marginBottom: GRID_GAP }),
+    []
+  );
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
-          <Text style={styles.loadingText}>Loading game modes...</Text>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StatusBar barStyle="light-content" backgroundColor="#0a0e17" />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Game List</Text>
+          <View style={styles.backBtn} />
+        </View>
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading games...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
-      
-      {/* Header */}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor="#0a0e17" />
+
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.8}>
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{game?.name || 'Game'}</Text>
-          <Text style={styles.headerSubtitle}>Choose Your Game Mode</Text>
-        </View>
-        <View style={styles.headerSpacer} />
+        <Text style={styles.headerTitle}>Game List</Text>
+        <View style={styles.backBtn} />
       </View>
 
-      <ScrollView 
-        style={styles.scrollView}
+      <View style={styles.headerLine} />
+
+      <FlatList
+        data={gameModes}
+        keyExtractor={(item) => String(item.id)}
+        numColumns={NUM_COLUMNS}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Info Card */}
-        <View style={styles.infoCard}>
-          <MaterialCommunityIcons name="information-outline" size={20} color={COLORS.accent} />
-          <Text style={styles.infoText}>Select a game mode to join and start playing!</Text>
-        </View>
-
-        {/* Game Modes Grid */}
-        <View style={styles.gameModeGrid}>
-          {gameModes.map((mode) => (
-            <TouchableOpacity 
-              key={mode.id} 
-              style={[styles.gameModeBox, { borderTopColor: mode.color }]}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('GameDetails', { gameMode: mode })}
-            >
-              <View 
-                style={[
-                  styles.modeBoxIconContainer,
-                  { backgroundColor: mode.backgroundColor }
-                ]}
-              >
-                <Image
-                  source={typeof mode.image === 'string' ? { uri: mode.image } : mode.image}
-                  style={styles.modeBoxIcon}
-                  resizeMode="cover"
-                />
-              </View>
-              
-              <Text style={styles.modeBoxName}>{mode.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Ready to compete?</Text>
-          <Text style={styles.footerSubtext}>Good luck and have fun!</Text>
-        </View>
-      </ScrollView>
+        contentContainerStyle={styles.gridContent}
+        columnWrapperStyle={columnWrapperStyle}
+        renderItem={({ item }) => (
+          <GameModeCard item={item} onPress={handleModePress} />
+        )}
+      />
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#0a0e17',
   },
-  loadingContainer: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    ...TEXT.h3,
+    fontFamily: FONTS.semiBold,
+    color: COLORS.white,
+    letterSpacing: 0.3,
+  },
+  headerLine: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    marginHorizontal: GRID_PADDING,
+  },
+  loadingWrap: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: COLORS.white,
     marginTop: 12,
-    fontSize: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: COLORS.darkGray,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  headerSubtitle: {
-    fontSize: 12,
+    ...TEXT.body,
     color: COLORS.gray,
-    marginTop: 2,
   },
-  headerSpacer: {
-    width: 40,
+  gridContent: {
+    paddingHorizontal: GRID_PADDING,
+    paddingTop: 14,
+    paddingBottom: 28,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingBottom: 30,
-  },
-  infoCard: {
-    backgroundColor: COLORS.lightGray,
+  card: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-  },
-  infoText: {
-    color: COLORS.white,
-    fontSize: 12,
-    marginLeft: 10,
-    flex: 1,
-  },
-  gameModeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  gameModeBox: {
-    width: '48%',
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-    borderTopWidth: 4,
-    alignItems: 'center',
-  },
-  modeBoxIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
     overflow: 'hidden',
+    backgroundColor: '#12162B',
   },
-  modeBoxIcon: {
+  cardImage: {
     width: '100%',
     height: '100%',
+    justifyContent: 'space-between',
   },
-  modeBoxName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  modeBoxDescription: {
-    fontSize: 10,
-    color: COLORS.gray,
-    textAlign: 'center',
-    marginBottom: 10,
-    lineHeight: 14,
-  },
-  modeBoxDetails: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 10,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  boxDetailBadge: {
+  liveBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    gap: 4,
+    zIndex: 2,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
     borderRadius: 4,
-    gap: 3,
+    backgroundColor: '#22C55E',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
   },
-  boxDetailText: {
+  liveCount: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
     color: COLORS.white,
-    fontSize: 9,
-    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  boxJoinButton: {
-    width: '100%',
+  titleBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.62)',
     paddingVertical: 8,
-    borderRadius: 6,
+    paddingHorizontal: 4,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
   },
-  boxJoinButtonText: {
+  cardTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    lineHeight: 14,
     color: COLORS.white,
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: 20,
-    paddingVertical: 20,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.darkGray,
-  },
-  footerText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  footerSubtext: {
-    color: COLORS.gray,
-    fontSize: 12,
-    marginTop: 4,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
 });
-
-export default GameModesScreen;

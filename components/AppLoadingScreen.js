@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { COLORS, FONTS } from '../styles/theme';
+import { BRAND } from '../constants/branding';
 import SKWinLogo from './SKWinLogo';
 
 const AppLoadingScreen = ({
-  title = 'SK WIN',
+  title = BRAND.name.toUpperCase(),
   subtitle = 'Loading battleground...'
 }) => {
   const progress = useRef(new Animated.Value(0)).current;
@@ -71,7 +72,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: COLORS.white,
     fontSize: 28,
-    fontFamily: FONTS.black,
+    fontFamily: FONTS.display,
     letterSpacing: 2,
   },
   subtitle: {
@@ -79,8 +80,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     color: COLORS.gray,
     fontSize: 13,
-    fontFamily: FONTS.medium,
-    letterSpacing: 0.8,
+    fontFamily: FONTS.regular,
+    letterSpacing: 0.3,
   },
   progressTrack: {
     width: 240,

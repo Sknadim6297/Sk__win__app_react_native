@@ -3,8 +3,21 @@ const User = require('../models/User');
 const WalletTransaction = require('../models/WalletTransaction');
 const TournamentParticipant = require('../models/TournamentParticipant');
 const Tournament = require('../models/Tournament');
+const CoinPack = require('../models/CoinPack');
+const HomeConfig = require('../models/HomeConfig');
 const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
+
+const requireAdmin = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+    next();
+  } catch (error) {
+    res.status(500).json({ error: 'Authorization failed' });
+  }
+};
 
 // Get all users (admin only)
 router.get('/all', authMiddleware, async (req, res) => {
@@ -60,6 +73,46 @@ router.get('/stats', authMiddleware, async (req, res) => {
     console.error('Error fetching statistics:', error);
     console.error('Stack trace:', error.stack);
     res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// Get wallet transactions across the platform (admin only)
+router.get('/transactions', authMiddleware, async (req, res) => {
+  try {
+    const admin = await User.findById(req.userId);
+    if (!admin) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (admin.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { type, status, limit = 100 } = req.query;
+    const query = {};
+
+    if (type) {
+      query.type = type;
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+
+    const transactions = await WalletTransaction.find(query)
+      .populate('userId', 'username email name')
+      .sort({ createdAt: -1 })
+      .limit(parsedLimit)
+      .lean();
+
+    res.json({
+      transactions,
+      count: transactions.length,
+    });
+  } catch (error) {
+    console.error('Error fetching admin transactions:', error);
+    res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 });
 
@@ -317,6 +370,73 @@ router.post('/tournaments/:tournamentId/complete', authMiddleware, async (req, r
   } catch (error) {
     console.error('Error completing tournament:', error);
     res.status(500).json({ error: 'Failed to complete tournament' });
+  }
+});
+
+// --- Home & wallet app content (admin) ---
+router.get('/home-config', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    let config = await HomeConfig.findOne({ key: 'main' });
+    if (!config) {
+      config = await HomeConfig.create({
+        key: 'main',
+        latestNews: { text: '🏆 Tournaments Are Back! 🎮', isActive: true },
+        banners: [{ title: 'HOW TO ADD COINS', subtitle: 'CLICK HERE', action: 'wallet', isActive: true }],
+      });
+    }
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load home config' });
+  }
+});
+
+router.put('/home-config', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const config = await HomeConfig.findOneAndUpdate(
+      { key: 'main' },
+      { $set: req.body },
+      { new: true, upsert: true }
+    );
+    res.json({ message: 'Home config updated', config });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update home config' });
+  }
+});
+
+router.get('/coin-packs', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const packs = await CoinPack.find().sort({ sortOrder: 1 });
+    res.json(packs);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load coin packs' });
+  }
+});
+
+router.post('/coin-packs', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const pack = await CoinPack.create(req.body);
+    res.status(201).json(pack);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create coin pack' });
+  }
+});
+
+router.put('/coin-packs/:id', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const pack = await CoinPack.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!pack) return res.status(404).json({ error: 'Coin pack not found' });
+    res.json(pack);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update coin pack' });
+  }
+});
+
+router.delete('/coin-packs/:id', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    await CoinPack.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Coin pack deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete coin pack' });
   }
 });
 
