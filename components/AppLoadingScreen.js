@@ -4,10 +4,7 @@ import { COLORS, FONTS } from '../styles/theme';
 import { BRAND } from '../constants/branding';
 import SKWinLogo from './SKWinLogo';
 
-const AppLoadingScreen = ({
-  title = BRAND.name.toUpperCase(),
-  subtitle = 'Loading battleground...'
-}) => {
+const AppLoadingScreen = ({ subtitle = 'Loading...' }) => {
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -43,8 +40,7 @@ const AppLoadingScreen = ({
       <View style={styles.glowOrbBottom} />
 
       <View style={styles.content}>
-        <SKWinLogo size={132} />
-        <Text style={styles.title}>{title}</Text>
+        <SKWinLogo size={140} />
         <Text style={styles.subtitle}>{subtitle}</Text>
 
         <View style={styles.progressTrack}>
@@ -68,15 +64,8 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 24,
   },
-  title: {
-    marginTop: 12,
-    color: COLORS.white,
-    fontSize: 28,
-    fontFamily: FONTS.display,
-    letterSpacing: 2,
-  },
   subtitle: {
-    marginTop: 6,
+    marginTop: 14,
     marginBottom: 24,
     color: COLORS.gray,
     fontSize: 13,

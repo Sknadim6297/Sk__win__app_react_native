@@ -4,7 +4,7 @@
     "slug": "warzone-free-fire",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo/App_logo.png",
+    "icon": "./assets/logo/game_logo.png",
     "userInterfaceStyle": "dark",
     "extra": {
       "eas": {
@@ -12,7 +12,7 @@
       }
     },
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logo/game_logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#0a0e27"
     },
@@ -22,7 +22,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo/App_logo.png",
+        "foregroundImage": "./assets/logo/game_logo.png",
         "backgroundColor": "#0a0e27"
       },
       "package": "com.skwin.tournament"

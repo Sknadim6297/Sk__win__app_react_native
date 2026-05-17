@@ -30,10 +30,16 @@ import {
   supportService,
 } from '../services/api';
 import HomeImageSlider from '../components/home/HomeImageSlider';
+import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 
 const { width } = Dimensions.get('window');
-const FF_IMAGE = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
-const BGMI_IMAGE = require('../assets/images/87904deacf9b547a95f019e0a322152a.jpg');
+
+const CARD_GRADIENTS = [
+  ['#FF6B00', '#E55A00'],
+  ['#22C55E', '#16A34A'],
+  ['#2563EB', '#1D4ED8'],
+  ['#A855F7', '#7C3AED'],
+];
 
 const QUICK_LINKS = [
   { id: 'support', label: 'Support', icon: 'headset', route: 'SupportTickets' },
@@ -41,6 +47,8 @@ const QUICK_LINKS = [
   { id: 'telegram', label: 'Telegram', icon: 'telegram', action: 'telegram' },
   { id: 'wallet', label: 'My Wallet', icon: 'wallet', route: 'WalletTab' },
 ];
+
+const EXCLUSIVE_CARD_WIDTH = (width - 32 - 12) / 2;
 
 export default function HomeScreen({ navigation }) {
   const { user } = useContext(AuthContext);
@@ -115,28 +123,15 @@ export default function HomeScreen({ navigation }) {
   );
 
   const displayName = user?.username || user?.name || 'Player';
-  const exclusiveGames = [
-    {
-      id: popularGames[0]?._id || 'ff',
-      name: popularGames[0]?.name || 'Free Fire',
-      image: popularGames[0]?.image
-        ? typeof popularGames[0].image === 'string'
-          ? { uri: popularGames[0].image }
-          : popularGames[0].image
-        : FF_IMAGE,
-      gradient: ['#FF6B00', '#E55A00'],
-    },
-    {
-      id: popularGames[1]?._id || 'bgmi',
-      name: popularGames[1]?.name || 'BGMI',
-      image: popularGames[1]?.image
-        ? typeof popularGames[1].image === 'string'
-          ? { uri: popularGames[1].image }
-          : popularGames[1].image
-        : BGMI_IMAGE,
-      gradient: ['#22C55E', '#16A34A'],
-    },
-  ];
+
+  const exclusiveGames = popularGames
+    .filter((g) => g?.name && g?.image)
+    .map((g, index) => ({
+      id: g._id,
+      name: g.name,
+      image: { uri: resolveMediaUrl(g.image) },
+      gradient: CARD_GRADIENTS[index % CARD_GRADIENTS.length],
+    }));
 
   const handleQuickLink = (item) => {
     if (item.route) {
@@ -166,10 +161,8 @@ export default function HomeScreen({ navigation }) {
   };
 
   const openGame = (gameId) => {
-    if (gameId && gameId !== 'ff' && gameId !== 'bgmi') {
+    if (gameId) {
       navigation.navigate('GameModes', { gameId });
-    } else {
-      navigation.navigate('GameModes', { gameId: popularGames[0]?._id });
     }
   };
 
@@ -186,7 +179,11 @@ export default function HomeScreen({ navigation }) {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.profileRow}>
+          <TouchableOpacity
+            style={styles.profileRow}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('AccountTab')}
+          >
             <View style={styles.avatar}>
               <SKWinLogo size={44} rounded />
             </View>
@@ -194,13 +191,13 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.username}>{displayName}</Text>
               <Text style={styles.brandTag}>{BRAND.name}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.supportIconBtn}
               onPress={() => navigation.navigate('SupportTickets')}
             >
-              <AppIcon name="headset" size={26} light />
+              <AppIcon name="headset" size={28} light />
               {(openSupportTickets > 0 || unreadNotifications > 0) && (
                 <View style={styles.badge99}>
                   <Text style={styles.badge99Text}>
@@ -215,7 +212,7 @@ export default function HomeScreen({ navigation }) {
               style={styles.coinPill}
               onPress={() => navigation.navigate('WalletTab')}
             >
-              <AppIcon name="coins" size={24} />
+              <AppIcon name="coins" size={26} />
               <Text style={styles.coinText}>{walletBalance.toFixed(0)}</Text>
             </TouchableOpacity>
           </View>
@@ -249,42 +246,45 @@ export default function HomeScreen({ navigation }) {
               onPress={() => handleQuickLink(item)}
             >
               <View style={styles.quickIconSquircle}>
-                <AppIcon name={item.icon} size={36} light />
+                <AppIcon name={item.icon} size={40} light />
               </View>
               <Text style={styles.quickLabel}>{item.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Exclusive */}
-        <View style={styles.sectionHead}>
-          <View style={styles.sectionTitleRow}>
-            <Text style={styles.contestsTitle}>Exclusive</Text>
-            <View style={styles.liveBadge}>
-              <Text style={styles.liveText}>LIVE</Text>
-            </View>
-          </View>
-          <Text style={styles.contestsSub}>Big Winnings For ALL</Text>
-        </View>
-
-        <View style={styles.gamesRow}>
-          {exclusiveGames.map((game) => (
-            <TouchableOpacity
-              key={game.id}
-              style={styles.gameCard}
-              activeOpacity={0.9}
-              onPress={() => openGame(game.id)}
-            >
-              <Image source={game.image} style={styles.gameCardImage} resizeMode="cover" />
-              <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.gameOverlay} />
-              <View style={styles.fairPlayBadge}>
-                <AppIcon name="shield-check" size="xs" color="#4ADE80" />
-                <Text style={styles.fairPlayText}>FairPlay : ON</Text>
+        {exclusiveGames.length > 0 && (
+          <>
+            <View style={styles.sectionHead}>
+              <View style={styles.sectionTitleRow}>
+                <Text style={styles.contestsTitle}>Exclusive</Text>
+                <View style={styles.liveBadge}>
+                  <Text style={styles.liveText}>LIVE</Text>
+                </View>
               </View>
-              <Text style={styles.gameCardTitle}>{game.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              <Text style={styles.contestsSub}>Big Winnings For ALL</Text>
+            </View>
+
+            <View style={styles.gamesRow}>
+              {exclusiveGames.map((game) => (
+                <TouchableOpacity
+                  key={game.id}
+                  style={styles.gameCard}
+                  activeOpacity={0.9}
+                  onPress={() => openGame(game.id)}
+                >
+                  <Image source={game.image} style={styles.gameCardImage} resizeMode="cover" />
+                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.gameOverlay} />
+                  <View style={styles.fairPlayBadge}>
+                    <AppIcon name="shield-check" size={18} color="#4ADE80" />
+                    <Text style={styles.fairPlayText}>FairPlay : ON</Text>
+                  </View>
+                  <Text style={styles.gameCardTitle}>{game.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* My Contests */}
         <View style={styles.contestsSectionHead}>
@@ -310,7 +310,7 @@ export default function HomeScreen({ navigation }) {
               activeOpacity={0.85}
             >
               <View style={styles.contestIconWrap}>
-                <AppIcon name={item.icon} size={48} accent="00F2FF" />
+                <AppIcon name={item.icon} size={52} accent="00F2FF" />
               </View>
               <Text style={styles.contestLabel}>{item.label}</Text>
               {item.count > 0 ? (
@@ -381,7 +381,7 @@ export default function HomeScreen({ navigation }) {
                   }
                 }}
               >
-                <AppIcon name={icon.name} size={52} />
+                <AppIcon name={icon.name} size={56} />
               </TouchableOpacity>
             ))}
           </View>
@@ -550,8 +550,8 @@ const styles = StyleSheet.create({
     maxWidth: (width - 32 - 30) / 4,
   },
   quickIconSquircle: {
-    width: 68,
-    height: 68,
+    width: 72,
+    height: 72,
     borderRadius: 18,
     backgroundColor: '#5E69C1',
     alignItems: 'center',
@@ -627,12 +627,13 @@ const styles = StyleSheet.create({
   },
   gamesRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     marginBottom: 26,
   },
   gameCard: {
-    flex: 1,
-    height: width * 0.52,
+    width: EXCLUSIVE_CARD_WIDTH,
+    height: width * 0.4,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: COLORS.surfaceDark,
@@ -777,9 +778,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   socialCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
