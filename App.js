@@ -1,5 +1,5 @@
 import React, { useContext, useEffect } from 'react';
-import { View, StyleSheet, LogBox } from 'react-native';
+import { LogBox } from 'react-native';
 
 LogBox.ignoreLogs([
   "Codegen didn't run",
@@ -8,7 +8,7 @@ LogBox.ignoreLogs([
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import AppIcon from './components/ui/AppIcon';
+import CustomTabBar from './components/navigation/CustomTabBar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { LilitaOne_400Regular } from '@expo-google-fonts/lilita-one';
@@ -21,12 +21,10 @@ import TournamentScreen from './screens/TournamentScreen';
 import TournamentDetailsScreen from './screens/TournamentDetailsScreen';
 import WalletScreen from './screens/WalletScreen';
 import HistoryScreen from './screens/HistoryScreen';
-import LeaderboardScreen from './screens/LeaderboardScreen';
 import AccountScreen from './screens/AccountScreen';
 import AccountProfileScreen from './screens/AccountProfileScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import MyWalletScreen from './screens/MyWalletScreen';
-import MyStatisticsScreen from './screens/MyStatisticsScreen';
 import TopPlayersScreen from './screens/TopPlayersScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 import ContactUsScreen from './screens/ContactUsScreen';
@@ -60,7 +58,6 @@ import AppContentManagement from './screens/admin/AppContentManagement';
 import SliderManagement from './screens/admin/SliderManagement';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { applyGlobalTypography } from './styles/typography';
-import { COLORS, TYPO } from './styles/theme';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -68,98 +65,18 @@ const Tab = createBottomTabNavigator();
 function MainTabNavigator() {
   return (
     <Tab.Navigator
+      initialRouteName="HomeTab"
+      tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false,
-        tabBarActiveTintColor: COLORS.white,
-        tabBarInactiveTintColor: '#9CA3AF',
-        tabBarStyle: tabStyles.bar,
       }}
     >
-      <Tab.Screen
-        name="StatsTab"
-        component={MyStatisticsScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <AppIcon name="percentage" size={26} light={focused} muted={!focused} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="LeaderboardTab"
-        component={LeaderboardScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <AppIcon name="podium" size={26} light={focused} muted={!focused} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="HomeTab"
-        component={HomeScreen}
-        options={{
-          tabBarLabel: '',
-          tabBarIcon: ({ focused }) => (
-            <View style={[tabStyles.homeFab, focused && tabStyles.homeFabActive]}>
-              <AppIcon name="home-variant" size={28} light />
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="WalletTab"
-        component={WalletScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <AppIcon name="wallet" size={26} light={focused} muted={!focused} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="AccountTab"
-        component={AccountScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <AppIcon name="user-settings" size={26} light={focused} muted={!focused} />
-          ),
-        }}
-      />
+      <Tab.Screen name="HomeTab" component={HomeScreen} />
+      <Tab.Screen name="WalletTab" component={WalletScreen} />
+      <Tab.Screen name="AccountTab" component={AccountScreen} />
     </Tab.Navigator>
   );
 }
-
-const tabStyles = StyleSheet.create({
-  bar: {
-    backgroundColor: '#050A12',
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    height: 72,
-    paddingBottom: 10,
-    paddingTop: 10,
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  homeFab: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#0F1520',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  homeFabActive: {
-    backgroundColor: '#151C28',
-    borderColor: 'rgba(255, 255, 255, 0.22)',
-  },
-});
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -199,7 +116,7 @@ function AppNavigator() {
       <Stack.Navigator
         key={navKey}
         initialRouteName={
-          isAuthenticated ? (isAdmin() ? 'AdminDashboard' : 'MainApp') : 'Welcome'
+          isAuthenticated ? (isAdmin() ? 'AdminDashboard' : 'MainApp') : 'Auth'
         }
         screenOptions={{
           headerShown: false,
@@ -210,9 +127,9 @@ function AppNavigator() {
         {/* Non-authenticated screens */}
         {!isAuthenticated ? (
           <>
+            <Stack.Screen name="Auth" component={AuthScreen} />
             <Stack.Screen name="Welcome" component={WelcomeOnboardingScreen} />
             <Stack.Screen name="Landing" component={LandingScreen} />
-            <Stack.Screen name="Auth" component={AuthScreen} />
           </>
         ) : (
           <>
@@ -237,14 +154,10 @@ function AppNavigator() {
               </>
             ) : (
               <>
-                {/* User routes */}
                 <Stack.Screen name="MainApp" component={MainTabNavigator} />
-                
-                {/* Account SubScreen */}
                 <Stack.Screen name="AccountProfile" component={AccountProfileScreen} />
                 <Stack.Screen name="EditProfile" component={EditProfileScreen} />
                 <Stack.Screen name="MyWallet" component={MyWalletScreen} />
-                <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
                 <Stack.Screen name="TopPlayers" component={TopPlayersScreen} />
                 <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 <Stack.Screen name="ContactUs" component={ContactUsScreen} />
@@ -258,15 +171,12 @@ function AppNavigator() {
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
                 <Stack.Screen name="TermsAndConditions" component={TermsAndConditionsScreen} />
                 <Stack.Screen name="ShareApp" component={ShareAppScreen} />
-                
-                {/* Game Modes */}
                 <Stack.Screen name="GameModes" component={GameModesScreen} />
                 <Stack.Screen name="GameDetails" component={GameDetailsScreen} />
                 <Stack.Screen name="TutorialDetail" component={TutorialDetailScreen} />
               </>
             )}
-            
-            {/* Shared screens available to both admin and regular users */}
+
             <Stack.Screen name="TournamentDetails" component={TournamentDetailsScreen} />
             <Stack.Screen name="Tournament" component={TournamentScreen} />
             <Stack.Screen name="History" component={HistoryScreen} />

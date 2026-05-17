@@ -63,12 +63,6 @@ const AccountProfileScreen = ({ navigation }) => {
   }
 
   const stats = profileData || {};
-  const tournament = stats.tournament || {};
-  const wallet = stats.wallet || {};
-
-  const totalMatches = tournament.participatedCount || 0;
-  const winMatches = tournament.wins || 0;
-  const totalEarnings = wallet.totalWinnings || tournament.earnings || 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -107,31 +101,6 @@ const AccountProfileScreen = ({ navigation }) => {
           {stats.gameUsername && (
             <Text style={styles.gameUsername}>@{stats.gameUsername}</Text>
           )}
-        </View>
-
-        {/* Stats Overview Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Game Statistics</Text>
-          
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <AppIcon name="gamepad-variant" size="lg" />
-              <Text style={styles.statValue}>{totalMatches}</Text>
-              <Text style={styles.statLabel}>Matches Played</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <AppIcon name="trophy" size="lg" />
-              <Text style={styles.statValue}>{winMatches}</Text>
-              <Text style={styles.statLabel}>Win Matches</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <AppIcon name="currency-inr" size="lg" />
-              <Text style={styles.statValue}>₹{totalEarnings.toLocaleString()}</Text>
-              <Text style={styles.statLabel}>Total Earnings</Text>
-            </View>
-          </View>
         </View>
 
         {/* Profile Details Section */}

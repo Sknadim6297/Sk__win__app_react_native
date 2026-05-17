@@ -10,9 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ONBOARDING } from '../../styles/onboardingTheme';
 
-const GAME_LOGO = require('../../assets/logo/game_logo.png');
-const GAME_IMG_1 = require('../../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
-const GAME_IMG_2 = require('../../assets/images/87904deacf9b547a95f019e0a322152a.jpg');
+const APP_LOGO = require('../../assets/logo/game_logo.png');
 
 const GRID_COLORS = ['#E74C3C', '#3498DB', '#2ECC71', '#9B59B6', '#F39C12', '#1ABC9C', '#E67E22', '#34495E'];
 
@@ -37,11 +35,10 @@ export default function MockupCard() {
     transform: [{ translateY: floatY.value }],
   }));
 
-  const gridItems = Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, i) => {
-    if (i === 7) return { type: 'image', source: GAME_IMG_1 };
-    if (i === 11) return { type: 'image', source: GAME_IMG_2 };
-    return { type: 'color', color: GRID_COLORS[i % GRID_COLORS.length] };
-  });
+  const gridItems = Array.from({ length: GRID_SIZE * GRID_SIZE }).map((_, i) => ({
+    type: 'color',
+    color: GRID_COLORS[i % GRID_COLORS.length],
+  }));
 
   return (
     <Animated.View style={[styles.wrapper, floatStyle]}>
@@ -53,16 +50,12 @@ export default function MockupCard() {
             <View style={styles.grid}>
               {gridItems.map((item, index) => (
                 <View key={index} style={styles.gridCell}>
-                  {item.type === 'image' ? (
-                    <Image source={item.source} style={styles.gridImage} resizeMode="cover" />
-                  ) : (
-                    <View style={[styles.gridColor, { backgroundColor: item.color }]} />
-                  )}
+                  <View style={[styles.gridColor, { backgroundColor: item.color }]} />
                 </View>
               ))}
             </View>
             <View style={styles.logoOverlay}>
-              <Image source={GAME_LOGO} style={styles.centerLogo} resizeMode="contain" />
+              <Image source={APP_LOGO} style={styles.centerLogo} resizeMode="contain" />
             </View>
           </View>
           <View style={styles.darkSection}>

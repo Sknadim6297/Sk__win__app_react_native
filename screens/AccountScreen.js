@@ -80,11 +80,6 @@ const AccountScreen = ({ navigation }) => {
       screen: 'MyWallet',
     },
     {
-      title: 'My Statistics',
-      icon: 'chart-bar',
-      screen: 'MyStatistics',
-    },
-    {
       title: 'Match History',
       icon: 'history',
       screen: 'History',
