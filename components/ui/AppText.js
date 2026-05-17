@@ -21,7 +21,7 @@ const VARIANTS = {
 };
 
 /**
- * Premium readable text with Poppins / Rajdhani hierarchy.
+ * App text using Lilita One typography scale.
  */
 export default function AppText({
   variant = 'body',

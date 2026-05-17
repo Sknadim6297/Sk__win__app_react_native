@@ -17,7 +17,7 @@ import { AuthContext } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
 import { userService, walletService, notificationService } from '../services/api';
 import SKWinLogo from '../components/SKWinLogo';
-import { useAppIcons } from '../hooks/useAppIcons';
+import AppIcon from '../components/ui/AppIcon';
 
 const AccountScreen = ({ navigation }) => {
   const { user, logout } = useContext(AuthContext);
@@ -27,7 +27,6 @@ const AccountScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const { appIcons } = useAppIcons();
 
   useFocusEffect(
     useCallback(() => {
@@ -168,7 +167,7 @@ const AccountScreen = ({ navigation }) => {
           <View style={styles.userCard}>
             <View style={styles.userInfo}>
               <View style={styles.avatar}>
-                <SKWinLogo size={64} logoUrl={appIcons.appLogo} rounded />
+                <SKWinLogo size={64} rounded />
               </View>
               <View style={styles.userDetails}>
                 <Text style={styles.userName}>{userData?.name || userData?.username || 'User'}</Text>
@@ -198,7 +197,7 @@ const AccountScreen = ({ navigation }) => {
             onPress={() => navigation.navigate(item.screen)}
           >
             <View style={styles.menuItemLeft}>
-              <MaterialCommunityIcons name={item.icon} size={24} color={COLORS.accent} />
+              <AppIcon name={item.icon} size="md" />
               <Text style={styles.menuItemText}>{item.title}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />

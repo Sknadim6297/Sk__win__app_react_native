@@ -20,42 +20,7 @@ const DEFAULT_HOME = {
     },
   ],
   supportLinks: { whatsapp: '', telegram: '', instagram: '' },
-  appIcons: {
-    appLogo: '',
-    support: '',
-    whatsapp: '',
-    telegram: '',
-    instagram: '',
-    wallet: '',
-    upcoming: '',
-    ongoing: '',
-    completed: '',
-    share: '',
-  },
 };
-
-const ICON_KEYS = [
-  'appLogo',
-  'support',
-  'whatsapp',
-  'telegram',
-  'instagram',
-  'wallet',
-  'upcoming',
-  'ongoing',
-  'completed',
-  'share',
-];
-
-function normalizeAppIcons(raw, req) {
-  const icons = raw || {};
-  const out = {};
-  ICON_KEYS.forEach((key) => {
-    const val = icons[key];
-    out[key] = val ? normalizeMediaUrl(val, req) : '';
-  });
-  return out;
-}
 
 const DEFAULT_PACKS = [
   { label: '550 COINS', coins: 500, bonusCoins: 50, priceInr: 500, isBest: true, sortOrder: 1 },
@@ -98,7 +63,6 @@ router.get('/home', async (req, res) => {
       latestAnnouncementTitle: latestAnnouncement?.title || '',
       banners: (config.banners || []).filter((b) => b.isActive),
       supportLinks: config.supportLinks || {},
-      appIcons: normalizeAppIcons(config.appIcons, req),
       carousel: carouselTutorials.map((t) => ({
         id: t._id,
         title: t.title,

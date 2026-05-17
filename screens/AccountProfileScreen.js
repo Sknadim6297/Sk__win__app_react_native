@@ -10,17 +10,15 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import AppIcon from '../components/ui/AppIcon';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
 import { userService } from '../services/api';
 import SKWinLogo from '../components/SKWinLogo';
-import { useAppIcons } from '../hooks/useAppIcons';
-
 const AccountProfileScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
-  const { appIcons } = useAppIcons();
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,7 +81,7 @@ const AccountProfileScreen = ({ navigation }) => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Profile</Text>
         <TouchableOpacity onPress={() => navigation.navigate('EditProfile')}>
-          <MaterialCommunityIcons name="pencil" size={24} color={COLORS.accent} />
+          <AppIcon name="pencil" size="md" />
         </TouchableOpacity>
       </View>
 
@@ -101,7 +99,7 @@ const AccountProfileScreen = ({ navigation }) => {
         {/* Profile Picture */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
-            <SKWinLogo size={100} logoUrl={appIcons.appLogo} />
+            <SKWinLogo size={100} />
           </View>
           <Text style={styles.userName}>
             {stats.name || stats.username || 'User'}
@@ -117,19 +115,19 @@ const AccountProfileScreen = ({ navigation }) => {
           
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              <MaterialCommunityIcons name="gamepad-variant" size={28} color={COLORS.accent} />
+              <AppIcon name="gamepad-variant" size="lg" />
               <Text style={styles.statValue}>{totalMatches}</Text>
               <Text style={styles.statLabel}>Matches Played</Text>
             </View>
 
             <View style={styles.statCard}>
-              <MaterialCommunityIcons name="trophy" size={28} color="#FFD700" />
+              <AppIcon name="trophy" size="lg" />
               <Text style={styles.statValue}>{winMatches}</Text>
               <Text style={styles.statLabel}>Win Matches</Text>
             </View>
 
             <View style={styles.statCard}>
-              <MaterialCommunityIcons name="currency-inr" size={28} color="#2196F3" />
+              <AppIcon name="currency-inr" size="lg" />
               <Text style={styles.statValue}>₹{totalEarnings.toLocaleString()}</Text>
               <Text style={styles.statLabel}>Total Earnings</Text>
             </View>
@@ -181,7 +179,7 @@ const AccountProfileScreen = ({ navigation }) => {
           style={styles.editButton}
           onPress={() => navigation.navigate('EditProfile')}
         >
-          <MaterialCommunityIcons name="pencil" size={20} color={COLORS.white} />
+          <AppIcon name="pencil" size={20} />
           <Text style={styles.editButtonText}>Edit Profile</Text>
         </TouchableOpacity>
 

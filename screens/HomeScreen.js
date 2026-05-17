@@ -17,9 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import AppIcon from '../components/ui/AppIcon';
-import DynamicAppIcon from '../components/ui/DynamicAppIcon';
 import SKWinLogo from '../components/SKWinLogo';
-import { EMPTY_APP_ICONS } from '../constants/appIconSlots';
 import { BRAND } from '../constants/branding';
 import {
   tournamentService,
@@ -38,10 +36,10 @@ const FF_IMAGE = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg'
 const BGMI_IMAGE = require('../assets/images/87904deacf9b547a95f019e0a322152a.jpg');
 
 const QUICK_LINKS = [
-  { id: 'support', label: 'Support', iconKey: 'support', fallback: 'headset', route: 'SupportTickets' },
-  { id: 'whatsapp', label: 'Whatsapp', iconKey: 'whatsapp', fallback: 'whatsapp', action: 'whatsapp' },
-  { id: 'telegram', label: 'Telegram', iconKey: 'telegram', fallback: 'telegram', action: 'telegram' },
-  { id: 'wallet', label: 'My Wallet', iconKey: 'wallet', fallback: 'wallet', route: 'WalletTab' },
+  { id: 'support', label: 'Support', icon: 'headset', route: 'SupportTickets' },
+  { id: 'whatsapp', label: 'Whatsapp', icon: 'whatsapp', action: 'whatsapp' },
+  { id: 'telegram', label: 'Telegram', icon: 'telegram', action: 'telegram' },
+  { id: 'wallet', label: 'My Wallet', icon: 'wallet', route: 'WalletTab' },
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -57,7 +55,6 @@ export default function HomeScreen({ navigation }) {
   const [supportLinks, setSupportLinks] = useState({});
   const [homeSliders, setHomeSliders] = useState([]);
   const [slidersLoading, setSlidersLoading] = useState(true);
-  const [appIcons, setAppIcons] = useState(EMPTY_APP_ICONS);
 
   const loadHomeData = useCallback(async () => {
     try {
@@ -84,8 +81,6 @@ export default function HomeScreen({ navigation }) {
         });
       }
       setSupportLinks(homeConfig.supportLinks || {});
-      setAppIcons({ ...EMPTY_APP_ICONS, ...(homeConfig.appIcons || {}) });
-
       if (!user) return;
 
       const [balanceData, myTournamentsData, notificationsResponse, myTickets] = await Promise.all([
@@ -193,11 +188,7 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.header}>
           <View style={styles.profileRow}>
             <View style={styles.avatar}>
-              {appIcons.appLogo ? (
-                <SKWinLogo size={44} logoUrl={appIcons.appLogo} rounded />
-              ) : (
-                <SKWinLogo size={44} />
-              )}
+              <SKWinLogo size={44} rounded />
             </View>
             <View>
               <Text style={styles.username}>{displayName}</Text>
@@ -209,11 +200,13 @@ export default function HomeScreen({ navigation }) {
               style={styles.supportIconBtn}
               onPress={() => navigation.navigate('SupportTickets')}
             >
-              <AppIcon name="headset" size="md" color={COLORS.white} />
-              {openSupportTickets > 0 && (
+              <AppIcon name="headset" size={26} light />
+              {(openSupportTickets > 0 || unreadNotifications > 0) && (
                 <View style={styles.badge99}>
                   <Text style={styles.badge99Text}>
-                    {openSupportTickets > 99 ? '99' : openSupportTickets}
+                    {(openSupportTickets || unreadNotifications) > 99
+                      ? '99'
+                      : openSupportTickets || unreadNotifications}
                   </Text>
                 </View>
               )}
@@ -222,7 +215,7 @@ export default function HomeScreen({ navigation }) {
               style={styles.coinPill}
               onPress={() => navigation.navigate('WalletTab')}
             >
-              <AppIcon name="circle-multiple" size="sm" color="#FBBF24" />
+              <AppIcon name="coins" size={24} />
               <Text style={styles.coinText}>{walletBalance.toFixed(0)}</Text>
             </TouchableOpacity>
           </View>
@@ -246,7 +239,7 @@ export default function HomeScreen({ navigation }) {
 
         <HomeImageSlider sliders={homeSliders} loading={slidersLoading} />
 
-        {/* Quick links */}
+        {/* Quick links — squircle tiles */}
         <View style={styles.quickRow}>
           {QUICK_LINKS.map((item) => (
             <TouchableOpacity
@@ -255,13 +248,9 @@ export default function HomeScreen({ navigation }) {
               activeOpacity={0.85}
               onPress={() => handleQuickLink(item)}
             >
-              <DynamicAppIcon
-                iconKey={item.iconKey}
-                icons={appIcons}
-                name={item.fallback}
-                size="md"
-                color={COLORS.white}
-              />
+              <View style={styles.quickIconSquircle}>
+                <AppIcon name={item.icon} size={36} light />
+              </View>
               <Text style={styles.quickLabel}>{item.label}</Text>
             </TouchableOpacity>
           ))}
@@ -270,12 +259,12 @@ export default function HomeScreen({ navigation }) {
         {/* Exclusive */}
         <View style={styles.sectionHead}>
           <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitle}>Exclusive</Text>
+            <Text style={styles.contestsTitle}>Exclusive</Text>
             <View style={styles.liveBadge}>
               <Text style={styles.liveText}>LIVE</Text>
             </View>
           </View>
-          <Text style={styles.sectionSub}>Big Winnings For ALL</Text>
+          <Text style={styles.contestsSub}>Big Winnings For ALL</Text>
         </View>
 
         <View style={styles.gamesRow}>
@@ -298,19 +287,21 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         {/* My Contests */}
-        <View style={styles.sectionHead}>
+        <View style={styles.contestsSectionHead}>
           <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitle}>My Contests</Text>
-            <AppIcon name="check-decagram" size="sm" color="#38BDF8" />
+            <Text style={styles.contestsTitle}>My Contests</Text>
+            <View style={styles.verifiedBadge}>
+              <AppIcon name="check-decagram" size={16} accent="38BDF8" />
+            </View>
           </View>
-          <Text style={styles.sectionSub}>Your Tournaments Journey</Text>
+          <Text style={styles.contestsSub}>Your Tournaments Journey</Text>
         </View>
 
         <View style={styles.contestsRow}>
           {[
-            { key: 'upcoming', label: 'Upcoming', iconKey: 'upcoming', fallback: 'clock-outline', count: upcomingCount },
-            { key: 'ongoing', label: 'Ongoing', iconKey: 'ongoing', fallback: 'broadcast', count: ongoingCount },
-            { key: 'completed', label: 'Completed', iconKey: 'completed', fallback: 'check-circle-outline', count: completedCount },
+            { key: 'upcoming', label: 'Upcoming', icon: 'clock-outline', count: upcomingCount },
+            { key: 'ongoing', label: 'Ongoing', icon: 'broadcast', count: ongoingCount },
+            { key: 'completed', label: 'Completed', icon: 'check-circle-outline', count: completedCount },
           ].map((item) => (
             <TouchableOpacity
               key={item.key}
@@ -318,69 +309,82 @@ export default function HomeScreen({ navigation }) {
               onPress={() => navigation.navigate('History')}
               activeOpacity={0.85}
             >
-              <DynamicAppIcon
-                iconKey={item.iconKey}
-                icons={appIcons}
-                name={item.fallback}
-                size="lg"
-                color="#22D3EE"
-              />
+              <View style={styles.contestIconWrap}>
+                <AppIcon name={item.icon} size={48} accent="00F2FF" />
+              </View>
               <Text style={styles.contestLabel}>{item.label}</Text>
-              {item.count > 0 && <Text style={styles.contestCount}>{item.count}</Text>}
+              {item.count > 0 ? (
+                <View style={styles.contestCountBadge}>
+                  <Text style={styles.contestCount}>{item.count}</Text>
+                </View>
+              ) : null}
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Share + WhatsApp */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.shareBtn} onPress={handleShare} activeOpacity={0.9}>
-            <DynamicAppIcon iconKey="share" icons={appIcons} name="share-variant" size="md" color={COLORS.white} />
-            <Text style={styles.shareBtnText}>Share</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.whatsappBtn}
-            onPress={() => {
-              const url = supportLinks.whatsapp || 'https://wa.me/';
-              Linking.openURL(url.startsWith('http') ? url : `https://wa.me/${url}`).catch(() => {});
-            }}
-            activeOpacity={0.9}
-          >
-            <DynamicAppIcon iconKey="whatsapp" icons={appIcons} name="whatsapp" size="md" color={COLORS.white} />
-            <Text style={styles.whatsappBtnText}>Join on Whatsapp</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.socialRow}>
-          {[
-            { key: 'instagram', action: 'instagram', fallback: 'instagram' },
-            { key: 'telegram', action: 'telegram', fallback: 'telegram' },
-            { key: 'whatsapp', action: 'whatsapp', fallback: 'whatsapp' },
-          ].map((icon) => (
+        {/* Share + WhatsApp + social */}
+        <View style={styles.bottomActionsBlock}>
+          <View style={styles.actionRow}>
+            <TouchableOpacity onPress={handleShare} activeOpacity={0.9} style={styles.shareBtnOuter}>
+              <LinearGradient
+                colors={['#9B6DFF', '#5B4FCF']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.shareBtn}
+              >
+                <AppIcon name="share-variant" size={26} light />
+                <Text style={styles.shareBtnText}>Share</Text>
+              </LinearGradient>
+            </TouchableOpacity>
             <TouchableOpacity
-              key={icon.key}
-              style={styles.socialCircle}
               onPress={() => {
-                if (icon.action === 'whatsapp') {
-                  const url = supportLinks.whatsapp || 'https://wa.me/';
-                  Linking.openURL(url.startsWith('http') ? url : `https://wa.me/${url}`).catch(() => {});
-                } else if (icon.action === 'telegram') {
-                  const url = supportLinks.telegram || 'https://t.me/';
-                  Linking.openURL(url.startsWith('http') ? url : `https://t.me/${url}`).catch(() => {});
-                } else if (icon.action === 'instagram') {
-                  const url = supportLinks.instagram || 'https://instagram.com/';
-                  Linking.openURL(url.startsWith('http') ? url : `https://instagram.com/${url}`).catch(() => {});
-                }
+                const url = supportLinks.whatsapp || 'https://wa.me/';
+                Linking.openURL(url.startsWith('http') ? url : `https://wa.me/${url}`).catch(() => {});
               }}
+              activeOpacity={0.9}
+              style={styles.whatsappBtnOuter}
             >
-              <DynamicAppIcon
-                iconKey={icon.key}
-                icons={appIcons}
-                name={icon.fallback}
-                size="md"
-                color={COLORS.white}
-              />
+              <LinearGradient
+                colors={['#3DDC84', '#1A9B5C']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.whatsappBtn}
+              >
+                <AppIcon name="whatsapp" size={26} light />
+                <Text style={styles.whatsappBtnText} numberOfLines={1}>
+                  Join on Whatsapp
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
-          ))}
+          </View>
+
+          <View style={styles.socialRow}>
+            {[
+              { name: 'instagram', action: 'instagram' },
+              { name: 'telegram', action: 'telegram' },
+              { name: 'whatsapp', action: 'whatsapp' },
+            ].map((icon) => (
+              <TouchableOpacity
+                key={icon.name}
+                style={styles.socialCircle}
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (icon.action === 'whatsapp') {
+                    const url = supportLinks.whatsapp || 'https://wa.me/';
+                    Linking.openURL(url.startsWith('http') ? url : `https://wa.me/${url}`).catch(() => {});
+                  } else if (icon.action === 'telegram') {
+                    const url = supportLinks.telegram || 'https://t.me/';
+                    Linking.openURL(url.startsWith('http') ? url : `https://t.me/${url}`).catch(() => {});
+                  } else if (icon.action === 'instagram') {
+                    const url = supportLinks.instagram || 'https://instagram.com/';
+                    Linking.openURL(url.startsWith('http') ? url : `https://instagram.com/${url}`).catch(() => {});
+                  }
+                }}
+              >
+                <AppIcon name={icon.name} size={52} />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </ScrollView>
 
@@ -389,7 +393,7 @@ export default function HomeScreen({ navigation }) {
         onPress={() => navigation.navigate('SupportTickets')}
         activeOpacity={0.9}
       >
-        <DynamicAppIcon iconKey="support" icons={appIcons} name="headset" size="lg" color={COLORS.white} />
+        <AppIcon name="headset" size={32} light />
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -460,42 +464,50 @@ const styles = StyleSheet.create({
   },
   supportIconBtn: {
     position: 'relative',
-    padding: 4,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badge99: {
     position: 'absolute',
-    top: -4,
-    right: -8,
-    minWidth: 22,
-    height: 18,
-    borderRadius: 9,
+    top: 0,
+    right: -2,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 6,
     backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#050A12',
   },
   badge99Text: {
-    ...TEXT.overline,
-    fontSize: 11,
+    fontSize: 10,
+    fontFamily: FONTS.bold,
+    fontWeight: '700',
     color: COLORS.white,
-    letterSpacing: 0,
-    textTransform: 'none',
   },
   coinPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surfaceDark,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
+    backgroundColor: '#0F1520',
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    gap: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    minHeight: 42,
   },
   coinText: {
-    ...TEXT.label,
+    fontSize: 16,
     fontFamily: FONTS.bold,
+    fontWeight: '700',
     color: COLORS.white,
+    minWidth: 16,
+    textAlign: 'center',
   },
   newsBar: {
     flexDirection: 'row',
@@ -529,26 +541,40 @@ const styles = StyleSheet.create({
   quickRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
-    gap: 8,
+    marginBottom: 26,
+    gap: 10,
   },
   quickTile: {
     flex: 1,
-    backgroundColor: 'rgba(88, 70, 140, 0.45)',
-    borderRadius: 14,
-    paddingVertical: 16,
     alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    maxWidth: (width - 32 - 30) / 4,
+  },
+  quickIconSquircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 18,
+    backgroundColor: '#5E69C1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#5E69C1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
   },
   quickLabel: {
-    ...TEXT.labelSm,
+    marginTop: 8,
+    fontSize: 13,
+    fontFamily: FONTS.bold,
+    fontWeight: '700',
     color: COLORS.white,
     textAlign: 'center',
   },
   sectionHead: {
     marginBottom: 12,
+  },
+  contestsSectionHead: {
+    marginBottom: 14,
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -556,13 +582,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    ...TEXT.h2,
+    fontSize: 20,
+    fontFamily: FONTS.bold,
     color: COLORS.white,
+    letterSpacing: 0.2,
+  },
+  contestsTitle: {
+    fontSize: 21,
+    fontFamily: FONTS.bold,
+    color: '#FFFFFF',
+    letterSpacing: 0.15,
+  },
+  verifiedBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(56, 189, 248, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionSub: {
-    ...TEXT.caption,
-    color: COLORS.gray,
+    fontSize: 13,
+    fontFamily: FONTS.medium,
+    color: '#8A96A3',
     marginTop: 6,
+  },
+  contestsSub: {
+    fontSize: 13,
+    fontFamily: FONTS.medium,
+    color: '#8A96A3',
+    marginTop: 5,
+    letterSpacing: 0.1,
   },
   liveBadge: {
     backgroundColor: '#2563EB',
@@ -621,90 +671,135 @@ const styles = StyleSheet.create({
   contestsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 22,
+    marginBottom: 28,
   },
   contestCard: {
     flex: 1,
-    backgroundColor: COLORS.surfaceDark,
-    borderRadius: 14,
-    paddingVertical: 18,
+    minHeight: 128,
+    backgroundColor: '#121A21',
+    borderRadius: 16,
+    paddingTop: 22,
+    paddingBottom: 18,
+    paddingHorizontal: 6,
     alignItems: 'center',
+    justifyContent: 'flex-start',
     borderWidth: 1,
-    borderColor: 'rgba(34, 211, 238, 0.2)',
-    gap: 8,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  contestIconWrap: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   contestLabel: {
-    ...TEXT.label,
-    color: COLORS.gray,
+    fontSize: 15,
+    fontFamily: FONTS.bold,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  contestCountBadge: {
+    marginTop: 6,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0, 229, 255, 0.2)',
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   contestCount: {
-    ...TEXT.label,
+    fontSize: 12,
     fontFamily: FONTS.bold,
-    color: '#22D3EE',
+    color: '#00E5FF',
+  },
+  bottomActionsBlock: {
+    marginTop: 4,
+    marginBottom: 8,
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    gap: 10,
+    marginBottom: 20,
+    alignItems: 'stretch',
+  },
+  shareBtnOuter: {
+    flex: 0.88,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   shareBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.purple,
-    borderRadius: 12,
-    paddingVertical: 14,
-    gap: 8,
+    paddingVertical: 17,
+    paddingHorizontal: 14,
+    gap: 10,
+    minHeight: 56,
   },
   shareBtnText: {
-    ...TEXT.buttonSm,
-    color: COLORS.white,
+    fontSize: 16,
+    fontFamily: FONTS.bold,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  whatsappBtnOuter: {
+    flex: 1.12,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   whatsappBtn: {
-    flex: 1.2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#22C55E',
-    borderRadius: 12,
-    paddingVertical: 14,
-    gap: 8,
+    paddingVertical: 17,
+    paddingHorizontal: 14,
+    gap: 10,
+    minHeight: 56,
   },
   whatsappBtnText: {
-    ...TEXT.buttonSm,
-    color: COLORS.white,
+    flexShrink: 1,
+    fontSize: 15,
+    fontFamily: FONTS.bold,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.15,
   },
   socialRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 16,
-    marginTop: 8,
+    alignItems: 'center',
+    gap: 28,
+    paddingVertical: 4,
   },
   socialCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 22,
-    backgroundColor: COLORS.surfaceDark,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    overflow: 'hidden',
   },
   fab: {
     position: 'absolute',
-    right: 20,
-    bottom: 100,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#22C55E',
+    right: 18,
+    bottom: 96,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: '#25D366',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 8,
-    shadowColor: '#22C55E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    elevation: 10,
+    shadowColor: '#25D366',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
 });

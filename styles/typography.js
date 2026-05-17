@@ -16,24 +16,27 @@ export const LINE_HEIGHT = {
   relaxed: 1.6,
 };
 
+/** Lilita One — single weight; all roles use the same family for consistency */
+export const FONT_FAMILY = 'LilitaOne-Regular';
+
 export const FONTS = {
-  regular: 'Poppins-Regular',
-  medium: 'Poppins-Medium',
-  semiBold: 'Poppins-SemiBold',
-  bold: 'Poppins-Bold',
-  display: 'Rajdhani-Bold',
-  displayMedium: 'Rajdhani-Medium',
-  displaySemiBold: 'Rajdhani-SemiBold',
+  regular: FONT_FAMILY,
+  medium: FONT_FAMILY,
+  semiBold: FONT_FAMILY,
+  bold: FONT_FAMILY,
+  display: FONT_FAMILY,
+  displayMedium: FONT_FAMILY,
+  displaySemiBold: FONT_FAMILY,
 };
 
-/** Gaming-style icon sizes — use with MaterialCommunityIcons */
+/** Icons8 display sizes — 24px default, 28px for important actions */
 export const ICON = {
-  xs: 18,
+  xs: 20,
   sm: 22,
-  md: 26,
-  lg: 30,
-  xl: 36,
-  xxl: 44,
+  md: 24,
+  lg: 28,
+  xl: 32,
+  xxl: 40,
 };
 
 function lh(fontSize, multiplier = LINE_HEIGHT.normal) {
@@ -120,6 +123,10 @@ export const TYPO = {
     fontSize: scaleFont(11),
     lineHeight: lh(scaleFont(11), LINE_HEIGHT.tight),
   },
+  fontRegular: FONT_FAMILY,
+  fontMedium: FONT_FAMILY,
+  fontSemiBold: FONT_FAMILY,
+  fontBold: FONT_FAMILY,
 };
 
 /** Pre-built text styles for StyleSheet composition */

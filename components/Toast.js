@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, StyleSheet, Dimensions } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, TYPO, ICON } from '../styles/theme';
+import { COLORS, TYPO } from '../styles/theme';
+import AppIcon from './ui/AppIcon';
 
 const { width } = Dimensions.get('window');
 
@@ -92,7 +92,7 @@ const Toast = ({ visible, message, type = 'error', onHide }) => {
         },
       ]}
     >
-      <Ionicons name={getIcon()} size={ICON.md} color={COLORS.white} style={styles.icon} />
+      <AppIcon name={getIcon()} size="md" style={styles.icon} />
       <Text style={styles.message}>{message}</Text>
     </Animated.View>
   );

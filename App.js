@@ -8,20 +8,10 @@ LogBox.ignoreLogs([
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AppIcon from './components/ui/AppIcon';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
-import {
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-} from '@expo-google-fonts/poppins';
-import {
-  Rajdhani_500Medium,
-  Rajdhani_600SemiBold,
-  Rajdhani_700Bold,
-} from '@expo-google-fonts/rajdhani';
+import { LilitaOne_400Regular } from '@expo-google-fonts/lilita-one';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import LandingScreen from './screens/LandingScreen';
 import WelcomeOnboardingScreen from './screens/WelcomeOnboardingScreen';
@@ -80,10 +70,9 @@ function MainTabNavigator() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: true,
+        tabBarShowLabel: false,
         tabBarActiveTintColor: COLORS.white,
-        tabBarInactiveTintColor: COLORS.grayDim,
-        tabBarLabelStyle: tabStyles.tabLabel,
+        tabBarInactiveTintColor: '#9CA3AF',
         tabBarStyle: tabStyles.bar,
       }}
     >
@@ -91,9 +80,8 @@ function MainTabNavigator() {
         name="StatsTab"
         component={MyStatisticsScreen}
         options={{
-          tabBarLabel: 'Stats',
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="chart-timeline-variant" size={28} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <AppIcon name="percentage" size={26} light={focused} muted={!focused} />
           ),
         }}
       />
@@ -101,9 +89,8 @@ function MainTabNavigator() {
         name="LeaderboardTab"
         component={LeaderboardScreen}
         options={{
-          tabBarLabel: 'Ranks',
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="trophy-outline" size={28} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <AppIcon name="podium" size={26} light={focused} muted={!focused} />
           ),
         }}
       />
@@ -114,7 +101,7 @@ function MainTabNavigator() {
           tabBarLabel: '',
           tabBarIcon: ({ focused }) => (
             <View style={[tabStyles.homeFab, focused && tabStyles.homeFabActive]}>
-              <MaterialCommunityIcons name="home-variant" size={30} color={COLORS.white} />
+              <AppIcon name="home-variant" size={28} light />
             </View>
           ),
         }}
@@ -123,9 +110,8 @@ function MainTabNavigator() {
         name="WalletTab"
         component={WalletScreen}
         options={{
-          tabBarLabel: 'Wallet',
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="wallet-plus-outline" size={28} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <AppIcon name="wallet" size={26} light={focused} muted={!focused} />
           ),
         }}
       />
@@ -133,9 +119,8 @@ function MainTabNavigator() {
         name="AccountTab"
         component={AccountScreen}
         options={{
-          tabBarLabel: 'Account',
-          tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="account-circle-outline" size={28} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <AppIcon name="user-settings" size={26} light={focused} muted={!focused} />
           ),
         }}
       />
@@ -145,44 +130,40 @@ function MainTabNavigator() {
 
 const tabStyles = StyleSheet.create({
   bar: {
-    backgroundColor: '#0D1025',
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    borderTopWidth: 1,
-    height: 88,
-    paddingBottom: 8,
-    paddingTop: 8,
+    backgroundColor: '#050A12',
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    height: 72,
+    paddingBottom: 10,
+    paddingTop: 10,
     elevation: 0,
-  },
-  tabLabel: {
-    ...TYPO.tabLabel,
-    marginTop: 2,
+    shadowOpacity: 0,
   },
   homeFab: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#12162B',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#0F1520',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 32,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    marginBottom: 28,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 8,
   },
   homeFabActive: {
-    backgroundColor: '#1E2440',
-    borderColor: COLORS.purple,
+    backgroundColor: '#151C28',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
   },
 });
 
 export default function App() {
   const [fontsLoaded] = useFonts({
-    'Poppins-Regular': Poppins_400Regular,
-    'Poppins-Medium': Poppins_500Medium,
-    'Poppins-SemiBold': Poppins_600SemiBold,
-    'Poppins-Bold': Poppins_700Bold,
-    'Rajdhani-Medium': Rajdhani_500Medium,
-    'Rajdhani-SemiBold': Rajdhani_600SemiBold,
-    'Rajdhani-Bold': Rajdhani_700Bold,
+    'LilitaOne-Regular': LilitaOne_400Regular,
   });
 
   useEffect(() => {

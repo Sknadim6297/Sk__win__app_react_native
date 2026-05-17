@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
-import { FONTS, TYPO, TEXT, ICON, scaleFont } from './typography';
+import { FONTS, TYPO, TEXT, ICON, scaleFont, FONT_FAMILY } from './typography';
 
-export { FONTS, TYPO, TEXT, ICON, scaleFont };
+export { FONTS, TYPO, TEXT, ICON, scaleFont, FONT_FAMILY };
 
 export const COLORS = {
   primary: '#FF6B00',

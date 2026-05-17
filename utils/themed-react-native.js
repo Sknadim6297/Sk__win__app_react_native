@@ -1,10 +1,10 @@
 /**
- * Themed react-native wrapper — Poppins base + readable default size.
+ * Themed react-native wrapper — Lilita One base + readable default size.
  */
 const RN = require('react-native');
 const React = require('react');
 
-const APP_FONT = 'Poppins-Regular';
+const APP_FONT = 'LilitaOne-Regular';
 const BASE_TEXT = {
   fontFamily: APP_FONT,
   fontWeight: 'normal',

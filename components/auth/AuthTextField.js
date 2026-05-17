@@ -6,7 +6,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { COLORS, TYPO, ICON } from '../../styles/theme';
+import { COLORS, TYPO } from '../../styles/theme';
 import AppIcon from '../ui/AppIcon';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
@@ -46,7 +46,12 @@ export default function AuthTextField({
   return (
     <AnimatedView style={[styles.wrap, borderStyle]}>
       {icon ? (
-        <AppIcon name={icon} size="sm" color={focused ? COLORS.purple : COLORS.gray} />
+        <AppIcon
+          name={icon}
+          size={22}
+          accent={focused ? 'A78BFA' : '94A3B8'}
+          color={focused ? COLORS.purple : COLORS.gray}
+        />
       ) : null}
       <TextInput
         style={styles.input}

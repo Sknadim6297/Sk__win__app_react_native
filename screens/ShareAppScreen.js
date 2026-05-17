@@ -13,12 +13,10 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../styles/theme';
 import { AuthContext } from '../context/AuthContext';
 import { userService } from '../services/api';
-import DynamicAppIcon from '../components/ui/DynamicAppIcon';
-import { useAppIcons } from '../hooks/useAppIcons';
+import AppIcon from '../components/ui/AppIcon';
 
 const ShareAppScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
-  const { appIcons } = useAppIcons();
   const [referralCode, setReferralCode] = useState(user?.referralCode || 'Loading...');
 
   useEffect(() => {
@@ -105,7 +103,7 @@ const ShareAppScreen = ({ navigation }) => {
 
       <View style={styles.content}>
         <View style={styles.sharePrompt}>
-          <DynamicAppIcon iconKey="share" icons={appIcons} name="share-variant" size={48} color={COLORS.accent} />
+          <AppIcon name="share-variant" size={48} />
           <Text style={styles.promptText}>Share WarZone with your friends</Text>
           <Text style={styles.promptSubText}>
             Help your friends discover the ultimate tournament gaming experience
