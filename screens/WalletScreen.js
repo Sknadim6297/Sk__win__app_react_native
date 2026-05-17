@@ -17,16 +17,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
-import DynamicAppIcon from '../components/ui/DynamicAppIcon';
+import AppIcon from '../components/ui/AppIcon';
 import { walletService, configService } from '../services/api';
-import { useAppIcons } from '../hooks/useAppIcons';
-import { EMPTY_APP_ICONS } from '../constants/appIconSlots';
 
 const { width } = Dimensions.get('window');
 const PACK_WIDTH = width * 0.42;
 
 const WalletScreen = ({ navigation }) => {
-  const { appIcons } = useAppIcons();
   const [balance, setBalance] = useState({
     totalBalance: 0,
     balance: 0,
@@ -159,13 +156,7 @@ const WalletScreen = ({ navigation }) => {
           style={styles.headerSide}
           onPress={() => navigation.navigate('SupportTickets')}
         >
-          <DynamicAppIcon
-            iconKey="support"
-            icons={appIcons || EMPTY_APP_ICONS}
-            name="headset"
-            size="md"
-            color={COLORS.white}
-          />
+          <AppIcon name="headset" size="md" />
         </TouchableOpacity>
       </View>
 

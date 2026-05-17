@@ -9,6 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo-google-fonts/lilita-one": "^0.4.1",
     "@expo-google-fonts/orbitron": "^0.4.2",
     "@expo-google-fonts/poppins": "^0.4.1",
     "@expo-google-fonts/rajdhani": "^0.4.1",

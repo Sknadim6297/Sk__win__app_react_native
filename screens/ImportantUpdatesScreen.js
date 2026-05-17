@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, TYPO } from '../styles/theme';
+import AppIcon from '../components/ui/AppIcon';
 import { announcementService } from '../services/api';
 
 const formatTimestamp = (iso) => {
@@ -68,7 +68,7 @@ export default function ImportantUpdatesScreen({ navigation }) {
   const renderItem = ({ item }) => (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={() => handlePress(item)}>
       <View style={styles.iconCircle}>
-        <MaterialCommunityIcons name="bullhorn" size={22} color="#38BDF8" />
+        <AppIcon name="bullhorn" size={22} />
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.title} numberOfLines={1}>
@@ -80,7 +80,7 @@ export default function ImportantUpdatesScreen({ navigation }) {
           <Text style={styles.timestamp}>{formatTimestamp(item.createdAt)}</Text>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={COLORS.white} />
+      <AppIcon name="chevron-right" size={20} />
     </TouchableOpacity>
   );
 
@@ -90,7 +90,7 @@ export default function ImportantUpdatesScreen({ navigation }) {
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+          <AppIcon name="arrow-back" size="md" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Important Updates</Text>
         <View style={{ width: 24 }} />
@@ -112,7 +112,7 @@ export default function ImportantUpdatesScreen({ navigation }) {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <MaterialCommunityIcons name="bullhorn-outline" size={48} color="#8B949E" />
+              <AppIcon name="bullhorn-outline" size={48} />
               <Text style={styles.emptyText}>No updates yet. Check back soon.</Text>
             </View>
           }

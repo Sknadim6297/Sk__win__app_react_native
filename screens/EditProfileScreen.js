@@ -16,11 +16,8 @@ import { AuthContext } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
 import { userService } from '../services/api';
 import SKWinLogo from '../components/SKWinLogo';
-import { useAppIcons } from '../hooks/useAppIcons';
-
 const EditProfileScreen = ({ navigation }) => {
   const { user, updateUser } = useContext(AuthContext);
-  const { appIcons } = useAppIcons();
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -190,7 +187,7 @@ const EditProfileScreen = ({ navigation }) => {
         {/* Avatar Section */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarContainer}>
-            <SKWinLogo size={100} logoUrl={appIcons.appLogo} />
+            <SKWinLogo size={100} />
           </View>
           <Text style={styles.avatarHint}>App Logo</Text>
         </View>

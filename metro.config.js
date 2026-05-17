@@ -12,7 +12,7 @@ const defaultResolveRequest = config.resolver.resolveRequest;
 
 // Redirect every `import ... from 'react-native'` that originates from project
 // source files to our themed wrapper, which injects the Orbitron font into all
-// Text and TextInput components without touching individual screen files (Poppins).
+// Text and TextInput components without touching individual screen files (Lilita One).
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const origin = context.originModulePath;
   const isProjectFile =

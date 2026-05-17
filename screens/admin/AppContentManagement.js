@@ -11,16 +11,12 @@ import {
   RefreshControl,
   Switch,
   Alert,
-  Image,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { COLORS, TEXT, TYPO } from '../../styles/theme';
-import { adminService, uploadImageFile } from '../../services/api';
+import { adminService } from '../../services/api';
 import Toast from '../../components/Toast';
-import { APP_ICON_SLOTS, EMPTY_APP_ICONS } from '../../constants/appIconSlots';
-import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 
 const AppContentManagement = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
@@ -35,9 +31,6 @@ const AppContentManagement = ({ navigation }) => {
   const [instagram, setInstagram] = useState('');
   const [footerNote, setFooterNote] = useState('');
   const [securityNote, setSecurityNote] = useState('');
-  const [appIcons, setAppIcons] = useState(EMPTY_APP_ICONS);
-  const [uploadingKey, setUploadingKey] = useState(null);
-
   const [packs, setPacks] = useState([]);
   const [packForm, setPackForm] = useState({
     label: '',
@@ -65,7 +58,6 @@ const AppContentManagement = ({ navigation }) => {
       setInstagram(config.supportLinks?.instagram || '');
       setFooterNote(config.walletFooterNote || '');
       setSecurityNote(config.walletSecurityNote || '');
-      setAppIcons({ ...EMPTY_APP_ICONS, ...(config.appIcons || {}) });
       setPacks(Array.isArray(coinPacks) ? coinPacks : []);
     } catch (e) {
       showToast(e.message || 'Failed to load');
@@ -91,53 +83,11 @@ const AppContentManagement = ({ navigation }) => {
         supportLinks: { whatsapp, telegram, instagram },
         walletFooterNote: footerNote.trim(),
         walletSecurityNote: securityNote.trim(),
-        appIcons,
       });
       showToast('Home & wallet text saved', 'success');
     } catch (e) {
       showToast(e.message || 'Save failed');
     }
-  };
-
-  const saveAppIcons = async () => {
-    try {
-      await adminService.updateHomeConfig({ appIcons });
-      showToast('App icons saved', 'success');
-    } catch (e) {
-      showToast(e.message || 'Save failed');
-    }
-  };
-
-  const pickIconImage = async (key) => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        showToast('Gallery permission required');
-        return;
-      }
-      const mediaTypes = ImagePicker.MediaType?.Images ?? ImagePicker.MediaTypeOptions?.Images;
-      const result = await ImagePicker.launchImageLibraryAsync({
-        ...(mediaTypes ? { mediaTypes } : {}),
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.9,
-      });
-      if (result.canceled || !result.assets?.length) return;
-
-      setUploadingKey(key);
-      const upload = await uploadImageFile(result.assets[0].uri);
-      const url = upload.url || upload.path || '';
-      setAppIcons((prev) => ({ ...prev, [key]: url }));
-      showToast('Icon uploaded — tap Save App Icons', 'success');
-    } catch (e) {
-      showToast(e.message || 'Upload failed');
-    } finally {
-      setUploadingKey(null);
-    }
-  };
-
-  const clearIcon = (key) => {
-    setAppIcons((prev) => ({ ...prev, [key]: '' }));
   };
 
   const savePack = async () => {
@@ -202,14 +152,14 @@ const AppContentManagement = ({ navigation }) => {
       </View>
 
       <View style={styles.tabs}>
-        {['home', 'icons', 'packs'].map((t) => (
+        {['home', 'packs'].map((t) => (
           <TouchableOpacity
             key={t}
             style={[styles.tab, tab === t && styles.tabActive]}
             onPress={() => setTab(t)}
           >
             <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t === 'home' ? 'Home' : t === 'icons' ? 'App Icons' : 'Packs'}
+              {t === 'home' ? 'Home & Wallet' : 'Coin Packs'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -229,8 +179,8 @@ const AppContentManagement = ({ navigation }) => {
             </View>
 
             <Text style={styles.hintBox}>
-              The LATEST bar opens Important Updates. Manage that list under Admin → Important
-              Updates (title, description, optional link). Home banners are under Home Banners.
+              The LATEST bar opens Important Updates. App UI icons use Icons8 Fluent Color
+              (consistent across home, tabs, and profile). Home banners: Admin → Home Banners.
             </Text>
 
             <Text style={styles.label}>WhatsApp link / number</Text>
@@ -247,50 +197,6 @@ const AppContentManagement = ({ navigation }) => {
 
             <TouchableOpacity style={styles.saveBtn} onPress={saveHomeConfig}>
               <Text style={styles.saveBtnText}>Save Home & Wallet Text</Text>
-            </TouchableOpacity>
-          </>
-        ) : tab === 'icons' ? (
-          <>
-            <Text style={styles.hintBox}>
-              Upload original PNG images for home quick links, contests, share, support, and
-              profile logo. Leave empty to use built-in vector icons / default game logo.
-            </Text>
-            {APP_ICON_SLOTS.map((slot) => {
-              const uri = appIcons[slot.key] ? resolveMediaUrl(appIcons[slot.key]) : '';
-              return (
-                <View key={slot.key} style={styles.iconRow}>
-                  <View style={styles.iconPreview}>
-                    {uri ? (
-                      <Image source={{ uri }} style={styles.iconPreviewImg} resizeMode="contain" />
-                    ) : (
-                      <MaterialCommunityIcons name="image-off-outline" size={28} color={COLORS.grayDim} />
-                    )}
-                  </View>
-                  <View style={styles.iconMeta}>
-                    <Text style={styles.iconLabel}>{slot.label}</Text>
-                    <Text style={styles.iconKey}>{slot.key}</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.iconUploadBtn}
-                    onPress={() => pickIconImage(slot.key)}
-                    disabled={uploadingKey === slot.key}
-                  >
-                    {uploadingKey === slot.key ? (
-                      <ActivityIndicator size="small" color={COLORS.white} />
-                    ) : (
-                      <Text style={styles.iconUploadText}>Upload</Text>
-                    )}
-                  </TouchableOpacity>
-                  {uri ? (
-                    <TouchableOpacity onPress={() => clearIcon(slot.key)} style={styles.iconClearBtn}>
-                      <MaterialCommunityIcons name="close-circle" size={22} color={COLORS.error} />
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              );
-            })}
-            <TouchableOpacity style={styles.saveBtn} onPress={saveAppIcons}>
-              <Text style={styles.saveBtnText}>Save App Icons</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -401,36 +307,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0, 179, 104, 0.3)',
   },
-  iconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  iconPreview: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-    backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  iconPreviewImg: { width: 40, height: 40 },
-  iconMeta: { flex: 1 },
-  iconLabel: { color: COLORS.white, fontFamily: TYPO.fontSemiBold, fontSize: 13 },
-  iconKey: { color: COLORS.grayDim, fontSize: 11, marginTop: 2 },
-  iconUploadBtn: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginRight: 6,
-  },
-  iconUploadText: { color: COLORS.white, fontSize: 12, fontFamily: TYPO.fontSemiBold },
-  iconClearBtn: { padding: 4 },
 });
