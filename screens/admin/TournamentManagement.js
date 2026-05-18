@@ -81,6 +81,7 @@ const TournamentManagement = ({ navigation }) => {
   const [resultsPreview, setResultsPreview] = useState([]);
   const [resultsLeaderboard, setResultsLeaderboard] = useState(null);
   const [uploadingResult, setUploadingResult] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [roomForm, setRoomForm] = useState({
@@ -108,6 +109,8 @@ const TournamentManagement = ({ navigation }) => {
     mode: 'solo',
     map: 'Bermuda',
     rulesText: '',
+    bannerTitle: '',
+    bannerImage: '',
     entryFee: '',
     prizePool: '',
     perKill: '',
@@ -308,7 +311,11 @@ const TournamentManagement = ({ navigation }) => {
       statusOverride: Boolean(tournament.statusOverride),
       mode: tournament.mode || 'solo',
       map: tournament.map || 'Bermuda',
-      rulesText: Array.isArray(tournament.rules) ? tournament.rules.join('\n') : (tournament.rules || ''),
+      rulesText: Array.isArray(tournament.rules)
+        ? tournament.rules.join('\n')
+        : (tournament.rules || ''),
+      bannerTitle: tournament.bannerTitle || '',
+      bannerImage: tournament.bannerImage || '',
       entryFee: tournament.entryFee?.toString() || '',
       prizePool: tournament.prizePool?.toString() || '',
       perKill: tournament.perKill?.toString() || '',
@@ -375,7 +382,11 @@ const TournamentManagement = ({ navigation }) => {
         statusOverride,
         mode: form.mode,
         map: form.map,
-        rules: form.rulesText.trim() ? [form.rulesText.trim()] : [],
+        rules: form.rulesText.trim()
+          ? form.rulesText.split('\n').map((r) => r.trim()).filter(Boolean)
+          : [],
+        bannerTitle: form.bannerTitle?.trim() || '',
+        bannerImage: form.bannerImage || '',
         entryFee: parseFloat(form.entryFee) || 0,
         prizePool: form.rewardType === 'per_kill' ? 0 : calculateTotalPrizePool(),
         perKill: form.rewardType === 'survival' ? 0 : (parseFloat(form.perKill) || 0),
@@ -419,6 +430,8 @@ const TournamentManagement = ({ navigation }) => {
       mode: 'solo',
       map: 'Bermuda',
       rulesText: '',
+      bannerTitle: '',
+      bannerImage: '',
       entryFee: '',
       prizePool: '',
       perKill: '',
@@ -559,6 +572,35 @@ const TournamentManagement = ({ navigation }) => {
       setShowResultsModal(true);
     } catch (error) {
       showToast(error.message || 'Failed to load participants', 'error');
+    }
+  };
+
+  const pickBannerImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showToast('Permission to access gallery is required', 'error');
+        return;
+      }
+
+      const mediaTypes = ImagePicker.MediaType?.Images ?? ImagePicker.MediaTypeOptions?.Images;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        ...(mediaTypes ? { mediaTypes } : {}),
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.85,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      setUploadingBanner(true);
+      const uploadResult = await uploadImageFile(result.assets[0].uri);
+      setForm((prev) => ({ ...prev, bannerImage: uploadResult.url }));
+      showToast('Banner image uploaded', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to upload banner', 'error');
+    } finally {
+      setUploadingBanner(false);
     }
   };
 
@@ -1338,12 +1380,40 @@ const TournamentManagement = ({ navigation }) => {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Tournament Rules / Info</Text>
+                <Text style={styles.label}>Card Banner Title</Text>
+                <TextInput
+                  style={styles.input}
+                  value={form.bannerTitle}
+                  onChangeText={(text) => setForm((prev) => ({ ...prev, bannerTitle: text }))}
+                  placeholder="e.g. SOLO FULL MAP TOURNAMENT"
+                  placeholderTextColor={COLORS.gray}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Card Banner Image</Text>
+                <TouchableOpacity
+                  style={[styles.imagePickerButton, uploadingBanner && styles.disabledButton]}
+                  onPress={pickBannerImage}
+                  disabled={uploadingBanner}
+                >
+                  <MaterialCommunityIcons name="image" size={16} color={COLORS.white} />
+                  <Text style={styles.imagePickerText}>
+                    {uploadingBanner ? 'Uploading...' : form.bannerImage ? 'Change banner' : 'Upload banner'}
+                  </Text>
+                </TouchableOpacity>
+                {form.bannerImage ? (
+                  <Image source={{ uri: form.bannerImage }} style={styles.bannerPreview} resizeMode="cover" />
+                ) : null}
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Tournament Rules (one per line)</Text>
                 <TextInput
                   style={[styles.input, styles.rulesTextArea]}
                   value={form.rulesText}
-                  onChangeText={(text) => setForm(prev => ({ ...prev, rulesText: text }))}
-                  placeholder="Write full tournament rules and info here..."
+                  onChangeText={(text) => setForm((prev) => ({ ...prev, rulesText: text }))}
+                  placeholder={'MINIMUM LEVEL 40+\nDOUBLE VECTOR AND M79 BAN\n...'}
                   placeholderTextColor={COLORS.gray}
                   multiline
                   numberOfLines={6}
@@ -2287,6 +2357,13 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 12,
     fontWeight: '600',
+  },
+  bannerPreview: {
+    width: '100%',
+    height: 120,
+    borderRadius: 10,
+    marginTop: 10,
+    backgroundColor: COLORS.lightGray,
   },
   disabledButton: {
     opacity: 0.6,

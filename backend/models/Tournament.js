@@ -6,6 +6,20 @@ const tournamentSchema = new mongoose.Schema({
     required: true,
   },
   description: String,
+  bannerImage: {
+    type: String,
+    default: '',
+  },
+  bannerTitle: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  matchNumber: {
+    type: Number,
+    unique: true,
+    sparse: true,
+  },
   game: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Game',
