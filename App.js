@@ -19,6 +19,9 @@ import AuthScreen from './screens/AuthScreen';
 import HomeScreen from './screens/HomeScreen';
 import TournamentScreen from './screens/TournamentScreen';
 import TournamentDetailsScreen from './screens/TournamentDetailsScreen';
+import TournamentEntryScreen from './screens/TournamentEntryScreen';
+import TournamentSlotBookingScreen from './screens/TournamentSlotBookingScreen';
+import TournamentResultsScreen from './screens/TournamentResultsScreen';
 import WalletScreen from './screens/WalletScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import AccountScreen from './screens/AccountScreen';
@@ -178,6 +181,9 @@ function AppNavigator() {
             )}
 
             <Stack.Screen name="TournamentDetails" component={TournamentDetailsScreen} />
+            <Stack.Screen name="TournamentEntry" component={TournamentEntryScreen} />
+            <Stack.Screen name="TournamentSlotBooking" component={TournamentSlotBookingScreen} />
+            <Stack.Screen name="TournamentResults" component={TournamentResultsScreen} />
             <Stack.Screen name="Tournament" component={TournamentScreen} />
             <Stack.Screen name="History" component={HistoryScreen} />
           </>

@@ -221,13 +221,13 @@ export const tournamentService = {
   
   // Slot booking endpoints
   getSlots: (id) => apiCall(`/tournaments/${id}/slots`),
-  bookSlot: (id, slotNumber, gamingUsername) => apiCall(`/tournaments/${id}/book-slot`, {
+  bookSlot: (id, slotNumber, gamingID, gamingUID) => apiCall(`/tournaments/${id}/book-slot`, {
     method: 'POST',
-    body: JSON.stringify({ slotNumber, gamingUsername }),
+    body: JSON.stringify({ slotNumber, gamingID, gamingUID }),
   }),
-  confirmSlotBooking: (id, slotNumber, gamingUsername) => apiCall(`/tournaments/${id}/confirm-slot-booking`, {
+  confirmSlotBooking: (id, slotNumber, gamingID, gamingUID) => apiCall(`/tournaments/${id}/confirm-slot-booking`, {
     method: 'POST',
-    body: JSON.stringify({ slotNumber, gamingUsername }),
+    body: JSON.stringify({ slotNumber, gamingID, gamingUID }),
   }),
   
   // Admin endpoints
@@ -261,6 +261,9 @@ export const tournamentService = {
     body: JSON.stringify({ firstWinnerId, secondWinnerId, thirdWinnerId }),
   }),
   distributePrizes: (id) => apiCall(`/tournaments/admin/${id}/distribute-prizes`, {
+    method: 'POST',
+  }),
+  publishResults: (id) => apiCall(`/tournaments/admin/${id}/publish-results`, {
     method: 'POST',
   }),
   distributeRewards: (id) => apiCall(`/tournaments/admin/${id}/distribute-prizes`, {

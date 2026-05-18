@@ -16,7 +16,8 @@ const tournamentParticipantSchema = new mongoose.Schema({
     min: 1,
     max: 50,
   },
-  gamingUsername: String, // Gaming username entered during slot booking
+  gamingUsername: String, // Gaming ID entered during slot booking
+  gamingUID: String,
   status: {
     type: String,
     enum: ['joined', 'disqualified', 'winner'],

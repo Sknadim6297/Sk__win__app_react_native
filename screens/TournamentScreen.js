@@ -328,11 +328,6 @@ const TournamentScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {tournament.description && (
-          <View style={styles.descriptionSection}>
-            <Text style={styles.descriptionText}>{tournament.description}</Text>
-          </View>
-        )}
       </View>
 
       {/* Join Button */}
@@ -607,17 +602,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.white,
-  },
-  descriptionSection: {
-    backgroundColor: `${COLORS.primary}20`,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  descriptionText: {
-    fontSize: 12,
-    color: COLORS.gray,
   },
   joinButton: {
     backgroundColor: COLORS.primary,
