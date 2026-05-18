@@ -215,7 +215,10 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
         <View style={styles.card}>
           <View style={styles.titleRow}>
             <View style={styles.titleContainer}>
-              <Text style={styles.title}>{tournament.name}</Text>
+              <Text style={styles.title}>
+                {tournament.name}
+                {tournament.matchNumber ? ` | Match #${tournament.matchNumber}` : ''}
+              </Text>
               <Text style={styles.subtitle}>
                 {tournament.game?.name} - {tournament.gameMode?.name}
               </Text>
@@ -277,12 +280,18 @@ const TournamentDetailsScreen = ({ navigation, route }) => {
           {tournament.rules && tournament.rules.length > 0 && (
             <View style={styles.rulesSection}>
               <Text style={styles.sectionTitle}>Rules & Requirements</Text>
-              {tournament.rules.map((rule, index) => (
-                <View key={index} style={styles.ruleItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color={COLORS.accent} />
-                  <Text style={styles.ruleText}>{rule}</Text>
-                </View>
-              ))}
+              {(Array.isArray(tournament.rules)
+                ? tournament.rules.flatMap((r) => String(r).split('\n'))
+                : String(tournament.rules).split('\n')
+              )
+                .map((r) => r.trim())
+                .filter(Boolean)
+                .map((rule, index) => (
+                  <View key={index} style={styles.ruleItem}>
+                    <MaterialCommunityIcons name="circle-small" size={16} color={COLORS.accent} />
+                    <Text style={styles.ruleText}>{rule}</Text>
+                  </View>
+                ))}
             </View>
           )}
 

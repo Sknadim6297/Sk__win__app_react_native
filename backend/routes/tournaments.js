@@ -32,6 +32,25 @@ const normalizeStatus = (status) => {
   return status;
 };
 
+async function getNextMatchNumber() {
+  const latest = await Tournament.findOne({ matchNumber: { $ne: null } })
+    .sort({ matchNumber: -1 })
+    .select('matchNumber')
+    .lean();
+  if (latest?.matchNumber) {
+    return latest.matchNumber + 1;
+  }
+  const total = await Tournament.countDocuments();
+  return 30000 + total + 1;
+}
+
+function resolveMatchNumber(tournament) {
+  if (tournament.matchNumber) return tournament.matchNumber;
+  const id = tournament._id?.toString() || '';
+  const derived = parseInt(id.slice(-6), 16) % 80000;
+  return 10000 + derived;
+}
+
 const getSurvivalReward = (tournament, rank) => {
   if (!rank) return 0;
   if (rank === 1) return tournament?.prizes?.first || 0;
@@ -160,7 +179,9 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
 
     const { 
       name, 
-      description, 
+      description,
+      bannerImage,
+      bannerTitle,
       game,
       gameMode,
       mode,
@@ -217,6 +238,8 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
     const tournamentData = {
       name,
       description: description || '',
+      bannerImage: bannerImage || '',
+      bannerTitle: bannerTitle || '',
       game,
       gameMode,
       mode: mode || 'solo',
@@ -245,6 +268,8 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       registeredPlayers: [],
       createdBy: req.userId,
     };
+
+    tournamentData.matchNumber = await getNextMatchNumber();
 
     console.log('Creating tournament with data:', tournamentData);
 
@@ -1002,8 +1027,8 @@ router.get('/list', async (req, res) => {
   try {
     const userId = req.headers.authorization ? await extractUserIdFromToken(req.headers.authorization) : null;
     const tournaments = await Tournament.find()
-      .populate('game', 'name')
-      .populate('gameMode', 'name')
+      .populate('game', 'name image')
+      .populate('gameMode', 'name image')
       .sort({ startDate: -1 });
 
     // Add participant count and user joined status for each tournament
@@ -1030,11 +1055,14 @@ router.get('/list', async (req, res) => {
         // Calculate real-time status
         const calculatedStatus = calculateTournamentStatus(tournament);
 
+        const doc = tournament.toObject();
         return {
-          ...tournament.toObject(),
+          ...doc,
+          matchNumber: resolveMatchNumber(doc),
+          currentParticipants: participantCount,
           participantCount,
           userJoined,
-          status: calculatedStatus, // Override with calculated status
+          status: calculatedStatus,
         };
       })
     );
@@ -1768,8 +1796,10 @@ router.get('/:id', async (req, res) => {
     const participants = await TournamentParticipant.find({ tournamentId: req.params.id })
       .populate('userId', 'username email');
 
+    const doc = tournament.toObject();
     res.json({
-      ...tournament.toObject(),
+      ...doc,
+      matchNumber: resolveMatchNumber(doc),
       participants,
       participantCount: participants.length,
       roomId: null,

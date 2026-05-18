@@ -104,7 +104,10 @@ export default function GameModesScreen({ navigation, route }) {
   }, [loadGameModes]);
 
   const handleModePress = (mode) => {
-    navigation.navigate('GameDetails', { gameMode: mode, gameId });
+    navigation.navigate('GameDetails', {
+      gameMode: { ...mode, _id: mode.id },
+      gameId,
+    });
   };
 
   const columnWrapperStyle = useMemo(
