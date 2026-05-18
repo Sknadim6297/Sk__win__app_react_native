@@ -1,7 +1,42 @@
 const express = require('express');
 const Game = require('../models/Game');
 const GameMode = require('../models/GameMode');
+const Tournament = require('../models/Tournament');
 const { authMiddleware } = require('../middleware/auth');
+
+async function countTournamentsByGame(gameIds) {
+  if (!gameIds.length) return new Map();
+  const rows = await Tournament.aggregate([
+    {
+      $match: {
+        game: { $in: gameIds },
+        status: { $ne: 'cancelled' },
+      },
+    },
+    { $group: { _id: '$game', count: { $sum: 1 } } },
+  ]);
+  return new Map(rows.map((r) => [String(r._id), r.count]));
+}
+
+async function countTournamentsByMode(modeIds) {
+  if (!modeIds.length) return new Map();
+  const rows = await Tournament.aggregate([
+    {
+      $match: {
+        gameMode: { $in: modeIds },
+        status: { $ne: 'cancelled' },
+      },
+    },
+    { $group: { _id: '$gameMode', count: { $sum: 1 } } },
+  ]);
+  return new Map(rows.map((r) => [String(r._id), r.count]));
+}
+
+function withTournamentCount(doc, countMap, idField = '_id') {
+  const obj = doc.toObject ? doc.toObject() : { ...doc };
+  const key = String(obj[idField] || obj.id);
+  return { ...obj, tournamentCount: countMap.get(key) || 0 };
+}
 
 const router = express.Router();
 
@@ -150,18 +185,20 @@ router.delete('/modes/admin/:id', authMiddleware, async (req, res) => {
 // Get all games
 router.get('/list', async (req, res) => {
   try {
-    const games = await Game.find({ status: 'active' });
-    res.json(games);
+    const games = await Game.find({ status: 'active' }).sort({ createdAt: -1 });
+    const countMap = await countTournamentsByGame(games.map((g) => g._id));
+    res.json(games.map((g) => withTournamentCount(g, countMap)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch games', message: error.message });
   }
 });
 
-// Get popular games for home screen
+// Get popular games for home screen (admin: isPopular + active)
 router.get('/popular', async (req, res) => {
   try {
-    const games = await Game.find({ status: 'active', isPopular: true });
-    res.json(games);
+    const games = await Game.find({ status: 'active', isPopular: true }).sort({ createdAt: -1 });
+    const countMap = await countTournamentsByGame(games.map((g) => g._id));
+    res.json(games.map((g) => withTournamentCount(g, countMap)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch popular games', message: error.message });
   }
@@ -183,8 +220,11 @@ router.get('/:id', async (req, res) => {
 // Get game modes for a specific game
 router.get('/:gameId/modes', async (req, res) => {
   try {
-    const modes = await GameMode.find({ game: req.params.gameId, status: 'active' });
-    res.json(modes);
+    const modes = await GameMode.find({ game: req.params.gameId, status: 'active' }).sort({
+      createdAt: -1,
+    });
+    const countMap = await countTournamentsByMode(modes.map((m) => m._id));
+    res.json(modes.map((m) => withTournamentCount(m, countMap)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch game modes', message: error.message });
   }

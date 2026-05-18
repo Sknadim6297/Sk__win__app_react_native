@@ -24,28 +24,6 @@ const CARD_WIDTH =
   (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
 const CARD_HEIGHT = CARD_WIDTH * 1.22;
 
-const DEFAULT_IMAGE = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
-const ALT_IMAGE = require('../assets/images/87904deacf9b547a95f019e0a322152a.jpg');
-
-const FALLBACK_MODES = [
-  { id: '1', name: 'FF SURVIVAL', liveCount: 6 },
-  { id: '2', name: 'FF FULL MAP', liveCount: 45 },
-  { id: '3', name: 'FF FULL MAP 2', liveCount: 51 },
-  { id: '4', name: 'LONE WOLF', liveCount: 12 },
-  { id: '5', name: 'LW HEADSHOT', liveCount: 8 },
-  { id: '6', name: 'LW LOSS TO WIN', liveCount: 22 },
-  { id: '7', name: 'FF CS-NEW', liveCount: 15 },
-  { id: '8', name: 'ONE TAP CS', liveCount: 9 },
-  { id: '9', name: 'GIVEAWAYS', liveCount: 3 },
-];
-
-function hashCount(seed) {
-  const s = String(seed || '');
-  let n = 0;
-  for (let i = 0; i < s.length; i += 1) n += s.charCodeAt(i);
-  return (n % 90) + 1;
-}
-
 const mapMode = (mode, index) => {
   const id = mode._id || mode.id || String(index);
   const imageUri =
@@ -55,29 +33,43 @@ const mapMode = (mode, index) => {
     id,
     name: (mode.name || 'GAME MODE').toUpperCase(),
     description: mode.description,
-    liveCount: mode.liveCount ?? mode.activeTournaments ?? hashCount(id),
-    image: imageUri ? { uri: imageUri } : index % 2 === 0 ? DEFAULT_IMAGE : ALT_IMAGE,
+    tournamentCount: mode.tournamentCount ?? mode.liveCount ?? mode.activeTournaments ?? 0,
+    image: imageUri ? { uri: imageUri } : null,
   };
 };
 
 function GameModeCard({ item, onPress }) {
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, !item.image && styles.cardPlaceholder]}
       activeOpacity={0.88}
       onPress={() => onPress(item)}
     >
-      <ImageBackground source={item.image} style={styles.cardImage} resizeMode="cover">
-        <View style={styles.liveBadge}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveCount}>{item.liveCount}</Text>
+      {item.image ? (
+        <ImageBackground source={item.image} style={styles.cardImage} resizeMode="cover">
+          <View style={styles.countBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveCount}>{item.tournamentCount}</Text>
+          </View>
+          <View style={styles.titleBar}>
+            <Text style={styles.cardTitle} numberOfLines={2}>
+              {item.name}
+            </Text>
+          </View>
+        </ImageBackground>
+      ) : (
+        <View style={styles.cardImage}>
+          <View style={styles.countBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveCount}>{item.tournamentCount}</Text>
+          </View>
+          <View style={styles.titleBar}>
+            <Text style={styles.cardTitle} numberOfLines={2}>
+              {item.name}
+            </Text>
+          </View>
         </View>
-        <View style={styles.titleBar}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
-            {item.name}
-          </Text>
-        </View>
-      </ImageBackground>
+      )}
     </TouchableOpacity>
   );
 }
@@ -89,7 +81,7 @@ export default function GameModesScreen({ navigation, route }) {
 
   const loadGameModes = useCallback(async () => {
     if (!gameId) {
-      setGameModes(FALLBACK_MODES.map((m, i) => mapMode(m, i)));
+      setGameModes([]);
       setLoading(false);
       return;
     }
@@ -97,15 +89,11 @@ export default function GameModesScreen({ navigation, route }) {
     try {
       setLoading(true);
       const modesData = await gameService.getGameModes(gameId).catch(() => []);
-
-      if (Array.isArray(modesData) && modesData.length > 0) {
-        setGameModes(modesData.map(mapMode));
-      } else {
-        setGameModes(FALLBACK_MODES.map((m, i) => mapMode(m, i)));
-      }
+      const list = Array.isArray(modesData) ? modesData : [];
+      setGameModes(list.map(mapMode));
     } catch (error) {
       console.error('Failed to load game modes:', error);
-      setGameModes(FALLBACK_MODES.map((m, i) => mapMode(m, i)));
+      setGameModes([]);
     } finally {
       setLoading(false);
     }
@@ -157,17 +145,25 @@ export default function GameModesScreen({ navigation, route }) {
 
       <View style={styles.headerLine} />
 
-      <FlatList
-        data={gameModes}
-        keyExtractor={(item) => String(item.id)}
-        numColumns={NUM_COLUMNS}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.gridContent}
-        columnWrapperStyle={columnWrapperStyle}
-        renderItem={({ item }) => (
-          <GameModeCard item={item} onPress={handleModePress} />
-        )}
-      />
+      {gameModes.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <Ionicons name="game-controller-outline" size={48} color={COLORS.gray} />
+          <Text style={styles.emptyTitle}>No game modes yet</Text>
+          <Text style={styles.emptySub}>
+            Ask admin to add modes for this game in Game Management.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={gameModes}
+          keyExtractor={(item) => String(item.id)}
+          numColumns={NUM_COLUMNS}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.gridContent}
+          columnWrapperStyle={columnWrapperStyle}
+          renderItem={({ item }) => <GameModeCard item={item} onPress={handleModePress} />}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -211,6 +207,23 @@ const styles = StyleSheet.create({
     ...TEXT.body,
     color: COLORS.gray,
   },
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    ...TEXT.h3,
+    color: COLORS.white,
+    marginTop: 16,
+  },
+  emptySub: {
+    ...TEXT.body,
+    color: COLORS.gray,
+    textAlign: 'center',
+    marginTop: 8,
+  },
   gridContent: {
     paddingHorizontal: GRID_PADDING,
     paddingTop: 14,
@@ -223,12 +236,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#12162B',
   },
+  cardPlaceholder: {
+    backgroundColor: '#1a2238',
+  },
   cardImage: {
     width: '100%',
     height: '100%',
     justifyContent: 'space-between',
   },
-  liveBadge: {
+  countBadge: {
     position: 'absolute',
     top: 6,
     right: 6,
@@ -236,6 +252,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     zIndex: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   liveDot: {
     width: 8,
