@@ -40,22 +40,16 @@ const MODE_MAX_PLAYERS = {
   squad: 50,
 };
 
-const TOURNAMENT_TYPES = [
-  { label: 'Battle Royale (Full Map)', value: 'battle_royale', description: 'Complete map survival tournament' },
-  { label: 'Clash Squad (Quick Match)', value: 'clash_squad', description: 'Fast-paced team combat' },
-  { label: 'Training Ground', value: 'training', description: 'Practice and skill development' },
-];
-
-const REWARD_TYPES = [
-  { label: 'Per Kill Reward', value: 'per_kill', description: 'Earn money for each kill' },
-  { label: 'Survival / Booyah Prize Pool', value: 'survival', description: 'Win based on placement' },
-  { label: 'Survival + Per Kill', value: 'hybrid', description: 'Placement + kill rewards' },
+const TOURNAMENT_CATEGORIES = [
+  { label: 'Battle Royale', value: 'battle_royale', description: 'Prize pool + per kill rewards' },
+  { label: 'Custom Match', value: 'custom', description: 'Prize pool only — winner / lose' },
 ];
 
 const MATCH_STATUSES = [
-  { label: 'Incoming', value: 'incoming' },
+  { label: 'Upcoming', value: 'incoming' },
   { label: 'Ongoing', value: 'ongoing' },
   { label: 'Completed', value: 'completed' },
+  { label: 'Result Published', value: 'result_published' },
 ];
 
 const TournamentManagement = ({ navigation }) => {
@@ -103,7 +97,7 @@ const TournamentManagement = ({ navigation }) => {
     game: '',
     gameMode: '',
     tournamentType: 'battle_royale',
-    rewardType: 'per_kill',
+    category: 'battle_royale',
     status: 'incoming',
     statusOverride: false,
     mode: 'solo',
@@ -233,28 +227,15 @@ const TournamentManagement = ({ navigation }) => {
   };
 
   const calculateTotalPrizePool = () => {
-    if (form.rewardType === 'per_kill') {
-      return 0; // No prize pool for per-kill only tournaments
-    }
-    if (form.rewardType === 'survival' && form.prizePool) {
-      return parseFloat(form.prizePool) || 0;
-    }
-    if (form.rewardType === 'hybrid') {
-      const entryFee = parseFloat(form.entryFee) || 0;
-      const maxParticipants = parseInt(form.maxParticipants) || 50;
-      const totalCollection = entryFee * maxParticipants;
-      const platformFee = totalCollection * 0.1; // 10% platform fee
-      const calculatedPool = totalCollection - platformFee;
-      return form.prizePool ? parseFloat(form.prizePool) : calculatedPool;
-    }
-    return 0;
+    if (form.prizePool) return parseFloat(form.prizePool) || 0;
+    const entryFee = parseFloat(form.entryFee) || 0;
+    const maxParticipants = parseInt(form.maxParticipants, 10) || 50;
+    const totalCollection = entryFee * maxParticipants;
+    return Math.floor(totalCollection * 0.9);
   };
 
   const calculateRecommendedRewards = () => {
     const totalPrize = calculateTotalPrizePool();
-    if (form.rewardType === 'per_kill') {
-      return { first: 0, second: 0, third: 0 }; // No placement rewards for per-kill
-    }
     return {
       first: Math.floor(totalPrize * 0.5), // 50% for 1st
       second: Math.floor(totalPrize * 0.3), // 30% for 2nd
@@ -305,8 +286,8 @@ const TournamentManagement = ({ navigation }) => {
       description: tournament.description || '',
       game: tournament.game?._id || tournament.game || '',
       gameMode: tournament.gameMode?._id || tournament.gameMode || '',
-      tournamentType: tournament.tournamentType || 'battle_royale',
-      rewardType: tournament.rewardType || 'per_kill',
+      tournamentType: tournament.category || tournament.tournamentType || 'battle_royale',
+      category: tournament.category || tournament.tournamentType || 'battle_royale',
       status: normalizeStatus(tournament.status),
       statusOverride: Boolean(tournament.statusOverride),
       mode: tournament.mode || 'solo',
@@ -327,7 +308,7 @@ const TournamentManagement = ({ navigation }) => {
       roomId: tournament.roomId || '',
       roomPassword: tournament.roomPassword || '',
       showRoomCredentials: Boolean(tournament.showRoomCredentials),
-      killRewardEnabled: tournament.rewardType !== 'survival',
+      killRewardEnabled: (tournament.category || 'battle_royale') !== 'custom',
       teamSize: tournament.teamSize || (tournament.mode === 'duo' ? 2 : tournament.mode === 'squad' ? 4 : 1),
     });
     setShowCreateModal(true);
@@ -376,8 +357,7 @@ const TournamentManagement = ({ navigation }) => {
         description: form.description,
         game: selectedGame,
         gameMode: selectedGameMode,
-        tournamentType: form.tournamentType,
-        rewardType: form.rewardType,
+        category: form.category || form.tournamentType || 'battle_royale',
         status: isEditMode ? form.status : 'incoming',
         statusOverride,
         mode: form.mode,
@@ -388,8 +368,8 @@ const TournamentManagement = ({ navigation }) => {
         bannerTitle: form.bannerTitle?.trim() || '',
         bannerImage: form.bannerImage || '',
         entryFee: parseFloat(form.entryFee) || 0,
-        prizePool: form.rewardType === 'per_kill' ? 0 : calculateTotalPrizePool(),
-        perKill: form.rewardType === 'survival' ? 0 : (parseFloat(form.perKill) || 0),
+        prizePool: parseFloat(form.prizePool) || calculateTotalPrizePool() || 0,
+        perKill: (form.category || form.tournamentType) === 'custom' ? 0 : (parseFloat(form.perKill) || 0),
         maxParticipants: parseInt(form.maxParticipants) || 50,
         maxTeams: form.mode === 'solo' ? parseInt(form.maxParticipants) : Math.floor(parseInt(form.maxParticipants) / form.teamSize),
         minimumBalance: parseFloat(form.minimumBalance) || parseFloat(form.entryFee) || 0,
@@ -398,7 +378,7 @@ const TournamentManagement = ({ navigation }) => {
         roomId: form.roomId,
         roomPassword: form.roomPassword,
         showRoomCredentials: form.showRoomCredentials,
-        killRewardEnabled: form.rewardType !== 'survival',
+        killRewardEnabled: (form.category || form.tournamentType) !== 'custom',
         prizes: calculateRecommendedRewards(),
         teamSize: form.teamSize,
       };
@@ -424,7 +404,7 @@ const TournamentManagement = ({ navigation }) => {
       game: '',
       gameMode: '',
       tournamentType: 'battle_royale',
-      rewardType: 'per_kill',
+      category: 'battle_royale',
       status: 'incoming',
       statusOverride: false,
       mode: 'solo',
@@ -644,14 +624,38 @@ const TournamentManagement = ({ navigation }) => {
     return match.username || match.gamingUsername || match.email || userId;
   };
 
+  const handlePublishResults = async () => {
+    if (!selectedTournamentForResults) return;
+    try {
+      await tournamentService.publishResults(selectedTournamentForResults._id);
+      showToast('Results published — leaderboard is now live', 'success');
+      setShowResultsModal(false);
+      fetchTournaments();
+    } catch (error) {
+      showToast(error.message || 'Failed to publish results', 'error');
+    }
+  };
+
   const handleCalculateResults = async () => {
     if (!selectedTournamentForResults) return;
 
     const missingRank = resultEntries.some(entry => !entry.rank || parseInt(entry.rank, 10) <= 0);
     if (missingRank) {
-      showToast('Please enter rank for all players', 'error');
+      showToast('Please assign a position/rank to every joined player', 'error');
       return;
     }
+
+    const ranks = resultEntries.map((e) => parseInt(e.rank, 10));
+    if (new Set(ranks).size !== ranks.length) {
+      showToast('Duplicate rank numbers are not allowed', 'error');
+      return;
+    }
+    if (ranks.filter((r) => r === 1).length !== 1) {
+      showToast('Exactly one player must be Position #1', 'error');
+      return;
+    }
+
+    const isBR = (selectedTournamentForResults.category || 'battle_royale') === 'battle_royale';
 
     try {
       const payload = {
@@ -659,7 +663,7 @@ const TournamentManagement = ({ navigation }) => {
         results: resultEntries.map(entry => ({
           userId: entry.userId,
           teamId: entry.teamId?.trim() || null,
-          kills: parseInt(entry.kills, 10) || 0,
+          kills: isBR ? parseInt(entry.kills, 10) || 0 : 0,
           rank: parseInt(entry.rank, 10) || 0,
         })),
       };
@@ -912,7 +916,7 @@ const TournamentManagement = ({ navigation }) => {
                     <View style={styles.detailRow}>
                       <MaterialCommunityIcons name="currency-usd" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>Entry: ₹{tournament.entryFee}</Text>
-                      {tournament.rewardType !== 'per_kill' && tournament.prizePool > 0 && (
+                      {tournament.prizePool > 0 && (
                         <>
                           <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
                           <Text style={styles.detailText}>Prize: ₹{tournament.prizePool}</Text>
@@ -920,7 +924,7 @@ const TournamentManagement = ({ navigation }) => {
                       )}
                     </View>
                     <View style={styles.detailRow}>
-                      {tournament.rewardType !== 'survival' && (
+                      {(tournament.category || 'battle_royale') === 'battle_royale' && tournament.perKill > 0 && (
                         <>
                           <MaterialCommunityIcons name="target" size={16} color={COLORS.accent} />
                           <Text style={styles.detailText}>Per Kill: ₹{tournament.perKill}</Text>
@@ -928,8 +932,7 @@ const TournamentManagement = ({ navigation }) => {
                       )}
                       <MaterialCommunityIcons name="star" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>
-                        {tournament.rewardType === 'per_kill' ? 'Kill Rewards' : 
-                         tournament.rewardType === 'survival' ? 'Placement Rewards' : 'Hybrid Rewards'}
+                        {(tournament.category || 'battle_royale') === 'custom' ? 'Custom Match' : 'Battle Royale'}
                       </Text>
                     </View>
                     <View style={styles.detailRow}>
@@ -1073,49 +1076,35 @@ const TournamentManagement = ({ navigation }) => {
                 />
               </View>
 
-              {/* Tournament Type */}
+              {/* Tournament Category */}
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Tournament Type</Text>
+                <Text style={styles.label}>Tournament Category *</Text>
                 <View style={styles.segmentedControl}>
-                  {TOURNAMENT_TYPES.map((type) => (
+                  {TOURNAMENT_CATEGORIES.map((type) => (
                     <TouchableOpacity
                       key={type.value}
                       style={[
                         styles.segmentButton,
-                        form.tournamentType === type.value && styles.segmentButtonActive
+                        (form.category || form.tournamentType) === type.value && styles.segmentButtonActive
                       ]}
-                      onPress={() => handleInputChange('tournamentType', type.value)}
+                      onPress={() => {
+                        handleInputChange('category', type.value);
+                        handleInputChange('tournamentType', type.value);
+                        if (type.value === 'custom') {
+                          handleInputChange('perKill', '0');
+                        }
+                      }}
                     >
                       <Text style={[
                         styles.segmentButtonText,
-                        form.tournamentType === type.value && styles.segmentButtonTextActive
+                        (form.category || form.tournamentType) === type.value && styles.segmentButtonTextActive
                       ]}>{type.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
-              </View>
-
-              {/* Reward Type */}
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Reward Type</Text>
-                <View style={styles.segmentedControl}>
-                  {REWARD_TYPES.map((type) => (
-                    <TouchableOpacity
-                      key={type.value}
-                      style={[
-                        styles.segmentButton,
-                        form.rewardType === type.value && styles.segmentButtonActive
-                      ]}
-                      onPress={() => handleInputChange('rewardType', type.value)}
-                    >
-                      <Text style={[
-                        styles.segmentButtonText,
-                        form.rewardType === type.value && styles.segmentButtonTextActive
-                      ]}>{type.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={styles.helperText}>{REWARD_TYPES.find(t => t.value === form.rewardType)?.description}</Text>
+                <Text style={styles.helperText}>
+                  {TOURNAMENT_CATEGORIES.find(t => t.value === (form.category || form.tournamentType))?.description}
+                </Text>
               </View>
 
               {/* Match Status (Edit only) */}
@@ -1167,46 +1156,37 @@ const TournamentManagement = ({ navigation }) => {
                     keyboardType="numeric"
                   />
                 </View>
-                {/* Show Per Kill Reward for per_kill and hybrid modes */}
-                {(form.rewardType === 'per_kill' || form.rewardType === 'hybrid') && (
+                {(form.category || form.tournamentType) === 'battle_royale' && (
                   <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                    <Text style={styles.label}>Per Kill Reward (₹)</Text>
+                    <Text style={styles.label}>Per Kill Amount (₹) *</Text>
                     <TextInput
                       style={styles.input}
                       value={form.perKill}
                       onChangeText={(text) => setForm(prev => ({ ...prev, perKill: text }))}
-                      placeholder="2"
+                      placeholder="20"
                       placeholderTextColor={COLORS.gray}
                       keyboardType="numeric"
                     />
                   </View>
                 )}
-                {/* Show Prize Pool for survival and hybrid modes */}
-                {(form.rewardType === 'survival' || form.rewardType === 'hybrid') && (
-                  <View style={[styles.formGroup, { flex: 1, marginLeft: form.rewardType === 'hybrid' ? 0 : 8 }]}>
-                    <Text style={styles.label}>
-                      {form.rewardType === 'hybrid' ? 'Additional Prize Pool (₹)' : 'Prize Pool (₹)'}
-                    </Text>
-                    <TextInput
-                      style={styles.input}
-                      value={form.prizePool}
-                      onChangeText={(text) => setForm(prev => ({ ...prev, prizePool: text }))}
-                      placeholder={form.rewardType === 'hybrid' ? 'Optional' : 'Auto-calculated'}
-                      placeholderTextColor={COLORS.gray}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                )}
+                <View style={[styles.formGroup, { flex: 1, marginLeft: (form.category || form.tournamentType) === 'battle_royale' ? 0 : 8 }]}>
+                  <Text style={styles.label}>Total Prize Pool (₹) *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.prizePool}
+                    onChangeText={(text) => setForm(prev => ({ ...prev, prizePool: text }))}
+                    placeholder="Prize pool amount"
+                    placeholderTextColor={COLORS.gray}
+                    keyboardType="numeric"
+                  />
+                </View>
               </View>
 
-              {/* Prize Pool Calculation - Only for survival and hybrid modes */}
-              {(form.rewardType === 'survival' || form.rewardType === 'hybrid') && form.entryFee && form.maxParticipants && (
+              {form.entryFee && form.maxParticipants && (
                 <View style={styles.prizePoolSection}>
                   <View style={styles.prizePoolHeader}>
                     <MaterialCommunityIcons name="trophy" size={20} color={COLORS.accent} />
-                    <Text style={styles.prizePoolTitle}>
-                      {form.rewardType === 'survival' ? 'Prize Pool Calculation' : 'Placement Prize Pool'}
-                    </Text>
+                    <Text style={styles.prizePoolTitle}>Prize Pool Estimate</Text>
                   </View>
                   <View style={styles.prizePoolDetails}>
                     <View style={styles.prizePoolItem}>
@@ -1222,9 +1202,7 @@ const TournamentManagement = ({ navigation }) => {
                       </Text>
                     </View>
                     <View style={[styles.prizePoolItem, styles.prizePoolTotal]}>
-                      <Text style={styles.prizePoolTotalLabel}>
-                        {form.rewardType === 'survival' ? 'Total Prize Pool:' : 'Placement Prize Pool:'}
-                      </Text>
+                      <Text style={styles.prizePoolTotalLabel}>Suggested Prize Pool:</Text>
                       <Text style={styles.prizePoolTotalValue}>
                         ₹{calculateTotalPrizePool().toLocaleString()}
                       </Text>
@@ -1233,8 +1211,7 @@ const TournamentManagement = ({ navigation }) => {
                 </View>
               )}
 
-              {/* Per Kill Rewards Info - Only for per_kill mode */}
-              {form.rewardType === 'per_kill' && form.entryFee && form.perKill && (
+              {(form.category || form.tournamentType) === 'battle_royale' && form.entryFee && form.perKill && (
                 <View style={styles.prizePoolSection}>
                   <View style={styles.prizePoolHeader}>
                     <MaterialCommunityIcons name="target" size={20} color={COLORS.accent} />
@@ -1254,34 +1231,6 @@ const TournamentManagement = ({ navigation }) => {
                     <View style={[styles.prizePoolItem, styles.prizePoolTotal]}>
                       <Text style={styles.prizePoolTotalLabel}>Entry Fee:</Text>
                       <Text style={styles.prizePoolTotalValue}>₹{form.entryFee}</Text>
-                    </View>
-                  </View>
-                </View>
-              )}
-
-              {/* Hybrid Mode Info */}
-              {form.rewardType === 'hybrid' && form.entryFee && (
-                <View style={styles.prizePoolSection}>
-                  <View style={styles.prizePoolHeader}>
-                    <MaterialCommunityIcons name="star-circle" size={20} color={COLORS.accent} />
-                    <Text style={styles.prizePoolTitle}>Hybrid Reward System</Text>
-                  </View>
-                  <View style={styles.prizePoolDetails}>
-                    <View style={styles.prizePoolItem}>
-                      <Text style={styles.prizePoolLabel}>Placement Pool:</Text>
-                      <Text style={styles.prizePoolValue}>₹{calculateTotalPrizePool().toLocaleString()}</Text>
-                    </View>
-                    {form.perKill && (
-                      <View style={styles.prizePoolItem}>
-                        <Text style={styles.prizePoolLabel}>Per Kill Reward:</Text>
-                        <Text style={styles.prizePoolValue}>₹{form.perKill} each</Text>
-                      </View>
-                    )}
-                    <View style={[styles.prizePoolItem, styles.prizePoolTotal]}>
-                      <Text style={styles.prizePoolTotalLabel}>Total Possible Earnings:</Text>
-                      <Text style={styles.prizePoolTotalValue}>
-                        Placement + Kill rewards
-                      </Text>
                     </View>
                   </View>
                 </View>
@@ -1753,6 +1702,7 @@ const TournamentManagement = ({ navigation }) => {
                   <View key={`${entry.userId}-${index}`} style={styles.resultRow}>
                     <Text style={styles.resultName}>{entry.name}</Text>
                     <View style={styles.resultInputs}>
+                      {(selectedTournamentForResults?.category || 'battle_royale') === 'battle_royale' && (
                       <TextInput
                         style={styles.resultInput}
                         value={entry.kills}
@@ -1761,6 +1711,7 @@ const TournamentManagement = ({ navigation }) => {
                         placeholderTextColor={COLORS.gray}
                         keyboardType="numeric"
                       />
+                      )}
                       <TextInput
                         style={styles.resultInput}
                         value={entry.rank}
@@ -1818,6 +1769,13 @@ const TournamentManagement = ({ navigation }) => {
                   <Text style={styles.createButtonText}>Calculate Reward</Text>
                 </TouchableOpacity>
               </View>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.createButton, styles.fullWidthButton]}
+                onPress={handlePublishResults}
+              >
+                <Text style={styles.createButtonText}>Publish Results</Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.modalButton, styles.createButton, styles.fullWidthButton]}

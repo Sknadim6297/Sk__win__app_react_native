@@ -35,10 +35,19 @@ const tournamentSchema = new mongoose.Schema({
     enum: ['solo', 'duo', 'squad'],
     default: 'solo',
   },
+  category: {
+    type: String,
+    enum: ['battle_royale', 'custom'],
+    default: 'battle_royale',
+  },
   rewardType: {
     type: String,
     enum: ['per_kill', 'survival', 'hybrid'],
     default: 'per_kill',
+  },
+  resultsPublished: {
+    type: Boolean,
+    default: false,
   },
   map: {
     type: String,
@@ -73,7 +82,7 @@ const tournamentSchema = new mongoose.Schema({
   }],
   status: {
     type: String,
-    enum: ['incoming', 'ongoing', 'upcoming', 'live', 'locked', 'completed', 'cancelled'],
+    enum: ['incoming', 'ongoing', 'upcoming', 'live', 'locked', 'completed', 'cancelled', 'result_published'],
     default: 'incoming',
   },
   statusOverride: {
@@ -132,6 +141,7 @@ const tournamentSchema = new mongoose.Schema({
       default: null,
     },
     gamingUsername: String,
+    gamingUID: String,
     bookedAt: Date,
     isBooked: {
       type: Boolean,

@@ -16,6 +16,7 @@ import AppIcon from '../components/ui/AppIcon';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { tournamentService } from '../services/api';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import { isBattleRoyaleMatch } from '../utils/tournamentHelpers';
 
 const CYAN = '#00E5FF';
 const ORANGE = '#FF8A00';
@@ -68,7 +69,8 @@ function getMatchNumber(item) {
   return 10000 + (parseInt(id.slice(-6), 16) % 80000);
 }
 
-function TournamentCard({ item, gameModeImage, onJoin }) {
+function TournamentCard({ item, gameModeImage, gameMode, onJoin }) {
+  const isBattleRoyale = isBattleRoyaleMatch(gameMode || item.gameMode);
   const current = item.participantCount ?? item.currentParticipants ?? 0;
   const max = item.maxParticipants || 48;
   const progress = max > 0 ? Math.min(current / max, 1) : 0;
@@ -87,14 +89,19 @@ function TournamentCard({ item, gameModeImage, onJoin }) {
   const bannerSource = bannerUri ? { uri: bannerUri } : DEFAULT_BANNER;
   const bannerTitle =
     item.bannerTitle?.trim() ||
-    `${modeLabel.toUpperCase()} FULL MAP TOURNAMENT`;
+    item.name ||
+    'Tournament';
   const avatarUri =
     item.gameMode?.image && typeof item.gameMode.image === 'string'
       ? resolveMediaUrl(item.gameMode.image)
       : gameModeImage;
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity 
+      style={styles.card} 
+      activeOpacity={0.9}
+      onPress={() => onJoin(item)}
+    >
       <ImageBackground source={bannerSource} style={styles.cardBanner} resizeMode="cover">
         <LinearGradient colors={['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.45)']} style={StyleSheet.absoluteFill} />
         <View style={styles.bannerTopBadges}>
@@ -111,17 +118,6 @@ function TournamentCard({ item, gameModeImage, onJoin }) {
       </ImageBackground>
 
       <View style={styles.cardBody}>
-        <View style={styles.titleRow}>
-          <View style={styles.badgeRow}>
-            <View style={styles.modeBadge}>
-              <Text style={styles.modeBadgeText}>{modeLabel}</Text>
-            </View>
-            <View style={styles.mapBadge}>
-              <Text style={styles.mapBadgeText}>{mapLabel}</Text>
-            </View>
-          </View>
-        </View>
-
         <View style={styles.titleContent}>
           {avatarUri ? (
             <Image source={{ uri: avatarUri }} style={styles.avatar} />
@@ -135,32 +131,6 @@ function TournamentCard({ item, gameModeImage, onJoin }) {
           </Text>
         </View>
 
-        {description ? (
-          <Text style={styles.descriptionText} numberOfLines={4}>
-            {description}
-          </Text>
-        ) : null}
-
-        {(rules.length > 0 || description) && (
-          <View style={styles.rulesBox}>
-            <View style={styles.rulesHeader}>
-              <Text style={styles.rulesHeaderText}>READ RULES BEFORE JOINING</Text>
-            </View>
-            <View style={styles.rulesBody}>
-              {rules.length > 0 ? (
-                rules.map((rule, idx) => (
-                  <View key={`${idx}-${rule.slice(0, 12)}`} style={styles.ruleRow}>
-                    <AppIcon name="check-circle" size={12} color="#4ADE80" />
-                    <Text style={styles.ruleText}>{rule}</Text>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.ruleText}>{description}</Text>
-              )}
-            </View>
-          </View>
-        )}
-
         <View style={styles.statsRow}>
           <View style={styles.statCol}>
             <Text style={styles.statValue} numberOfLines={2}>
@@ -172,11 +142,15 @@ function TournamentCard({ item, gameModeImage, onJoin }) {
             <Text style={styles.statLabel}>PRIZE POOL</Text>
             <CoinAmount value={item.prizePool ?? 0} />
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCol}>
-            <Text style={styles.statLabel}>PER KILL</Text>
-            <CoinAmount value={item.perKill ?? 0} />
-          </View>
+          {isBattleRoyale && (
+            <>
+              <View style={styles.statDivider} />
+              <View style={styles.statCol}>
+                <Text style={styles.statLabel}>PER KILL</Text>
+                <CoinAmount value={item.perKill ?? 0} />
+              </View>
+            </>
+          )}
         </View>
 
         <View style={styles.footerRow}>
@@ -196,7 +170,7 @@ function TournamentCard({ item, gameModeImage, onJoin }) {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -304,7 +278,7 @@ export default function GameDetailsScreen({ navigation, route }) {
             </View>
           }
           renderItem={({ item }) => (
-            <TournamentCard item={item} gameModeImage={gameModeImage} onJoin={handleJoin} />
+            <TournamentCard item={item} gameMode={gameMode} gameModeImage={gameModeImage} onJoin={handleJoin} />
           )}
         />
       )}
@@ -383,7 +357,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
   },
   cardBanner: {
-    height: 148,
+    height: 190,
     padding: 10,
     justifyContent: 'space-between',
   },
