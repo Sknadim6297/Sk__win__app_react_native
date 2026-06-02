@@ -64,7 +64,49 @@ export default function TournamentResultsScreen({ navigation, route }) {
     );
   }
 
-  const { winner, leaderboard = [], isBattleRoyale, tournament } = data;
+  const { winner, leaderboard = [], isBattleRoyale, tournament, customMatch, tournamentType } = data;
+
+  if (tournamentType === 'custom_match' && customMatch) {
+    const winnerName = customMatch.winnerTeam?.name || 'Winner';
+    const runnerName = customMatch.runnerUpTeam?.name || 'Runner-up';
+    const mvpName =
+      customMatch.mvp?.gamingUsername || customMatch.mvp?.username || 'MVP';
+
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12}>
+            <AppIcon name="arrow-left" size={24} color={COLORS.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {tournament?.name || 'Results'}
+          </Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <LinearGradient colors={['#2a2208', '#121A28']} style={styles.winnerCard}>
+            <Text style={styles.winnerBadge}>Winner</Text>
+            <Text style={styles.winnerName}>{winnerName}</Text>
+            <Text style={styles.winnerReward}>₹{customMatch.winnerPrize ?? 0}</Text>
+          </LinearGradient>
+          <View style={styles.row}>
+            <View style={styles.rowBody}>
+              <Text style={styles.rowName}>Runner-Up</Text>
+              <Text style={styles.rowSub}>{runnerName}</Text>
+            </View>
+            <Text style={styles.rowReward}>₹{customMatch.runnerUpPrize ?? 0}</Text>
+          </View>
+          <View style={styles.row}>
+            <View style={styles.rowBody}>
+              <Text style={styles.rowName}>Player of the Match</Text>
+              <Text style={styles.rowSub}>{mvpName}</Text>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   const top3 = leaderboard.filter((e) => e.rank >= 1 && e.rank <= 3);
   const rest = leaderboard.filter((e) => !e.rank || e.rank > 3);
 

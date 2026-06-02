@@ -37,8 +37,18 @@ const tournamentSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['battle_royale', 'custom'],
+    enum: ['battle_royale', 'custom', 'custom_match'],
     default: 'battle_royale',
+  },
+  /** Primary lifecycle: draft → upcoming → ongoing → completed → result_published */
+  lifecycleStatus: {
+    type: String,
+    enum: ['draft', 'upcoming', 'ongoing', 'completed', 'result_published', 'cancelled'],
+    default: 'draft',
+  },
+  maxTeams: {
+    type: Number,
+    default: 2,
   },
   rewardType: {
     type: String,
@@ -82,8 +92,11 @@ const tournamentSchema = new mongoose.Schema({
   }],
   status: {
     type: String,
-    enum: ['incoming', 'ongoing', 'upcoming', 'live', 'locked', 'completed', 'cancelled', 'result_published'],
-    default: 'incoming',
+    enum: [
+      'draft', 'upcoming', 'ongoing', 'completed', 'result_published', 'cancelled',
+      'incoming', 'live', 'locked',
+    ],
+    default: 'draft',
   },
   statusOverride: {
     type: Boolean,

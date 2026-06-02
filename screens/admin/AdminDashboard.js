@@ -160,7 +160,7 @@ const AdminDashboard = ({ navigation }) => {
 
             <TouchableOpacity 
               style={styles.actionCardWide}
-              onPress={() => navigateTo('TournamentManagement')}
+              onPress={() => navigateTo('TournamentManagementV2')}
             >
               <View style={[styles.actionGradient, { backgroundColor: `${COLORS.accent}15` }]}>
                 <View style={styles.actionCardContent}>

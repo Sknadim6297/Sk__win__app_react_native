@@ -23,10 +23,6 @@ import {
   getPaymentSplit,
   formatScheduleLine,
   formatModeLabel,
-  isBattleRoyaleMatch,
-  getJoinBlockReason,
-  getDisplayStatus,
-  formatCountdown,
 } from '../utils/tournamentHelpers';
 
 const CYAN = '#00E5FF';
@@ -53,18 +49,15 @@ export default function TournamentDetailsScreen({ navigation, route }) {
   const [hasJoined, setHasJoined] = useState(false);
   const [activeTab, setActiveTab] = useState('RULES');
   const [joining, setJoining] = useState(false);
-  const [countdown, setCountdown] = useState('');
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
 
   const showToast = (message, type = 'error') => setToast({ visible: true, message, type });
   const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
 
-  const loadDetails = useCallback(async (silent = false) => {
+  const loadDetails = useCallback(async () => {
     try {
-      if (!silent) {
-        setLoading(true);
-        setError(null);
-      }
+      setLoading(true);
+      setError(null);
       if (!tournamentId) {
         setError('Tournament ID not provided');
         return;
@@ -73,9 +66,9 @@ export default function TournamentDetailsScreen({ navigation, route }) {
       setTournament(data);
       setHasJoined(!!data.userJoined);
     } catch (e) {
-      if (!silent) setError(e.message || 'Failed to load tournament details');
+      setError(e.message || 'Failed to load tournament details');
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   }, [tournamentId]);
 
@@ -86,23 +79,8 @@ export default function TournamentDetailsScreen({ navigation, route }) {
   useFocusEffect(
     useCallback(() => {
       loadDetails();
-      const poll = setInterval(() => {
-        loadDetails(true);
-      }, 15000);
-      return () => clearInterval(poll);
     }, [loadDetails])
   );
-
-  useEffect(() => {
-    if (!tournament?.startDate) return undefined;
-    const tick = () => setCountdown(formatCountdown(tournament.startDate));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [tournament?.startDate, tournament?.status]);
-
-  const joinBlockReason = tournament ? getJoinBlockReason(tournament) : null;
-  const canJoinMatch = !hasJoined && !joinBlockReason && tournament?.canJoin !== false;
 
   const handleJoinNow = async () => {
     if (!user) {
@@ -117,13 +95,14 @@ export default function TournamentDetailsScreen({ navigation, route }) {
       showToast('You have already joined this tournament', 'info');
       return;
     }
-    if (joinBlockReason) {
-      showToast(joinBlockReason, 'warning');
-      return;
-    }
-
     try {
       setJoining(true);
+      const eligibility = await tournamentService.canJoin(tournamentId);
+      if (!eligibility?.canJoin) {
+        showToast(eligibility?.reason || 'This tournament is not open for joining', 'warning');
+        return;
+      }
+
       const w = await walletService.getBalance();
       const balance = w?.balance ?? 0;
       const bonusBalance = w?.bonusBalance ?? 0;
@@ -168,11 +147,6 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
   const rules = parseRules(tournament.rules);
   const overlayRules = rules.slice(0, 6);
-  
-  const isBattleRoyale = isBattleRoyaleMatch(tournament);
-  const myGaming = tournament.myGamingDetails;
-  const displayGamingUID = myGaming?.gamingUID;
-  
   const maxP = tournament.maxParticipants || tournament.slots?.length || 48;
   const joined = tournament.participantCount || 0;
   const spotsLeft = Math.max(maxP - joined, 0);
@@ -180,13 +154,30 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
   const displayTitle =
     tournament.bannerTitle ||
-    `${(tournament.map || 'FULL MAP').toUpperCase()} | ${formatModeLabel(tournament.mode).toUpperCase()}`;
+    `FF ${(tournament.map || 'FULL MAP').toUpperCase()} | ${formatModeLabel(tournament.mode).toUpperCase()}`;
 
   const totalPrize =
     Number(tournament.prizePool) ||
     (Number(tournament.prizes?.first || 0) +
       Number(tournament.prizes?.second || 0) +
       Number(tournament.prizes?.third || 0));
+
+  const lifecycleStatus = tournament.lifecycleStatus || tournament.status;
+  const isJoinOpen = lifecycleStatus === 'upcoming' || lifecycleStatus === 'incoming';
+  const joinDisabled = hasJoined || joining || !isJoinOpen;
+  const statusButtonLabelMap = {
+    ongoing: 'ONGOING',
+    completed: 'COMPLETED',
+    result_published: 'RESULT PUBLISHED',
+    cancelled: 'CANCELLED',
+    draft: 'DRAFT',
+    locked: 'LOCKED',
+  };
+  const joinButtonLabel = hasJoined
+    ? 'JOINED'
+    : isJoinOpen
+      ? 'JOIN NOW'
+      : statusButtonLabelMap[lifecycleStatus] || String(lifecycleStatus || 'UNAVAILABLE').toUpperCase();
 
   const renderTabContent = () => {
     if (activeTab === 'PLAYERS') {
@@ -202,18 +193,19 @@ export default function TournamentDetailsScreen({ navigation, route }) {
       ));
     }
     if (activeTab === 'PRIZE POOL') {
+      const prizes = tournament.prizes || {};
+      const firstPlace = Number(prizes.first || 0);
+      const hasPerKill = Number(tournament.perKill) > 0;
       return (
         <View style={styles.prizeBlock}>
-          <View style={[styles.prizeRow, styles.prizeTotal]}>
-            <Text style={styles.prizeLabelBold}>Prize Pool</Text>
-            <CoinValue value={totalPrize} size={20} />
+          <View style={styles.prizeDetailsBox}>
+            <Text style={styles.prizeDetailsTitle}>Prize Distribution Details:</Text>
+            <Text style={styles.prizeDetailsLine}>
+              {hasPerKill
+                ? `1st Place: INR ${firstPlace} + Kill Points`
+                : `1st Place: INR ${firstPlace}`}
+            </Text>
           </View>
-          {isBattleRoyale && Number(tournament.perKill) > 0 && (
-            <View style={styles.prizeRow}>
-              <Text style={styles.prizeLabel}>Per Kill</Text>
-              <CoinValue value={tournament.perKill} />
-            </View>
-          )}
         </View>
       );
     }
@@ -224,7 +216,6 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           <Text style={styles.rulesHeaderText}>Rules and Policies</Text>
         </View>
         <View style={styles.rulesBody}>
-          <Text style={styles.rulesIntro}>INSTRUCTIONS BEFORE JOINING :</Text>
           {rules.length === 0 ? (
             <Text style={styles.ruleLine}>Follow fair play. No hacks or teaming.</Text>
           ) : (
@@ -262,69 +253,37 @@ export default function TournamentDetailsScreen({ navigation, route }) {
             <AppIcon name="arrow-left" size={24} color={COLORS.white} />
           </TouchableOpacity>
 
-          {hasJoined && displayGamingUID && (
-            <View style={styles.gamingUIDBox}>
-              <Text style={styles.gamingUIDLabel}>GAMING UID</Text>
-              <Text style={styles.gamingUIDValue}>{displayGamingUID}</Text>
+          {overlayRules.length > 0 && (
+            <View style={styles.rulesOverlay}>
+              <Text style={styles.rulesOverlayTitle}>READ RULES BEFORE JOINING</Text>
+              {overlayRules.map((r, i) => (
+                <View key={i} style={styles.overlayRuleRow}>
+                  <AppIcon name="check" size={12} color={CYAN} />
+                  <Text style={styles.overlayRuleText} numberOfLines={2}>
+                    {r.length > 42 ? `${r.slice(0, 42)}…` : r}
+                  </Text>
+                </View>
+              ))}
             </View>
           )}
 
           <View style={styles.heroTitleBlock}>
-            <View style={styles.statusBadgeRow}>
-              <View style={[styles.statusPill, styles[`status_${tournament.status}`] || styles.status_incoming]}>
-                <Text style={styles.statusPillText}>{getDisplayStatus(tournament.status)}</Text>
-              </View>
-            </View>
             <Text style={styles.heroTitle}>{displayTitle}</Text>
             <Text style={styles.heroDate}>{formatScheduleLine(tournament.startDate)}</Text>
-            {(tournament.status === 'incoming' || tournament.status === 'locked' || tournament.status === 'upcoming') && (
-              <View style={styles.countdownBox}>
-                <Text style={styles.countdownLabel}>Starts in</Text>
-                <Text style={styles.countdownValue}>{countdown}</Text>
-              </View>
-            )}
           </View>
         </View>
 
-        {joinBlockReason && !hasJoined && (
-          <View style={styles.blockBanner}>
-            <AppIcon name="alert-circle" size={18} color="#FBBF24" />
-            <Text style={styles.blockBannerText}>{joinBlockReason}</Text>
-          </View>
-        )}
-
-        {(tournament.resultsPublished || tournament.status === 'result_published') && (
-          <TouchableOpacity
-            style={styles.resultsCta}
-            onPress={() => navigation.navigate('TournamentResults', { tournamentId })}
-          >
-            <AppIcon name="trophy" size={20} color={CYAN} />
-            <Text style={styles.resultsCtaText}>View Final Leaderboard</Text>
-            <AppIcon name="chevron-right" size={20} color={CYAN} />
-          </TouchableOpacity>
-        )}
-
         <View style={styles.statsRow}>
-          {(() => {
-            const statsToShow = isBattleRoyale
-              ? [
-                  { label: 'PRIZE POOL', value: totalPrize },
-                  { label: 'PER KILL', value: tournament.perKill || 0 },
-                ]
-              : [
-                  { label: 'PRIZE POOL', value: totalPrize },
-                ];
-            return statsToShow.map((item) => (
-              <View key={item.label} style={styles.statCard}>
-                <Text style={styles.statLabel}>{item.label}</Text>
-                {typeof item.value === 'number' ? (
-                  <CoinValue value={item.value} />
-                ) : (
-                  <Text style={styles.coinText}>{item.value}</Text>
-                )}
-              </View>
-            ));
-          })()}
+          {[
+            { label: 'TOTAL PRIZE', value: totalPrize },
+            ...(Number(tournament.perKill) > 0 ? [{ label: 'PER KILL', value: tournament.perKill }] : []),
+            { label: 'ENTRY FEE', value: tournament.entryFee || 0 },
+          ].map((item) => (
+            <View key={item.label} style={styles.statCard}>
+              <Text style={styles.statLabel}>{item.label}</Text>
+              <CoinValue value={item.value} />
+            </View>
+          ))}
         </View>
 
         <View style={styles.joinStatusBlock}>
@@ -371,15 +330,13 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           <Text style={styles.entriesBtnText}>ENTRIES</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.joinBtn, (!canJoinMatch || joining) && styles.joinBtnDisabled]}
+          style={[styles.joinBtn, joinDisabled && styles.joinBtnDisabled]}
           onPress={handleJoinNow}
-          disabled={!canJoinMatch || joining}
+          disabled={joinDisabled}
         >
           <CoinValue value={tournament.entryFee || 0} size={16} />
           <View style={styles.joinDivider} />
-          <Text style={styles.joinBtnText}>
-            {hasJoined ? 'JOINED' : joinBlockReason ? 'CLOSED' : 'JOIN NOW'}
-          </Text>
+          <Text style={styles.joinBtnText}>{joinButtonLabel}</Text>
         </TouchableOpacity>
       </View>
 
@@ -404,29 +361,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  gamingUIDBox: {
-    position: 'absolute',
-    top: 52,
-    right: 10,
-    backgroundColor: 'rgba(0, 229, 255, 0.08)',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 229, 255, 0.3)',
-  },
-  gamingUIDLabel: {
-    color: CYAN,
-    fontSize: 9,
-    fontFamily: FONTS.bold,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  gamingUIDValue: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontFamily: FONTS.bold,
   },
   rulesOverlay: {
     position: 'absolute',
@@ -462,55 +396,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   heroDate: { marginTop: 6, color: CYAN, fontFamily: FONTS.bold, fontSize: 14 },
-  statusBadgeRow: { marginBottom: 8 },
-  statusPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: 'rgba(0,229,255,0.15)',
-  },
-  statusPillText: { fontFamily: FONTS.bold, fontSize: 11, color: CYAN },
-  status_ongoing: { backgroundColor: 'rgba(239,68,68,0.2)' },
-  status_completed: { backgroundColor: 'rgba(148,163,184,0.2)' },
-  status_result_published: { backgroundColor: 'rgba(251,191,36,0.2)' },
-  countdownBox: {
-    marginTop: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  countdownLabel: { color: COLORS.gray, fontSize: 11 },
-  countdownValue: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 16, marginTop: 2 },
-  blockBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 12,
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.35)',
-  },
-  blockBannerText: { flex: 1, color: '#FCA5A5', fontSize: 13 },
-  resultsCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: 12,
-    marginTop: 12,
-    padding: 14,
-    backgroundColor: 'rgba(0,229,255,0.1)',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(0,229,255,0.35)',
-  },
-  resultsCtaText: { color: CYAN, fontFamily: FONTS.bold, flex: 1 },
   statsRow: {
     flexDirection: 'row',
     paddingHorizontal: 12,
@@ -565,7 +450,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#1a2744',
   },
-  rulesIntro: { fontFamily: FONTS.bold, color: '#111', marginBottom: 10, fontSize: 13 },
   ruleLine: { color: '#333', fontSize: 13, lineHeight: 22, marginBottom: 6 },
   playerRow: {
     flexDirection: 'row',
@@ -579,6 +463,24 @@ const styles = StyleSheet.create({
   playerName: { color: COLORS.white, flex: 1 },
   emptyTab: { color: COLORS.gray, textAlign: 'center', marginTop: 24 },
   prizeBlock: { gap: 12 },
+  prizeDetailsBox: {
+    backgroundColor: '#121A21',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    minHeight: 96,
+  },
+  prizeDetailsTitle: {
+    color: COLORS.white,
+    fontSize: 13,
+    marginBottom: 14,
+  },
+  prizeDetailsLine: {
+    color: COLORS.white,
+    fontSize: 14,
+    lineHeight: 22,
+  },
   prizeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

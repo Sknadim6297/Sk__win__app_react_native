@@ -13,6 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { LilitaOne_400Regular } from '@expo-google-fonts/lilita-one';
 import { AuthProvider, AuthContext } from './context/AuthContext';
+import { logApiConfig } from './utils/apiConfig';
 import LandingScreen from './screens/LandingScreen';
 import WelcomeOnboardingScreen from './screens/WelcomeOnboardingScreen';
 import AuthScreen from './screens/AuthScreen';
@@ -49,6 +50,8 @@ import UserManagement from './screens/admin/UserManagement';
 import UserDetails from './screens/admin/UserDetails';
 import TournamentHistory from './screens/admin/TournamentHistory';
 import TournamentManagement from './screens/admin/TournamentManagement';
+import TournamentManagementV2 from './screens/admin/TournamentManagementV2';
+import TournamentResultEntryScreen from './screens/admin/TournamentResultEntryScreen';
 import TournamentLeaderboard from './screens/admin/TournamentLeaderboard';
 import GameManagement from './screens/admin/GameManagement';
 import TutorialManagement from './screens/admin/TutorialManagement';
@@ -82,6 +85,9 @@ function MainTabNavigator() {
 }
 
 export default function App() {
+  useEffect(() => {
+    if (__DEV__) logApiConfig();
+  }, []);
   const [fontsLoaded] = useFonts({
     'LilitaOne-Regular': LilitaOne_400Regular,
   });
@@ -144,6 +150,8 @@ function AppNavigator() {
                 <Stack.Screen name="UserDetails" component={UserDetails} />
                 <Stack.Screen name="TournamentHistory" component={TournamentHistory} />
                 <Stack.Screen name="TournamentManagement" component={TournamentManagement} />
+                <Stack.Screen name="TournamentManagementV2" component={TournamentManagementV2} />
+                <Stack.Screen name="TournamentResultEntry" component={TournamentResultEntryScreen} />
                 <Stack.Screen name="TournamentLeaderboard" component={TournamentLeaderboard} />
                 <Stack.Screen name="GameManagement" component={GameManagement} />
                 <Stack.Screen name="TutorialManagement" component={TutorialManagement} />

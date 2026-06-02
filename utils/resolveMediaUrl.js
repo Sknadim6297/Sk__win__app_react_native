@@ -1,27 +1,24 @@
-import { getApiUrl } from './apiConfig';
+import { getApiOrigin, isPrivateOrLocalHost } from './apiConfig';
 
 /**
- * Turn relative /uploads paths into device-reachable URLs.
- * Rewrites localhost/127.0.0.1 from server uploads to the app's API host (LAN IP).
+ * Turn relative /uploads paths into absolute URLs using the configured API origin.
+ * Rewrites localhost and private LAN hosts from stored DB URLs to the public API origin.
  */
 export function resolveMediaUrl(url) {
   if (!url || typeof url !== 'string') return '';
 
   const trimmed = url.trim();
-  const apiBase = getApiUrl().replace(/\/api\/?$/, '');
+  const apiOrigin = getApiOrigin();
 
   try {
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       const parsed = new URL(trimmed);
-      const apiHost = new URL(apiBase.startsWith('http') ? apiBase : `http://${apiBase}`);
 
-      if (
-        parsed.hostname === 'localhost' ||
-        parsed.hostname === '127.0.0.1' ||
-        parsed.hostname === '10.0.2.2'
-      ) {
-        parsed.hostname = apiHost.hostname;
-        parsed.port = apiHost.port || parsed.port;
+      if (isPrivateOrLocalHost(parsed.hostname)) {
+        const apiParsed = new URL(apiOrigin.startsWith('http') ? apiOrigin : `https://${apiOrigin}`);
+        parsed.protocol = apiParsed.protocol;
+        parsed.hostname = apiParsed.hostname;
+        parsed.port = apiParsed.port;
         return parsed.toString();
       }
 
@@ -29,11 +26,11 @@ export function resolveMediaUrl(url) {
     }
 
     if (trimmed.startsWith('/')) {
-      return `${apiBase}${trimmed}`;
+      return `${apiOrigin}${trimmed}`;
     }
 
-    return `${apiBase}/${trimmed}`;
+    return `${apiOrigin}/${trimmed}`;
   } catch {
-    return trimmed.startsWith('http') ? trimmed : `${apiBase}/${trimmed.replace(/^\//, '')}`;
+    return trimmed.startsWith('http') ? trimmed : `${apiOrigin}/${trimmed.replace(/^\//, '')}`;
   }
 }

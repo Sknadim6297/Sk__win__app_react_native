@@ -80,6 +80,24 @@ function TournamentCard({ item, gameModeImage, gameMode, onJoin }) {
   const description = (item.description || '').trim();
   const matchNo = getMatchNumber(item);
   const displayTitle = `${item.name || 'Tournament'} | Match #${matchNo}`;
+  const lifecycleStatus = item.lifecycleStatus || item.status;
+  const isJoinOpen = lifecycleStatus === 'upcoming' || lifecycleStatus === 'incoming';
+  const isJoined = Boolean(item.userJoined);
+  const statusLabelMap = {
+    ongoing: 'ONGOING',
+    live: 'ONGOING',
+    completed: 'COMPLETED',
+    result_published: 'RESULTS',
+    cancelled: 'CANCELLED',
+    locked: 'LOCKED',
+    draft: 'DRAFT',
+  };
+  const ctaLabel = isJoined
+    ? 'JOINED'
+    : isJoinOpen
+      ? 'JOIN'
+      : statusLabelMap[lifecycleStatus] || String(lifecycleStatus || 'UNAVAILABLE').toUpperCase();
+  const ctaDisabled = !isJoinOpen || isJoined;
 
   const bannerUri = item.bannerImage
     ? resolveMediaUrl(item.bannerImage)
@@ -163,10 +181,23 @@ function TournamentCard({ item, gameModeImage, gameMode, onJoin }) {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.joinBtn} activeOpacity={0.9} onPress={() => onJoin(item)}>
-            <CoinAmount value={item.entryFee ?? 0} color="#050510" size={16} />
-            <Text style={styles.joinText}>JOIN</Text>
-            <AppIcon name="chevron-right" size={18} color="#050510" />
+          <TouchableOpacity
+            style={[styles.joinBtn, ctaDisabled && styles.joinBtnDisabled, isJoined && styles.joinBtnJoined]}
+            activeOpacity={0.9}
+            onPress={() => {
+              if (isJoinOpen && !isJoined) onJoin(item);
+            }}
+            disabled={ctaDisabled}
+          >
+            {isJoinOpen && !isJoined ? (
+              <>
+                <CoinAmount value={item.entryFee ?? 0} color="#050510" size={16} />
+                <Text style={styles.joinText}>{ctaLabel}</Text>
+                <AppIcon name="chevron-right" size={18} color="#050510" />
+              </>
+            ) : (
+              <Text style={styles.joinTextDisabled}>{ctaLabel}</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -576,11 +607,23 @@ const styles = StyleSheet.create({
     minWidth: 118,
     justifyContent: 'center',
   },
+  joinBtnDisabled: {
+    backgroundColor: '#2B3342',
+  },
+  joinBtnJoined: {
+    backgroundColor: '#1F8F4D',
+  },
   joinText: {
     fontFamily: FONTS.bold,
     fontSize: 15,
     color: '#050510',
     letterSpacing: 0.5,
+  },
+  joinTextDisabled: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: COLORS.white,
+    letterSpacing: 0.4,
   },
   centered: {
     flex: 1,

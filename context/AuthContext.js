@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getApiUrl } from '../utils/apiConfig';
+import { getApiUrl, getApiConfigDiagnostics } from '../utils/apiConfig';
 
 export const AuthContext = createContext();
 
@@ -149,10 +149,13 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: data.user, role: userRole };
     } catch (error) {
       console.error('Login error:', error);
+      const diag = getApiConfigDiagnostics();
       const message =
         error.message?.includes('Network request failed') ||
         error.message?.includes('Failed to fetch')
-          ? `Cannot reach server at ${apiUrl}. Start backend (npm run dev in /backend) and use the same Wi‑Fi.`
+          ? diag.isPrivate
+            ? `Cannot reach server. The app is using a local/Wi‑Fi-only URL (${apiUrl}). On mobile data, set EXPO_PUBLIC_API_URL in .env to your public API (https://your-domain.com/api) and restart Expo.`
+            : `Cannot reach server at ${apiUrl}. Check internet connection and that the API is online.`
           : error.message || 'Login failed';
       return { success: false, error: message };
     }

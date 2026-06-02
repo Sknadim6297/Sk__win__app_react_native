@@ -61,6 +61,7 @@ export function isCustomMatch(tournament) {
 }
 
 const STATUS_LABELS = {
+  draft: 'Draft',
   incoming: 'Upcoming',
   upcoming: 'Upcoming',
   locked: 'Upcoming',
@@ -97,7 +98,10 @@ export function formatCountdown(targetDate) {
 export function getJoinBlockReason(tournament) {
   if (!tournament) return null;
   if (tournament.joinBlockReason) return tournament.joinBlockReason;
-  const status = tournament.status;
+  const status = tournament.lifecycleStatus || tournament.status;
+  if (status === 'draft') {
+    return 'Tournament is not published yet';
+  }
   if (tournament.resultsPublished || status === 'result_published') {
     return 'Results have been published for this match';
   }
@@ -109,6 +113,9 @@ export function getJoinBlockReason(tournament) {
   }
   if (status === 'locked') {
     return 'Registration is closed';
+  }
+  if (status !== 'upcoming' && status !== 'incoming') {
+    return 'Match is not open for joining';
   }
   const max = tournament.maxParticipants || 50;
   const joined = tournament.participantCount ?? tournament.currentParticipants ?? 0;

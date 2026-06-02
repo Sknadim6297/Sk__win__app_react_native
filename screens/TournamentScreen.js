@@ -205,6 +205,7 @@ const TournamentScreen = ({ navigation }) => {
 
   const getJoinButtonState = (tournament) => {
     const userJoined = isUserJoined(tournament._id);
+    const status = tournament.lifecycleStatus || tournament.status;
 
     if (userJoined) {
       return {
@@ -217,27 +218,16 @@ const TournamentScreen = ({ navigation }) => {
       };
     }
 
-    // For locked tournaments, show Join Now button but it will show notification when clicked
-    if (tournament.status === 'locked') {
-      return {
-        label: 'Join Now',
-        Icon: PlusCircleIcon,
-        disabled: false,
-        buttonStyle: styles.joinButton,
-        textStyle: styles.joinButtonText,
-        showIcon: true,
-        isLocked: true, // Flag to show lock icon
-      };
-    }
+    // Show status-wise disabled button for non-upcoming states
+    if (status !== 'incoming' && status !== 'upcoming') {
+      let label = 'UNAVAILABLE';
+      if (status === 'ongoing' || status === 'live') label = 'ONGOING';
+      else if (status === 'completed') label = 'COMPLETED';
+      else if (status === 'result_published') label = 'RESULT PUBLISHED';
+      else if (status === 'cancelled') label = 'CANCELLED';
+      else if (status === 'locked') label = 'LOCKED';
+      else if (status === 'draft') label = 'DRAFT';
 
-    // For ended tournaments, disable button
-    if (tournament.status === 'completed' || tournament.status === 'cancelled' || tournament.status === 'live' || tournament.status === 'ongoing') {
-      let label = 'COMPLETED';
-      if (tournament.status === 'cancelled') {
-        label = 'CANCELLED';
-      } else if (tournament.status === 'live' || tournament.status === 'ongoing') {
-        label = 'LIVE';
-      }
       return {
         label,
         Icon: null,

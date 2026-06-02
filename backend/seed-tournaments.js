@@ -1,9 +1,9 @@
 /**
- * Seeds 10 dummy tournaments for UI / flow testing:
- * - 5 Custom (Lone Wolf) — prize pool only
- * - 5 Battle Royale (Full Map) — prize pool + per kill
+ * Seeds 10 dummy tournaments for admin lifecycle + result entry testing:
+ * - 5 Custom (team vs team) — CustomMatchResult + PrizeDistribution
+ * - 5 Battle Royale (solo slots) — BattleRoyaleResult + rank tiers
  *
- * Run: npm run seed:tournaments
+ * Run from backend/: npm run seed:tournaments
  */
 require('dotenv').config();
 const mongoose = require('mongoose');
@@ -13,10 +13,15 @@ const Game = require('./models/Game');
 const GameMode = require('./models/GameMode');
 const Tournament = require('./models/Tournament');
 const TournamentParticipant = require('./models/TournamentParticipant');
-const TournamentResult = require('./models/TournamentResult');
+const Team = require('./models/Team');
+const TeamMember = require('./models/TeamMember');
+const PrizeDistribution = require('./models/PrizeDistribution');
+const BattleRoyaleResult = require('./models/BattleRoyaleResult');
+const CustomMatchResult = require('./models/CustomMatchResult');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/sk-win';
-const SEED_TAG = 'dummy-tournament-v1';
+const SEED_TAG = 'dummy-tournament-v2';
+
 const BANNER_IMAGES = [
   'img_1775898188319.jpg',
   'img_1779015715280.jpg',
@@ -58,27 +63,27 @@ function hoursAgo(h) {
   return new Date(Date.now() - h * 60 * 60 * 1000);
 }
 
-function buildSlots(maxSlots, bookings) {
-  const slots = [];
-  for (let i = 1; i <= maxSlots; i++) {
-    const b = bookings.find((x) => x.slotNumber === i);
-    slots.push({
-      slotNumber: i,
-      userId: b?.userId || null,
-      gamingUsername: b?.gamingID || null,
-      gamingUID: b?.gamingUID || null,
-      bookedAt: b ? b.bookedAt || new Date() : null,
-      isBooked: !!b,
-    });
-  }
-  return slots;
-}
-
 function splitPrizes(prizePool) {
   return {
     first: Math.floor(prizePool * 0.5),
     second: Math.floor(prizePool * 0.3),
     third: Math.floor(prizePool * 0.2),
+  };
+}
+
+function brRankTiers(prizePool) {
+  const p = splitPrizes(prizePool);
+  return [
+    { rankFrom: 1, rankTo: 1, prize: p.first },
+    { rankFrom: 2, rankTo: 2, prize: p.second },
+    { rankFrom: 3, rankTo: 3, prize: p.third },
+  ];
+}
+
+function customPrizeSplit(prizePool) {
+  return {
+    winnerPrize: Math.floor(prizePool * 0.6),
+    runnerUpPrize: Math.floor(prizePool * 0.4),
   };
 }
 
@@ -141,7 +146,7 @@ async function ensureGameAndModes() {
     loneWolfMode = await GameMode.create({
       game: game._id,
       name: 'Lone Wolf',
-      description: 'Custom matches — 1v1 and arena modes',
+      description: 'Custom matches — squad vs squad',
       image: BANNER_IMAGES[1],
       status: 'active',
     });
@@ -164,18 +169,38 @@ async function ensureGameAndModes() {
 async function clearPreviousSeed() {
   const old = await Tournament.find({ name: { $in: SEED_TITLES } }).select('_id');
   const ids = old.map((t) => t._id);
-  if (ids.length) {
-    await TournamentParticipant.deleteMany({ tournamentId: { $in: ids } });
-    await TournamentResult.deleteMany({ tournamentId: { $in: ids } });
-    await Tournament.deleteMany({ _id: { $in: ids } });
-    console.log(`Removed ${ids.length} previous seed tournaments`);
+  if (!ids.length) return;
+
+  await TournamentParticipant.deleteMany({ tournamentId: { $in: ids } });
+  await TeamMember.deleteMany({ tournamentId: { $in: ids } });
+  await Team.deleteMany({ tournamentId: { $in: ids } });
+  await BattleRoyaleResult.deleteMany({ tournamentId: { $in: ids } });
+  await CustomMatchResult.deleteMany({ tournamentId: { $in: ids } });
+  await PrizeDistribution.deleteMany({ tournamentId: { $in: ids } });
+  await Tournament.deleteMany({ _id: { $in: ids } });
+  console.log(`Removed ${ids.length} previous seed tournaments (+ related results/teams)`);
+}
+
+function buildSlots(maxSlots, bookings) {
+  const slots = [];
+  for (let i = 1; i <= maxSlots; i++) {
+    const b = bookings.find((x) => x.slotNumber === i);
+    slots.push({
+      slotNumber: i,
+      userId: b?.userId || null,
+      gamingUsername: b?.gamingID || null,
+      gamingUID: b?.gamingUID || null,
+      bookedAt: b ? b.bookedAt || new Date() : null,
+      isBooked: !!b,
+    });
   }
+  return slots;
 }
 
 function makeBookings(players, count, startSlot = 1) {
   const capped = Math.min(count, players.length);
   if (count > players.length) {
-    console.warn(`  ⚠ Requested ${count} bookings but only ${players.length} unique test players — capping.`);
+    console.warn(`  ⚠ Requested ${count} bookings but only ${players.length} players — capping.`);
   }
   return Array.from({ length: capped }, (_, i) => {
     const p = players[i];
@@ -190,7 +215,7 @@ function makeBookings(players, count, startSlot = 1) {
   });
 }
 
-async function attachParticipants(tournament, bookings, category) {
+async function attachBrParticipants(tournament, bookings) {
   for (const b of bookings) {
     await TournamentParticipant.create({
       tournamentId: tournament._id,
@@ -204,78 +229,140 @@ async function attachParticipants(tournament, bookings, category) {
   }
 }
 
-async function attachResults(tournament, players, bookings, { isBR, publish }) {
+async function attachCustomTeams(tournament, players, teamSize = 4) {
+  const sliceA = players.slice(0, teamSize);
+  const sliceB = players.slice(teamSize, teamSize * 2);
+  if (sliceA.length < teamSize || sliceB.length < teamSize) {
+    throw new Error(`Need ${teamSize * 2} players for custom teams, got ${players.length}`);
+  }
+
+  const teamA = await Team.create({
+    tournamentId: tournament._id,
+    name: 'Alpha Squad',
+    captainUserId: sliceA[0]._id,
+    status: 'registered',
+  });
+  const teamB = await Team.create({
+    tournamentId: tournament._id,
+    name: 'Bravo Squad',
+    captainUserId: sliceB[0]._id,
+    status: 'registered',
+  });
+
+  const attachMembers = async (team, members) => {
+    for (let i = 0; i < members.length; i++) {
+      const p = members[i];
+      await TeamMember.create({
+        tournamentId: tournament._id,
+        teamId: team._id,
+        userId: p._id,
+        gamingUsername: `FF_${p.username}`,
+        gamingUID: `${1000000000 + i + (team === teamA ? 1 : 10)}`,
+        role: i === 0 ? 'captain' : 'member',
+      });
+    }
+  };
+
+  await attachMembers(teamA, sliceA);
+  await attachMembers(teamB, sliceB);
+
+  tournament.currentParticipants = 2;
+  tournament.registeredPlayers = [...sliceA, ...sliceB].map((p) => p._id);
+  await tournament.save();
+
+  return { teamA, teamB, mvpUser: sliceA[1] };
+}
+
+async function seedPrizeDistribution(tournament, type) {
+  if (type === 'battle_royale') {
+    return PrizeDistribution.create({
+      tournamentId: tournament._id,
+      tournamentType: 'battle_royale',
+      rankTiers: brRankTiers(tournament.prizePool),
+      winnerPrize: 0,
+      runnerUpPrize: 0,
+    });
+  }
+  const { winnerPrize, runnerUpPrize } = customPrizeSplit(tournament.prizePool);
+  return PrizeDistribution.create({
+    tournamentId: tournament._id,
+    tournamentType: 'custom_match',
+    rankTiers: [],
+    winnerPrize,
+    runnerUpPrize,
+  });
+}
+
+async function seedBattleRoyaleResults(tournament, bookings, prizeDistribution) {
   const ordered = [...bookings].sort((a, b) => a.slotNumber - b.slotNumber);
   const killTable = [12, 8, 5, 4, 3, 2, 1, 0, 0, 0];
-  const results = [];
+  const perKill = tournament.perKill || 0;
+  const entries = [];
 
   for (let i = 0; i < ordered.length; i++) {
     const rank = i + 1;
     const b = ordered[i];
-    const kills = isBR ? killTable[i] || 0 : 0;
-    const perKill = tournament.perKill || 0;
-    const killReward = isBR ? kills * perKill : 0;
-    const survivalReward =
-      rank === 1
-        ? tournament.prizes.first
-        : rank === 2
-          ? tournament.prizes.second
-          : rank === 3
-            ? tournament.prizes.third
-            : 0;
-    const totalReward = killReward + survivalReward;
+    const kills = killTable[i] || 0;
+    const placementPrize = prizeDistribution.rankTiers.reduce((sum, tier) => {
+      if (rank >= tier.rankFrom && rank <= tier.rankTo) return tier.prize;
+      return sum;
+    }, 0);
+    const prize = placementPrize + kills * perKill;
 
-    results.push({
+    entries.push({
       tournamentId: tournament._id,
       userId: b.userId,
+      position: rank,
       kills,
-      rank,
-      prizeAmount: survivalReward,
-      perKillAmount: perKill,
-      rewardType: isBR ? 'per_kill' : 'survival',
-      killReward,
-      survivalReward,
-      totalReward,
-      prizeCredited: false,
+      prize,
+      gamingUsername: b.gamingID,
+      gamingUID: b.gamingUID,
     });
 
     await TournamentParticipant.updateOne(
       { tournamentId: tournament._id, userId: b.userId },
       {
         rank,
-        prizeAmount: totalReward,
+        prizeAmount: prize,
         status: rank === 1 ? 'winner' : 'joined',
       }
     );
   }
 
-  await TournamentResult.insertMany(results);
+  await BattleRoyaleResult.insertMany(entries);
+}
 
-  if (publish) {
-    tournament.resultsPublished = true;
-    tournament.status = 'result_published';
-    tournament.statusOverride = true;
-    await tournament.save();
-  }
+async function seedCustomMatchResult(tournament, teams, mvpUser, prizeDistribution) {
+  await CustomMatchResult.create({
+    tournamentId: tournament._id,
+    winnerTeamId: teams.teamA._id,
+    runnerUpTeamId: teams.teamB._id,
+    mvpUserId: mvpUser._id,
+    winnerPrize: prizeDistribution.winnerPrize,
+    runnerUpPrize: prizeDistribution.runnerUpPrize,
+  });
 }
 
 async function createTournament(def, ctx) {
   const { game, admin, matchNumber } = ctx;
+  const lifecycleStatus = def.lifecycleStatus;
   const maxSlots = def.maxParticipants || 48;
-  const bookings = def.bookings || [];
   const prizePool = def.prizePool;
   const prizes = splitPrizes(prizePool);
+  const locked = ['ongoing', 'completed', 'result_published'].includes(lifecycleStatus);
 
   const tournament = await Tournament.create({
     name: def.name,
-    description: def.description,
+    description: `${def.description} [${SEED_TAG}]`,
     bannerImage: def.bannerImage || BANNER_IMAGES[matchNumber % BANNER_IMAGES.length],
     bannerTitle: def.bannerTitle || def.name.toUpperCase(),
-    matchNumber: 40000 + matchNumber,
+    matchNumber: 50000 + matchNumber,
     game: game._id,
     gameMode: def.gameModeId,
     mode: def.mode || 'solo',
     category: def.category,
+    lifecycleStatus,
+    status: lifecycleStatus,
     rewardType: def.category === 'custom' ? 'survival' : 'per_kill',
     map: def.map,
     rules: def.rules || DEFAULT_RULES,
@@ -283,35 +370,48 @@ async function createTournament(def, ctx) {
     prizePool,
     perKill: def.category === 'custom' ? 0 : def.perKill,
     maxParticipants: maxSlots,
-    currentParticipants: bookings.length,
-    registeredPlayers: bookings.map((b) => b.userId),
-    status: def.status,
-    statusOverride: def.statusOverride ?? false,
-    locked: def.locked ?? false,
+    maxTeams: def.maxTeams || 2,
+    currentParticipants: 0,
+    registeredPlayers: [],
+    locked,
     startDate: def.startDate,
     endDate: def.endDate,
-    resultsPublished: def.resultsPublished ?? false,
+    resultsPublished: lifecycleStatus === 'result_published',
     prizes,
-    slots: buildSlots(maxSlots, bookings),
+    slots: def.category === 'battle_royale' ? buildSlots(maxSlots, def.bookings || []) : [],
     createdBy: admin._id,
     minimumBalance: def.entryFee,
-    roomId: def.roomId || '',
-    roomPassword: def.roomPassword || '',
-    showRoomCredentials: def.showRoomCredentials ?? false,
+    roomId: def.roomId || (locked ? 'SEEDROOM99' : ''),
+    roomPassword: def.roomPassword || (locked ? 'seed99' : ''),
+    showRoomCredentials: def.showRoomCredentials ?? locked,
   });
 
-  if (bookings.length) {
-    await attachParticipants(tournament, bookings, def.category);
+  let prizeDistribution = null;
+
+  if (def.category === 'custom' && def.teamPlayers?.length) {
+    const teams = await attachCustomTeams(tournament, def.teamPlayers, def.teamSize || 4);
+    prizeDistribution = await seedPrizeDistribution(tournament, 'custom_match');
+    if (def.seedResults) {
+      await seedCustomMatchResult(tournament, teams, teams.mvpUser, prizeDistribution);
+    }
+    return { tournament, prizeDistribution, teams };
   }
 
-  if (def.seedResults) {
-    await attachResults(tournament, ctx.players, bookings, {
-      isBR: def.category === 'battle_royale',
-      publish: def.resultsPublished,
-    });
+  if (def.bookings?.length) {
+    await attachBrParticipants(tournament, def.bookings);
+    tournament.currentParticipants = def.bookings.length;
+    tournament.registeredPlayers = def.bookings.map((b) => b.userId);
+    await tournament.save();
   }
 
-  return tournament;
+  if (def.category === 'battle_royale') {
+    prizeDistribution = await seedPrizeDistribution(tournament, 'battle_royale');
+    if (def.seedResults && def.bookings?.length) {
+      await seedBattleRoyaleResults(tournament, def.bookings, prizeDistribution);
+    }
+  }
+
+  return { tournament, prizeDistribution };
 }
 
 async function seedTournaments() {
@@ -333,80 +433,73 @@ async function seedTournaments() {
     {
       name: 'Lone Wolf Clash',
       category: 'custom',
+      mode: 'squad',
       gameModeId: loneWolfMode._id,
       map: 'Training Ground',
       entryFee: 5,
       prizePool: 200,
-      maxParticipants: 48,
+      lifecycleStatus: 'upcoming',
       startDate: minutesFromNow(30),
       endDate: hoursFromNow(3),
-      status: 'incoming',
-      statusOverride: false,
-      bookings: [],
-      description: 'Solo custom clash — winner takes the prize pool. Empty slots for join testing.',
+      teamPlayers: players.slice(0, 8),
+      description: 'Upcoming squad custom — register teams, no results yet.',
     },
     {
       name: '1v1 Arena',
       category: 'custom',
+      mode: 'squad',
       gameModeId: loneWolfMode._id,
       map: 'Arena Alpha',
       entryFee: 10,
       prizePool: 400,
-      maxParticipants: 48,
+      lifecycleStatus: 'upcoming',
       startDate: hoursFromNow(2),
       endDate: hoursFromNow(5),
-      status: 'incoming',
-      bookings: makeBookings(players, 24),
-      description: 'Half-filled custom arena — test countdown and partial slots.',
+      teamPlayers: players.slice(8, 16),
+      description: 'Both teams registered — ready to publish & start.',
     },
     {
       name: 'Sniper Challenge',
       category: 'custom',
+      mode: 'squad',
       gameModeId: loneWolfMode._id,
       map: 'Sniper Ridge',
       entryFee: 15,
       prizePool: 600,
-      maxParticipants: 48,
+      lifecycleStatus: 'ongoing',
       startDate: hoursAgo(0.15),
       endDate: hoursFromNow(2),
-      status: 'ongoing',
-      statusOverride: true,
-      locked: true,
-      bookings: makeBookings(players, 32),
-      description: 'Ongoing custom match — join should be blocked.',
+      teamPlayers: players.slice(16, 24),
+      description: 'Live custom match — join blocked.',
     },
     {
       name: 'Desert Duel',
       category: 'custom',
+      mode: 'squad',
       gameModeId: loneWolfMode._id,
       map: 'Desert Ruins',
       entryFee: 12,
       prizePool: 500,
-      maxParticipants: 48,
+      lifecycleStatus: 'completed',
       startDate: hoursAgo(4),
       endDate: hoursAgo(1),
-      status: 'completed',
-      statusOverride: true,
-      bookings: makeBookings(players, 10),
-      seedResults: true,
-      description: 'Completed custom — positions only, no kills.',
+      teamPlayers: players.slice(24, 32),
+      description: 'Completed — enter results in admin, then publish (no results saved yet).',
     },
     {
       name: 'Fast Combat Room',
       category: 'custom',
+      mode: 'squad',
       gameModeId: loneWolfMode._id,
       map: 'Combat Lab',
       entryFee: 8,
       prizePool: 350,
-      maxParticipants: 48,
+      lifecycleStatus: 'result_published',
       startDate: hoursAgo(6),
       endDate: hoursAgo(3),
-      status: 'result_published',
-      statusOverride: true,
-      resultsPublished: true,
-      bookings: makeBookings(players, 12),
+      teamPlayers: players.slice(32, 40),
       seedResults: true,
-      description: 'Result published custom — test leaderboard & winner badge.',
+      description: 'Published custom — winner/runner-up/MVP visible to players.',
     },
   ];
 
@@ -420,11 +513,11 @@ async function seedTournaments() {
       prizePool: 800,
       perKill: 5,
       maxParticipants: 48,
+      lifecycleStatus: 'upcoming',
       startDate: minutesFromNow(30),
       endDate: hoursFromNow(3),
-      status: 'incoming',
       bookings: [],
-      description: 'Upcoming BR — empty slots, per kill ₹5.',
+      description: 'Upcoming BR — empty slots.',
     },
     {
       name: 'Purgatory Survival',
@@ -434,12 +527,11 @@ async function seedTournaments() {
       entryFee: 10,
       prizePool: 1200,
       perKill: 8,
-      maxParticipants: 48,
+      lifecycleStatus: 'upcoming',
       startDate: hoursFromNow(2),
       endDate: hoursFromNow(5),
-      status: 'incoming',
       bookings: makeBookings(players.slice(4), 24),
-      description: 'Half-filled BR — prize pool + per kill visible.',
+      description: 'Half-filled BR — prize tiers configured.',
     },
     {
       name: 'Kalahari Rush',
@@ -449,14 +541,11 @@ async function seedTournaments() {
       entryFee: 12,
       prizePool: 1500,
       perKill: 10,
-      maxParticipants: 48,
+      lifecycleStatus: 'ongoing',
       startDate: hoursAgo(0.2),
       endDate: hoursFromNow(2),
-      status: 'ongoing',
-      statusOverride: true,
-      locked: true,
       bookings: makeBookings(players, 40),
-      description: 'Ongoing BR — join disabled, nearly full.',
+      description: 'Ongoing BR — nearly full lobby.',
     },
     {
       name: 'Alpine Warzone',
@@ -466,14 +555,12 @@ async function seedTournaments() {
       entryFee: 15,
       prizePool: 2000,
       perKill: 12,
-      maxParticipants: 48,
+      lifecycleStatus: 'completed',
       startDate: hoursAgo(5),
       endDate: hoursAgo(2),
-      status: 'completed',
-      statusOverride: true,
       bookings: makeBookings(players, 8),
       seedResults: true,
-      description: 'Completed BR with kills & placements (not yet published).',
+      description: 'Completed BR with saved placements — ready to publish results.',
     },
     {
       name: 'Nextterra Championship',
@@ -483,32 +570,34 @@ async function seedTournaments() {
       entryFee: 20,
       prizePool: 3000,
       perKill: 15,
-      maxParticipants: 48,
+      lifecycleStatus: 'result_published',
       startDate: hoursAgo(8),
       endDate: hoursAgo(4),
-      status: 'result_published',
-      statusOverride: true,
-      resultsPublished: true,
       bookings: makeBookings(players, 48, 1),
-      description: 'Fully booked BR (48/48) — published results & leaderboard.',
+      seedResults: true,
+      description: 'Full lobby BR — published leaderboard.',
     },
   ];
 
-  console.log('\n--- Lone Wolf (Custom) ---');
+  console.log('\n--- Lone Wolf (Custom, 2 squads) ---');
   for (const def of customDefs) {
-    const t = await createTournament(def, { ...ctx, matchNumber: nextNum() });
-    console.log(`  ✓ ${t.name} [${t.status}] slots ${t.currentParticipants}/${t.maxParticipants}`);
+    const { tournament } = await createTournament(def, { ...ctx, matchNumber: nextNum() });
+    const extra = def.seedResults ? ' + CustomMatchResult' : def.lifecycleStatus === 'completed' ? ' (awaiting result entry)' : '';
+    console.log(`  ✓ ${tournament.name} [${tournament.lifecycleStatus}] teams 2/2${extra}`);
   }
 
   console.log('\n--- Full Map (Battle Royale) ---');
   for (const def of brDefs) {
-    const t = await createTournament(def, { ...ctx, matchNumber: nextNum() });
-    console.log(`  ✓ ${t.name} [${t.status}] slots ${t.currentParticipants}/${t.maxParticipants} perKill ₹${t.perKill}`);
+    const { tournament } = await createTournament(def, { ...ctx, matchNumber: nextNum() });
+    const slots = `${tournament.currentParticipants}/${tournament.maxParticipants}`;
+    const extra = def.seedResults ? ' + BattleRoyaleResult' : '';
+    console.log(`  ✓ ${tournament.name} [${tournament.lifecycleStatus}] ${slots} perKill ₹${tournament.perKill}${extra}`);
   }
 
-  console.log('\n✅ Seed complete — 10 tournaments');
-  console.log('   Game modes: Lone Wolf (custom) | Full Map Battle Royale');
-  console.log('   Test login: seed_player_1 … seed_player_50 / password: test1234');
+  console.log('\n✅ Seed complete — 10 tournaments (v2 lifecycle models)');
+  console.log('   Custom: save results on "Desert Duel" before Publish Results');
+  console.log('   BR: "Alpine Warzone" has results saved; "Nextterra" is fully published');
+  console.log('   Test login: seed_player_1 … seed_player_50 / test1234');
   console.log('   Admin: admin@skwin.com / admin123\n');
 
   await mongoose.connection.close();

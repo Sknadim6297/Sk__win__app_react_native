@@ -22,6 +22,7 @@ import RNPickerSelect from 'react-native-picker-select';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../../styles/theme';
 import { tournamentService, gameService, uploadImageFile } from '../../services/api';
+import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 import Toast from '../../components/Toast';
 
 const AVAILABLE_MAPS = [
@@ -253,11 +254,7 @@ const TournamentManagement = ({ navigation }) => {
 
   const getModeImage = (mode) => {
     if (mode?.image) {
-      // Check if image is a full URL or relative path
-      const imageUrl = mode.image.startsWith('http') 
-        ? mode.image 
-        : `http://172.20.10.3:5000${mode.image}`;
-      return { uri: imageUrl };
+      return { uri: resolveMediaUrl(mode.image) };
     }
     // Default mode icon
     return null;

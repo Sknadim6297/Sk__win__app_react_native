@@ -5,6 +5,11 @@ const Game = require('../models/Game');
 const GameMode = require('../models/GameMode');
 const TournamentParticipant = require('../models/TournamentParticipant');
 const TournamentResult = require('../models/TournamentResult');
+const BattleRoyaleResult = require('../models/BattleRoyaleResult');
+const CustomMatchResult = require('../models/CustomMatchResult');
+const Team = require('../models/Team');
+const TeamMember = require('../models/TeamMember');
+const lifecycle = require('../services/tournamentLifecycle');
 const WalletTransaction = require('../models/WalletTransaction');
 const Notification = require('../models/Notification');
 const { authMiddleware } = require('../middleware/auth');
@@ -106,16 +111,20 @@ const calculateResultRewards = (tournament, resultsInput) => {
   });
 };
 
-function getJoinEligibility(tournament, participantCount) {
-  const status = calculateTournamentStatus(tournament);
-  const max = tournament.maxParticipants || 50;
+async function getJoinEligibility(tournament, participantCount) {
+  const status = lifecycle.getEffectiveStatus(tournament);
   const joined = participantCount ?? tournament.currentParticipants ?? 0;
+  const isCustom = lifecycle.isCustomMatch(tournament);
+  const max = isCustom ? (tournament.maxTeams || 2) : (tournament.maxParticipants || 50);
 
+  if (status === 'draft') {
+    return { canJoin: false, reason: 'Tournament is not published yet' };
+  }
   if (tournament.resultsPublished || status === 'result_published') {
     return { canJoin: false, reason: 'Results have been published for this match' };
   }
   if (status === 'ongoing' || status === 'live') {
-    return { canJoin: false, reason: 'Match is already ongoing' };
+    return { canJoin: false, reason: 'Match has started — registration is locked' };
   }
   if (status === 'completed' || status === 'cancelled') {
     return { canJoin: false, reason: 'This tournament is not open for joining' };
@@ -124,16 +133,24 @@ function getJoinEligibility(tournament, participantCount) {
     return { canJoin: false, reason: 'Registration is closed' };
   }
   if (joined >= max) {
-    return { canJoin: false, reason: 'All slots are full' };
+    return {
+      canJoin: false,
+      reason: isCustom ? 'Match is full — both teams registered' : 'Tournament is full — all slots taken',
+      isFull: true,
+    };
   }
-  if (status !== 'incoming') {
+  if (status !== 'upcoming' && status !== 'incoming') {
     return { canJoin: false, reason: 'Match is not open for joining' };
   }
-  return { canJoin: true, reason: null };
+  return { canJoin: true, reason: null, isFull: false };
 }
 
 // Helper function to calculate tournament status based on time
 function calculateTournamentStatus(tournament) {
+  if (tournament.lifecycleStatus) {
+    return lifecycle.getEffectiveStatus(tournament);
+  }
+
   const now = new Date();
   const startDate = new Date(tournament.startDate);
   const endDate = tournament.endDate ? new Date(tournament.endDate) : null;
@@ -141,6 +158,10 @@ function calculateTournamentStatus(tournament) {
 
   if (tournament.resultsPublished || normalizedStatus === 'result_published') {
     return 'result_published';
+  }
+
+  if (['draft', 'upcoming', 'ongoing', 'completed', 'result_published', 'cancelled'].includes(tournament.status)) {
+    return tournament.status;
   }
 
   // Respect manual override
@@ -306,10 +327,10 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       roomId: roomId || '',
       roomPassword: roomPassword || '',
       showRoomCredentials: !!showRoomCredentials,
-      status: normalizeStatus(status) || 'incoming',
-      statusOverride: typeof statusOverride === 'boolean'
-        ? statusOverride
-        : Boolean(status && normalizeStatus(status) !== 'incoming'),
+      lifecycleStatus: 'draft',
+      status: 'draft',
+      maxTeams: matchCategory === 'custom' ? (req.body.maxTeams || 2) : 2,
+      statusOverride: true,
       registeredPlayers: [],
       createdBy: req.userId,
     };
@@ -718,117 +739,11 @@ router.post('/admin/:id/winners', authMiddleware, async (req, res) => {
   }
 });
 
-// Submit match results (Admin)
-router.post('/admin/:id/results', authMiddleware, async (req, res) => {
-  try {
-    const admin = await User.findById(req.userId);
-    if (!admin) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    if (admin.role !== 'admin') {
-      return res.status(403).json({ error: 'Only admins can submit results' });
-    }
-
-    const { results, screenshotUrl } = req.body;
-    if (!Array.isArray(results) || results.length === 0) {
-      return res.status(400).json({ error: 'Results array is required' });
-    }
-
-    const tournament = await Tournament.findById(req.params.id).populate('gameMode', 'name');
-    if (!tournament) {
-      return res.status(404).json({ error: 'Tournament not found' });
-    }
-
-    const isBR = isBattleRoyaleTournament(tournament);
-    const allJoined = await TournamentParticipant.find({
-      tournamentId: req.params.id,
-      status: { $in: ['joined', 'winner'] },
-    });
-
-    if (allJoined.length === 0) {
-      return res.status(400).json({ error: 'No joined players found for this tournament' });
-    }
-
-    const participantIds = results.map((r) => String(r.userId));
-    const participants = allJoined.filter((p) => participantIds.includes(String(p.userId)));
-
-    if (participants.length !== allJoined.length) {
-      return res.status(400).json({
-        error: 'Every joined player must have an assigned position/rank before publishing results',
-        missingCount: allJoined.length - participants.length,
-      });
-    }
-
-    const ranks = results.map((r) => Number(r.rank)).filter((r) => r > 0);
-    if (ranks.length !== allJoined.length) {
-      return res.status(400).json({ error: 'Please assign a valid rank to every joined player' });
-    }
-    const uniqueRanks = new Set(ranks);
-    if (uniqueRanks.size !== ranks.length) {
-      return res.status(400).json({ error: 'Duplicate rank numbers are not allowed' });
-    }
-    const rankOnes = ranks.filter((r) => r === 1);
-    if (rankOnes.length !== 1) {
-      return res.status(400).json({ error: 'Exactly one player must be assigned Position #1' });
-    }
-
-    const normalizedResults = results.map((r) => ({
-      userId: r.userId,
-      teamId: r.teamId || null,
-      kills: isBR ? Number(r.kills) || 0 : 0,
-      rank: Number(r.rank) || 0,
-    }));
-
-    const computedResults = calculateResultRewards(tournament, normalizedResults);
-
-    await TournamentResult.deleteMany({ tournamentId: req.params.id });
-
-    const savedResults = await TournamentResult.insertMany(
-      computedResults.map(r => ({
-        tournamentId: req.params.id,
-        userId: r.userId,
-        teamId: r.teamId,
-        kills: r.kills,
-        rank: r.rank,
-        prizeAmount: r.prizeAmount,
-        perKillAmount: r.perKillAmount,
-        rewardType: r.rewardType,
-        killReward: r.killReward,
-        survivalReward: r.survivalReward,
-        totalReward: r.totalReward,
-        screenshotUrl: screenshotUrl || null,
-        prizeCredited: false,
-      }))
-    );
-
-    for (const result of computedResults) {
-      const status = result.rank === 1 ? 'winner' : 'joined';
-      await TournamentParticipant.findOneAndUpdate(
-        { tournamentId: req.params.id, userId: result.userId },
-        { status, rank: result.rank, prizeAmount: result.totalReward },
-        { new: true }
-      );
-    }
-
-    tournament.status = 'completed';
-    tournament.statusOverride = true;
-    await tournament.save();
-
-    const leaderboard = {
-      survival: [...savedResults].sort((a, b) => a.rank - b.rank),
-      kills: [...savedResults].sort((a, b) => (b.kills || 0) - (a.kills || 0)),
-      earnings: [...savedResults].sort((a, b) => (b.totalReward || 0) - (a.totalReward || 0)),
-    };
-
-    res.json({
-      message: 'Results saved and rewards calculated',
-      results: savedResults,
-      leaderboard,
-    });
-  } catch (error) {
-    console.error('Error submitting results:', error);
-    res.status(500).json({ error: 'Failed to submit results' });
-  }
+// Submit match results (Admin) — deprecated; use /api/tournament-management
+router.post('/admin/:id/results', authMiddleware, (req, res) => {
+  res.status(410).json({
+    error: 'Deprecated. Use POST /api/tournament-management/admin/:id/results/battle-royale or custom-match',
+  });
 });
 
 // Publish results — makes leaderboard visible to users
@@ -844,28 +759,21 @@ router.post('/admin/:id/publish-results', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Tournament not found' });
     }
 
-    const resultCount = await TournamentResult.countDocuments({ tournamentId: req.params.id });
-    if (resultCount === 0) {
-      return res.status(400).json({ error: 'Submit and calculate results before publishing' });
+    const type = lifecycle.getTournamentType(tournament);
+    if (type === 'battle_royale') {
+      const joinedCount = await lifecycle.getJoinedCount(tournament._id, tournament);
+      const resultCount = await BattleRoyaleResult.countDocuments({ tournamentId: req.params.id });
+      if (joinedCount > 0 && resultCount < joinedCount) {
+        return res.status(400).json({ error: 'Save results for every joined player first' });
+      }
+    } else {
+      const custom = await CustomMatchResult.findOne({ tournamentId: req.params.id });
+      if (!custom) {
+        return res.status(400).json({ error: 'Save custom match results before publishing' });
+      }
     }
 
-    const joinedCount = await TournamentParticipant.countDocuments({
-      tournamentId: req.params.id,
-      status: { $in: ['joined', 'winner'] },
-    });
-    const rankedCount = await TournamentParticipant.countDocuments({
-      tournamentId: req.params.id,
-      rank: { $gte: 1 },
-    });
-    if (joinedCount > 0 && rankedCount < joinedCount) {
-      return res.status(400).json({
-        error: 'Every joined player must have an assigned position before publishing',
-      });
-    }
-
-    tournament.resultsPublished = true;
-    tournament.status = 'result_published';
-    tournament.statusOverride = true;
+    lifecycle.syncLegacyFields(tournament, 'result_published');
     await tournament.save();
 
     res.json({ message: 'Results published successfully', status: 'result_published' });
@@ -1236,7 +1144,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
       (tournament.roomId || tournament.roomPassword);
 
     const doc = tournament.toObject();
-    const joinCheck = getJoinEligibility(tournament, participantCount);
+    const joinCheck = await getJoinEligibility(tournament, participantCount);
     const startMs = new Date(tournament.startDate).getTime() - Date.now();
 
     res.json({
@@ -1578,61 +1486,88 @@ router.get('/:id/room-info', authMiddleware, async (req, res) => {
   }
 });
 
-// Get tournament results (published leaderboard)
+// Get tournament results — delegates to new result collections
 router.get('/:id/results', async (req, res) => {
   try {
-    const tournament = await Tournament.findById(req.params.id)
-      .populate('gameMode', 'name')
-      .lean();
-    if (!tournament) {
-      return res.status(404).json({ error: 'Tournament not found' });
-    }
+    const tournament = await Tournament.findById(req.params.id).populate('gameMode', 'name').lean();
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
 
-    if (!tournament.resultsPublished) {
+    const status = lifecycle.getEffectiveStatus(tournament);
+    if (status !== 'result_published') {
       return res.status(403).json({ error: 'Results are not published yet' });
     }
 
-    const participants = await TournamentParticipant.find({ tournamentId: req.params.id })
-      .populate('userId', 'username profileImage')
-      .sort({ rank: 1 });
+    const type = lifecycle.getTournamentType(tournament);
 
-    const results = await TournamentResult.find({ tournamentId: req.params.id })
-      .populate('userId', 'username email')
-      .sort({ rank: 1 });
+    if (type === 'battle_royale') {
+      const results = await BattleRoyaleResult.find({ tournamentId: req.params.id })
+        .populate('userId', 'username')
+        .sort({ position: 1 })
+        .lean();
 
-    const isBR = isBattleRoyaleTournament(tournament);
-    const leaderboard = participants.map((p) => {
-      const result = results.find((r) => String(r.userId) === String(p.userId));
-      return {
-        userId: p.userId?._id || p.userId,
-        username: p.userId?.username,
-        gamingID: p.gamingUsername,
-        gamingUID: p.gamingUID,
-        slotNumber: p.slotNumber,
-        rank: p.rank,
-        kills: isBR ? (result?.kills || 0) : null,
-        killReward: isBR ? (result?.killReward || 0) : 0,
-        placementReward: result?.survivalReward || result?.prizeAmount || 0,
-        totalReward: result?.totalReward || p.prizeAmount || 0,
-        status: p.rank === 1 ? 'winner' : p.status === 'joined' ? 'lose' : p.status,
-        isWinner: p.rank === 1,
-      };
-    });
+      const leaderboard = results.map((r) => ({
+        userId: r.userId?._id || r.userId,
+        username: r.userId?.username,
+        gamingID: r.gamingUsername,
+        gamingUID: r.gamingUID,
+        rank: r.position,
+        kills: r.kills,
+        prize: r.prize,
+        totalReward: r.prize,
+        isWinner: r.position === 1,
+      }));
 
-    const winner = leaderboard.find((e) => e.rank === 1) || null;
+      return res.json({
+        tournament: {
+          _id: tournament._id,
+          name: tournament.name,
+          category: tournament.category,
+          perKill: tournament.perKill,
+          prizePool: tournament.prizePool,
+          status,
+        },
+        tournamentType: 'battle_royale',
+        isBattleRoyale: true,
+        winner: leaderboard.find((e) => e.rank === 1) || null,
+        leaderboard,
+      });
+    }
 
-    res.json({
+    const custom = await CustomMatchResult.findOne({ tournamentId: req.params.id })
+      .populate('winnerTeamId')
+      .populate('runnerUpTeamId')
+      .populate('mvpUserId', 'username')
+      .lean();
+
+    if (!custom) return res.status(404).json({ error: 'Results not found' });
+
+    const mvpMember = await TeamMember.findOne({
+      tournamentId: req.params.id,
+      userId: custom.mvpUserId?._id || custom.mvpUserId,
+    }).lean();
+
+    return res.json({
       tournament: {
         _id: tournament._id,
         name: tournament.name,
         category: tournament.category,
-        perKill: tournament.perKill,
         prizePool: tournament.prizePool,
-        status: tournament.status,
+        status,
       },
-      isBattleRoyale: isBR,
-      winner,
-      leaderboard,
+      tournamentType: 'custom_match',
+      isBattleRoyale: false,
+      customMatch: {
+        winnerTeam: custom.winnerTeamId,
+        runnerUpTeam: custom.runnerUpTeamId,
+        mvp: {
+          userId: custom.mvpUserId?._id || custom.mvpUserId,
+          username: custom.mvpUserId?.username,
+          gamingUsername: mvpMember?.gamingUsername,
+          gamingUID: mvpMember?.gamingUID,
+        },
+        winnerPrize: custom.winnerPrize,
+        runnerUpPrize: custom.runnerUpPrize,
+      },
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch tournament results' });
@@ -1739,7 +1674,7 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
     const participantCount = await TournamentParticipant.countDocuments({
       tournamentId: req.params.id,
     });
-    const joinCheck = getJoinEligibility(tournament, participantCount);
+    const joinCheck = await getJoinEligibility(tournament, participantCount);
     if (!joinCheck.canJoin) {
       return res.status(400).json({ error: joinCheck.reason, success: false });
     }

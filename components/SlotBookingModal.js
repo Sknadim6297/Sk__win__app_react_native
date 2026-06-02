@@ -131,7 +131,6 @@ const SlotBookingModal = ({
       const response = await tournamentService.bookSlot(
         tournament._id,
         selectedSlot,
-        gamingUsername,
         gamingUsername
       );
 
@@ -172,7 +171,6 @@ const SlotBookingModal = ({
       const response = await tournamentService.confirmSlotBooking(
         tournament._id,
         selectedSlot,
-        gamingUsername,
         gamingUsername
       );
 
