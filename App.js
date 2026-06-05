@@ -1,5 +1,6 @@
 import React, { useContext, useEffect } from 'react';
-import { LogBox } from 'react-native';
+import { InteractionManager, LogBox, View, StyleSheet } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 
 LogBox.ignoreLogs([
   "Codegen didn't run",
@@ -15,7 +16,6 @@ import { LilitaOne_400Regular } from '@expo-google-fonts/lilita-one';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { logApiConfig } from './utils/apiConfig';
 import LandingScreen from './screens/LandingScreen';
-import WelcomeOnboardingScreen from './screens/WelcomeOnboardingScreen';
 import AuthScreen from './screens/AuthScreen';
 import HomeScreen from './screens/HomeScreen';
 import TournamentScreen from './screens/TournamentScreen';
@@ -29,6 +29,7 @@ import AccountScreen from './screens/AccountScreen';
 import AccountProfileScreen from './screens/AccountProfileScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import MyWalletScreen from './screens/MyWalletScreen';
+import MyStatisticsScreen from './screens/MyStatisticsScreen';
 import TopPlayersScreen from './screens/TopPlayersScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 import ContactUsScreen from './screens/ContactUsScreen';
@@ -62,7 +63,7 @@ import AnnouncementManagement from './screens/admin/AnnouncementManagement';
 import Analytics from './screens/admin/Analytics';
 import AppContentManagement from './screens/admin/AppContentManagement';
 import SliderManagement from './screens/admin/SliderManagement';
-import AppLoadingScreen from './components/AppLoadingScreen';
+import AppLoadingScreen, { WELCOME_BG } from './components/AppLoadingScreen';
 import { applyGlobalTypography } from './styles/typography';
 
 const Stack = createStackNavigator();
@@ -98,15 +99,27 @@ export default function App() {
     }
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
-    return <AppLoadingScreen subtitle="Loading game assets..." />;
-  }
+  useEffect(() => {
+    if (!fontsLoaded) return undefined;
+
+    const task = InteractionManager.runAfterInteractions(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    });
+
+    return () => task.cancel();
+  }, [fontsLoaded]);
 
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <AppNavigator />
-      </AuthProvider>
+    <SafeAreaProvider style={styles.root}>
+      <View style={styles.root}>
+        {!fontsLoaded ? (
+          <AppLoadingScreen />
+        ) : (
+          <AuthProvider>
+            <AppNavigator />
+          </AuthProvider>
+        )}
+      </View>
     </SafeAreaProvider>
   );
 }
@@ -114,8 +127,14 @@ export default function App() {
 function AppNavigator() {
   const { isAuthenticated, isLoading, isAdmin } = useContext(AuthContext);
 
+  useEffect(() => {
+    if (!isLoading) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isLoading]);
+
   if (isLoading) {
-    return <AppLoadingScreen subtitle="Syncing your profile..." />;
+    return <AppLoadingScreen />;
   }
 
   const navKey = isAuthenticated ? (isAdmin() ? 'admin' : 'user') : 'guest';
@@ -125,20 +144,19 @@ function AppNavigator() {
       <Stack.Navigator
         key={navKey}
         initialRouteName={
-          isAuthenticated ? (isAdmin() ? 'AdminDashboard' : 'MainApp') : 'Auth'
+          isAuthenticated ? (isAdmin() ? 'AdminDashboard' : 'MainApp') : 'Landing'
         }
         screenOptions={{
           headerShown: false,
           gestureEnabled: false,
-          cardStyle: { backgroundColor: '#050510' },
+          cardStyle: { backgroundColor: WELCOME_BG },
         }}
       >
         {/* Non-authenticated screens */}
         {!isAuthenticated ? (
           <>
-            <Stack.Screen name="Auth" component={AuthScreen} />
-            <Stack.Screen name="Welcome" component={WelcomeOnboardingScreen} />
             <Stack.Screen name="Landing" component={LandingScreen} />
+            <Stack.Screen name="Auth" component={AuthScreen} />
           </>
         ) : (
           <>
@@ -169,6 +187,7 @@ function AppNavigator() {
                 <Stack.Screen name="AccountProfile" component={AccountProfileScreen} />
                 <Stack.Screen name="EditProfile" component={EditProfileScreen} />
                 <Stack.Screen name="MyWallet" component={MyWalletScreen} />
+                <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
                 <Stack.Screen name="TopPlayers" component={TopPlayersScreen} />
                 <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 <Stack.Screen name="ContactUs" component={ContactUsScreen} />
@@ -200,3 +219,10 @@ function AppNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: WELCOME_BG,
+  },
+});

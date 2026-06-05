@@ -17,17 +17,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import AppIcon from '../components/ui/AppIcon';
+import AppHeader from '../components/navigation/AppHeader';
 import SKWinLogo from '../components/SKWinLogo';
 import { BRAND } from '../constants/branding';
 import {
   tournamentService,
-  userService,
-  walletService,
   gameService,
-  notificationService,
   configService,
   sliderService,
-  supportService,
 } from '../services/api';
 import HomeImageSlider from '../components/home/HomeImageSlider';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
@@ -52,13 +49,10 @@ const EXCLUSIVE_CARD_WIDTH = (width - 32 - 12) / 2;
 
 export default function HomeScreen({ navigation }) {
   const { user } = useContext(AuthContext);
-  const [walletBalance, setWalletBalance] = useState(0);
   const [popularGames, setPopularGames] = useState([]);
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [ongoingCount, setOngoingCount] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [openSupportTickets, setOpenSupportTickets] = useState(0);
   const [latestNews, setLatestNews] = useState({ text: '🏆 Tournaments Are Back! 🎮', isActive: true });
   const [supportLinks, setSupportLinks] = useState({});
   const [homeSliders, setHomeSliders] = useState([]);
@@ -91,25 +85,11 @@ export default function HomeScreen({ navigation }) {
       setSupportLinks(homeConfig.supportLinks || {});
       if (!user) return;
 
-      const [balanceData, myTournamentsData, notificationsResponse, myTickets] = await Promise.all([
-        walletService.getBalance().catch(() => ({ balance: 0 })),
-        tournamentService.getMyTournaments().catch(() => []),
-        notificationService.getAll().catch(() => ({ notifications: [] })),
-        supportService.getMyTickets().catch(() => []),
-      ]);
-
-      setWalletBalance(balanceData?.balance ?? 0);
+      const myTournamentsData = await tournamentService.getMyTournaments().catch(() => []);
       const tournamentList = Array.isArray(myTournamentsData) ? myTournamentsData : [];
       setUpcomingCount(tournamentList.filter((t) => t.status === 'incoming' || t.status === 'upcoming').length);
       setOngoingCount(tournamentList.filter((t) => t.status === 'ongoing' || t.status === 'live').length);
       setCompletedCount(tournamentList.filter((t) => t.status === 'completed').length);
-      setUnreadNotifications(
-        (notificationsResponse?.notifications || []).filter((n) => !n?.isRead).length
-      );
-      const tickets = Array.isArray(myTickets) ? myTickets : [];
-      setOpenSupportTickets(
-        tickets.filter((t) => t.status === 'open' || t.status === 'in_progress').length
-      );
     } catch (e) {
       console.error('Home load error:', e);
       setSlidersLoading(false);
@@ -121,8 +101,6 @@ export default function HomeScreen({ navigation }) {
       loadHomeData();
     }, [loadHomeData])
   );
-
-  const displayName = user?.username || user?.name || 'Player';
 
   const exclusiveGames = popularGames
     .filter((g) => g?.name && g?.image)
@@ -177,46 +155,7 @@ export default function HomeScreen({ navigation }) {
         nestedScrollEnabled
         contentContainerStyle={styles.scroll}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.profileRow}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('AccountTab')}
-          >
-            <View style={styles.avatar}>
-              <SKWinLogo size={44} rounded />
-            </View>
-            <View>
-              <Text style={styles.username}>{displayName}</Text>
-              <Text style={styles.brandTag}>{BRAND.name}</Text>
-            </View>
-          </TouchableOpacity>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.supportIconBtn}
-              onPress={() => navigation.navigate('SupportTickets')}
-            >
-              <AppIcon name="headset" size={28} light />
-              {(openSupportTickets > 0 || unreadNotifications > 0) && (
-                <View style={styles.badge99}>
-                  <Text style={styles.badge99Text}>
-                    {(openSupportTickets || unreadNotifications) > 99
-                      ? '99'
-                      : openSupportTickets || unreadNotifications}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.coinPill}
-              onPress={() => navigation.navigate('WalletTab')}
-            >
-              <AppIcon name="coins" size={26} />
-              <Text style={styles.coinText}>{walletBalance.toFixed(0)}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <AppHeader navigation={navigation} />
 
         {latestNews?.isActive !== false && (
           <TouchableOpacity
@@ -425,89 +364,6 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 16,
     paddingBottom: 120,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingTop: 4,
-  },
-  profileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.surfaceDark,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  username: {
-    ...TEXT.h3,
-    color: COLORS.white,
-  },
-  brandTag: {
-    ...TEXT.label,
-    color: '#FBBF24',
-    marginTop: 4,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  supportIconBtn: {
-    position: 'relative',
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badge99: {
-    position: 'absolute',
-    top: 0,
-    right: -2,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 6,
-    backgroundColor: '#EF4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: '#050A12',
-  },
-  badge99Text: {
-    fontSize: 10,
-    fontFamily: FONTS.bold,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  coinPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0F1520',
-    borderRadius: 22,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    minHeight: 42,
-  },
-  coinText: {
-    fontSize: 16,
-    fontFamily: FONTS.bold,
-    fontWeight: '700',
-    color: COLORS.white,
-    minWidth: 16,
-    textAlign: 'center',
   },
   newsBar: {
     flexDirection: 'row',

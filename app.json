@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "WarZone Free Fire Tournament",
+    "name": "SK WIN",
     "slug": "sk-win",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo/game_logo.png",
+    "icon": "./assets/logo/sk_win_logo.png",
     "userInterfaceStyle": "dark",
     "extra": {
       "eas": {
@@ -12,9 +12,9 @@
       }
     },
     "splash": {
-      "image": "./assets/logo/game_logo.png",
+      "image": "./assets/logo/sk_win_logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0a0e27"
+      "backgroundColor": "#0a0e1a"
     },
     "ios": {
       "supportsTablet": true,
@@ -22,15 +22,32 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo/game_logo.png",
-        "backgroundColor": "#0a0e27"
+        "foregroundImage": "./assets/logo/sk_win_logo.png",
+        "backgroundColor": "#0a0e1a"
       },
       "package": "com.skwin.tournament"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "backgroundColor": "#0a0e1a"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#0a0e1a",
+      "barStyle": "light-content"
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#0a0e1a"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0a0e1a",
+          "image": "./assets/logo/sk_win_logo.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
+        }
+      ],
       [
         "expo-build-properties",
         {

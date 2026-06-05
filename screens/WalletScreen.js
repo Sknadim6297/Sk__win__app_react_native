@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
-import AppIcon from '../components/ui/AppIcon';
+import AppHeader from '../components/navigation/AppHeader';
 import { walletService, configService } from '../services/api';
 
 const WalletScreen = ({ navigation }) => {
@@ -160,22 +160,12 @@ const WalletScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#0B0E1E" />
 
-      <View style={styles.header}>
-        <View style={styles.headerSide} />
-        <Text style={styles.headerTitle}>My Wallet</Text>
-        <TouchableOpacity
-          style={styles.headerSide}
-          onPress={() => navigation.navigate('SupportTickets')}
-        >
-          <AppIcon name="headset" size="md" />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />}
         contentContainerStyle={styles.scroll}
       >
+        <AppHeader navigation={navigation} />
         <View style={styles.balanceCard}>
           <View style={styles.balanceRow}>
             <View>
@@ -353,23 +343,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerSide: {
-    width: 40,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    ...TEXT.h3,
-    color: COLORS.white,
-  },
   scroll: {
     paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 100,
   },
   balanceCard: {
