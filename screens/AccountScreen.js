@@ -9,13 +9,11 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  Switch,
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS, FONTS } from '../styles/theme';
@@ -25,27 +23,22 @@ import AppIcon from '../components/ui/AppIcon';
 import AppHeader from '../components/navigation/AppHeader';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 
-const PUSH_PREF_KEY = 'pushNotificationsEnabled';
-
 const ACCOUNT_THEME = {
-  bg: '#000000',
-  card: '#1A1235',
+  bg: '#0B0E1E',
+  card: '#151D36',
   cardBorder: 'rgba(255, 255, 255, 0.06)',
-  accent: '#40E0D0',
-  walletPill: '#4A2D8A',
-  kycGreen: '#22C55E',
-  muted: '#9CA3AF',
+  accent: '#7B61FF',
+  walletPill: '#5B39A8',
+  muted: '#B8C5D9',
+  logout: '#EF4444',
+  logoutBg: 'rgba(239, 68, 68, 0.12)',
+  logoutBorder: 'rgba(239, 68, 68, 0.35)',
 };
 
 const MENU_ITEMS = [
-  { id: 'push', title: 'Push Notification', icon: 'bell', type: 'toggle' },
   { id: 'profile', title: 'My Profile', icon: 'account', screen: 'AccountProfile' },
   { id: 'wallet', title: 'My Wallet', icon: 'wallet', screen: 'MyWallet' },
   { id: 'matches', title: 'My Matches', icon: 'gamepad-variant', screen: 'History' },
-  { id: 'order', title: 'My Order', icon: 'order', screen: 'MyWallet' },
-  { id: 'statistics', title: 'My Statistics', icon: 'statistics', screen: 'MyStatistics' },
-  { id: 'rewards', title: 'My Rewards', icon: 'gift', screen: 'MyWallet' },
-  { id: 'referrals', title: 'My Referrals', icon: 'users', screen: 'ShareApp' },
   { id: 'announcement', title: 'Announcement', icon: 'flag', screen: 'ImportantUpdates' },
   { id: 'tutorial', title: 'App Tutorial', icon: 'help-circle', screen: 'FAQ' },
   { id: 'about', title: 'About us', icon: 'information', screen: 'AboutUs' },
@@ -61,25 +54,12 @@ const AccountScreen = ({ navigation }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       loadAccountData();
-      loadPushPreference();
     }, [])
   );
-
-  const loadPushPreference = async () => {
-    try {
-      const saved = await AsyncStorage.getItem(PUSH_PREF_KEY);
-      if (saved !== null) {
-        setPushEnabled(saved === 'true');
-      }
-    } catch {
-      /* keep default */
-    }
-  };
 
   const loadAccountData = async (silent = false) => {
     try {
@@ -100,15 +80,6 @@ const AccountScreen = ({ navigation }) => {
     setRefreshing(true);
     loadAccountData(true);
   }, []);
-
-  const handlePushToggle = async (value) => {
-    setPushEnabled(value);
-    try {
-      await AsyncStorage.setItem(PUSH_PREF_KEY, String(value));
-    } catch {
-      /* non-critical */
-    }
-  };
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -141,7 +112,6 @@ const AccountScreen = ({ navigation }) => {
   const matchesPlayed = userData?.tournament?.participatedCount ?? 0;
   const totalKilled = userData?.gameStats?.totalKills ?? 0;
   const amountWon = userData?.tournament?.earnings ?? userData?.wallet?.totalWinnings ?? 0;
-  const isKycVerified = Boolean(userData?.verified);
   const appVersion = Constants.expoConfig?.version?.split('.')[0] || '1';
   const profilePhoto = userData?.profilePhoto ? resolveMediaUrl(userData.profilePhoto) : '';
 
@@ -185,16 +155,11 @@ const AccountScreen = ({ navigation }) => {
         >
           <AppHeader navigation={navigation} style={styles.appHeader} />
 
-          {/* Main profile */}
           <View style={styles.profileSection}>
             <View style={styles.mainAvatarWrap}>{renderAvatar(108)}</View>
             <Text style={styles.mainUsername}>{displayName}</Text>
-            <Text style={[styles.kycStatus, isKycVerified ? styles.kycVerified : styles.kycPending]}>
-              {isKycVerified ? 'Kyc Verified' : 'Kyc Not Verified'}
-            </Text>
           </View>
 
-          {/* Stats card */}
           <View style={styles.statsCard}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{matchesPlayed}</Text>
@@ -215,34 +180,32 @@ const AccountScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Menu list */}
           <View style={styles.menuList}>
-            {MENU_ITEMS.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.menuButton, item.id === 'logout' && styles.logoutButton]}
-                onPress={() => handleMenuPress(item)}
-                activeOpacity={item.type === 'toggle' ? 1 : 0.85}
-                disabled={item.type === 'toggle'}
-              >
-                <View style={styles.menuLeft}>
-                  <AppIcon name={item.icon} size={24} light />
-                  <Text style={styles.menuTitle}>{item.title}</Text>
-                </View>
-
-                {item.type === 'toggle' ? (
-                  <Switch
-                    value={pushEnabled}
-                    onValueChange={handlePushToggle}
-                    trackColor={{ false: '#3A3058', true: '#2563EB' }}
-                    thumbColor={COLORS.white}
-                    ios_backgroundColor="#3A3058"
-                  />
-                ) : (
-                  <Ionicons name="chevron-forward" size={20} color={COLORS.white} />
-                )}
-              </TouchableOpacity>
-            ))}
+            {MENU_ITEMS.map((item) => {
+              const isLogout = item.id === 'logout';
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.menuButton, isLogout && styles.logoutButton]}
+                  onPress={() => handleMenuPress(item)}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.menuLeft}>
+                    <AppIcon
+                      name={item.icon}
+                      size={24}
+                      light={!isLogout}
+                      color={isLogout ? ACCOUNT_THEME.logout : undefined}
+                      accent={isLogout ? 'EF4444' : undefined}
+                    />
+                    <Text style={[styles.menuTitle, isLogout && styles.logoutTitle]}>{item.title}</Text>
+                  </View>
+                  {!isLogout && (
+                    <Ionicons name="chevron-forward" size={20} color={COLORS.white} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           <Text style={styles.versionText}>Version : {appVersion}</Text>
@@ -292,17 +255,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: FONTS.bold,
     color: COLORS.white,
-    marginBottom: 6,
-  },
-  kycStatus: {
-    fontSize: 14,
-    fontFamily: FONTS.regular,
-  },
-  kycVerified: {
-    color: ACCOUNT_THEME.kycGreen,
-  },
-  kycPending: {
-    color: ACCOUNT_THEME.muted,
   },
   statsCard: {
     flexDirection: 'row',
@@ -360,6 +312,11 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginTop: 4,
+    backgroundColor: ACCOUNT_THEME.logoutBg,
+    borderColor: ACCOUNT_THEME.logoutBorder,
+  },
+  logoutTitle: {
+    color: ACCOUNT_THEME.logout,
   },
   menuLeft: {
     flexDirection: 'row',

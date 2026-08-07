@@ -24,6 +24,7 @@ import {
   isCustomMatch,
 } from '../utils/tournamentHelpers';
 import Toast from '../components/Toast';
+import { LIST_PERF } from '../utils/listPerf';
 
 const CYAN = '#00E5FF';
 const ORANGE = '#FF8A00';
@@ -350,6 +351,7 @@ export default function MyContestsScreen({ navigation, route }) {
         </View>
       ) : (
         <FlatList
+          {...LIST_PERF}
           data={filtered}
           keyExtractor={(item) => String(item._id)}
           contentContainerStyle={styles.listContent}

@@ -16,66 +16,28 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import CustomTabBar from './components/navigation/CustomTabBar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
-import { LilitaOne_400Regular } from '@expo-google-fonts/lilita-one';
+import {
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_600SemiBold,
+  DMSans_700Bold,
+} from '@expo-google-fonts/dm-sans';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { logApiConfig } from './utils/apiConfig';
+// Eager: first paint / auth gate only
 import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
 import HomeScreen from './screens/HomeScreen';
-import TournamentScreen from './screens/TournamentScreen';
-import TournamentDetailsScreen from './screens/TournamentDetailsScreen';
-import TournamentEntryScreen from './screens/TournamentEntryScreen';
-import TournamentSlotBookingScreen from './screens/TournamentSlotBookingScreen';
-import TournamentResultsScreen from './screens/TournamentResultsScreen';
 import WalletScreen from './screens/WalletScreen';
-import CashfreeQrPaymentScreen from './screens/CashfreeQrPaymentScreen';
-import HistoryScreen from './screens/HistoryScreen';
-import MyContestsScreen from './screens/MyContestsScreen';
 import AccountScreen from './screens/AccountScreen';
-import AccountProfileScreen from './screens/AccountProfileScreen';
-import EditProfileScreen from './screens/EditProfileScreen';
-import MyWalletScreen from './screens/MyWalletScreen';
-import MyStatisticsScreen from './screens/MyStatisticsScreen';
-import TopPlayersScreen from './screens/TopPlayersScreen';
-import NotificationsScreen from './screens/NotificationsScreen';
-import ContactUsScreen from './screens/ContactUsScreen';
-import SupportTicketsScreen from './screens/SupportTicketsScreen';
-import CreateSupportTicketScreen from './screens/CreateSupportTicketScreen';
-import SupportTicketDetailScreen from './screens/SupportTicketDetailScreen';
-import ImportantUpdatesScreen from './screens/ImportantUpdatesScreen';
-import AnnouncementDetailScreen from './screens/AnnouncementDetailScreen';
-import FAQScreen from './screens/FAQScreen';
-import AboutUsScreen from './screens/AboutUsScreen';
-import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen';
-import TermsAndConditionsScreen from './screens/TermsAndConditionsScreen';
-import ShareAppScreen from './screens/ShareAppScreen';
-import GameModesScreen from './screens/GameModesScreen';
-import GameDetailsScreen from './screens/GameDetailsScreen';
-import TutorialDetailScreen from './screens/TutorialDetailScreen';
-import AdminDashboard from './screens/admin/AdminDashboard';
-import UserManagement from './screens/admin/UserManagement';
-import UserDetails from './screens/admin/UserDetails';
-import TournamentHistory from './screens/admin/TournamentHistory';
-import TournamentManagement from './screens/admin/TournamentManagement';
-import TournamentManagementV2 from './screens/admin/TournamentManagementV2';
-import TournamentResultEntryScreen from './screens/admin/TournamentResultEntryScreen';
-import TournamentLeaderboard from './screens/admin/TournamentLeaderboard';
-import GameManagement from './screens/admin/GameManagement';
-import TutorialManagement from './screens/admin/TutorialManagement';
-import PaymentManagement from './screens/admin/PaymentManagement';
-import ReportedIssues from './screens/admin/ReportedIssues';
-import SupportManagement from './screens/admin/SupportManagement';
-import AnnouncementManagement from './screens/admin/AnnouncementManagement';
-import Analytics from './screens/admin/Analytics';
-import AppContentManagement from './screens/admin/AppContentManagement';
-import MapManagement from './screens/admin/MapManagement';
-import SliderManagement from './screens/admin/SliderManagement';
-import CustomMatchTeamRegisterScreen from './screens/CustomMatchTeamRegisterScreen';
 import AppLoadingScreen, { WELCOME_BG } from './components/AppLoadingScreen';
 import { applyGlobalTypography } from './styles/typography';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+
+/** Defer screen module evaluation until first navigation (faster cold start). */
+const screen = (loader) => ({ getComponent: loader });
 
 function MainTabNavigator() {
   return (
@@ -84,6 +46,8 @@ function MainTabNavigator() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
+        lazy: true,
+        freezeOnBlur: true,
       }}
     >
       <Tab.Screen name="HomeTab" component={HomeScreen} />
@@ -98,7 +62,10 @@ export default function App() {
     if (__DEV__) logApiConfig();
   }, []);
   const [fontsLoaded] = useFonts({
-    'LilitaOne-Regular': LilitaOne_400Regular,
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_600SemiBold,
+    DMSans_700Bold,
   });
 
   useEffect(() => {
@@ -160,10 +127,11 @@ function AppNavigator() {
         screenOptions={{
           headerShown: false,
           gestureEnabled: false,
+          freezeOnBlur: true,
+          detachInactiveScreens: true,
           cardStyle: { backgroundColor: WELCOME_BG },
         }}
       >
-        {/* Non-authenticated screens */}
         {!isAuthenticated ? (
           <>
             <Stack.Screen name="Landing" component={LandingScreen} />
@@ -171,63 +139,62 @@ function AppNavigator() {
           </>
         ) : (
           <>
-            {/* Admin-only routes */}
             {isAdmin() ? (
               <>
-                <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
-                <Stack.Screen name="UserManagement" component={UserManagement} />
-                <Stack.Screen name="UserDetails" component={UserDetails} />
-                <Stack.Screen name="TournamentHistory" component={TournamentHistory} />
-                <Stack.Screen name="TournamentManagement" component={TournamentManagement} />
-                <Stack.Screen name="TournamentManagementV2" component={TournamentManagementV2} />
-                <Stack.Screen name="TournamentResultEntry" component={TournamentResultEntryScreen} />
-                <Stack.Screen name="TournamentLeaderboard" component={TournamentLeaderboard} />
-                <Stack.Screen name="GameManagement" component={GameManagement} />
-                <Stack.Screen name="TutorialManagement" component={TutorialManagement} />
-                <Stack.Screen name="PaymentManagement" component={PaymentManagement} />
-                <Stack.Screen name="ReportedIssues" component={ReportedIssues} />
-                <Stack.Screen name="SupportManagement" component={SupportManagement} />
-                <Stack.Screen name="AnnouncementManagement" component={AnnouncementManagement} />
-                <Stack.Screen name="Analytics" component={Analytics} />
-                <Stack.Screen name="AppContentManagement" component={AppContentManagement} />
-                <Stack.Screen name="SliderManagement" component={SliderManagement} />
-                <Stack.Screen name="MapManagement" component={MapManagement} />
+                <Stack.Screen name="AdminDashboard" {...screen(() => require('./screens/admin/AdminDashboard').default)} />
+                <Stack.Screen name="UserManagement" {...screen(() => require('./screens/admin/UserManagement').default)} />
+                <Stack.Screen name="UserDetails" {...screen(() => require('./screens/admin/UserDetails').default)} />
+                <Stack.Screen name="TournamentHistory" {...screen(() => require('./screens/admin/TournamentHistory').default)} />
+                <Stack.Screen name="TournamentManagement" {...screen(() => require('./screens/admin/TournamentManagement').default)} />
+                <Stack.Screen name="TournamentManagementV2" {...screen(() => require('./screens/admin/TournamentManagementV2').default)} />
+                <Stack.Screen name="TournamentResultEntry" {...screen(() => require('./screens/admin/TournamentResultEntryScreen').default)} />
+                <Stack.Screen name="TournamentLeaderboard" {...screen(() => require('./screens/admin/TournamentLeaderboard').default)} />
+                <Stack.Screen name="GameManagement" {...screen(() => require('./screens/admin/GameManagement').default)} />
+                <Stack.Screen name="TutorialManagement" {...screen(() => require('./screens/admin/TutorialManagement').default)} />
+                <Stack.Screen name="PaymentManagement" {...screen(() => require('./screens/admin/PaymentManagement').default)} />
+                <Stack.Screen name="ReportedIssues" {...screen(() => require('./screens/admin/ReportedIssues').default)} />
+                <Stack.Screen name="SupportManagement" {...screen(() => require('./screens/admin/SupportManagement').default)} />
+                <Stack.Screen name="AnnouncementManagement" {...screen(() => require('./screens/admin/AnnouncementManagement').default)} />
+                <Stack.Screen name="Analytics" {...screen(() => require('./screens/admin/Analytics').default)} />
+                <Stack.Screen name="AppContentManagement" {...screen(() => require('./screens/admin/AppContentManagement').default)} />
+                <Stack.Screen name="SliderManagement" {...screen(() => require('./screens/admin/SliderManagement').default)} />
+                <Stack.Screen name="MapManagement" {...screen(() => require('./screens/admin/MapManagement').default)} />
               </>
             ) : (
               <>
                 <Stack.Screen name="MainApp" component={MainTabNavigator} />
-                <Stack.Screen name="AccountProfile" component={AccountProfileScreen} />
-                <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-            <Stack.Screen name="MyWallet" component={MyWalletScreen} />
-            <Stack.Screen name="CashfreeQrPayment" component={CashfreeQrPaymentScreen} />
-            <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
-                <Stack.Screen name="TopPlayers" component={TopPlayersScreen} />
-                <Stack.Screen name="Notifications" component={NotificationsScreen} />
-                <Stack.Screen name="ContactUs" component={ContactUsScreen} />
-                <Stack.Screen name="SupportTickets" component={SupportTicketsScreen} />
-                <Stack.Screen name="CreateSupportTicket" component={CreateSupportTicketScreen} />
-                <Stack.Screen name="SupportTicketDetail" component={SupportTicketDetailScreen} />
-                <Stack.Screen name="ImportantUpdates" component={ImportantUpdatesScreen} />
-                <Stack.Screen name="AnnouncementDetail" component={AnnouncementDetailScreen} />
-                <Stack.Screen name="FAQ" component={FAQScreen} />
-                <Stack.Screen name="AboutUs" component={AboutUsScreen} />
-                <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-                <Stack.Screen name="TermsAndConditions" component={TermsAndConditionsScreen} />
-                <Stack.Screen name="ShareApp" component={ShareAppScreen} />
-                <Stack.Screen name="GameModes" component={GameModesScreen} />
-                <Stack.Screen name="GameDetails" component={GameDetailsScreen} />
-                <Stack.Screen name="TutorialDetail" component={TutorialDetailScreen} />
+                <Stack.Screen name="AccountProfile" {...screen(() => require('./screens/AccountProfileScreen').default)} />
+                <Stack.Screen name="EditProfile" {...screen(() => require('./screens/EditProfileScreen').default)} />
+                <Stack.Screen name="MyWallet" {...screen(() => require('./screens/MyWalletScreen').default)} />
+                <Stack.Screen name="CashfreeQrPayment" {...screen(() => require('./screens/CashfreeQrPaymentScreen').default)} />
+                <Stack.Screen name="MyStatistics" {...screen(() => require('./screens/MyStatisticsScreen').default)} />
+                <Stack.Screen name="TopPlayers" {...screen(() => require('./screens/TopPlayersScreen').default)} />
+                <Stack.Screen name="Notifications" {...screen(() => require('./screens/NotificationsScreen').default)} />
+                <Stack.Screen name="ContactUs" {...screen(() => require('./screens/ContactUsScreen').default)} />
+                <Stack.Screen name="SupportTickets" {...screen(() => require('./screens/SupportTicketsScreen').default)} />
+                <Stack.Screen name="CreateSupportTicket" {...screen(() => require('./screens/CreateSupportTicketScreen').default)} />
+                <Stack.Screen name="SupportTicketDetail" {...screen(() => require('./screens/SupportTicketDetailScreen').default)} />
+                <Stack.Screen name="ImportantUpdates" {...screen(() => require('./screens/ImportantUpdatesScreen').default)} />
+                <Stack.Screen name="AnnouncementDetail" {...screen(() => require('./screens/AnnouncementDetailScreen').default)} />
+                <Stack.Screen name="FAQ" {...screen(() => require('./screens/FAQScreen').default)} />
+                <Stack.Screen name="AboutUs" {...screen(() => require('./screens/AboutUsScreen').default)} />
+                <Stack.Screen name="PrivacyPolicy" {...screen(() => require('./screens/PrivacyPolicyScreen').default)} />
+                <Stack.Screen name="TermsAndConditions" {...screen(() => require('./screens/TermsAndConditionsScreen').default)} />
+                <Stack.Screen name="ShareApp" {...screen(() => require('./screens/ShareAppScreen').default)} />
+                <Stack.Screen name="GameModes" {...screen(() => require('./screens/GameModesScreen').default)} />
+                <Stack.Screen name="GameDetails" {...screen(() => require('./screens/GameDetailsScreen').default)} />
+                <Stack.Screen name="TutorialDetail" {...screen(() => require('./screens/TutorialDetailScreen').default)} />
               </>
             )}
 
-            <Stack.Screen name="TournamentDetails" component={TournamentDetailsScreen} />
-            <Stack.Screen name="CustomMatchTeamRegister" component={CustomMatchTeamRegisterScreen} />
-            <Stack.Screen name="TournamentEntry" component={TournamentEntryScreen} />
-            <Stack.Screen name="TournamentSlotBooking" component={TournamentSlotBookingScreen} />
-            <Stack.Screen name="TournamentResults" component={TournamentResultsScreen} />
-            <Stack.Screen name="Tournament" component={TournamentScreen} />
-            <Stack.Screen name="History" component={HistoryScreen} />
-            <Stack.Screen name="MyContests" component={MyContestsScreen} />
+            <Stack.Screen name="TournamentDetails" {...screen(() => require('./screens/TournamentDetailsScreen').default)} />
+            <Stack.Screen name="CustomMatchTeamRegister" {...screen(() => require('./screens/CustomMatchTeamRegisterScreen').default)} />
+            <Stack.Screen name="TournamentEntry" {...screen(() => require('./screens/TournamentEntryScreen').default)} />
+            <Stack.Screen name="TournamentSlotBooking" {...screen(() => require('./screens/TournamentSlotBookingScreen').default)} />
+            <Stack.Screen name="TournamentResults" {...screen(() => require('./screens/TournamentResultsScreen').default)} />
+            <Stack.Screen name="Tournament" {...screen(() => require('./screens/TournamentScreen').default)} />
+            <Stack.Screen name="History" {...screen(() => require('./screens/HistoryScreen').default)} />
+            <Stack.Screen name="MyContests" {...screen(() => require('./screens/MyContestsScreen').default)} />
           </>
         )}
       </Stack.Navigator>

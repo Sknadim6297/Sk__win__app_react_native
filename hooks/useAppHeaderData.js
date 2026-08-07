@@ -39,12 +39,10 @@ export function useAppHeaderData() {
 
   const displayName =
     profile?.username || profile?.name || user?.username || user?.name || 'Player';
-  const subtitle = profile?.gameUsername || 'Game Victory';
   const profilePhoto = profile?.profilePhoto ? resolveMediaUrl(profile.profilePhoto) : '';
 
   return {
     displayName,
-    subtitle,
     profilePhoto,
     walletBalance,
     supportBadgeCount,

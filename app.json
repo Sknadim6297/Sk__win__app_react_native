@@ -6,10 +6,12 @@
     "orientation": "portrait",
     "icon": "./assets/logo/ROUND_GAME_LOGO.png",
     "userInterfaceStyle": "dark",
+    "jsEngine": "hermes",
     "extra": {
       "eas": {
-        "projectId": "9bf33d68-cc48-4456-9873-3cb14d624b77"
-      }
+        "projectId": "43e67fb1-94ec-48c2-8e78-fa94f3290cec"
+      },
+      "appName": "WAREZONE"
     },
     "splash": {
       "image": "./assets/logo/ROUND_GAME_LOGO.png",
@@ -46,7 +48,7 @@
         {
           "backgroundColor": "#0a0e1a",
           "image": "./assets/logo/ROUND_GAME_LOGO.png",
-          "imageWidth": 220,
+          "imageWidth": 200,
           "resizeMode": "contain"
         }
       ],
@@ -58,7 +60,14 @@
         {
           "android": {
             "newArchEnabled": true,
-            "usesCleartextTraffic": true
+            "usesCleartextTraffic": true,
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "enablePngCrunchInReleaseBuilds": true,
+            "useLegacyPackaging": true,
+            "abiFilters": [
+              "arm64-v8a"
+            ]
           },
           "ios": {
             "newArchEnabled": true
@@ -66,6 +75,7 @@
         }
       ],
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "owner": "nadim123456"
   }
 }

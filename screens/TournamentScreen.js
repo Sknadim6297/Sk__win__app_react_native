@@ -10,15 +10,17 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import CalendarDaysIcon from 'react-native-heroicons/outline/CalendarDaysIcon';
-import SignalIcon from 'react-native-heroicons/outline/SignalIcon';
-import CheckCircleIcon from 'react-native-heroicons/outline/CheckCircleIcon';
-import XCircleIcon from 'react-native-heroicons/outline/XCircleIcon';
-import PlusCircleIcon from 'react-native-heroicons/outline/PlusCircleIcon';
-import UserGroupIcon from 'react-native-heroicons/outline/UserGroupIcon';
-import TrophyIcon from 'react-native-heroicons/outline/TrophyIcon';
-import CurrencyDollarIcon from 'react-native-heroicons/outline/CurrencyDollarIcon';
-import ClockIcon from 'react-native-heroicons/outline/ClockIcon';
+import {
+  CalendarDaysIcon,
+  SignalIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  PlusCircleIcon,
+  UserGroupIcon,
+  TrophyIcon,
+  CurrencyDollarIcon,
+  ClockIcon,
+} from '../utils/vectorIcons';
 import { COLORS } from '../styles/theme';
 import { tournamentService } from '../services/api';
 import Toast from '../components/Toast';

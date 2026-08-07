@@ -13,6 +13,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../styles/theme';
 import { notificationService } from '../services/api';
+import { LIST_PERF } from '../utils/listPerf';
 
 const NotificationsScreen = ({ navigation }) => {
   const [notifications, setNotifications] = useState([]);
@@ -106,6 +107,7 @@ const NotificationsScreen = ({ navigation }) => {
       </View>
 
       <FlatList
+        {...LIST_PERF}
         data={notifications}
         renderItem={renderNotification}
         keyExtractor={(item) => item._id}

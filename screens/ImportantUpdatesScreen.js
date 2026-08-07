@@ -12,9 +12,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { COLORS, TYPO } from '../styles/theme';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import { PAGE, pageStyles } from '../styles/pageTheme';
+import ScreenHeader from '../components/navigation/ScreenHeader';
 import AppIcon from '../components/ui/AppIcon';
 import { announcementService } from '../services/api';
+import { LIST_PERF } from '../utils/listPerf';
 
 const formatTimestamp = (iso) => {
   const d = new Date(iso);
@@ -57,7 +60,6 @@ export default function ImportantUpdatesScreen({ navigation }) {
         const url = link.startsWith('http') ? link : `https://${link}`;
         await Linking.openURL(url);
       } catch {
-        // fallback to detail if link fails
         navigation.navigate('AnnouncementDetail', { id: item.id, item });
       }
       return;
@@ -68,7 +70,7 @@ export default function ImportantUpdatesScreen({ navigation }) {
   const renderItem = ({ item }) => (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={() => handlePress(item)}>
       <View style={styles.iconCircle}>
-        <AppIcon name="bullhorn" size={22} />
+        <AppIcon name="bullhorn" size={22} light />
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.title} numberOfLines={1}>
@@ -76,44 +78,38 @@ export default function ImportantUpdatesScreen({ navigation }) {
         </Text>
         <View style={styles.metaRow}>
           <Text style={styles.category}>{item.category || 'ANNOUNCEMENT'}</Text>
-          <Text style={styles.dot}>■</Text>
+          <Text style={styles.dot}>·</Text>
           <Text style={styles.timestamp}>{formatTimestamp(item.createdAt)}</Text>
         </View>
       </View>
-      <AppIcon name="chevron-right" size={20} />
+      <AppIcon name="chevron-right" size={20} light />
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D1117" />
-
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <AppIcon name="arrow-back" size="md" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Important Updates</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <SafeAreaView style={pageStyles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
+      <ScreenHeader title="Announcement" onBack={() => navigation.goBack()} />
 
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#38BDF8" />
+        <View style={pageStyles.centered}>
+          <ActivityIndicator size="large" color={PAGE.accent} />
         </View>
       ) : (
         <FlatList
+          {...LIST_PERF}
           data={items}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#38BDF8" />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />
           }
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <AppIcon name="bullhorn-outline" size={48} />
-              <Text style={styles.emptyText}>No updates yet. Check back soon.</Text>
+            <View style={pageStyles.emptyWrap}>
+              <AppIcon name="bullhorn-outline" size={48} light />
+              <Text style={pageStyles.emptyText}>No updates yet. Check back soon.</Text>
             </View>
           }
         />
@@ -123,90 +119,45 @@ export default function ImportantUpdatesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0D1117',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  headerTitle: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontFamily: TYPO.fontSemiBold,
-  },
   list: {
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 24,
+    flexGrow: 1,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#161B22',
-    borderRadius: 14,
+    backgroundColor: PAGE.cardAlt,
+    borderRadius: 16,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: PAGE.border,
   },
   iconCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(37, 99, 235, 0.35)',
+    backgroundColor: 'rgba(91, 57, 168, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  cardBody: {
-    flex: 1,
-    marginRight: 8,
-  },
+  cardBody: { flex: 1, marginRight: 8, minWidth: 0 },
   title: {
-    color: COLORS.white,
+    fontFamily: FONTS.semiBold,
     fontSize: 15,
-    fontFamily: TYPO.fontSemiBold,
+    color: COLORS.white,
     marginBottom: 6,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   category: {
-    color: '#2DD4BF',
+    color: PAGE.cyan,
     fontSize: 11,
-    fontFamily: TYPO.fontSemiBold,
+    fontFamily: FONTS.semiBold,
     letterSpacing: 0.4,
   },
-  dot: {
-    color: '#8B949E',
-    fontSize: 8,
-    marginHorizontal: 6,
-  },
-  timestamp: {
-    color: '#8B949E',
-    fontSize: 11,
-    fontFamily: TYPO.fontRegular,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  empty: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 24,
-  },
-  emptyText: {
-    color: '#8B949E',
-    marginTop: 12,
-    textAlign: 'center',
-    fontFamily: TYPO.fontRegular,
-  },
+  dot: { color: PAGE.mutedDim, marginHorizontal: 6 },
+  timestamp: { ...TEXT.caption, color: PAGE.mutedDim },
 });

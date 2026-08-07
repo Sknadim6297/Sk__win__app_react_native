@@ -194,6 +194,11 @@ const WalletScreen = ({ navigation, route }) => {
     );
   }
 
+  const formatAmount = (value) => {
+    const n = Number(value) || 0;
+    return Math.round(n).toLocaleString('en-IN');
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#0B0E1E" translucent={false} />
@@ -204,64 +209,105 @@ const WalletScreen = ({ navigation, route }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />
         }
         contentContainerStyle={styles.scroll}
+        bounces
       >
         <AppHeader navigation={navigation} />
 
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Total Balance</Text>
-          <View style={styles.heroAmountRow}>
-            <MaterialCommunityIcons name="circle-multiple" size={28} color="#FBBF24" />
-            <Text style={styles.heroAmount}>{balance.totalBalance.toFixed(0)}</Text>
+        <View style={styles.body}>
+          <View style={styles.heroCard}>
+            <Text style={styles.heroLabel}>Total Balance</Text>
+            <View style={styles.heroAmountRow}>
+              <MaterialCommunityIcons name="circle-multiple" size={32} color="#FBBF24" />
+              <Text
+                style={styles.heroAmount}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.55}
+              >
+                {formatAmount(balance.totalBalance)}
+              </Text>
+            </View>
+            <View style={styles.heroSplit}>
+              <View style={styles.heroSplitItem}>
+                <Text style={styles.heroSplitLabel}>Real</Text>
+                <Text style={styles.heroSplitValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  ₹{formatAmount(balance.balance)}
+                </Text>
+              </View>
+              <View style={styles.heroSplitDivider} />
+              <View style={styles.heroSplitItem}>
+                <Text style={styles.heroSplitLabel}>Bonus</Text>
+                <Text style={styles.heroSplitValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  ₹{formatAmount(balance.bonusBalance)}
+                </Text>
+              </View>
+            </View>
           </View>
-          <Text style={styles.heroSub}>Real ₹{balance.balance.toFixed(0)} · Bonus ₹{balance.bonusBalance.toFixed(0)}</Text>
-        </View>
 
-        <View style={styles.grid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Deposited</Text>
-            <Text style={styles.statValue}>{balance.totalDeposited.toFixed(0)}</Text>
+          <View style={styles.statsList}>
+            <View style={styles.statRow}>
+              <View style={styles.statLeft}>
+                <MaterialCommunityIcons name="bank-transfer-in" size={22} color="#60A5FA" />
+                <Text style={styles.statLabel}>Deposited</Text>
+              </View>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+                ₹{formatAmount(balance.totalDeposited)}
+              </Text>
+            </View>
+            <View style={styles.statRow}>
+              <View style={styles.statLeft}>
+                <MaterialCommunityIcons name="trophy" size={22} color="#FBBF24" />
+                <Text style={styles.statLabel}>Winnings</Text>
+              </View>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+                ₹{formatAmount(balance.totalWinnings)}
+              </Text>
+            </View>
+            <View style={[styles.statRow, styles.statRowLast]}>
+              <View style={styles.statLeft}>
+                <MaterialCommunityIcons name="gift" size={22} color="#A78BFA" />
+                <Text style={styles.statLabel}>Bonus</Text>
+              </View>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+                ₹{formatAmount(balance.bonusBalance)}
+              </Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Winnings</Text>
-            <Text style={styles.statValue}>{balance.totalWinnings.toFixed(0)}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Bonus</Text>
-            <Text style={styles.statValue}>{balance.bonusBalance.toFixed(0)}</Text>
-          </View>
-        </View>
 
-        <View style={styles.actions}>
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionGreen]}
+              onPress={() => setShowAddCoins(true)}
+              activeOpacity={0.88}
+            >
+              <MaterialCommunityIcons name="wallet-plus" size={22} color={COLORS.white} />
+              <Text style={styles.actionText}>Add Coins</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionPurple]}
+              onPress={() => setShowWithdraw(true)}
+              activeOpacity={0.88}
+            >
+              <MaterialCommunityIcons name="export" size={22} color={COLORS.white} />
+              <Text style={styles.actionText}>Withdraw</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
-            style={[styles.actionBtn, styles.actionGreen]}
-            onPress={() => setShowAddCoins(true)}
-            activeOpacity={0.88}
+            style={styles.historyBtn}
+            onPress={() => setShowTransactions(true)}
+            activeOpacity={0.85}
           >
-            <MaterialCommunityIcons name="wallet-plus" size={20} color={COLORS.white} />
-            <Text style={styles.actionText}>Add Coins</Text>
+            <MaterialCommunityIcons name="history" size={22} color={COLORS.purple} />
+            <Text style={styles.historyText}>Transaction History</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.gray} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionPurple]}
-            onPress={() => setShowWithdraw(true)}
-            activeOpacity={0.88}
-          >
-            <MaterialCommunityIcons name="export" size={20} color={COLORS.white} />
-            <Text style={styles.actionText}>Withdraw</Text>
-          </TouchableOpacity>
+
+          <View style={styles.footerBlock}>
+            <Text style={styles.footerNote}>{footerNote}</Text>
+            <Text style={styles.securityNote}>{securityNote}</Text>
+          </View>
         </View>
-
-        <TouchableOpacity
-          style={styles.historyBtn}
-          onPress={() => setShowTransactions(true)}
-          activeOpacity={0.85}
-        >
-          <MaterialCommunityIcons name="history" size={20} color={COLORS.purple} />
-          <Text style={styles.historyText}>Transaction History</Text>
-          <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.gray} />
-        </TouchableOpacity>
-
-        <Text style={styles.footerNote}>{footerNote}</Text>
-        <Text style={styles.securityNote}>{securityNote}</Text>
       </ScrollView>
 
       <CenterDialog
@@ -299,8 +345,10 @@ const WalletScreen = ({ navigation, route }) => {
                       ? styles.txNeg
                       : styles.txPos,
                   ]}
+                  numberOfLines={1}
                 >
-                  {tx.type === 'withdraw' || tx.type === 'tournament_entry' ? '-' : '+'}₹{tx.amount}
+                  {tx.type === 'withdraw' || tx.type === 'tournament_entry' ? '-' : '+'}₹
+                  {formatAmount(tx.amount)}
                 </Text>
               </View>
             ))
@@ -323,7 +371,7 @@ const WalletScreen = ({ navigation, route }) => {
         dismissOnOverlay={!withdrawing}
       >
         <Text style={styles.modalTitle}>Withdraw Winnings</Text>
-        <Text style={styles.withdrawHint}>Available: ₹{balance.totalWinnings.toFixed(0)}</Text>
+        <Text style={styles.withdrawHint}>Available: ₹{formatAmount(balance.totalWinnings)}</Text>
         <View style={styles.inputWrap}>
           <Text style={styles.currency}>₹</Text>
           <TextInput
@@ -377,63 +425,119 @@ const styles = StyleSheet.create({
     ...TEXT.body,
   },
   scroll: {
+    flexGrow: 1,
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 110,
+    paddingBottom: 120,
+  },
+  body: {
+    flexGrow: 1,
+    marginTop: 8,
   },
   heroCard: {
     backgroundColor: '#151D36',
-    borderRadius: 20,
-    padding: 22,
-    marginTop: 8,
-    marginBottom: 14,
+    borderRadius: 22,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(123,97,255,0.25)',
+    borderColor: 'rgba(123,97,255,0.28)',
+    minHeight: 180,
+    justifyContent: 'center',
   },
   heroLabel: {
     ...TEXT.label,
     color: COLORS.gray,
-    marginBottom: 8,
+    marginBottom: 12,
+    textAlign: 'center',
   },
   heroAmountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
+    gap: 12,
+    width: '100%',
+    paddingHorizontal: 4,
   },
   heroAmount: {
+    flexShrink: 1,
     fontFamily: FONTS.bold,
-    fontSize: 36,
+    fontSize: 48,
+    lineHeight: 58,
     color: COLORS.white,
+    textAlign: 'center',
   },
-  heroSub: {
-    marginTop: 10,
+  heroSplit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 22,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  heroSplitItem: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  heroSplitDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  heroSplitLabel: {
     ...TEXT.caption,
     color: COLORS.grayDim,
-  },
-  grid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#121B33',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-  },
-  statLabel: {
-    ...TEXT.caption,
-    color: COLORS.gray,
     marginBottom: 6,
   },
-  statValue: {
+  heroSplitValue: {
+    width: '100%',
     fontFamily: FONTS.bold,
     fontSize: 18,
+    lineHeight: 24,
     color: COLORS.white,
+    textAlign: 'center',
+  },
+  statsList: {
+    backgroundColor: '#121B33',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    marginBottom: 18,
+    overflow: 'hidden',
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  statRowLast: {
+    borderBottomWidth: 0,
+  },
+  statLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 0,
+  },
+  statLabel: {
+    ...TEXT.label,
+    color: COLORS.gray,
+  },
+  statValue: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: FONTS.bold,
+    fontSize: 20,
+    lineHeight: 26,
+    color: COLORS.white,
+    textAlign: 'right',
   },
   actions: {
     flexDirection: 'row',
@@ -446,15 +550,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 14,
-    minHeight: 52,
+    minHeight: 56,
   },
   actionGreen: { backgroundColor: '#00B368' },
   actionPurple: { backgroundColor: '#5B39A8' },
   actionText: {
     fontFamily: FONTS.bold,
-    fontSize: 14,
+    fontSize: 15,
     color: COLORS.white,
   },
   historyBtn: {
@@ -462,7 +566,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#121B33',
     borderRadius: 14,
-    padding: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
     gap: 12,
@@ -473,10 +577,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.white,
   },
+  footerBlock: {
+    marginTop: 'auto',
+    paddingTop: 28,
+    paddingBottom: 8,
+  },
   footerNote: {
     ...TEXT.body,
     color: COLORS.white,
-    marginTop: 20,
     textAlign: 'center',
   },
   securityNote: {
@@ -532,7 +640,11 @@ const styles = StyleSheet.create({
   },
   txAmount: {
     fontFamily: FONTS.bold,
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 20,
+    flexShrink: 0,
+    maxWidth: '42%',
+    textAlign: 'right',
   },
   txPos: { color: '#4ADE80' },
   txNeg: { color: '#F87171' },

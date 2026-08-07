@@ -1,0 +1,11 @@
+# Keep EAS upload slim (does not affect runtime features)
+dist/
+web-build/
+.expo/
+*.original.*
+public/downloads/*.apk
+node_modules/
+backend/
+docs/
+**/*.md
+!README.md

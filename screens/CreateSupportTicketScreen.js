@@ -12,8 +12,9 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, TEXT, TYPO } from '../styles/theme';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import { PAGE, pageStyles } from '../styles/pageTheme';
+import ScreenHeader from '../components/navigation/ScreenHeader';
 import { supportService } from '../services/api';
 import Toast from '../components/Toast';
 
@@ -68,28 +69,21 @@ export default function CreateSupportTicketScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+    <SafeAreaView style={pageStyles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
       <Toast {...toast} onHide={hideToast} />
-
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Ticket</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Create Ticket" onBack={() => navigation.goBack()} />
 
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={COLORS.green} />
+        <View style={pageStyles.centered}>
+          <ActivityIndicator size="large" color={PAGE.accent} />
         </View>
       ) : (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={pageStyles.scroll} keyboardShouldPersistTaps="handled">
             <Text style={styles.label}>Category</Text>
             <View style={styles.chipWrap}>
               {categories.map((cat) => {
@@ -97,7 +91,7 @@ export default function CreateSupportTicketScreen({ navigation }) {
                 return (
                   <TouchableOpacity
                     key={cat.id || cat.name}
-                    style={[styles.chip, active && styles.chipActive]}
+                    style={[pageStyles.chip, active && pageStyles.chipActive]}
                     onPress={() => setSelectedCategory(cat.name)}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat.name}</Text>
@@ -110,7 +104,7 @@ export default function CreateSupportTicketScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="Tell us what happened..."
-              placeholderTextColor="#8B949E"
+              placeholderTextColor={PAGE.mutedDim}
               multiline
               numberOfLines={6}
               textAlignVertical="top"
@@ -120,14 +114,14 @@ export default function CreateSupportTicketScreen({ navigation }) {
             />
 
             <TouchableOpacity
-              style={[styles.submitBtn, submitting && styles.submitDisabled]}
+              style={[pageStyles.primaryBtn, submitting && { opacity: 0.7 }, { marginTop: 24 }]}
               onPress={handleSubmit}
               disabled={submitting}
             >
               {submitting ? (
                 <ActivityIndicator color={COLORS.white} />
               ) : (
-                <Text style={styles.submitText}>Submit Ticket</Text>
+                <Text style={pageStyles.primaryBtnText}>Submit Ticket</Text>
               )}
             </TouchableOpacity>
           </ScrollView>
@@ -138,89 +132,20 @@ export default function CreateSupportTicketScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0D1117',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  headerTitle: {
-    ...TEXT.h3,
-    color: COLORS.white,
-    fontFamily: TYPO.fontSemiBold,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  label: {
-    color: '#8B949E',
-    fontSize: 13,
-    fontFamily: TYPO.fontMedium,
-    marginBottom: 10,
-    marginTop: 8,
-  },
-  chipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: '#161B22',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  chipActive: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
-  },
-  chipText: {
-    color: '#8B949E',
-    fontSize: 13,
-    fontFamily: TYPO.fontSemiBold,
-  },
-  chipTextActive: {
-    color: COLORS.white,
-  },
+  label: { ...TEXT.label, color: PAGE.muted, marginBottom: 10, marginTop: 8 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  chipText: { fontFamily: FONTS.semiBold, fontSize: 13, color: PAGE.muted },
+  chipTextActive: { color: COLORS.white },
   input: {
-    backgroundColor: '#161B22',
+    backgroundColor: PAGE.cardAlt,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: PAGE.border,
     color: COLORS.white,
     padding: 16,
     minHeight: 140,
     fontSize: 15,
-    fontFamily: TYPO.fontRegular,
+    fontFamily: FONTS.regular,
     lineHeight: 22,
-  },
-  submitBtn: {
-    marginTop: 24,
-    backgroundColor: '#22C55E',
-    borderRadius: 999,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  submitDisabled: {
-    opacity: 0.7,
-  },
-  submitText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontFamily: TYPO.fontBold,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

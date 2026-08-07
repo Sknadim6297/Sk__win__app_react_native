@@ -21,7 +21,7 @@ const VARIANTS = {
 };
 
 /**
- * App text using Lilita One typography scale.
+ * App text using DM Sans typography scale.
  */
 export default function AppText({
   variant = 'body',

@@ -35,6 +35,7 @@ const SKWinLogo = ({
         source={remote ? { uri: remote } : APP_LOGO}
         style={styles.logoImage(side, side, radius)}
         resizeMode="cover"
+        fadeDuration={0}
         accessibilityLabel="WAREZONE Tournament logo"
       />
     </View>

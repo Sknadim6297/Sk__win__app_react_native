@@ -1,126 +1,80 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  StatusBar,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../styles/theme';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import { PAGE, pageStyles } from '../styles/pageTheme';
+import ScreenHeader from '../components/navigation/ScreenHeader';
+
+const SECTIONS = [
+  {
+    title: '1. Acceptance of Terms',
+    body:
+      'By accessing and using the WarZone Free Fire Tournament application, you accept and agree to be bound by the terms and provision of this agreement.',
+  },
+  {
+    title: '2. Use License',
+    body:
+      'Permission is granted to temporarily download one copy of the materials on WarZone Free Fire Tournament for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title.',
+  },
+  {
+    title: '3. Disclaimer',
+    body:
+      "The materials on WarZone Free Fire Tournament are provided on an 'as is' basis. WarZone Free Fire Tournament makes no warranties, expressed or implied, and hereby disclaims and negates all other warranties.",
+  },
+  {
+    title: '4. Limitations',
+    body:
+      'In no event shall WarZone Free Fire Tournament or its suppliers be liable for any damages arising out of the use or inability to use the materials on WarZone Free Fire Tournament.',
+  },
+  {
+    title: '5. User Conduct',
+    body:
+      'Users agree to not engage in cheating or fraudulent activities, not harass or abuse other users, not attempt to gain unauthorized access, and comply with all applicable laws and regulations.',
+  },
+  {
+    title: '6. Termination',
+    body:
+      'WarZone Free Fire Tournament may terminate or suspend your account and access to the service immediately, without prior notice or liability, for any reason whatsoever, including if you breach the Terms.',
+  },
+  {
+    title: '7. Contact Information',
+    body: 'If you have any questions about these Terms and Conditions, please contact us at legal@warzoneff.com',
+  },
+];
 
 const TermsAndConditionsScreen = ({ navigation }) => {
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.darkGray} />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.accent} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Terms & Conditions</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <SafeAreaView style={pageStyles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
+      <ScreenHeader title="Terms & Conditions" onBack={() => navigation.goBack()} />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          <Text style={styles.lastUpdated}>Last Updated: January 2026</Text>
-
-          <Text style={styles.sectionTitle}>1. Acceptance of Terms</Text>
-          <Text style={styles.text}>
-            By accessing and using the WarZone Free Fire Tournament application, you accept and agree to be bound by the terms and provision of this agreement.
-          </Text>
-
-          <Text style={styles.sectionTitle}>2. Use License</Text>
-          <Text style={styles.text}>
-            Permission is granted to temporarily download one copy of the materials (information or software) on WarZone Free Fire Tournament for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title.
-          </Text>
-
-          <Text style={styles.sectionTitle}>3. Disclaimer</Text>
-          <Text style={styles.text}>
-            The materials on WarZone Free Fire Tournament are provided on an 'as is' basis. WarZone Free Fire Tournament makes no warranties, expressed or implied, and hereby disclaims and negates all other warranties including, without limitation, implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.
-          </Text>
-
-          <Text style={styles.sectionTitle}>4. Limitations</Text>
-          <Text style={styles.text}>
-            In no event shall WarZone Free Fire Tournament or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the materials on WarZone Free Fire Tournament.
-          </Text>
-
-          <Text style={styles.sectionTitle}>5. User Conduct</Text>
-          <Text style={styles.text}>
-            Users agree to:{'\n\n'}
-            • Not engage in cheating or fraudulent activities{'\n'}
-            • Not harass or abuse other users{'\n'}
-            • Not attempt to gain unauthorized access{'\n'}
-            • Comply with all applicable laws and regulations{'\n'}
-            • Not violate the rights of WarZone Free Fire Tournament or other users
-          </Text>
-
-          <Text style={styles.sectionTitle}>6. Termination</Text>
-          <Text style={styles.text}>
-            WarZone Free Fire Tournament may terminate or suspend your account and access to the service immediately, without prior notice or liability, for any reason whatsoever, including if you breach the Terms.
-          </Text>
-
-          <Text style={styles.sectionTitle}>7. Contact Information</Text>
-          <Text style={styles.text}>
-            If you have any questions about these Terms and Conditions, please contact us at:
-            {'\n\n'}
-            Email: legal@warzoneff.com
-          </Text>
+      <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
+        <Text style={styles.updated}>Last Updated: January 2026</Text>
+        <View style={pageStyles.card}>
+          {SECTIONS.map((section, index) => (
+            <View
+              key={section.title}
+              style={[
+                pageStyles.row,
+                styles.sectionRow,
+                index === SECTIONS.length - 1 && pageStyles.rowLast,
+              ]}
+            >
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <Text style={styles.text}>{section.body}</Text>
+            </View>
+          ))}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginHorizontal: 10,
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 15,
-    paddingVertical: 20,
-  },
-  lastUpdated: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.accent,
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  text: {
-    fontSize: 13,
-    color: COLORS.gray,
-    lineHeight: 20,
-    marginBottom: 10,
-  },
-});
-
 export default TermsAndConditionsScreen;
+
+const styles = StyleSheet.create({
+  updated: { ...TEXT.caption, color: PAGE.mutedDim, marginBottom: 12 },
+  sectionRow: { flexDirection: 'column', alignItems: 'stretch', gap: 8 },
+  sectionTitle: { fontFamily: FONTS.bold, fontSize: 15, color: COLORS.white },
+  text: { ...TEXT.body, color: PAGE.muted, lineHeight: 22 },
+});

@@ -11,9 +11,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, TEXT, TYPO } from '../styles/theme';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import { PAGE, pageStyles } from '../styles/pageTheme';
+import ScreenHeader from '../components/navigation/ScreenHeader';
 import { supportService } from '../services/api';
+import { LIST_PERF } from '../utils/listPerf';
 
 const formatDate = (iso) => {
   const d = new Date(iso);
@@ -34,7 +37,7 @@ const statusLabel = (status) => {
 const statusColor = (status) => {
   if (status === 'closed') return '#EF4444';
   if (status === 'in_progress') return '#F59E0B';
-  return '#22C55E';
+  return PAGE.green;
 };
 
 export default function SupportTicketsScreen({ navigation }) {
@@ -78,46 +81,42 @@ export default function SupportTicketsScreen({ navigation }) {
       <Text style={styles.categoryLine}>Category: {item.category}</Text>
       <View style={styles.badgeRow}>
         <View style={styles.categoryBadge}>
-          <Text style={styles.categoryBadgeText}>{item.category}</Text>
+          <Text style={styles.badgeText}>{item.category}</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusColor(item.status) }]}>
-          <Text style={styles.statusBadgeText}>{statusLabel(item.status)}</Text>
+          <Text style={styles.badgeText}>{statusLabel(item.status)}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Support Tickets</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <SafeAreaView style={pageStyles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
+      <ScreenHeader title="Customer Support" onBack={() => navigation.goBack()} />
 
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={COLORS.green} />
+        <View style={pageStyles.centered}>
+          <ActivityIndicator size="large" color={PAGE.accent} />
         </View>
       ) : (
         <FlatList
+          {...LIST_PERF}
           data={tickets}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id || item._id || String(item.ticketCode)}
           renderItem={renderTicket}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.green} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />
           }
           ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Ionicons name="chatbubbles-outline" size={48} color={COLORS.grayDim} />
-              <Text style={styles.emptyTitle}>No tickets yet</Text>
-              <Text style={styles.emptyText}>Tap Create Ticket below to reach our support team.</Text>
+            <View style={pageStyles.emptyWrap}>
+              <MaterialCommunityIcons name="headset" size={48} color={PAGE.mutedDim} />
+              <Text style={pageStyles.emptyTitle}>No tickets yet</Text>
+              <Text style={pageStyles.emptyText}>
+                Tap Create Ticket below to reach our support team.
+              </Text>
             </View>
           }
         />
@@ -125,12 +124,12 @@ export default function SupportTicketsScreen({ navigation }) {
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={styles.createBtn}
+          style={pageStyles.primaryBtn}
           activeOpacity={0.9}
           onPress={() => navigation.navigate('CreateSupportTicket')}
         >
           <Ionicons name="add" size={22} color={COLORS.white} />
-          <Text style={styles.createBtnText}>Create Ticket</Text>
+          <Text style={pageStyles.primaryBtnText}>Create Ticket</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -138,34 +137,19 @@ export default function SupportTicketsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0D1117',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-  },
-  headerTitle: {
-    ...TEXT.h3,
-    color: COLORS.white,
-    fontFamily: TYPO.fontSemiBold,
-  },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingTop: 12,
+    paddingBottom: 110,
     flexGrow: 1,
   },
   card: {
-    backgroundColor: '#161B22',
-    borderRadius: 15,
+    backgroundColor: PAGE.cardAlt,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: PAGE.border,
   },
   cardTop: {
     flexDirection: 'row',
@@ -173,93 +157,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  ticketId: {
-    color: '#8B949E',
-    fontSize: 13,
-    fontFamily: TYPO.fontMedium,
-  },
-  ticketDate: {
-    color: '#8B949E',
-    fontSize: 12,
-    fontFamily: TYPO.fontRegular,
-  },
+  ticketId: { ...TEXT.caption, color: PAGE.muted },
+  ticketDate: { ...TEXT.caption, color: PAGE.mutedDim },
   categoryLine: {
-    color: COLORS.white,
+    fontFamily: FONTS.semiBold,
     fontSize: 15,
-    fontFamily: TYPO.fontSemiBold,
+    color: COLORS.white,
     marginBottom: 12,
   },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  badgeRow: { flexDirection: 'row', gap: 8 },
   categoryBadge: {
-    backgroundColor: '#2563EB',
+    backgroundColor: PAGE.purple,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-  },
-  categoryBadgeText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontFamily: TYPO.fontSemiBold,
-    letterSpacing: 0.3,
   },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
-  statusBadgeText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontFamily: TYPO.fontSemiBold,
-  },
+  badgeText: { fontFamily: FONTS.semiBold, fontSize: 11, color: COLORS.white },
   footer: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 24,
     paddingTop: 12,
-    backgroundColor: 'rgba(13,17,23,0.95)',
-  },
-  createBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#22C55E',
-    borderRadius: 999,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  createBtnText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontFamily: TYPO.fontBold,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyWrap: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 24,
-  },
-  emptyTitle: {
-    color: COLORS.white,
-    fontSize: 17,
-    fontFamily: TYPO.fontSemiBold,
-    marginTop: 16,
-  },
-  emptyText: {
-    color: '#8B949E',
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 22,
-    fontFamily: TYPO.fontRegular,
+    backgroundColor: 'rgba(11,14,30,0.96)',
+    borderTopWidth: 1,
+    borderTopColor: PAGE.border,
   },
 });

@@ -6,27 +6,21 @@ import SKWinLogo from '../SKWinLogo';
 import { COLORS, FONTS } from '../../styles/theme';
 import { useAppHeaderData } from '../../hooks/useAppHeaderData';
 
-const HEADER_THEME = {
-  card: '#1A1235',
-  accent: '#40E0D0',
-  walletPill: '#4A2D8A',
+const formatBalance = (value) => {
+  const n = Number(value) || 0;
+  if (n >= 100000) return Math.round(n).toLocaleString('en-IN');
+  if (Number.isInteger(n)) return n.toLocaleString('en-IN');
+  return n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 };
 
 export default function AppHeader({ navigation, style }) {
-  const { displayName, subtitle, profilePhoto, walletBalance, supportBadgeCount } =
-    useAppHeaderData();
+  const { displayName, profilePhoto, walletBalance, supportBadgeCount } = useAppHeaderData();
 
   const renderAvatar = () => {
     if (profilePhoto) {
-      return (
-        <Image
-          source={{ uri: profilePhoto }}
-          style={styles.avatarImage}
-          resizeMode="cover"
-        />
-      );
+      return <Image source={{ uri: profilePhoto }} style={styles.avatarImage} resizeMode="cover" />;
     }
-    return <SKWinLogo size={40} rounded backgroundColor="transparent" />;
+    return <SKWinLogo size={34} rounded backgroundColor="transparent" />;
   };
 
   return (
@@ -36,13 +30,13 @@ export default function AppHeader({ navigation, style }) {
         activeOpacity={0.85}
         onPress={() => navigation.navigate('AccountTab')}
       >
-        <View style={styles.avatarWrap}>{renderAvatar()}</View>
+        <View style={styles.avatar}>{renderAvatar()}</View>
         <View style={styles.nameBlock}>
+          <Text style={styles.greeting} numberOfLines={1}>
+            Hi,
+          </Text>
           <Text style={styles.username} numberOfLines={1}>
             {displayName}
-          </Text>
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {subtitle}
           </Text>
         </View>
       </TouchableOpacity>
@@ -54,10 +48,10 @@ export default function AppHeader({ navigation, style }) {
           hitSlop={8}
           activeOpacity={0.85}
         >
-          <AppIcon name="headset" size={28} light />
+          <AppIcon name="headset" size={24} light />
           {supportBadgeCount > 0 && (
-            <View style={styles.supportBadge}>
-              <Text style={styles.supportBadgeText}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
                 {supportBadgeCount > 99 ? '99' : supportBadgeCount}
               </Text>
             </View>
@@ -67,12 +61,18 @@ export default function AppHeader({ navigation, style }) {
         <TouchableOpacity
           style={styles.walletPill}
           onPress={() => navigation.navigate('WalletTab')}
-          activeOpacity={0.85}
+          activeOpacity={0.88}
         >
-          <MaterialCommunityIcons name="wallet-outline" size={20} color={COLORS.white} />
-          <Text style={styles.walletText}>{walletBalance.toFixed(2)}</Text>
-          <View style={styles.walletDivider} />
-          <MaterialCommunityIcons name="plus" size={18} color={COLORS.white} />
+          <MaterialCommunityIcons name="wallet-outline" size={18} color={COLORS.white} />
+          <Text
+            style={styles.walletText}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
+            {formatBalance(walletBalance)}
+          </Text>
+          <MaterialCommunityIcons name="plus" size={16} color="#FBBF24" />
         </TouchableOpacity>
       </View>
     </View>
@@ -84,43 +84,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 4,
-    marginBottom: 16,
+    paddingTop: 2,
+    marginBottom: 14,
   },
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     flex: 1,
-    marginRight: 8,
+    marginRight: 10,
+    minWidth: 0,
   },
-  avatarWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: HEADER_THEME.card,
+    backgroundColor: '#151D36',
   },
   avatarImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
   },
   nameBlock: {
     flex: 1,
+    minWidth: 0,
+  },
+  greeting: {
+    fontSize: 12,
+    fontFamily: FONTS.medium,
+    color: COLORS.gray,
   },
   username: {
-    fontSize: 15,
+    fontSize: 17,
     fontFamily: FONTS.bold,
     color: COLORS.white,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontFamily: FONTS.regular,
-    color: HEADER_THEME.accent,
-    marginTop: 2,
+    marginTop: 1,
   },
   actions: {
     flexDirection: 'row',
@@ -134,46 +135,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  supportBadge: {
+  badge: {
     position: 'absolute',
-    top: 0,
-    right: -2,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 6,
+    top: 2,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: '#050A12',
+    paddingHorizontal: 3,
   },
-  supportBadgeText: {
-    fontSize: 10,
+  badgeText: {
+    fontSize: 9,
     fontFamily: FONTS.bold,
-    fontWeight: '700',
     color: COLORS.white,
   },
   walletPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: HEADER_THEME.walletPill,
-    borderRadius: 20,
+    backgroundColor: '#5B39A8',
+    borderRadius: 22,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
+    paddingVertical: 9,
+    gap: 7,
     minHeight: 40,
   },
   walletText: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: FONTS.bold,
     color: COLORS.white,
-    minWidth: 36,
-    textAlign: 'center',
-  },
-  walletDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    maxWidth: 72,
   },
 });

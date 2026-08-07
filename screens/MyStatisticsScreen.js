@@ -2,213 +2,184 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   ScrollView,
   StatusBar,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { COLORS } from '../styles/theme';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import { PAGE, pageStyles } from '../styles/pageTheme';
+import ScreenHeader from '../components/navigation/ScreenHeader';
+import { userService } from '../services/api';
+
+const formatAmount = (value) => Math.round(Number(value) || 0).toLocaleString('en-IN');
 
 const MyStatisticsScreen = ({ navigation }) => {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
-    totalTournaments: 24,
-    tournamentsWon: 8,
-    winRate: 33.3,
-    totalPrizeWon: 5000,
-    longestStreak: 4,
-    totalMatches: 120,
-    matchesWon: 65,
+    totalTournaments: 0,
+    tournamentsWon: 0,
+    winRate: 0,
+    totalPrizeWon: 0,
+    totalMatches: 0,
+    matchesWon: 0,
+    totalKills: 0,
   });
+
+  const loadStats = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const profile = await userService.getProfile().catch(() => ({}));
+      const tournament = profile?.tournament || {};
+      const gameStats = profile?.gameStats || {};
+      const joined = tournament.participatedCount || 0;
+      const won = tournament.wins || 0;
+      const winRate = joined > 0 ? Math.round((won / joined) * 1000) / 10 : 0;
+
+      setStats({
+        totalTournaments: joined,
+        tournamentsWon: won,
+        winRate,
+        totalPrizeWon: tournament.earnings || profile?.wallet?.totalWinnings || 0,
+        totalMatches: joined,
+        matchesWon: won,
+        totalKills: gameStats.totalKills || 0,
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      // Load statistics
-    }, [])
+      loadStats();
+    }, [loadStats])
   );
 
+  const winPct = stats.totalMatches > 0 ? (stats.matchesWon / stats.totalMatches) * 100 : 0;
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.darkGray} />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.accent} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Statistics</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <SafeAreaView style={pageStyles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
+      <ScreenHeader title="My Statistics" onBack={() => navigation.goBack()} />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="trophy" size={32} color={COLORS.accent} />
-            <Text style={styles.statValue}>{stats.tournamentsWon}</Text>
-            <Text style={styles.statLabel}>Tournaments Won</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="percent" size={32} color={COLORS.accent} />
-            <Text style={styles.statValue}>{stats.winRate}%</Text>
-            <Text style={styles.statLabel}>Win Rate</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="gamepad-variant" size={32} color={COLORS.accent} />
-            <Text style={styles.statValue}>{stats.totalTournaments}</Text>
-            <Text style={styles.statLabel}>Tournaments Joined</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <MaterialCommunityIcons name="cash" size={32} color={COLORS.accent} />
-            <Text style={styles.statValue}>₹{stats.totalPrizeWon}</Text>
-            <Text style={styles.statLabel}>Total Prize</Text>
-          </View>
+      {loading ? (
+        <View style={pageStyles.centered}>
+          <ActivityIndicator size="large" color={PAGE.accent} />
         </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={pageStyles.scroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadStats(true);
+              }}
+              tintColor={COLORS.white}
+            />
+          }
+        >
+          <View style={styles.heroCard}>
+            <Text style={styles.heroLabel}>Win Rate</Text>
+            <Text style={styles.heroValue}>{stats.winRate}%</Text>
+            <Text style={styles.heroSub}>
+              {stats.tournamentsWon} wins · {stats.totalTournaments} joined
+            </Text>
+          </View>
 
-        {/* Detailed Stats */}
-        <View style={styles.detailedStats}>
-          <Text style={styles.sectionTitle}>Detailed Statistics</Text>
-
-          <View style={styles.statRow}>
-            <View style={styles.statRowContent}>
-              <Text style={styles.statRowLabel}>Total Matches</Text>
-              <Text style={styles.statRowValue}>{stats.totalMatches}</Text>
+          <View style={pageStyles.card}>
+            <View style={pageStyles.row}>
+              <View style={styles.left}>
+                <MaterialCommunityIcons name="trophy" size={22} color={PAGE.gold} />
+                <Text style={pageStyles.label}>Tournaments Won</Text>
+              </View>
+              <Text style={pageStyles.value}>{stats.tournamentsWon}</Text>
             </View>
-            <View style={styles.progressBar}>
-              <View style={[styles.progress, { width: '100%' }]} />
+            <View style={pageStyles.row}>
+              <View style={styles.left}>
+                <MaterialCommunityIcons name="gamepad-variant" size={22} color="#60A5FA" />
+                <Text style={pageStyles.label}>Tournaments Joined</Text>
+              </View>
+              <Text style={pageStyles.value}>{stats.totalTournaments}</Text>
+            </View>
+            <View style={pageStyles.row}>
+              <View style={styles.left}>
+                <MaterialCommunityIcons name="cash" size={22} color={PAGE.green} />
+                <Text style={pageStyles.label}>Total Prize</Text>
+              </View>
+              <Text style={pageStyles.value}>₹{formatAmount(stats.totalPrizeWon)}</Text>
+            </View>
+            <View style={[pageStyles.row, pageStyles.rowLast]}>
+              <View style={styles.left}>
+                <MaterialCommunityIcons name="target" size={22} color="#F87171" />
+                <Text style={pageStyles.label}>Total Kills</Text>
+              </View>
+              <Text style={pageStyles.value}>{stats.totalKills}</Text>
             </View>
           </View>
 
-          <View style={styles.statRow}>
-            <View style={styles.statRowContent}>
-              <Text style={styles.statRowLabel}>Matches Won</Text>
-              <Text style={styles.statRowValue}>{stats.matchesWon}</Text>
-            </View>
-            <View style={styles.progressBar}>
-              <View style={[styles.progress, { width: `${(stats.matchesWon / stats.totalMatches) * 100}%` }]} />
-            </View>
-          </View>
-
-          <View style={styles.statRow}>
-            <View style={styles.statRowContent}>
-              <Text style={styles.statRowLabel}>Longest Streak</Text>
-              <Text style={styles.statRowValue}>{stats.longestStreak}</Text>
-            </View>
-            <View style={styles.streakBadge}>
-              <MaterialCommunityIcons name="fire" size={18} color="#FF6B6B" />
+          <Text style={pageStyles.sectionTitle}>Match Breakdown</Text>
+          <View style={pageStyles.card}>
+            <View style={[pageStyles.row, pageStyles.rowLast, styles.breakdown]}>
+              <View style={styles.breakdownTop}>
+                <Text style={pageStyles.label}>Matches Won</Text>
+                <Text style={pageStyles.value}>
+                  {stats.matchesWon}/{stats.totalMatches || 0}
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.min(winPct, 100)}%` }]} />
+              </View>
             </View>
           </View>
-        </View>
-
-        <View style={{ height: 30 }} />
-      </ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };
 
+export default MyStatisticsScreen;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
+  heroCard: {
+    ...pageStyles.heroCard,
     alignItems: 'center',
+  },
+  heroLabel: { ...TEXT.label, color: PAGE.muted, marginBottom: 8 },
+  heroValue: {
+    fontFamily: FONTS.bold,
+    fontSize: 48,
+    lineHeight: 56,
+    color: COLORS.white,
+  },
+  heroSub: { ...TEXT.caption, color: PAGE.mutedDim, marginTop: 8 },
+  left: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  breakdown: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
+  breakdownTop: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 10,
-    paddingVertical: 15,
-  },
-  statCard: {
-    width: '48%',
-    backgroundColor: COLORS.darkGray,
-    borderRadius: 12,
-    padding: 20,
-    marginHorizontal: 5,
-    marginBottom: 15,
     alignItems: 'center',
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.accent,
+    width: '100%',
   },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.accent,
-    marginTop: 10,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginTop: 5,
-    textAlign: 'center',
-  },
-  detailedStats: {
-    backgroundColor: COLORS.darkGray,
-    marginHorizontal: 15,
-    marginBottom: 15,
-    paddingHorizontal: 15,
-    paddingVertical: 20,
-    borderRadius: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.accent,
-    marginBottom: 20,
-  },
-  statRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  statRowContent: {
-    width: '35%',
-  },
-  statRowLabel: {
-    fontSize: 13,
-    color: COLORS.gray,
-    marginBottom: 3,
-  },
-  statRowValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  progressBar: {
-    flex: 1,
+  progressTrack: {
     height: 8,
-    backgroundColor: COLORS.background,
     borderRadius: 4,
-    marginLeft: 10,
+    backgroundColor: PAGE.bg,
     overflow: 'hidden',
+    width: '100%',
   },
-  progress: {
+  progressFill: {
     height: '100%',
-    backgroundColor: COLORS.accent,
-  },
-  streakBadge: {
-    alignItems: 'center',
+    backgroundColor: PAGE.green,
+    borderRadius: 4,
   },
 });
-
-export default MyStatisticsScreen;

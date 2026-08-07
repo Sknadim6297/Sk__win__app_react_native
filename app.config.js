@@ -56,7 +56,7 @@ module.exports = ({ config }) => ({
       {
         backgroundColor: splashBg,
         image: './assets/logo/ROUND_GAME_LOGO.png',
-        imageWidth: 220,
+        imageWidth: 200,
         resizeMode: 'contain',
       },
     ],
@@ -67,6 +67,14 @@ module.exports = ({ config }) => ({
           // Reanimated 4 (SDK 54) requires New Architecture
           newArchEnabled: true,
           usesCleartextTraffic: usesHttp,
+          // Release APK size / performance
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+          enablePngCrunchInReleaseBuilds: true,
+          useLegacyPackaging: true,
+          // Phone APKs: arm64 only (drops 32-bit + emulator ABIs). Biggest native size cut.
+          // Trade-off: very old 32-bit-only Android devices cannot install this build.
+          abiFilters: ['arm64-v8a'],
         },
         ios: {
           newArchEnabled: true,
@@ -93,6 +101,9 @@ module.exports = ({ config }) => ({
   },
   extra: {
     ...config.extra,
-    ...(apiUrl ? { apiUrl: apiUrl.replace(/\/$/, '') } : {}),
+    // Always embed API URL in the native app config so release APKs
+    // still resolve it via Constants.expoConfig.extra even if env inlining fails.
+    apiUrl: (apiUrl || process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '') || undefined,
+    appName: process.env.EXPO_PUBLIC_APP_NAME || config.name || 'WAREZONE Tournament',
   },
 });

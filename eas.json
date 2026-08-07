@@ -5,18 +5,30 @@
   },
   "build": {
     "production": {
+      "env": {
+        "NODE_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://stunning-glorifier-panama.ngrok-free.dev/api",
+        "EXPO_PUBLIC_APP_NAME": "WAREZONE Tournament"
+      },
       "android": {
         "releaseChannel": "production",
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
       "ios": {
         "releaseChannel": "production"
       }
     },
     "preview": {
+      "env": {
+        "NODE_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://stunning-glorifier-panama.ngrok-free.dev/api",
+        "EXPO_PUBLIC_APP_NAME": "WAREZONE Tournament"
+      },
       "android": {
         "releaseChannel": "preview",
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       }
     }
   },

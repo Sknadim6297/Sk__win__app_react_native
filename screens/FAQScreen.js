@@ -9,132 +9,94 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../styles/theme';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import { PAGE, pageStyles } from '../styles/pageTheme';
+import ScreenHeader from '../components/navigation/ScreenHeader';
 
 const FAQScreen = ({ navigation }) => {
   const faqs = [
     {
       question: 'How do I join a tournament?',
-      answer: 'Go to the Tournaments tab, select a tournament you like, and click "Join". You can then invite friends to participate.',
+      answer:
+        'Go to the Tournaments tab, select a tournament you like, and click "Join". You can then invite friends to participate.',
     },
     {
       question: 'How are prizes distributed?',
-      answer: 'Prizes are distributed to top performers based on tournament rules. Winners receive prize money in their wallet within 24 hours.',
+      answer:
+        'Prizes are distributed to top performers based on tournament rules. Winners receive prize money in their wallet within 24 hours.',
     },
     {
       question: 'Can I withdraw my winnings?',
-      answer: 'Yes, you can withdraw your winnings anytime. Go to Wallet > Withdraw Money and follow the process.',
+      answer:
+        'Yes, you can withdraw your winnings anytime. Go to Wallet > Withdraw Money and follow the process.',
     },
     {
       question: 'How do I report a user?',
-      answer: 'If you encounter inappropriate behavior, contact our support team with details and screenshot evidence.',
+      answer:
+        'If you encounter inappropriate behavior, contact our support team with details and screenshot evidence.',
     },
     {
       question: 'Is WarZone Free Fire Tournament available in my region?',
-      answer: 'WarZone Free Fire Tournament is available in most regions. Check your app store or contact support for regional availability.',
+      answer:
+        'WarZone Free Fire Tournament is available in most regions. Check your app store or contact support for regional availability.',
     },
   ];
 
   const [expanded, setExpanded] = React.useState(null);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.darkGray} />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.accent} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Frequently Asked Questions</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <SafeAreaView style={pageStyles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
+      <ScreenHeader title="App Tutorial" onBack={() => navigation.goBack()} />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {faqs.map((faq, index) => (
-          <View key={index}>
-            <TouchableOpacity
-              style={styles.faqItem}
-              onPress={() => setExpanded(expanded === index ? null : index)}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.question}>{faq.question}</Text>
+      <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={pageStyles.card}>
+          {faqs.map((faq, index) => {
+            const open = expanded === index;
+            const last = index === faqs.length - 1;
+            return (
+              <View key={index}>
+                <TouchableOpacity
+                  style={[pageStyles.row, last && !open && pageStyles.rowLast]}
+                  onPress={() => setExpanded(open ? null : index)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.question}>{faq.question}</Text>
+                  <Ionicons
+                    name={open ? 'chevron-up' : 'chevron-down'}
+                    size={20}
+                    color={COLORS.white}
+                  />
+                </TouchableOpacity>
+                {open ? (
+                  <View style={[styles.answerBox, last && pageStyles.rowLast]}>
+                    <Text style={styles.answer}>{faq.answer}</Text>
+                  </View>
+                ) : null}
               </View>
-              <Ionicons 
-                name={expanded === index ? 'chevron-up' : 'chevron-down'} 
-                size={24} 
-                color={COLORS.accent} 
-              />
-            </TouchableOpacity>
-            
-            {expanded === index && (
-              <View style={styles.answerContainer}>
-                <Text style={styles.answer}>{faq.answer}</Text>
-              </View>
-            )}
-          </View>
-        ))}
-
-        <View style={{ height: 30 }} />
+            );
+          })}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginHorizontal: 10,
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-  },
-  faqItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.darkGray,
-    paddingVertical: 15,
-    paddingHorizontal: 15,
-    marginBottom: 10,
-    borderRadius: 12,
-  },
-  question: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.white,
-    lineHeight: 20,
-  },
-  answerContainer: {
-    backgroundColor: 'rgba(102, 126, 234, 0.1)',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    marginBottom: 10,
-    borderRadius: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.accent,
-  },
-  answer: {
-    fontSize: 13,
-    color: COLORS.gray,
-    lineHeight: 18,
-  },
-});
-
 export default FAQScreen;
+
+const styles = StyleSheet.create({
+  question: {
+    flex: 1,
+    fontFamily: FONTS.semiBold,
+    fontSize: 15,
+    color: COLORS.white,
+    paddingRight: 10,
+  },
+  answerBox: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: PAGE.border,
+  },
+  answer: { ...TEXT.body, color: PAGE.muted, lineHeight: 22 },
+});

@@ -1,10 +1,11 @@
 /**
- * Themed react-native wrapper — Lilita One base + readable default size.
+ * Themed react-native wrapper — DM Sans base + readable default size.
+ * Default font is applied first so style fontFamily (FONTS.bold, etc.) can override.
  */
 const RN = require('react-native');
 const React = require('react');
 
-const APP_FONT = 'LilitaOne-Regular';
+const APP_FONT = 'DMSans_400Regular';
 const BASE_TEXT = {
   fontFamily: APP_FONT,
   fontWeight: 'normal',
@@ -17,7 +18,7 @@ function wrapWithFont(Component) {
     const extra = Array.isArray(style) ? style : style ? [style] : [];
     return React.createElement(Component, {
       ref,
-      style: [...extra, BASE_TEXT],
+      style: [BASE_TEXT, ...extra],
       ...props,
     });
   });

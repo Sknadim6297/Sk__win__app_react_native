@@ -8,305 +8,156 @@ import {
   StatusBar,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import AppIcon from '../components/ui/AppIcon';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
-import { COLORS } from '../styles/theme';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import { PAGE, pageStyles } from '../styles/pageTheme';
+import ScreenHeader from '../components/navigation/ScreenHeader';
 import { userService } from '../services/api';
 import SKWinLogo from '../components/SKWinLogo';
+import AppIcon from '../components/ui/AppIcon';
+import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+
 const AccountProfileScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadProfileData();
-    }, [])
-  );
-
-  const loadProfileData = async (silent = false) => {
+  const loadProfileData = useCallback(async (silent = false) => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
+      if (!silent) setLoading(true);
       const data = await userService.getProfile();
       setProfileData(data);
     } catch (error) {
       console.log('Error loading profile:', error.message);
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      if (!silent) setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadProfileData(true);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProfileData();
+    }, [loadProfileData])
+  );
+
+  const stats = profileData || {};
+  const photo = stats.profilePhoto ? resolveMediaUrl(stats.profilePhoto) : '';
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
+      <SafeAreaView style={pageStyles.container} edges={['top']}>
+        <ScreenHeader title="My Profile" onBack={() => navigation.goBack()} />
+        <View style={pageStyles.centered}>
+          <ActivityIndicator size="large" color={PAGE.accent} />
         </View>
       </SafeAreaView>
     );
   }
 
-  const stats = profileData || {};
+  const rows = [
+    { label: 'Full Name', value: stats.name || 'Not set' },
+    { label: 'Username', value: stats.username || user?.username || 'N/A' },
+    { label: 'Game Username', value: stats.gameUsername || 'Not set' },
+    { label: 'Email', value: stats.email || 'N/A' },
+    { label: 'User ID', value: `#${stats._id?.slice(-8) || 'N/A'}` },
+  ];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.accent} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Profile</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('EditProfile')}>
-          <AppIcon name="pencil" size="md" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={pageStyles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
+      <ScreenHeader
+        title="My Profile"
+        onBack={() => navigation.goBack()}
+        right={
+          <TouchableOpacity onPress={() => navigation.navigate('EditProfile')} hitSlop={10}>
+            <AppIcon name="pencil" size={22} light />
+          </TouchableOpacity>
+        }
+      />
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        contentContainerStyle={pageStyles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={COLORS.accent}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadProfileData(true);
+            }}
+            tintColor={COLORS.white}
           />
         }
       >
-        {/* Profile Picture */}
-        <View style={styles.avatarSection}>
-          <View style={styles.avatarContainer}>
-            <SKWinLogo size={100} />
+        <View style={styles.heroCard}>
+          <View style={styles.avatarWrap}>
+            {photo ? (
+              <Image source={{ uri: photo }} style={styles.avatar} />
+            ) : (
+              <SKWinLogo size={96} rounded backgroundColor="transparent" />
+            )}
           </View>
-          <Text style={styles.userName}>
-            {stats.name || stats.username || 'User'}
-          </Text>
-          {stats.gameUsername && (
-            <Text style={styles.gameUsername}>@{stats.gameUsername}</Text>
-          )}
+          <Text style={styles.name}>{stats.name || stats.username || 'User'}</Text>
+          {stats.gameUsername ? (
+            <Text style={styles.gameId}>@{stats.gameUsername}</Text>
+          ) : null}
         </View>
 
-        {/* Profile Details Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
-          
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Full Name</Text>
-              <Text style={styles.infoValue}>{stats.name || 'Not set'}</Text>
+        <Text style={pageStyles.sectionTitle}>Personal Information</Text>
+        <View style={pageStyles.card}>
+          {rows.map((row, index) => (
+            <View
+              key={row.label}
+              style={[pageStyles.row, index === rows.length - 1 && pageStyles.rowLast]}
+            >
+              <Text style={pageStyles.label}>{row.label}</Text>
+              <Text style={[pageStyles.value, styles.rowValue]} numberOfLines={1}>
+                {row.value}
+              </Text>
             </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Username</Text>
-              <Text style={styles.infoValue}>{stats.username || 'N/A'}</Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Game Username</Text>
-              <Text style={styles.infoValue}>{stats.gameUsername || 'Not set'}</Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{stats.email || 'N/A'}</Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>User ID</Text>
-              <Text style={styles.infoValue}>#{stats._id?.slice(-8) || 'N/A'}</Text>
-            </View>
-          </View>
+          ))}
         </View>
 
-        {/* Edit Profile Button */}
-        <TouchableOpacity 
-          style={styles.editButton}
+        <TouchableOpacity
+          style={pageStyles.primaryBtn}
           onPress={() => navigation.navigate('EditProfile')}
+          activeOpacity={0.88}
         >
-          <AppIcon name="pencil" size={20} />
-          <Text style={styles.editButtonText}>Edit Profile</Text>
+          <AppIcon name="pencil" size={20} light />
+          <Text style={pageStyles.primaryBtnText}>Edit Profile</Text>
         </TouchableOpacity>
-
-        <View style={{ height: 30 }} />
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    paddingVertical: 30,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
-  },
-  avatarContainer: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: COLORS.darkGray,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-    borderWidth: 3,
-    borderColor: COLORS.accent,
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 5,
-  },
-  gameUsername: {
-    fontSize: 14,
-    color: COLORS.accent,
-  },
-  section: {
-    padding: 15,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 15,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statCard: {
-    width: '48%',
-    backgroundColor: COLORS.darkGray,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.gray + '30',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginTop: 10,
-    marginBottom: 5,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: COLORS.gray,
-    textAlign: 'center',
-  },
-  infoCard: {
-    backgroundColor: COLORS.darkGray,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.gray + '30',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: COLORS.gray,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.white,
-    textAlign: 'right',
-    flex: 1,
-    marginLeft: 10,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.gray + '20',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  verified: {
-    backgroundColor: '#4CAF50' + '20',
-  },
-  pending: {
-    backgroundColor: '#FF9800' + '20',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.accent,
-    marginHorizontal: 15,
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-  },
-  editButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-});
-
 export default AccountProfileScreen;
+
+const styles = StyleSheet.create({
+  heroCard: {
+    ...pageStyles.heroCard,
+    alignItems: 'center',
+  },
+  avatarWrap: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    overflow: 'hidden',
+    backgroundColor: PAGE.cardAlt,
+    borderWidth: 2,
+    borderColor: PAGE.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  avatar: { width: 104, height: 104 },
+  name: { fontFamily: FONTS.bold, fontSize: 22, color: COLORS.white },
+  gameId: { ...TEXT.caption, color: PAGE.cyan, marginTop: 6 },
+  rowValue: { flex: 1, textAlign: 'right', marginLeft: 12 },
+});

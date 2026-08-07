@@ -62,6 +62,17 @@ app.use(
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/download', express.static(path.join(PUBLIC_ROOT, 'download')));
 
+// Single brand logo (no copies) — used by download page favicon/OG/hero
+const BRAND_LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo', 'ROUND_GAME_LOGO.png');
+app.get(['/brand/logo.png', '/download/logo.png'], (req, res) => {
+  res.sendFile(BRAND_LOGO_PATH, (err) => {
+    if (err) {
+      console.error('[brand] logo missing:', BRAND_LOGO_PATH, err.message);
+      res.status(404).end();
+    }
+  });
+});
+
 const isDbReady = () => mongoose.connection.readyState === 1;
 
 /** Modern APK landing page */

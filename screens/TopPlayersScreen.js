@@ -13,6 +13,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../styles/theme';
 
+import { LIST_PERF } from '../utils/listPerf';
+
 const TopPlayersScreen = ({ navigation }) => {
   const [topPlayers, setTopPlayers] = useState([
     { id: 1, rank: 1, name: 'Pro Player 1', wins: 45, rating: 2500 },
@@ -74,6 +76,7 @@ const TopPlayersScreen = ({ navigation }) => {
       </View>
 
       <FlatList
+        {...LIST_PERF}
         data={topPlayers}
         renderItem={renderPlayerItem}
         keyExtractor={(item) => item.id.toString()}

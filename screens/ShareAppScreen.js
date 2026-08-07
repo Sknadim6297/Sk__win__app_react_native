@@ -7,46 +7,38 @@ import {
   StatusBar,
   Share,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS } from '../styles/theme';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import { PAGE, pageStyles } from '../styles/pageTheme';
+import ScreenHeader from '../components/navigation/ScreenHeader';
 import { AuthContext } from '../context/AuthContext';
 import { userService } from '../services/api';
 import AppIcon from '../components/ui/AppIcon';
 
 const ShareAppScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
-  const [referralCode, setReferralCode] = useState(user?.referralCode || 'Loading...');
+  const [referralCode, setReferralCode] = useState(user?.referralCode || '…');
 
   useEffect(() => {
     let mounted = true;
-
     const loadReferralCode = async () => {
       try {
         if (user?.referralCode) {
           setReferralCode(user.referralCode);
           return;
         }
-
         const profile = await userService.getProfile();
-        if (mounted && profile?.referralCode) {
-          setReferralCode(profile.referralCode);
-          return;
-        }
-
         if (mounted) {
-          setReferralCode('Not generated yet');
+          setReferralCode(profile?.referralCode || 'Not generated yet');
         }
-      } catch (error) {
-        if (mounted && !user?.referralCode) {
-          setReferralCode('Unavailable');
-        }
+      } catch {
+        if (mounted && !user?.referralCode) setReferralCode('Unavailable');
       }
     };
-
     loadReferralCode();
-
     return () => {
       mounted = false;
     };
@@ -54,212 +46,110 @@ const ShareAppScreen = ({ navigation }) => {
 
   const handleShare = async () => {
     try {
-      const result = await Share.share({
-        message: `Join WarZone Free Fire Tournament and play for real rewards! Use my referral code ${referralCode} during signup. I get ₹25 referral bonus when you register with my code. Bonus usage rule: only up to 20% of entry fee can be paid using bonus.`,
+      await Share.share({
+        message: `Join WarZone Free Fire Tournament and play for real rewards! Use my referral code ${referralCode} during signup. I get ₹25 referral bonus when you register with my code.`,
         title: 'Share WarZone Free Fire Tournament',
-        url: 'https://your-app-download-link.com', // Update with your actual link
       });
-
-      if (result.action === Share.dismissedAction) {
-        // dismissed
-      }
     } catch (error) {
       Alert.alert('Error', error.message);
     }
   };
 
-  const shareOptions = [
-    { icon: 'message-text', label: 'SMS', color: '#00BCD4' },
-    { icon: 'email', label: 'Email', color: '#FF6B6B' },
-    { icon: 'whatsapp', label: 'WhatsApp', color: '#25D366' },
-    { icon: 'facebook', label: 'Facebook', color: '#1877F2' },
-    { icon: 'twitter', label: 'Twitter', color: '#1DA1F2' },
-  ];
-
   const handleCopyCode = async () => {
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(referralCode);
-        Alert.alert('Copied', 'Referral code copied to clipboard');
+        Alert.alert('Copied', 'Referral code copied');
         return;
       }
       Alert.alert('Referral Code', referralCode);
-    } catch (error) {
+    } catch {
       Alert.alert('Referral Code', referralCode);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.darkGray} />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.accent} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Share App</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <SafeAreaView style={pageStyles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
+      <ScreenHeader title="My Referrals" onBack={() => navigation.goBack()} />
 
-      <View style={styles.content}>
-        <View style={styles.sharePrompt}>
-          <AppIcon name="share-variant" size={48} />
-          <Text style={styles.promptText}>Share WarZone with your friends</Text>
-          <Text style={styles.promptSubText}>
-            Help your friends discover the ultimate tournament gaming experience
+      <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroCard}>
+          <AppIcon name="share-variant" size={40} light />
+          <Text style={styles.heroTitle}>Invite friends</Text>
+          <Text style={styles.heroSub}>
+            Share WarZone and earn ₹25 bonus when they register with your code
           </Text>
         </View>
 
-        <View style={styles.sharingOptions}>
-          {shareOptions.map((option, index) => (
-            <TouchableOpacity key={index} style={styles.shareOption}>
-              <View style={[styles.optionIcon, { backgroundColor: option.color + '20' }]}>
-                <MaterialCommunityIcons name={option.icon} size={28} color={option.color} />
-              </View>
-              <Text style={styles.optionLabel}>{option.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-          <MaterialCommunityIcons name="share-variant" size={22} color={COLORS.white} />
-          <Text style={styles.shareButtonText}>Share Now</Text>
-        </TouchableOpacity>
-
-        <View style={styles.referralCode}>
-          <Text style={styles.referralLabel}>Your Referral Code</Text>
-          <View style={styles.codeContainer}>
-            <Text style={styles.code}>{referralCode}</Text>
-            <TouchableOpacity style={styles.copyButton} onPress={handleCopyCode}>
-              <Ionicons name="copy" size={18} color={COLORS.accent} />
+        <Text style={pageStyles.sectionTitle}>Your Referral Code</Text>
+        <View style={pageStyles.card}>
+          <View style={[pageStyles.row, pageStyles.rowLast]}>
+            <Text style={styles.code} numberOfLines={1}>
+              {referralCode}
+            </Text>
+            <TouchableOpacity style={styles.copyBtn} onPress={handleCopyCode} activeOpacity={0.85}>
+              <Ionicons name="copy-outline" size={18} color={COLORS.white} />
+              <Text style={styles.copyText}>Copy</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.referralInfo}>
-            Referral reward rule: the person who shared the code gets ₹25 bonus when a new user registers using it. Only up to 20% of any tournament entry fee can be paid from bonus balance. If your code is not generated yet, login again once.
-          </Text>
         </View>
-      </View>
+
+        <TouchableOpacity style={pageStyles.primaryBtn} onPress={handleShare} activeOpacity={0.88}>
+          <MaterialCommunityIcons name="share-variant" size={22} color={COLORS.white} />
+          <Text style={pageStyles.primaryBtnText}>Share Now</Text>
+        </TouchableOpacity>
+
+        <View style={[pageStyles.card, { marginTop: 18 }]}>
+          <View style={[pageStyles.row, pageStyles.rowLast, styles.infoRow]}>
+            <MaterialCommunityIcons name="information-outline" size={20} color={PAGE.cyan} />
+            <Text style={styles.infoText}>
+              Up to 20% of any tournament entry fee can be paid from bonus balance. If your code is
+              not generated yet, log in again once.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
 
+export default ShareAppScreen;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
+  heroCard: {
+    ...pageStyles.heroCard,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  heroTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 22,
     color: COLORS.white,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 15,
-    paddingVertical: 25,
-  },
-  sharePrompt: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  promptText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginTop: 15,
+    marginTop: 14,
     marginBottom: 8,
   },
-  promptSubText: {
-    fontSize: 13,
-    color: COLORS.gray,
+  heroSub: {
+    ...TEXT.body,
+    color: PAGE.muted,
     textAlign: 'center',
-    lineHeight: 18,
-  },
-  sharingOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    marginBottom: 30,
-  },
-  shareOption: {
-    alignItems: 'center',
-    width: '30%',
-    marginBottom: 20,
-  },
-  optionIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  optionLabel: {
-    fontSize: 12,
-    color: COLORS.white,
-    fontWeight: '600',
-  },
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.accent,
-    paddingVertical: 15,
-    borderRadius: 10,
-    marginBottom: 25,
-  },
-  shareButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  referralCode: {
-    backgroundColor: COLORS.darkGray,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderRadius: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.accent,
-  },
-  referralLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  codeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 10,
+    lineHeight: 22,
   },
   code: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.accent,
     flex: 1,
+    fontFamily: FONTS.bold,
+    fontSize: 22,
+    color: PAGE.cyan,
   },
-  copyButton: {
-    padding: 8,
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: PAGE.purple,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
-  referralInfo: {
-    fontSize: 12,
-    color: COLORS.gray,
-    lineHeight: 16,
-  },
+  copyText: { fontFamily: FONTS.semiBold, fontSize: 13, color: COLORS.white },
+  infoRow: { alignItems: 'flex-start', gap: 10 },
+  infoText: { flex: 1, ...TEXT.caption, color: PAGE.muted, lineHeight: 18 },
 });
-
-export default ShareAppScreen;

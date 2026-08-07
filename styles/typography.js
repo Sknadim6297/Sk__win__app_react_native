@@ -16,17 +16,17 @@ export const LINE_HEIGHT = {
   relaxed: 1.6,
 };
 
-/** Lilita One — single weight; all roles use the same family for consistency */
-export const FONT_FAMILY = 'LilitaOne-Regular';
+/** DM Sans — use weight-specific families (avoid fontWeight with custom fonts on Android) */
+export const FONT_FAMILY = 'DMSans_400Regular';
 
 export const FONTS = {
-  regular: FONT_FAMILY,
-  medium: FONT_FAMILY,
-  semiBold: FONT_FAMILY,
-  bold: FONT_FAMILY,
-  display: FONT_FAMILY,
-  displayMedium: FONT_FAMILY,
-  displaySemiBold: FONT_FAMILY,
+  regular: 'DMSans_400Regular',
+  medium: 'DMSans_500Medium',
+  semiBold: 'DMSans_600SemiBold',
+  bold: 'DMSans_700Bold',
+  display: 'DMSans_700Bold',
+  displayMedium: 'DMSans_500Medium',
+  displaySemiBold: 'DMSans_600SemiBold',
 };
 
 /** Icons8 display sizes — 24px default, 28px for important actions */
@@ -123,10 +123,10 @@ export const TYPO = {
     fontSize: scaleFont(11),
     lineHeight: lh(scaleFont(11), LINE_HEIGHT.tight),
   },
-  fontRegular: FONT_FAMILY,
-  fontMedium: FONT_FAMILY,
-  fontSemiBold: FONT_FAMILY,
-  fontBold: FONT_FAMILY,
+  fontRegular: FONTS.regular,
+  fontMedium: FONTS.medium,
+  fontSemiBold: FONTS.semiBold,
+  fontBold: FONTS.bold,
 };
 
 /** Pre-built text styles for StyleSheet composition */

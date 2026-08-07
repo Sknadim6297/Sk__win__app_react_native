@@ -10,9 +10,7 @@ config.resolver.resolverMainFields = ['main', 'module', 'react-native'];
 
 const defaultResolveRequest = config.resolver.resolveRequest;
 
-// Redirect every `import ... from 'react-native'` that originates from project
-// source files to our themed wrapper, which injects the Orbitron font into all
-// Text and TextInput components without touching individual screen files (Lilita One).
+// Redirect project `react-native` imports to themed wrapper (DM Sans on Text/TextInput).
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   // qrcode's package "main" points at Node server (fs/png). RN/Expo needs the
   // pure core used by react-native-qrcode-svg's genMatrix (QRCode.create only).
