@@ -40,7 +40,7 @@ const tournamentSchema = new mongoose.Schema({
     enum: ['battle_royale', 'custom', 'custom_match'],
     default: 'battle_royale',
   },
-  /** Primary lifecycle: draft → upcoming → ongoing → completed → result_published */
+  /** Primary lifecycle: draft → upcoming → ongoing → completed */
   lifecycleStatus: {
     type: String,
     enum: ['draft', 'upcoming', 'ongoing', 'completed', 'result_published', 'cancelled'],
@@ -58,6 +58,9 @@ const tournamentSchema = new mongoose.Schema({
   resultsPublished: {
     type: Boolean,
     default: false,
+  },
+  resultsPublishedAt: {
+    type: Date,
   },
   map: {
     type: String,

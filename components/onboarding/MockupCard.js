@@ -10,7 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ONBOARDING } from '../../styles/onboardingTheme';
 
-const APP_LOGO = require('../../assets/logo/game_logo.png');
+const APP_LOGO = require('../../assets/logo/ROUND_GAME_LOGO.png');
 
 const GRID_COLORS = ['#E74C3C', '#3498DB', '#2ECC71', '#9B59B6', '#F39C12', '#1ABC9C', '#E67E22', '#34495E'];
 
@@ -55,7 +55,7 @@ export default function MockupCard() {
               ))}
             </View>
             <View style={styles.logoOverlay}>
-              <Image source={APP_LOGO} style={styles.centerLogo} resizeMode="contain" />
+              <Image source={APP_LOGO} style={styles.centerLogo} resizeMode="cover" />
             </View>
           </View>
           <View style={styles.darkSection}>
@@ -142,6 +142,8 @@ const styles = StyleSheet.create({
   centerLogo: {
     width: mockupWidth * 0.42,
     height: mockupWidth * 0.42,
+    borderRadius: (mockupWidth * 0.42) / 2,
+    overflow: 'hidden',
   },
   darkSection: {
     flex: 0.85,

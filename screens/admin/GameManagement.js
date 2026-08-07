@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { gameService } from '../../services/api';
+import { gameService, uploadImageFile } from '../../services/api';
+import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 import { COLORS } from '../../styles/theme';
 
 const GameManagement = ({ navigation }) => {
@@ -50,6 +51,10 @@ const GameManagement = ({ navigation }) => {
   
   const [editingGameId, setEditingGameId] = useState(null);
   const [editingModeId, setEditingModeId] = useState(null);
+  const mainScrollRef = useRef(null);
+  const modesScrollRef = useRef(null);
+  const modeFormSectionRef = useRef(null);
+  const savedMainScrollY = useRef(0);
 
   useEffect(() => {
     fetchGames();
@@ -207,6 +212,26 @@ const GameManagement = ({ navigation }) => {
     setShowModal(true);
   };
 
+  const scrollToModeForm = () => {
+    requestAnimationFrame(() => {
+      try {
+        if (modeFormSectionRef.current && modesScrollRef.current) {
+          modeFormSectionRef.current.measureLayout(
+            modesScrollRef.current,
+            (_x, y) => {
+              modesScrollRef.current?.scrollTo({ y: Math.max(y - 12, 0), animated: true });
+            },
+            () => modesScrollRef.current?.scrollToEnd({ animated: true })
+          );
+          return;
+        }
+      } catch {
+        /* measureLayout unavailable on some platforms */
+      }
+      modesScrollRef.current?.scrollToEnd({ animated: true });
+    });
+  };
+
   const handleEditMode = (mode) => {
     setEditingModeId(mode._id);
     setModeFormData({
@@ -214,9 +239,23 @@ const GameManagement = ({ navigation }) => {
       description: mode.description || '',
       image: mode.image || '',
     });
+    setTimeout(scrollToModeForm, 100);
+  };
+
+  const closeModesModal = () => {
+    setShowModesModal(false);
+    resetModeForm();
+    setSelectedGameForModes(null);
+    requestAnimationFrame(() => {
+      mainScrollRef.current?.scrollTo({ y: savedMainScrollY.current, animated: false });
+    });
   };
 
   const handleViewModes = (game) => {
+    savedMainScrollY.current =
+      mainScrollRef.current?._scrollMetrics?.offset?.y ||
+      mainScrollRef.current?.contentOffset?.y ||
+      0;
     setSelectedGameForModes(game);
     fetchGameModes(game._id);
     resetModeForm();
@@ -263,11 +302,13 @@ const GameManagement = ({ navigation }) => {
       if (!result.canceled && result.assets[0]) {
         setUploading(true);
         try {
-          const uploadResult = await gameService.uploadImage(result.assets[0].uri);
-          setFormData({ ...formData, image: uploadResult.url });
+          const uploadResult = await uploadImageFile(result.assets[0].uri);
+          const imageUrl = uploadResult.path || uploadResult.url;
+          if (!imageUrl) throw new Error('Upload succeeded but no image URL returned');
+          setFormData((prev) => ({ ...prev, image: imageUrl }));
           Alert.alert('Success', 'Game image uploaded successfully');
         } catch (error) {
-          Alert.alert('Upload Failed', error.message);
+          Alert.alert('Upload Failed', error.message || 'Failed to upload image');
         } finally {
           setUploading(false);
         }
@@ -296,11 +337,13 @@ const GameManagement = ({ navigation }) => {
       if (!result.canceled && result.assets[0]) {
         setUploadingMode(true);
         try {
-          const uploadResult = await gameService.uploadImage(result.assets[0].uri);
-          setModeFormData({ ...modeFormData, image: uploadResult.url });
+          const uploadResult = await uploadImageFile(result.assets[0].uri);
+          const imageUrl = uploadResult.path || uploadResult.url;
+          if (!imageUrl) throw new Error('Upload succeeded but no image URL returned');
+          setModeFormData((prev) => ({ ...prev, image: imageUrl }));
           Alert.alert('Success', 'Mode image uploaded successfully');
         } catch (error) {
-          Alert.alert('Upload Failed', error.message);
+          Alert.alert('Upload Failed', error.message || 'Failed to upload image');
         } finally {
           setUploadingMode(false);
         }
@@ -313,7 +356,7 @@ const GameManagement = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.accent} />
           <Text style={styles.loadingText}>Loading Games...</Text>
@@ -323,7 +366,7 @@ const GameManagement = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
       <View style={styles.header}>
@@ -334,8 +377,13 @@ const GameManagement = ({ navigation }) => {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView 
+      <ScrollView
+        ref={mainScrollRef}
         style={styles.content}
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          savedMainScrollY.current = e.nativeEvent.contentOffset.y;
+        }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />}
       >
         <View style={styles.section}>
@@ -366,7 +414,7 @@ const GameManagement = ({ navigation }) => {
                   <View style={styles.gameIcon}>
                     {game.image ? (
                       <Image 
-                        source={{ uri: game.image }} 
+                        source={{ uri: resolveMediaUrl(game.image) }} 
                         style={styles.gameImage}
                         defaultSource={require('../../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg')}
                       />
@@ -422,7 +470,7 @@ const GameManagement = ({ navigation }) => {
 
       {/* Add/Edit Game Modal */}
       <Modal visible={showModal} transparent animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowModal(false)}>
               <Ionicons name="close" size={24} color={COLORS.white} />
@@ -463,7 +511,7 @@ const GameManagement = ({ navigation }) => {
               </TouchableOpacity>
               {formData.image && (
                 <View style={styles.imagePreview}>
-                  <Image source={{ uri: formData.image }} style={styles.previewImage} />
+                  <Image source={{ uri: resolveMediaUrl(formData.image) }} style={styles.previewImage} />
                 </View>
               )}
             </View>
@@ -526,23 +574,72 @@ const GameManagement = ({ navigation }) => {
       </Modal>
 
       {/* Game Modes Modal */}
-      <Modal visible={showModesModal} transparent animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
+      <Modal
+        visible={showModesModal}
+        transparent
+        animationType="slide"
+        onRequestClose={closeModesModal}
+      >
+        <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowModesModal(false)}>
+            <TouchableOpacity onPress={closeModesModal}>
               <Ionicons name="arrow-back" size={24} color={COLORS.white} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>{selectedGameForModes?.name} - Modes</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => {
                 resetModeForm();
+                setTimeout(scrollToModeForm, 100);
               }}
             >
               <Ionicons name="add" size={24} color={COLORS.accent} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            ref={modesScrollRef}
+            style={styles.modalContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={styles.sectionHeading}>Registered Modes</Text>
+            {gameModes.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No game modes</Text>
+                <Text style={styles.emptySubtext}>Add a game mode below</Text>
+              </View>
+            ) : (
+              gameModes.map((mode) => (
+                <View key={mode._id} style={styles.modeCard}>
+                  <View style={styles.modeContent}>
+                    {mode.image && (
+                      <Image source={{ uri: resolveMediaUrl(mode.image) }} style={styles.modeImage} />
+                    )}
+                    <View style={styles.modeInfo}>
+                      <Text style={styles.modeName}>{mode.name}</Text>
+                      {mode.description ? (
+                        <Text style={styles.modeDescription}>{mode.description}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <View style={styles.modeActions}>
+                    <TouchableOpacity onPress={() => handleEditMode(mode)}>
+                      <Ionicons name="create-outline" size={22} color={COLORS.accent} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDeleteMode(mode._id)}>
+                      <Ionicons name="trash-outline" size={22} color={COLORS.error} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            )}
+
+            <Text
+              ref={modeFormSectionRef}
+              style={[styles.sectionHeading, { marginTop: 20 }]}
+            >
+              {editingModeId ? 'Edit Mode' : 'Add Mode'}
+            </Text>
             <View style={styles.formGroup}>
               <Text style={styles.label}>Mode Name *</Text>
               <TextInput
@@ -568,7 +665,7 @@ const GameManagement = ({ navigation }) => {
 
             <View style={styles.formGroup}>
               <Text style={styles.label}>Mode Image</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.imagePickerButton}
                 onPress={pickModeImage}
                 disabled={uploadingMode}
@@ -584,59 +681,18 @@ const GameManagement = ({ navigation }) => {
                   </>
                 )}
               </TouchableOpacity>
-              {modeFormData.image && (
+              {modeFormData.image ? (
                 <View style={styles.imagePreview}>
-                  <Image source={{ uri: modeFormData.image }} style={styles.previewImage} />
+                  <Image source={{ uri: resolveMediaUrl(modeFormData.image) }} style={styles.previewImage} />
                 </View>
-              )}
+              ) : null}
             </View>
 
-            <TouchableOpacity 
-              style={styles.submitButton}
-              onPress={handleAddGameMode}
-            >
+            <TouchableOpacity style={styles.submitButton} onPress={handleAddGameMode}>
               <Text style={styles.submitButtonText}>
                 {editingModeId ? 'Update Mode' : 'Add Mode'}
               </Text>
             </TouchableOpacity>
-
-            {gameModes.length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="puzzle" size={48} color={COLORS.gray} />
-                <Text style={styles.emptyText}>No game modes</Text>
-                <Text style={styles.emptySubtext}>Add a game mode to get started</Text>
-              </View>
-            ) : (
-              gameModes.map((mode) => (
-                <View key={mode._id} style={styles.modeCard}>
-                  <View style={styles.modeContent}>
-                    {mode.image && (
-                      <Image source={{ uri: mode.image }} style={styles.modeImage} />
-                    )}
-                    <View style={styles.modeInfo}>
-                      <Text style={styles.modeName}>{mode.name}</Text>
-                      {mode.description && (
-                        <Text style={styles.modeDescription}>{mode.description}</Text>
-                      )}
-                    </View>
-                  </View>
-                  <View style={styles.modeActions}>
-                    <TouchableOpacity 
-                      style={styles.editButton}
-                      onPress={() => handleEditMode(mode)}
-                    >
-                      <Ionicons name="pencil" size={16} color={COLORS.accent} />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.deleteButton}
-                      onPress={() => handleDeleteMode(mode._id)}
-                    >
-                      <Ionicons name="trash" size={16} color={COLORS.error} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))
-            )}
           </ScrollView>
         </SafeAreaView>
       </Modal>
@@ -681,6 +737,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.white,
+  },
+  sectionHeading: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.white,
+    marginBottom: 10,
   },
   addButton: {
     flexDirection: 'row',

@@ -6,8 +6,16 @@
 const PRIVATE_HOST =
   /^(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$/i;
 
+let publicUrlWarned = false;
+
 function isPrivateHost(hostname) {
   return !hostname || PRIVATE_HOST.test(hostname);
+}
+
+function warnOnce(...args) {
+  if (publicUrlWarned) return;
+  publicUrlWarned = true;
+  console.warn(...args);
 }
 
 function getPublicBaseUrl(req) {
@@ -22,12 +30,12 @@ function getPublicBaseUrl(req) {
           hostname
         );
       } else if (isPrivateHost(hostname)) {
-        console.warn(
+        warnOnce(
           '[publicUrl] PUBLIC_BASE_URL is a LAN/local address (%s). Works on same Wi‑Fi only — use your public domain for 4G/5G.',
           fromEnv
         );
       } else if (protocol !== 'https:' && process.env.NODE_ENV === 'production') {
-        console.warn('[publicUrl] Use HTTPS for PUBLIC_BASE_URL in production.');
+        warnOnce('[publicUrl] Use HTTPS for PUBLIC_BASE_URL in production.');
       }
     } catch {
       console.error('[publicUrl] Invalid PUBLIC_BASE_URL:', fromEnv);

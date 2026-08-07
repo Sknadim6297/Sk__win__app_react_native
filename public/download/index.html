@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Download WarZone AMR Tournament APK | India's Ultimate Esports Platform</title>
+  <meta name="description" content="Download WarZone AMR Tournament APK — create & join Free Fire tournaments, wallet top-up, live updates, and instant prize distribution." />
+  <meta name="theme-color" content="#0f172a" />
+  <meta property="og:title" content="WarZone AMR Tournament — Download APK" />
+  <meta property="og:description" content="India's Ultimate Esports Tournament Platform. Download the Android APK." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/download/logo.png" />
+  <link rel="icon" href="/download/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: '#0f172a',
+            panel: '#111827',
+            purple: '#8750f7',
+            orange: '#FF6B00',
+          },
+          fontFamily: {
+            display: ['Orbitron', 'sans-serif'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            glow: '0 0 40px rgba(135, 80, 247, 0.35)',
+            orange: '0 10px 40px rgba(255, 107, 0, 0.35)',
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    :root { color-scheme: dark; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: #0f172a;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .bg-mesh {
+      background:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(135, 80, 247, 0.35), transparent 50%),
+        radial-gradient(ellipse 60% 40% at 90% 10%, rgba(255, 107, 0, 0.22), transparent 45%),
+        radial-gradient(ellipse 50% 50% at 50% 100%, rgba(135, 80, 247, 0.12), transparent 50%),
+        #0f172a;
+    }
+    .glass {
+      background: rgba(17, 24, 39, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+    .glass:hover {
+      border-color: rgba(135, 80, 247, 0.45);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 30px rgba(135, 80, 247, 0.15);
+    }
+    .card-anim { transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease; }
+    .btn-download {
+      background: linear-gradient(135deg, #8750f7 0%, #6d28d9 45%, #FF6B00 100%);
+      background-size: 200% 200%;
+      transition: transform 0.25s ease, box-shadow 0.25s ease, background-position 0.4s ease;
+    }
+    .btn-download:hover:not(:disabled) {
+      transform: translateY(-3px) scale(1.02);
+      background-position: 100% 0;
+      box-shadow: 0 16px 40px rgba(135, 80, 247, 0.45), 0 8px 24px rgba(255, 107, 0, 0.25);
+    }
+    .btn-download:disabled { opacity: 0.55; cursor: not-allowed; }
+    .logo-ring {
+      box-shadow: 0 0 0 3px rgba(135, 80, 247, 0.5), 0 0 40px rgba(255, 107, 0, 0.25);
+    }
+    .shot-track {
+      display: flex;
+      gap: 1rem;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      padding-bottom: 0.5rem;
+      -webkit-overflow-scrolling: touch;
+    }
+    .shot-track::-webkit-scrollbar { height: 6px; }
+    .shot-track::-webkit-scrollbar-thumb { background: rgba(135,80,247,0.5); border-radius: 999px; }
+    .shot {
+      scroll-snap-align: center;
+      flex: 0 0 auto;
+      width: min(240px, 70vw);
+      aspect-ratio: 9/16;
+      border-radius: 1.25rem;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    #loader {
+      position: fixed; inset: 0; z-index: 80;
+      display: flex; align-items: center; justify-content: center;
+      background: #0f172a;
+      transition: opacity 0.5s ease, visibility 0.5s ease;
+    }
+    #loader.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+    .spin {
+      width: 56px; height: 56px; border-radius: 50%;
+      border: 3px solid rgba(135,80,247,0.2);
+      border-top-color: #8750f7;
+      border-right-color: #FF6B00;
+      animation: spin 0.85s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .faq-item summary { list-style: none; cursor: pointer; }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .badge {
+      background: linear-gradient(90deg, rgba(135,80,247,0.25), rgba(255,107,0,0.2));
+      border: 1px solid rgba(135,80,247,0.4);
+    }
+  </style>
+</head>
+<body class="bg-mesh text-slate-100 antialiased">
+  <div id="loader" aria-live="polite" aria-busy="true">
+    <div class="text-center">
+      <div class="spin mx-auto mb-4"></div>
+      <p class="font-display text-sm tracking-widest text-purple">LOADING WAREZONE</p>
+    </div>
+  </div>
+
+  <header class="sticky top-0 z-40 border-b border-white/5 bg-ink/70 backdrop-blur-xl">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+      <a href="/download" class="flex items-center gap-3">
+        <img src="/download/logo.png" alt="WarZone AMR" class="h-10 w-10 rounded-full logo-ring object-cover" />
+        <span class="font-display text-sm font-bold tracking-wide sm:text-base">WarZone <span class="text-orange">AMR</span></span>
+      </a>
+      <a href="#download" class="rounded-full bg-purple/20 px-4 py-2 text-xs font-semibold text-purple ring-1 ring-purple/40 transition hover:bg-purple/30 sm:text-sm">Get APK</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="relative mx-auto max-w-6xl px-4 pb-16 pt-12 sm:px-6 sm:pt-20">
+      <div class="flex flex-col items-center text-center">
+        <span id="versionBadge" class="badge mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-200">
+          <span class="h-2 w-2 animate-pulse rounded-full bg-orange"></span>
+          Latest · v<span data-field="version">1.0.0</span>
+        </span>
+        <img src="/download/logo.png" alt="WarZone AMR Tournament logo" class="mb-8 h-36 w-36 rounded-full logo-ring object-cover sm:h-44 sm:w-44" />
+        <h1 class="font-display text-3xl font-extrabold leading-tight tracking-wide sm:text-5xl">
+          WarZone <span class="bg-gradient-to-r from-purple to-orange bg-clip-text text-transparent">AMR</span> Tournament
+        </h1>
+        <p class="mt-3 font-display text-sm uppercase tracking-[0.2em] text-orange sm:text-base">
+          India's Ultimate Esports Tournament Platform
+        </p>
+        <p class="mt-5 max-w-2xl text-sm leading-relaxed text-slate-300 sm:text-base">
+          Compete in Free Fire tournaments, manage your wallet, track live matches, and claim prizes instantly —
+          all in one premium Android app built for serious players.
+        </p>
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <a href="#download" class="btn-download inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-sm font-bold text-white sm:text-base">
+            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3a1 1 0 011 1v8.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V4a1 1 0 011-1z"/><path d="M4 16a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z"/></svg>
+            Download APK
+          </a>
+          <a href="#features" class="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-slate-200 transition hover:border-purple/40 hover:bg-white/10">Explore Features</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- App info -->
+    <section class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" id="info">
+      <div class="glass card-anim rounded-3xl p-6 sm:p-8">
+        <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+          <h2 class="font-display text-xl font-bold sm:text-2xl">App Information</h2>
+          <span class="text-xs text-slate-400">Auto-synced from release</span>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5">
+            <p class="text-xs uppercase tracking-wider text-slate-400">Current Version</p>
+            <p class="mt-1 font-display text-lg font-bold text-purple" data-field="version">1.0.0</p>
+          </div>
+          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5">
+            <p class="text-xs uppercase tracking-wider text-slate-400">APK Size</p>
+            <p class="mt-1 font-display text-lg font-bold text-orange" data-field="sizeLabel">—</p>
+          </div>
+          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5">
+            <p class="text-xs uppercase tracking-wider text-slate-400">Last Updated</p>
+            <p class="mt-1 font-display text-lg font-bold" data-field="lastUpdatedLabel">—</p>
+          </div>
+          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5">
+            <p class="text-xs uppercase tracking-wider text-slate-400">Android Requirement</p>
+            <p class="mt-1 text-base font-semibold" data-field="androidMin">Android 8.0+</p>
+          </div>
+          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5">
+            <p class="text-xs uppercase tracking-wider text-slate-400">Downloads</p>
+            <p class="mt-1 font-display text-lg font-bold text-purple" data-field="downloadCount">0</p>
+          </div>
+          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5 sm:col-span-2 lg:col-span-1">
+            <p class="text-xs uppercase tracking-wider text-slate-400">Status</p>
+            <p class="mt-1 text-base font-semibold" id="apkStatus">Checking…</p>
+          </div>
+        </div>
+        <div class="mt-6 rounded-2xl border border-dashed border-purple/30 bg-purple/5 p-4">
+          <p class="text-xs font-semibold uppercase tracking-wider text-purple">Release Notes</p>
+          <p class="mt-2 text-sm leading-relaxed text-slate-300" data-field="releaseNotes">Loading…</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screenshots -->
+    <section class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" id="screenshots">
+      <h2 class="mb-6 text-center font-display text-xl font-bold sm:text-2xl">App Screenshots</h2>
+      <div class="shot-track" id="shotTrack">
+        <div class="shot glass"><img src="/download/screenshots/shot-1.png" alt="WarZone AMR screenshot 1" class="h-full w-full object-cover" /></div>
+        <div class="shot glass"><img src="/download/screenshots/shot-2.png" alt="WarZone AMR screenshot 2" class="h-full w-full object-cover" onerror="this.parentElement.style.display='none'" /></div>
+        <div class="shot glass flex items-center justify-center bg-gradient-to-br from-purple/40 to-orange/30 p-6 text-center">
+          <p class="font-display text-sm font-bold">Tournaments · Wallet · Live Matches</p>
+        </div>
+        <div class="shot glass flex items-center justify-center bg-gradient-to-br from-ink to-purple/40 p-6 text-center">
+          <p class="font-display text-sm font-bold">Secure · Fast · Competitive</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" id="features">
+      <h2 class="mb-8 text-center font-display text-xl font-bold sm:text-2xl">Why Players Choose WarZone AMR</h2>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <article class="glass card-anim rounded-3xl p-6">
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple/20 text-xl text-purple">🏆</div>
+          <h3 class="font-display text-base font-bold">Create Tournament</h3>
+          <p class="mt-2 text-sm text-slate-400">Host competitive Free Fire matches with custom rules and prize pools.</p>
+        </article>
+        <article class="glass card-anim rounded-3xl p-6">
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange/20 text-xl text-orange">🎮</div>
+          <h3 class="font-display text-base font-bold">Join Tournament</h3>
+          <p class="mt-2 text-sm text-slate-400">Find live contests, book slots, and enter with one tap.</p>
+        </article>
+        <article class="glass card-anim rounded-3xl p-6">
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple/20 text-xl text-purple">📡</div>
+          <h3 class="font-display text-base font-bold">Live Match Updates</h3>
+          <p class="mt-2 text-sm text-slate-400">Stay on top of room IDs, schedules, and results in real time.</p>
+        </article>
+        <article class="glass card-anim rounded-3xl p-6">
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange/20 text-xl text-orange">👛</div>
+          <h3 class="font-display text-base font-bold">Wallet System</h3>
+          <p class="mt-2 text-sm text-slate-400">Secure top-ups, entry fees, and transparent transaction history.</p>
+        </article>
+        <article class="glass card-anim rounded-3xl p-6">
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple/20 text-xl text-purple">⚡</div>
+          <h3 class="font-display text-base font-bold">Instant Prize Distribution</h3>
+          <p class="mt-2 text-sm text-slate-400">Winnings credited to your wallet after verified match results.</p>
+        </article>
+        <article class="glass card-anim rounded-3xl p-6">
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange/20 text-xl text-orange">🔐</div>
+          <h3 class="font-display text-base font-bold">Secure Login</h3>
+          <p class="mt-2 text-sm text-slate-400">Protected accounts with session auth and encrypted API access.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Download CTA -->
+    <section class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" id="download">
+      <div class="glass card-anim relative overflow-hidden rounded-3xl p-8 text-center sm:p-12">
+        <div class="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-purple/20 blur-3xl"></div>
+        <div class="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-orange/15 blur-3xl"></div>
+        <h2 class="relative font-display text-2xl font-bold sm:text-3xl">Ready to Compete?</h2>
+        <p class="relative mx-auto mt-3 max-w-lg text-sm text-slate-300">
+          Download the latest Android APK. Direct install — no Play Store required.
+        </p>
+        <button
+          id="downloadBtn"
+          type="button"
+          class="btn-download relative mt-8 inline-flex items-center gap-3 rounded-2xl px-10 py-5 text-base font-bold text-white sm:text-lg"
+        >
+          <span id="downloadBtnLabel">Download WarZone AMR v1.0.0</span>
+        </button>
+        <p id="downloadHint" class="relative mt-4 text-xs text-slate-500">Preparing download link…</p>
+      </div>
+    </section>
+
+    <!-- Install guide -->
+    <section class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" id="install">
+      <h2 class="mb-8 text-center font-display text-xl font-bold sm:text-2xl">Installation Guide</h2>
+      <ol class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <li class="glass card-anim rounded-3xl p-6">
+          <span class="font-display text-3xl font-bold text-purple">01</span>
+          <h3 class="mt-3 font-semibold">Download APK</h3>
+          <p class="mt-2 text-sm text-slate-400">Tap the download button and save the file to your phone.</p>
+        </li>
+        <li class="glass card-anim rounded-3xl p-6">
+          <span class="font-display text-3xl font-bold text-orange">02</span>
+          <h3 class="mt-3 font-semibold">Enable Unknown Apps</h3>
+          <p class="mt-2 text-sm text-slate-400">Allow install from your browser or file manager in Android settings.</p>
+        </li>
+        <li class="glass card-anim rounded-3xl p-6">
+          <span class="font-display text-3xl font-bold text-purple">03</span>
+          <h3 class="mt-3 font-semibold">Install</h3>
+          <p class="mt-2 text-sm text-slate-400">Open the APK and confirm installation when prompted.</p>
+        </li>
+        <li class="glass card-anim rounded-3xl p-6">
+          <span class="font-display text-3xl font-bold text-orange">04</span>
+          <h3 class="mt-3 font-semibold">Open WarZone AMR</h3>
+          <p class="mt-2 text-sm text-slate-400">Launch the app, sign in, and join your first tournament.</p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- FAQ -->
+    <section class="mx-auto max-w-3xl px-4 pb-20 sm:px-6" id="faq">
+      <h2 class="mb-8 text-center font-display text-xl font-bold sm:text-2xl">FAQ</h2>
+      <div class="space-y-3">
+        <details class="faq-item glass card-anim rounded-2xl p-5" open>
+          <summary class="flex items-center justify-between font-semibold">
+            Is this app safe?
+            <span class="text-purple">+</span>
+          </summary>
+          <p class="mt-3 text-sm leading-relaxed text-slate-400">
+            Yes. The APK is published by the WarZone AMR team. Always download from this official page only.
+          </p>
+        </details>
+        <details class="faq-item glass card-anim rounded-2xl p-5">
+          <summary class="flex items-center justify-between font-semibold">
+            Does it require Play Store?
+            <span class="text-purple">+</span>
+          </summary>
+          <p class="mt-3 text-sm leading-relaxed text-slate-400">
+            No. Install directly via APK. You may need to allow “Install unknown apps” for your browser.
+          </p>
+        </details>
+        <details class="faq-item glass card-anim rounded-2xl p-5">
+          <summary class="flex items-center justify-between font-semibold">
+            How to update?
+            <span class="text-purple">+</span>
+          </summary>
+          <p class="mt-3 text-sm leading-relaxed text-slate-400">
+            Return to this page and download the newest version. Install over the existing app — your account stays intact.
+          </p>
+        </details>
+        <details class="faq-item glass card-anim rounded-2xl p-5">
+          <summary class="flex items-center justify-between font-semibold">
+            Is it free?
+            <span class="text-purple">+</span>
+          </summary>
+          <p class="mt-3 text-sm leading-relaxed text-slate-400">
+            The app is free to download. Tournament entry fees and wallet top-ups apply as shown in-app.
+          </p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-white/5 bg-black/30">
+    <div class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-10 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <p>© <span id="year"></span> WarZone AMR Tournament. All rights reserved.</p>
+      <nav class="flex flex-wrap gap-4">
+        <a class="hover:text-purple" href="mailto:support@warzoneamr.com">Contact</a>
+        <a class="hover:text-purple" href="#faq">Privacy Policy</a>
+        <a class="hover:text-purple" href="#faq">Terms</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      const yearEl = document.getElementById('year');
+      if (yearEl) yearEl.textContent = String(new Date().getFullYear());
+
+      const loader = document.getElementById('loader');
+      const btn = document.getElementById('downloadBtn');
+      const btnLabel = document.getElementById('downloadBtnLabel');
+      const hint = document.getElementById('downloadHint');
+      const apkStatus = document.getElementById('apkStatus');
+      let release = null;
+
+      function setFields(data) {
+        document.querySelectorAll('[data-field]').forEach((el) => {
+          const key = el.getAttribute('data-field');
+          if (data[key] != null) el.textContent = String(data[key]);
+        });
+      }
+
+      async function loadRelease() {
+        try {
+          const res = await fetch('/api/download/release', { headers: { Accept: 'application/json' } });
+          const json = await res.json();
+          if (!json.success || !json.release) throw new Error(json.message || 'Failed');
+          release = json.release;
+          setFields(release);
+          btnLabel.textContent = release.downloadLabel || ('Download WarZone AMR v' + release.version);
+          if (release.apkExists) {
+            apkStatus.textContent = 'Available';
+            apkStatus.className = 'mt-1 text-base font-semibold text-emerald-400';
+            hint.textContent = 'Secure direct download · counted automatically';
+            btn.disabled = false;
+          } else {
+            apkStatus.textContent = 'APK pending upload';
+            apkStatus.className = 'mt-1 text-base font-semibold text-amber-400';
+            hint.textContent = 'Place the APK in public/downloads/' + release.fileName;
+            btn.disabled = true;
+          }
+        } catch (e) {
+          apkStatus.textContent = 'Could not load release info';
+          apkStatus.className = 'mt-1 text-base font-semibold text-red-400';
+          hint.textContent = 'Check that the backend is running.';
+          btn.disabled = true;
+        } finally {
+          loader.classList.add('hide');
+          loader.setAttribute('aria-busy', 'false');
+        }
+      }
+
+      btn.addEventListener('click', function () {
+        if (!release || !release.apkExists) return;
+        const url = release.downloadUrl || ('/downloads/' + encodeURIComponent(release.fileName));
+        window.location.href = url;
+        // Optimistic bump; next refresh shows server count
+        const countEl = document.querySelector('[data-field="downloadCount"]');
+        if (countEl) {
+          const n = parseInt(countEl.textContent, 10) || 0;
+          countEl.textContent = String(n + 1);
+        }
+      });
+
+      loadRelease();
+    })();
+  </script>
+</body>
+</html>

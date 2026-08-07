@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,12 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import AppIcon from '../components/ui/AppIcon';
 import { COLORS, FONTS } from '../styles/theme';
 import { tournamentService, walletService } from '../services/api';
-import { getPaymentSplit, getTeamSize } from '../utils/tournamentHelpers';
+import { getPaymentSplit, getTeamSize, isTeamEntryMode } from '../utils/tournamentHelpers';
+import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
 import Toast from '../components/Toast';
 
 const CYAN = '#00E5FF';
@@ -23,6 +25,7 @@ const PURPLE = '#7B61FF';
 
 export default function TournamentSlotBookingScreen({ navigation, route }) {
   const { tournamentId, gamingUsername: initialUsername = '' } = route.params || {};
+  const { showInsufficientBalance, InsufficientBalanceDialog } = useInsufficientBalance(navigation);
   const [tournament, setTournament] = useState(null);
   const [slots, setSlots] = useState([]);
   const [selected, setSelected] = useState([]);
@@ -39,7 +42,8 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
   const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
 
 
-  const teamSize = getTeamSize(tournament?.mode);
+  const teamSize = 1;
+  const perTeamMode = isTeamEntryMode(tournament?.mode);
 
   useEffect(() => {
     (async () => {
@@ -50,6 +54,11 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           tournamentService.getSlots(tournamentId),
         ]);
         setTournament(tData);
+        if (isTeamEntryMode(tData?.mode)) {
+          showToast('Duo/Squad uses team registration. Captain pays once for the team.', 'warning');
+          navigation.replace('CustomMatchTeamRegister', { tournamentId });
+          return;
+        }
         setBalance(wData?.balance ?? 0);
         setBonusBalance(wData?.bonusBalance ?? 0);
         setSlots(sData?.slots || []);
@@ -61,6 +70,18 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
       }
     })();
   }, [tournamentId, navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      walletService
+        .getBalance()
+        .then((w) => {
+          setBalance(w?.balance ?? 0);
+          setBonusBalance(w?.bonusBalance ?? 0);
+        })
+        .catch(() => {});
+    }, [])
+  );
 
   const toggleSlot = (num) => {
     const slot = slots.find((s) => s.slotNumber === num);
@@ -81,14 +102,19 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
   };
 
   const handleNext = () => {
-    if (selected.length !== teamSize) {
-      showToast(`Please select ${teamSize} slot${teamSize > 1 ? 's' : ''}.`, 'warning');
+    if (selected.length !== 1) {
+      showToast('Please select one slot.', 'warning');
       return;
     }
     const split = getPaymentSplit(tournament?.entryFee, bonusBalance);
-    const required = split.realRequired * teamSize;
-    if (balance < required) {
-      navigation.replace('TournamentEntry', { tournamentId });
+    if (balance < split.realRequired) {
+      showInsufficientBalance({
+        tournamentId,
+        returnScreen: 'TournamentSlotBooking',
+        forTeam: false,
+        requiredAmount: split.realRequired,
+        currentBalance: balance,
+      });
       return;
     }
     setStep(2);
@@ -131,7 +157,18 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
         { text: 'OK', onPress: () => navigation.replace('TournamentDetails', { tournamentId }) },
       ]);
     } catch (e) {
-      showToast(e.message || 'Failed to book', 'error');
+      const msg = e.message || 'Failed to book';
+      if (/balance|insufficient/i.test(msg)) {
+        showInsufficientBalance({
+          tournamentId,
+          returnScreen: 'TournamentSlotBooking',
+          forTeam: false,
+          requiredAmount: getPaymentSplit(tournament?.entryFee, bonusBalance).realRequired,
+          currentBalance: balance,
+        });
+      } else {
+        showToast(msg, 'error');
+      }
     } finally {
       setBooking(false);
     }
@@ -165,7 +202,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <ActivityIndicator size="large" color={CYAN} style={{ marginTop: 80 }} />
       </SafeAreaView>
     );
@@ -210,9 +247,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
 
       {step === 1 && (
         <>
-          <Text style={styles.hint}>
-            Select {teamSize} slot{teamSize > 1 ? 's' : ''} ({selected.length}/{teamSize})
-          </Text>
+          <Text style={styles.hint}>Select 1 slot for Solo mode ({selected.length}/1)</Text>
           <FlatList
             data={slots}
             keyExtractor={(item) => String(item.slotNumber)}
@@ -272,6 +307,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
       )}
 
       <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hideToast} />
+      {InsufficientBalanceDialog}
     </SafeAreaView>
   );
 }

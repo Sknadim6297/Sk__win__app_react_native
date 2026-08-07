@@ -54,7 +54,7 @@ const AdminDashboard = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading Admin Dashboard...</Text>
@@ -64,7 +64,7 @@ const AdminDashboard = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
       <ScrollView 
@@ -244,6 +244,24 @@ const AdminDashboard = ({ navigation }) => {
                     <Text style={styles.actionCardSubtitle}>Manage games & modes</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={24} color="#9C27B0" />
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionCardWide}
+              onPress={() => navigateTo('MapManagement')}
+            >
+              <View style={[styles.actionGradient, { backgroundColor: `#26A69A15` }]}>
+                <View style={styles.actionCardContent}>
+                  <View style={[styles.actionCardIcon, { backgroundColor: `#26A69A30` }]}>
+                    <MaterialCommunityIcons name="map" size={32} color="#26A69A" />
+                  </View>
+                  <View style={styles.actionCardText}>
+                    <Text style={styles.actionCardTitle}>Map Management</Text>
+                    <Text style={styles.actionCardSubtitle}>Add / edit tournament maps</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#26A69A" />
                 </View>
               </View>
             </TouchableOpacity>

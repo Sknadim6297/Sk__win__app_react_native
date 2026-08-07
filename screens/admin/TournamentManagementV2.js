@@ -19,9 +19,10 @@ const STATUS_LABELS = {
   draft: 'Draft',
   upcoming: 'Upcoming',
   incoming: 'Upcoming',
-  ongoing: 'Ongoing',
+  ongoing: 'Live',
+  live: 'Live',
   completed: 'Completed',
-  result_published: 'Result Published',
+  result_published: 'Completed',
   cancelled: 'Cancelled',
 };
 
@@ -33,9 +34,8 @@ const TYPE_LABELS = {
 
 const SECTION_ORDER = [
   { key: 'upcoming', title: 'Upcoming', statuses: ['upcoming', 'incoming'] },
-  { key: 'ongoing', title: 'Ongoing', statuses: ['ongoing', 'live'] },
-  { key: 'completed', title: 'Completed', statuses: ['completed'] },
-  { key: 'result_published', title: 'Result Published', statuses: ['result_published'] },
+  { key: 'ongoing', title: 'Live', statuses: ['ongoing', 'live'] },
+  { key: 'completed', title: 'Completed', statuses: ['completed', 'result_published'] },
   { key: 'draft', title: 'Draft', statuses: ['draft'] },
   { key: 'cancelled', title: 'Cancelled', statuses: ['cancelled'] },
 ];
@@ -171,36 +171,34 @@ export default function TournamentManagementV2({ navigation }) {
         </>
       );
     }
-    if (status === 'completed') {
+    if (status === 'completed' || status === 'result_published') {
+      const published = item.resultsPublished || status === 'result_published';
       return (
         <>
           <ActionBtn
-            label="Enter Results"
-            primary
+            label={published ? 'View / Edit Result' : 'Publish Result'}
+            primary={!published}
             onPress={() => navigation.navigate('TournamentResultEntry', { tournamentId: id })}
           />
-          {commonDelete}
-        </>
-      );
-    }
-    if (status === 'result_published') {
-      return (
-        <>
-          <ActionBtn
-            label="View Results"
-            onPress={() => navigation.navigate('TournamentResults', { tournamentId: id })}
-          />
-          <ActionBtn
-            label="Export"
-            onPress={async () => {
-              try {
-                const data = await tournamentManagementService.exportResults(id);
-                Alert.alert('Export', JSON.stringify(data, null, 2).slice(0, 800));
-              } catch (e) {
-                Alert.alert('Export', e.message);
-              }
-            }}
-          />
+          {published ? (
+            <ActionBtn
+              label="View Results"
+              onPress={() => navigation.navigate('TournamentResults', { tournamentId: id })}
+            />
+          ) : null}
+          {published ? (
+            <ActionBtn
+              label="Export"
+              onPress={async () => {
+                try {
+                  const data = await tournamentManagementService.exportResults(id);
+                  Alert.alert('Export', JSON.stringify(data, null, 2).slice(0, 800));
+                } catch (e) {
+                  Alert.alert('Export', e.message);
+                }
+              }}
+            />
+          ) : null}
           {commonDelete}
         </>
       );
@@ -286,6 +284,11 @@ export default function TournamentManagementV2({ navigation }) {
                       <View style={[styles.statusPill, statusPillStyle(status)]}>
                         <Text style={styles.statusText}>{STATUS_LABELS[status] || status}</Text>
                       </View>
+                      {item.resultsPublished || status === 'result_published' ? (
+                        <View style={styles.resultReadyPill}>
+                          <Text style={styles.resultReadyText}>Result Ready</Text>
+                        </View>
+                      ) : null}
                       <Text style={styles.date}>{formatDate(item.matchDate || item.startDate)}</Text>
                     </View>
                     <View style={styles.actions}>{renderActions(item)}</View>
@@ -313,9 +316,8 @@ function ActionBtn({ label, onPress, primary, danger }) {
 }
 
 function statusPillStyle(status) {
-  if (status === 'ongoing') return { backgroundColor: '#1e3a5f' };
-  if (status === 'completed') return { backgroundColor: '#3d2e00' };
-  if (status === 'result_published') return { backgroundColor: '#0d3d2e' };
+  if (status === 'ongoing' || status === 'live') return { backgroundColor: '#1e3a5f' };
+  if (status === 'completed' || status === 'result_published') return { backgroundColor: '#3d2e00' };
   if (status === 'upcoming' || status === 'incoming') return { backgroundColor: '#1a2e44' };
   return { backgroundColor: '#2a2a2a' };
 }
@@ -388,6 +390,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
   statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusText: { color: COLORS.white, fontSize: 12, fontWeight: '600' },
+  resultReadyPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: '#0d3d2e',
+  },
+  resultReadyText: { color: '#4ADE80', fontSize: 11, fontWeight: '700' },
   date: { color: COLORS.textSecondary || '#94a3b8', fontSize: 12 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   actionBtn: {

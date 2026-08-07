@@ -134,14 +134,14 @@ const AppContentManagement = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>

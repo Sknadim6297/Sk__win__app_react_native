@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
 const walletRoutes = require('./routes/wallet');
+const paymentRoutes = require('./routes/payments');
 const tournamentRoutes = require('./routes/tournaments');
 const tournamentManagementRoutes = require('./routes/tournamentManagement');
 const gamesRoutes = require('./routes/games');
@@ -18,6 +19,13 @@ const configRoutes = require('./routes/config');
 const sliderRoutes = require('./routes/sliders');
 const supportRoutes = require('./routes/support');
 const announcementRoutes = require('./routes/announcements');
+const {
+  router: downloadApiRouter,
+  PUBLIC_ROOT,
+  PAGE_PATH,
+  getApkStats,
+} = require('./routes/download');
+const AppRelease = require('./models/AppRelease');
 const { initFcm } = require('./services/fcm');
 const { runTournamentNotifier } = require('./services/tournamentNotifier');
 
@@ -41,13 +49,84 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
+// Capture raw body for Cashfree webhook signature verification
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      if (req.originalUrl && req.originalUrl.includes('/api/payments/cashfree/webhook')) {
+        req.rawBody = buf.toString('utf8');
+      }
+    },
+  })
+);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/download', express.static(path.join(PUBLIC_ROOT, 'download')));
 
 const isDbReady = () => mongoose.connection.readyState === 1;
 
+/** Modern APK landing page */
+app.get(['/download', '/download/'], (req, res) => {
+  res.sendFile(PAGE_PATH, (err) => {
+    if (err) {
+      console.error('[download] page missing:', PAGE_PATH, err.message);
+      res.status(500).send('Download page is not available.');
+    }
+  });
+});
+
+/**
+ * Serve APK and increment download counter first.
+ * GET /downloads/WarZone-AMR-v1.0.0.apk
+ */
+app.get('/downloads/:fileName', async (req, res) => {
+  try {
+    const fileName = path.basename(req.params.fileName || '');
+    if (!fileName.toLowerCase().endsWith('.apk')) {
+      return res.status(400).json({ success: false, message: 'Invalid file' });
+    }
+
+    const stats = getApkStats(fileName);
+    if (!stats.exists || !stats.filePath) {
+      return res.status(404).json({
+        success: false,
+        message: `APK not found. Place the file at public/downloads/${fileName}`,
+      });
+    }
+
+    if (isDbReady()) {
+      try {
+        await AppRelease.findOneAndUpdate(
+          { fileName },
+          {
+            $inc: { downloadCount: 1 },
+            $setOnInsert: {
+              version: '1.0.0',
+              title: 'WarZone AMR Tournament',
+              androidMin: 'Android 8.0 (API 26)+',
+              releaseNotes: 'WarZone AMR Tournament release',
+              isLatest: false,
+              publishedAt: new Date(),
+            },
+          },
+          { upsert: true }
+        );
+      } catch (e) {
+        console.warn('[download] counter update failed:', e.message);
+      }
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Length', String(stats.sizeBytes));
+    return res.sendFile(stats.filePath);
+  } catch (error) {
+    console.error('[download] serve error:', error.message);
+    return res.status(500).json({ success: false, message: 'Download failed' });
+  }
+});
+
 app.use('/api', (req, res, next) => {
-  if (req.path === '/health') {
+  if (req.path === '/health' || req.path.startsWith('/download')) {
     return next();
   }
   if (!isDbReady()) {
@@ -77,9 +156,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/tournament-management', tournamentManagementRoutes);
 app.use('/api/games', gamesRoutes);
+app.use('/api/maps', require('./routes/maps'));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/tutorials', tutorialRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -87,6 +168,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/sliders', sliderRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/download', downloadApiRouter);
 
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API endpoint not found' });
@@ -121,6 +203,7 @@ async function startServer() {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);
+      console.log(`APK download page: http://localhost:${PORT}/download`);
       if (process.env.PUBLIC_BASE_URL) {
         console.log(`Public base URL (for uploads/images): ${process.env.PUBLIC_BASE_URL}`);
       } else {

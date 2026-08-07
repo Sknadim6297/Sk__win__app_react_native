@@ -1,10 +1,14 @@
 import React, { useContext, useEffect } from 'react';
-import { InteractionManager, LogBox, View, StyleSheet } from 'react-native';
+import { InteractionManager, LogBox, View, StyleSheet, StatusBar } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
 
 LogBox.ignoreLogs([
   "Codegen didn't run",
   'is not a valid icon name for family',
+  'Splashscreen.setOptions',
+  'SplashScreen.setOptions',
+  'cannot be used in Expo Go',
 ]);
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -24,7 +28,9 @@ import TournamentEntryScreen from './screens/TournamentEntryScreen';
 import TournamentSlotBookingScreen from './screens/TournamentSlotBookingScreen';
 import TournamentResultsScreen from './screens/TournamentResultsScreen';
 import WalletScreen from './screens/WalletScreen';
+import CashfreeQrPaymentScreen from './screens/CashfreeQrPaymentScreen';
 import HistoryScreen from './screens/HistoryScreen';
+import MyContestsScreen from './screens/MyContestsScreen';
 import AccountScreen from './screens/AccountScreen';
 import AccountProfileScreen from './screens/AccountProfileScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
@@ -62,7 +68,9 @@ import SupportManagement from './screens/admin/SupportManagement';
 import AnnouncementManagement from './screens/admin/AnnouncementManagement';
 import Analytics from './screens/admin/Analytics';
 import AppContentManagement from './screens/admin/AppContentManagement';
+import MapManagement from './screens/admin/MapManagement';
 import SliderManagement from './screens/admin/SliderManagement';
+import CustomMatchTeamRegisterScreen from './screens/CustomMatchTeamRegisterScreen';
 import AppLoadingScreen, { WELCOME_BG } from './components/AppLoadingScreen';
 import { applyGlobalTypography } from './styles/typography';
 
@@ -111,15 +119,18 @@ export default function App() {
 
   return (
     <SafeAreaProvider style={styles.root}>
-      <View style={styles.root}>
-        {!fontsLoaded ? (
-          <AppLoadingScreen />
-        ) : (
-          <AuthProvider>
-            <AppNavigator />
-          </AuthProvider>
-        )}
-      </View>
+      <GestureHandlerRootView style={styles.root}>
+        <StatusBar barStyle="light-content" backgroundColor={WELCOME_BG} translucent={false} />
+        <View style={styles.root}>
+          {!fontsLoaded ? (
+            <AppLoadingScreen />
+          ) : (
+            <AuthProvider>
+              <AppNavigator />
+            </AuthProvider>
+          )}
+        </View>
+      </GestureHandlerRootView>
     </SafeAreaProvider>
   );
 }
@@ -180,14 +191,16 @@ function AppNavigator() {
                 <Stack.Screen name="Analytics" component={Analytics} />
                 <Stack.Screen name="AppContentManagement" component={AppContentManagement} />
                 <Stack.Screen name="SliderManagement" component={SliderManagement} />
+                <Stack.Screen name="MapManagement" component={MapManagement} />
               </>
             ) : (
               <>
                 <Stack.Screen name="MainApp" component={MainTabNavigator} />
                 <Stack.Screen name="AccountProfile" component={AccountProfileScreen} />
                 <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-                <Stack.Screen name="MyWallet" component={MyWalletScreen} />
-                <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
+            <Stack.Screen name="MyWallet" component={MyWalletScreen} />
+            <Stack.Screen name="CashfreeQrPayment" component={CashfreeQrPaymentScreen} />
+            <Stack.Screen name="MyStatistics" component={MyStatisticsScreen} />
                 <Stack.Screen name="TopPlayers" component={TopPlayersScreen} />
                 <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 <Stack.Screen name="ContactUs" component={ContactUsScreen} />
@@ -208,11 +221,13 @@ function AppNavigator() {
             )}
 
             <Stack.Screen name="TournamentDetails" component={TournamentDetailsScreen} />
+            <Stack.Screen name="CustomMatchTeamRegister" component={CustomMatchTeamRegisterScreen} />
             <Stack.Screen name="TournamentEntry" component={TournamentEntryScreen} />
             <Stack.Screen name="TournamentSlotBooking" component={TournamentSlotBookingScreen} />
             <Stack.Screen name="TournamentResults" component={TournamentResultsScreen} />
             <Stack.Screen name="Tournament" component={TournamentScreen} />
             <Stack.Screen name="History" component={HistoryScreen} />
+            <Stack.Screen name="MyContests" component={MyContestsScreen} />
           </>
         )}
       </Stack.Navigator>

@@ -19,6 +19,8 @@ const PRIVATE_HOST_PATTERNS = [
   /^10\.0\.2\.2$/,
 ];
 
+let apiConfigWarned = false;
+
 export function isPrivateOrLocalHost(hostname) {
   if (!hostname) return true;
   const h = hostname.toLowerCase();
@@ -63,6 +65,12 @@ function getExpoLanApiUrl() {
   return null;
 }
 
+function warnOnce(...args) {
+  if (apiConfigWarned || !__DEV__) return;
+  apiConfigWarned = true;
+  console.warn(...args);
+}
+
 /**
  * Resolved API base including /api suffix, e.g. https://api.example.com/api
  */
@@ -77,12 +85,12 @@ export function getApiUrl() {
           hostname
         );
       } else if (isPrivateOrLocalHost(hostname) && __DEV__) {
-        console.warn(
+        warnOnce(
           '[API] Using LAN/local API URL (%s). This works on the same Wi‑Fi only. For 4G/5G testing, set EXPO_PUBLIC_API_URL to your public server.',
           configured
         );
       } else if (__DEV__ && protocol === 'http:') {
-        console.warn('[API] Using HTTP in development. Use HTTPS in production.');
+        warnOnce('[API] Using HTTP in development. Use HTTPS in production.');
       }
     } catch {
       /* invalid url handled below */
@@ -93,7 +101,7 @@ export function getApiUrl() {
   if (__DEV__) {
     const lan = getExpoLanApiUrl();
     if (lan) {
-      console.warn(
+      warnOnce(
         '[API] No EXPO_PUBLIC_API_URL set — using Expo dev host (%s). Mobile data will NOT work. Add EXPO_PUBLIC_API_URL to .env with your public API URL.',
         lan
       );

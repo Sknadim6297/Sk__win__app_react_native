@@ -49,7 +49,7 @@ export default function AnnouncementDetailScreen({ navigation, route }) {
 
   if (loading && !item) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <ActivityIndicator size="large" color="#38BDF8" style={{ marginTop: 40 }} />
       </SafeAreaView>
     );

@@ -3,6 +3,15 @@ const Game = require('../models/Game');
 const GameMode = require('../models/GameMode');
 const Tournament = require('../models/Tournament');
 const { authMiddleware } = require('../middleware/auth');
+const { normalizeMediaUrl } = require('../utils/publicUrl');
+
+function withNormalizedImage(doc, req) {
+  const obj = doc.toObject ? doc.toObject() : { ...doc };
+  if (obj.image) {
+    obj.image = normalizeMediaUrl(obj.image, req);
+  }
+  return obj;
+}
 
 async function countTournamentsByGame(gameIds) {
   if (!gameIds.length) return new Map();
@@ -32,8 +41,8 @@ async function countTournamentsByMode(modeIds) {
   return new Map(rows.map((r) => [String(r._id), r.count]));
 }
 
-function withTournamentCount(doc, countMap, idField = '_id') {
-  const obj = doc.toObject ? doc.toObject() : { ...doc };
+function withTournamentCount(doc, countMap, idField = '_id', req) {
+  const obj = withNormalizedImage(doc, req);
   const key = String(obj[idField] || obj.id);
   return { ...obj, tournamentCount: countMap.get(key) || 0 };
 }
@@ -46,7 +55,7 @@ const router = express.Router();
 router.get('/admin/all', authMiddleware, async (req, res) => {
   try {
     const games = await Game.find().sort({ createdAt: -1 });
-    res.json(games);
+    res.json(games.map((g) => withNormalizedImage(g, req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch games', message: error.message });
   }
@@ -71,7 +80,7 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
     });
 
     await game.save();
-    res.status(201).json({ message: 'Game created successfully', game });
+    res.status(201).json({ message: 'Game created successfully', game: withNormalizedImage(game, req) });
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({ error: 'Game with this name already exists' });
@@ -93,7 +102,7 @@ router.put('/admin/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Game not found' });
     }
 
-    res.json({ message: 'Game updated successfully', game });
+    res.json({ message: 'Game updated successfully', game: withNormalizedImage(game, req) });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update game', message: error.message });
   }
@@ -140,7 +149,7 @@ router.post('/modes/admin/create', authMiddleware, async (req, res) => {
     });
 
     await mode.save();
-    res.status(201).json({ message: 'Game mode created successfully', mode });
+    res.status(201).json({ message: 'Game mode created successfully', mode: withNormalizedImage(mode, req) });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create game mode', message: error.message });
   }
@@ -149,17 +158,20 @@ router.post('/modes/admin/create', authMiddleware, async (req, res) => {
 // Update game mode (Admin)
 router.put('/modes/admin/:id', authMiddleware, async (req, res) => {
   try {
-    const mode = await GameMode.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body, updatedAt: new Date() },
-      { new: true }
-    );
+    const { name, description, image, status } = req.body;
+    const updates = { updatedAt: new Date() };
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (image !== undefined) updates.image = image;
+    if (status !== undefined) updates.status = status;
+
+    const mode = await GameMode.findByIdAndUpdate(req.params.id, updates, { new: true });
 
     if (!mode) {
       return res.status(404).json({ error: 'Game mode not found' });
     }
 
-    res.json({ message: 'Game mode updated successfully', mode });
+    res.json({ message: 'Game mode updated successfully', mode: withNormalizedImage(mode, req) });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update game mode', message: error.message });
   }
@@ -187,7 +199,7 @@ router.get('/list', async (req, res) => {
   try {
     const games = await Game.find({ status: 'active' }).sort({ createdAt: -1 });
     const countMap = await countTournamentsByGame(games.map((g) => g._id));
-    res.json(games.map((g) => withTournamentCount(g, countMap)));
+    res.json(games.map((g) => withTournamentCount(g, countMap, '_id', req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch games', message: error.message });
   }
@@ -198,7 +210,7 @@ router.get('/popular', async (req, res) => {
   try {
     const games = await Game.find({ status: 'active', isPopular: true }).sort({ createdAt: -1 });
     const countMap = await countTournamentsByGame(games.map((g) => g._id));
-    res.json(games.map((g) => withTournamentCount(g, countMap)));
+    res.json(games.map((g) => withTournamentCount(g, countMap, '_id', req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch popular games', message: error.message });
   }
@@ -211,7 +223,7 @@ router.get('/:id', async (req, res) => {
     if (!game) {
       return res.status(404).json({ error: 'Game not found' });
     }
-    res.json(game);
+    res.json(withNormalizedImage(game, req));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch game', message: error.message });
   }
@@ -224,7 +236,7 @@ router.get('/:gameId/modes', async (req, res) => {
       createdAt: -1,
     });
     const countMap = await countTournamentsByMode(modes.map((m) => m._id));
-    res.json(modes.map((m) => withTournamentCount(m, countMap)));
+    res.json(modes.map((m) => withTournamentCount(m, countMap, '_id', req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch game modes', message: error.message });
   }

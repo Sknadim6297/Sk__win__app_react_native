@@ -22,12 +22,32 @@ const walletTransactionSchema = new mongoose.Schema({
     default: 'pending',
   },
   paymentMethod: String,
-  transactionId: String,
+  transactionId: {
+    type: String,
+    index: true,
+    sparse: true,
+  },
   tournamentId: mongoose.Schema.Types.ObjectId,
+  paymentOrderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PaymentOrder',
+    index: true,
+    sparse: true,
+  },
+  cashfreePaymentId: {
+    type: String,
+    index: true,
+    sparse: true,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
+walletTransactionSchema.index(
+  { transactionId: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { transactionId: { $type: 'string' } } }
+);
 
 module.exports = mongoose.model('WalletTransaction', walletTransactionSchema);

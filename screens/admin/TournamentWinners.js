@@ -192,7 +192,7 @@ const TournamentWinners = ({ navigation }) => {
 
   if (loading && tournaments.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading tournaments...</Text>
@@ -203,7 +203,7 @@ const TournamentWinners = ({ navigation }) => {
 
   if (!selectedTournament) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -273,7 +273,7 @@ const TournamentWinners = ({ navigation }) => {
 
   // Winner Selection View
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => setSelectedTournament(null)}>
@@ -409,7 +409,7 @@ const TournamentWinners = ({ navigation }) => {
 
       {/* Winner Selector Modal */}
       <Modal visible={showWinnerModal} transparent animationType="slide">
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowWinnerModal(false)}>
               <Ionicons name="close" size={28} color={COLORS.primary} />

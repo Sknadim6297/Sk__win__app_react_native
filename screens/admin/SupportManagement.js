@@ -113,7 +113,7 @@ export default function SupportManagement({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
       <Toast {...toast} onHide={hideToast} />
 

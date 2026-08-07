@@ -44,7 +44,7 @@ export default function WelcomeOnboardingScreen({ navigation }) {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor={ONBOARDING.colors.background} />
+      <StatusBar barStyle="light-content" backgroundColor={ONBOARDING.colors.background} translucent={false} />
       <BackgroundLayer />
 
       <Animated.View

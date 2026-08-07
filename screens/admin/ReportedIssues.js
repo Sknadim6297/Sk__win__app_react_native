@@ -19,7 +19,7 @@ const issueCards = [
 
 const ReportedIssues = ({ navigation }) => {
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
 
       <View style={styles.header}>

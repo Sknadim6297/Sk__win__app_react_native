@@ -93,7 +93,7 @@ const TournamentLeaderboard = ({ navigation }) => {
 
   if (loading && tournaments.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.accent} />
           <Text style={styles.loadingText}>Loading leaderboard...</Text>
@@ -103,7 +103,7 @@ const TournamentLeaderboard = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
 
       <View style={styles.header}>

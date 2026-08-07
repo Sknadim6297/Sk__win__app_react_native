@@ -21,18 +21,20 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import RNPickerSelect from 'react-native-picker-select';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../../styles/theme';
-import { tournamentService, gameService, uploadImageFile } from '../../services/api';
+import { tournamentService, tournamentManagementService, gameService, uploadImageFile, mapService } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import { getPrizeBreakdown, buildPrizesForCategory, getCustomWinnerPrize } from '../../utils/tournamentHelpers';
 import Toast from '../../components/Toast';
 
-const AVAILABLE_MAPS = [
-  { label: 'Bermuda', value: 'Bermuda' },
+const GAME_MODES = [
+  { label: 'Solo', value: 'solo', teamSize: 1 },
+  { label: 'Duo', value: 'duo', teamSize: 2 },
+  { label: 'Squad', value: 'squad', teamSize: 4 },
 ];
 
-const GAME_MODES = [
-  { label: 'Solo', value: 'solo' },
-  { label: 'Duo', value: 'duo' },
-  { label: 'Squad', value: 'squad' },
+const CUSTOM_GAME_MODES = [
+  { label: 'Solo', value: 'solo', teamSize: 1 },
+  { label: 'Squad', value: 'squad', teamSize: 4 },
 ];
 
 const MODE_MAX_PLAYERS = {
@@ -47,15 +49,28 @@ const TOURNAMENT_CATEGORIES = [
 ];
 
 const MATCH_STATUSES = [
-  { label: 'Upcoming', value: 'incoming' },
-  { label: 'Ongoing', value: 'ongoing' },
+  { label: 'Draft', value: 'draft' },
+  { label: 'Upcoming', value: 'upcoming' },
+  { label: 'Live', value: 'ongoing' },
   { label: 'Completed', value: 'completed' },
-  { label: 'Result Published', value: 'result_published' },
 ];
+
+const STATUS_LABELS = {
+  draft: 'DRAFT',
+  upcoming: 'UPCOMING',
+  incoming: 'UPCOMING',
+  ongoing: 'LIVE',
+  live: 'LIVE',
+  locked: 'UPCOMING',
+  completed: 'COMPLETED',
+  result_published: 'COMPLETED',
+  cancelled: 'CANCELLED',
+};
 
 const TournamentManagement = ({ navigation }) => {
   const [games, setGames] = useState([]);
   const [gameModes, setGameModes] = useState([]);
+  const [availableMaps, setAvailableMaps] = useState([{ label: 'Bermuda', value: 'Bermuda' }]);
   const [tournaments, setTournaments] = useState([]);
   const [selectedGame, setSelectedGame] = useState(null);
   const [selectedGameMode, setSelectedGameMode] = useState(null);
@@ -99,7 +114,7 @@ const TournamentManagement = ({ navigation }) => {
     gameMode: '',
     tournamentType: 'battle_royale',
     category: 'battle_royale',
-    status: 'incoming',
+    status: 'draft',
     statusOverride: false,
     mode: 'solo',
     map: 'Bermuda',
@@ -121,21 +136,57 @@ const TournamentManagement = ({ navigation }) => {
     teamSize: 1,
   });
 
-  // Update team size based on mode
+  // Update team size based on mode / custom match rules
   useEffect(() => {
+    const isCustom = (form.category || form.tournamentType) === 'custom';
+    if (isCustom) {
+      const customMode = form.mode === 'squad' ? 'squad' : 'solo';
+      const perTeam = customMode === 'squad' ? 4 : 1;
+      const nextMax = String(perTeam * 2);
+      setForm((prev) => {
+        if (
+          prev.mode === customMode &&
+          prev.teamSize === perTeam &&
+          String(prev.maxTeams) === '2' &&
+          String(prev.maxParticipants) === nextMax
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          mode: customMode,
+          teamSize: perTeam,
+          maxTeams: '2',
+          maxParticipants: nextMax,
+        };
+      });
+      return;
+    }
     const suggestedMaxPlayers = MODE_MAX_PLAYERS[form.mode];
-    if (suggestedMaxPlayers) {
-      const teamSize = form.mode === 'solo' ? 1 : form.mode === 'duo' ? 2 : 4;
-      setForm(prev => ({
+    if (!suggestedMaxPlayers) return;
+    const teamSize = form.mode === 'solo' ? 1 : form.mode === 'duo' ? 2 : 4;
+    setForm((prev) => {
+      if (isEditMode) {
+        if (prev.teamSize === teamSize) return prev;
+        return { ...prev, teamSize };
+      }
+      if (
+        prev.teamSize === teamSize &&
+        String(prev.maxParticipants) === String(suggestedMaxPlayers)
+      ) {
+        return prev;
+      }
+      return {
         ...prev,
         teamSize,
-        maxParticipants: isEditMode ? prev.maxParticipants : suggestedMaxPlayers.toString(),
-      }));
-    }
-  }, [form.mode, isEditMode]);
+        maxParticipants: suggestedMaxPlayers.toString(),
+      };
+    });
+  }, [form.mode, form.category, form.tournamentType, isEditMode]);
 
   useEffect(() => {
     fetchGames();
+    fetchMaps();
   }, []);
 
   useEffect(() => {
@@ -149,6 +200,25 @@ const TournamentManagement = ({ navigation }) => {
       fetchTournaments();
     }
   }, [selectedGameMode]);
+
+  const fetchMaps = async () => {
+    try {
+      const data = await mapService.getList();
+      const options = (Array.isArray(data) ? data : []).map((m) => ({
+        label: m.name,
+        value: m.name,
+      }));
+      if (options.length) {
+        setAvailableMaps(options);
+        setForm((prev) => ({
+          ...prev,
+          map: options.some((o) => o.value === prev.map) ? prev.map : options[0].value,
+        }));
+      }
+    } catch (error) {
+      console.warn('Failed to load maps:', error.message);
+    }
+  };
 
   const fetchGames = async () => {
     try {
@@ -227,21 +297,29 @@ const TournamentManagement = ({ navigation }) => {
     });
   };
 
+  const getTeamSizeFromMode = (mode) => {
+    if (mode === 'duo') return 2;
+    if (mode === 'squad') return 4;
+    return 1;
+  };
+
+  const getPayingUnits = () => {
+    const maxParticipants = parseInt(form.maxParticipants, 10) || 50;
+    if (form.mode === 'solo') return maxParticipants;
+    return Math.floor(maxParticipants / (form.teamSize || getTeamSizeFromMode(form.mode)));
+  };
+
   const calculateTotalPrizePool = () => {
     if (form.prizePool) return parseFloat(form.prizePool) || 0;
     const entryFee = parseFloat(form.entryFee) || 0;
-    const maxParticipants = parseInt(form.maxParticipants, 10) || 50;
-    const totalCollection = entryFee * maxParticipants;
+    const payingUnits = getPayingUnits();
+    const totalCollection = entryFee * payingUnits;
     return Math.floor(totalCollection * 0.9);
   };
 
   const calculateRecommendedRewards = () => {
     const totalPrize = calculateTotalPrizePool();
-    return {
-      first: Math.floor(totalPrize * 0.5), // 50% for 1st
-      second: Math.floor(totalPrize * 0.3), // 30% for 2nd
-      third: Math.floor(totalPrize * 0.2), // 20% for 3rd
-    };
+    return getPrizeBreakdown(totalPrize);
   };
 
   const getGameImage = (game) => {
@@ -261,10 +339,13 @@ const TournamentManagement = ({ navigation }) => {
   };
 
   const normalizeStatus = (status) => {
-    if (status === 'upcoming') return 'incoming';
+    if (status === 'incoming' || status === 'locked') return 'upcoming';
     if (status === 'live') return 'ongoing';
-    return status || 'incoming';
+    return status || 'draft';
   };
+
+  const getTournamentStatus = (tournament) =>
+    normalizeStatus(tournament?.lifecycleStatus || tournament?.status || 'draft');
 
   const openCreateModal = () => {
     setIsEditMode(false);
@@ -285,7 +366,7 @@ const TournamentManagement = ({ navigation }) => {
       gameMode: tournament.gameMode?._id || tournament.gameMode || '',
       tournamentType: tournament.category || tournament.tournamentType || 'battle_royale',
       category: tournament.category || tournament.tournamentType || 'battle_royale',
-      status: normalizeStatus(tournament.status),
+      status: getTournamentStatus(tournament),
       statusOverride: Boolean(tournament.statusOverride),
       mode: tournament.mode || 'solo',
       map: tournament.map || 'Bermuda',
@@ -343,7 +424,7 @@ const TournamentManagement = ({ navigation }) => {
 
     try {
       const isStatusChanged = isEditMode
-        ? normalizeStatus(editingTournament?.status) !== form.status
+        ? getTournamentStatus(editingTournament) !== form.status
         : false;
       const statusOverride = isEditMode
         ? Boolean(form.statusOverride || isStatusChanged)
@@ -355,7 +436,8 @@ const TournamentManagement = ({ navigation }) => {
         game: selectedGame,
         gameMode: selectedGameMode,
         category: form.category || form.tournamentType || 'battle_royale',
-        status: isEditMode ? form.status : 'incoming',
+        status: isEditMode ? form.status : 'draft',
+        lifecycleStatus: isEditMode ? form.status : 'draft',
         statusOverride,
         mode: form.mode,
         map: form.map,
@@ -367,8 +449,13 @@ const TournamentManagement = ({ navigation }) => {
         entryFee: parseFloat(form.entryFee) || 0,
         prizePool: parseFloat(form.prizePool) || calculateTotalPrizePool() || 0,
         perKill: (form.category || form.tournamentType) === 'custom' ? 0 : (parseFloat(form.perKill) || 0),
-        maxParticipants: parseInt(form.maxParticipants) || 50,
-        maxTeams: form.mode === 'solo' ? parseInt(form.maxParticipants) : Math.floor(parseInt(form.maxParticipants) / form.teamSize),
+        maxParticipants:
+          (form.category || form.tournamentType) === 'custom'
+            ? (form.mode === 'squad' ? 4 : 1) * 2
+            : parseInt(form.maxParticipants) || 50,
+        maxTeams: (form.category || form.tournamentType) === 'custom' ? 2 : form.mode === 'solo'
+          ? parseInt(form.maxParticipants) || 50
+          : Math.floor((parseInt(form.maxParticipants) || 50) / (form.teamSize || 1)),
         minimumBalance: parseFloat(form.minimumBalance) || parseFloat(form.entryFee) || 0,
         startDate: form.startDate.toISOString(),
         endDate: form.endDate ? form.endDate.toISOString() : null,
@@ -376,17 +463,41 @@ const TournamentManagement = ({ navigation }) => {
         roomPassword: form.roomPassword,
         showRoomCredentials: form.showRoomCredentials,
         killRewardEnabled: (form.category || form.tournamentType) !== 'custom',
-        prizes: calculateRecommendedRewards(),
+        prizes: buildPrizesForCategory(
+          form.category || form.tournamentType,
+          parseFloat(form.prizePool) || calculateTotalPrizePool() || 0
+        ),
         teamSize: form.teamSize,
       };
 
+      let savedTournament = null;
       if (isEditMode && editingTournament?._id) {
-        await tournamentService.updateTournament(editingTournament._id, tournamentData);
+        const res = await tournamentService.updateTournament(editingTournament._id, tournamentData);
+        savedTournament = res?.tournament || editingTournament;
         showToast('Tournament updated successfully!', 'success');
       } else {
-        await tournamentService.createTournament(tournamentData);
+        const res = await tournamentService.createTournament(tournamentData);
+        savedTournament = res?.tournament;
         showToast('Tournament created successfully!', 'success');
       }
+
+      // Custom Match: keep PrizeDistribution as winner-only (100% of pool)
+      const savedId = savedTournament?._id || editingTournament?._id;
+      const isCustom =
+        (form.category || form.tournamentType) === 'custom' ||
+        (form.category || form.tournamentType) === 'custom_match';
+      if (savedId && isCustom) {
+        const winnerPrize = getCustomWinnerPrize(tournamentData.prizePool);
+        try {
+          await tournamentManagementService.savePrizeDistribution(savedId, {
+            winnerPrize,
+            runnerUpPrize: 0,
+          });
+        } catch (e) {
+          console.warn('Prize distribution sync failed:', e?.message);
+        }
+      }
+
       closeFormModal();
       fetchTournaments();
     } catch (error) {
@@ -402,7 +513,7 @@ const TournamentManagement = ({ navigation }) => {
       gameMode: '',
       tournamentType: 'battle_royale',
       category: 'battle_royale',
-      status: 'incoming',
+      status: 'draft',
       statusOverride: false,
       mode: 'solo',
       map: 'Bermuda',
@@ -761,7 +872,7 @@ const TournamentManagement = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
       {/* Header */}
@@ -904,8 +1015,10 @@ const TournamentManagement = ({ navigation }) => {
                         {tournament.game?.name} - {tournament.gameMode?.name}
                       </Text>
                     </View>
-                    <View style={[styles.statusBadge, styles[`status${tournament.status}`]]}>
-                      <Text style={styles.statusText}>{tournament.status.toUpperCase()}</Text>
+                    <View style={[styles.statusBadge, styles[`status${getTournamentStatus(tournament)}`] || styles.statusupcoming]}>
+                      <Text style={styles.statusText}>
+                        {STATUS_LABELS[getTournamentStatus(tournament)] || getTournamentStatus(tournament).toUpperCase()}
+                      </Text>
                     </View>
                   </View>
 
@@ -1089,6 +1202,10 @@ const TournamentManagement = ({ navigation }) => {
                         handleInputChange('tournamentType', type.value);
                         if (type.value === 'custom') {
                           handleInputChange('perKill', '0');
+                          handleInputChange('mode', 'solo');
+                          handleInputChange('maxTeams', '2');
+                          handleInputChange('maxParticipants', '2');
+                          handleInputChange('teamSize', 1);
                         }
                       }}
                     >
@@ -1167,12 +1284,22 @@ const TournamentManagement = ({ navigation }) => {
                   </View>
                 )}
                 <View style={[styles.formGroup, { flex: 1, marginLeft: (form.category || form.tournamentType) === 'battle_royale' ? 0 : 8 }]}>
-                  <Text style={styles.label}>Total Prize Pool (₹) *</Text>
+                  <Text style={styles.label}>
+                    {(form.category || form.tournamentType) === 'custom' ||
+                    (form.category || form.tournamentType) === 'custom_match'
+                      ? 'Winner Prize (₹) *'
+                      : 'Total Prize Pool (₹) *'}
+                  </Text>
                   <TextInput
                     style={styles.input}
                     value={form.prizePool}
                     onChangeText={(text) => setForm(prev => ({ ...prev, prizePool: text }))}
-                    placeholder="Prize pool amount"
+                    placeholder={
+                      (form.category || form.tournamentType) === 'custom' ||
+                      (form.category || form.tournamentType) === 'custom_match'
+                        ? 'Winner prize amount'
+                        : 'Prize pool amount'
+                    }
                     placeholderTextColor={COLORS.gray}
                     keyboardType="numeric"
                   />
@@ -1189,13 +1316,18 @@ const TournamentManagement = ({ navigation }) => {
                     <View style={styles.prizePoolItem}>
                       <Text style={styles.prizePoolLabel}>Total Collection:</Text>
                       <Text style={styles.prizePoolValue}>
-                        ₹{(parseFloat(form.entryFee) * parseInt(form.maxParticipants) || 0).toLocaleString()}
+                        ₹{((parseFloat(form.entryFee) || 0) * getPayingUnits()).toLocaleString()}
+                      </Text>
+                      <Text style={styles.prizePoolHint}>
+                        {form.mode === 'solo'
+                          ? `${getPayingUnits()} players × entry fee`
+                          : `${getPayingUnits()} teams × team entry fee`}
                       </Text>
                     </View>
                     <View style={styles.prizePoolItem}>
                       <Text style={styles.prizePoolLabel}>Platform Fee (10%):</Text>
                       <Text style={styles.prizePoolValue}>
-                        -₹{Math.floor((parseFloat(form.entryFee) * parseInt(form.maxParticipants) || 0) * 0.1).toLocaleString()}
+                        -₹{Math.floor(((parseFloat(form.entryFee) || 0) * getPayingUnits()) * 0.1).toLocaleString()}
                       </Text>
                     </View>
                     <View style={[styles.prizePoolItem, styles.prizePoolTotal]}>
@@ -1204,9 +1336,62 @@ const TournamentManagement = ({ navigation }) => {
                         ₹{calculateTotalPrizePool().toLocaleString()}
                       </Text>
                     </View>
+                    {(() => {
+                      const isCustom =
+                        (form.category || form.tournamentType) === 'custom' ||
+                        (form.category || form.tournamentType) === 'custom_match';
+                      const pool = calculateTotalPrizePool();
+                      if (isCustom) {
+                        return (
+                          <View style={[styles.prizePoolItem, styles.prizePoolTotal]}>
+                            <Text style={styles.prizePoolTotalLabel}>Winner Prize (100%):</Text>
+                            <Text style={styles.prizePoolTotalValue}>
+                              ₹{getCustomWinnerPrize(pool).toLocaleString()}
+                            </Text>
+                          </View>
+                        );
+                      }
+                      const breakdown = calculateRecommendedRewards();
+                      return (
+                        <>
+                          <View style={styles.prizePoolItem}>
+                            <Text style={styles.prizePoolLabel}>1st Place (50%):</Text>
+                            <Text style={styles.prizePoolValue}>₹{breakdown.first.toLocaleString()}</Text>
+                          </View>
+                          <View style={styles.prizePoolItem}>
+                            <Text style={styles.prizePoolLabel}>2nd Place (30%):</Text>
+                            <Text style={styles.prizePoolValue}>₹{breakdown.second.toLocaleString()}</Text>
+                          </View>
+                          <View style={styles.prizePoolItem}>
+                            <Text style={styles.prizePoolLabel}>3rd Place (20%):</Text>
+                            <Text style={styles.prizePoolValue}>₹{breakdown.third.toLocaleString()}</Text>
+                          </View>
+                        </>
+                      );
+                    })()}
                   </View>
                 </View>
               )}
+
+              {(form.category || form.tournamentType) === 'custom' && form.prizePool ? (
+                <View style={styles.prizePoolSection}>
+                  <View style={styles.prizePoolHeader}>
+                    <MaterialCommunityIcons name="trophy-award" size={20} color={COLORS.accent} />
+                    <Text style={styles.prizePoolTitle}>Prize Distribution</Text>
+                  </View>
+                  <View style={styles.prizePoolDetails}>
+                    <View style={[styles.prizePoolItem, styles.prizePoolTotal]}>
+                      <Text style={styles.prizePoolTotalLabel}>Winner Prize:</Text>
+                      <Text style={styles.prizePoolTotalValue}>
+                        ₹{getCustomWinnerPrize(parseFloat(form.prizePool) || calculateTotalPrizePool()).toLocaleString()}
+                      </Text>
+                    </View>
+                    <Text style={styles.prizePoolHint}>
+                      Custom Match is 2 teams only. Winning team receives 100% of the prize. Losing team receives ₹0.
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
 
               {(form.category || form.tournamentType) === 'battle_royale' && form.entryFee && form.perKill && (
                 <View style={styles.prizePoolSection}>
@@ -1225,9 +1410,15 @@ const TournamentManagement = ({ navigation }) => {
                         ₹{(parseFloat(form.perKill) * 20 || 0).toLocaleString()}
                       </Text>
                     </View>
+                    <View style={styles.prizePoolItem}>
+                      <Text style={styles.prizePoolLabel}>Entry Fee (per player/team):</Text>
+                      <Text style={styles.prizePoolValue}>₹{form.entryFee}</Text>
+                    </View>
                     <View style={[styles.prizePoolItem, styles.prizePoolTotal]}>
-                      <Text style={styles.prizePoolTotalLabel}>Entry Fee:</Text>
-                      <Text style={styles.prizePoolTotalValue}>₹{form.entryFee}</Text>
+                      <Text style={styles.prizePoolTotalLabel}>Suggested Winner (1st):</Text>
+                      <Text style={styles.prizePoolTotalValue}>
+                        ₹{calculateRecommendedRewards().first.toLocaleString()}
+                      </Text>
                     </View>
                   </View>
                 </View>
@@ -1237,14 +1428,21 @@ const TournamentManagement = ({ navigation }) => {
                 <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
                   <Text style={styles.label}>Game Mode</Text>
                   <View style={styles.modeToggleRow}>
-                    {GAME_MODES.map((modeOption) => (
+                    {((form.category || form.tournamentType) === 'custom'
+                      ? CUSTOM_GAME_MODES
+                      : GAME_MODES
+                    ).map((modeOption) => (
                       <TouchableOpacity
                         key={modeOption.value}
                         style={[
                           styles.modeToggleButton,
                           form.mode === modeOption.value && styles.modeToggleActive,
                         ]}
-                        onPress={() => setForm(prev => ({ ...prev, mode: modeOption.value }))}
+                        onPress={() => setForm(prev => ({
+                          ...prev,
+                          mode: modeOption.value,
+                          teamSize: modeOption.teamSize,
+                        }))}
                       >
                         <Text
                           style={[
@@ -1260,11 +1458,41 @@ const TournamentManagement = ({ navigation }) => {
                 </View>
                 <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
                   <Text style={styles.label}>Battle Map</Text>
-                  <TextInput
-                    style={[styles.input, styles.disabledInput]}
-                    value="Bermuda"
-                    editable={false}
-                  />
+                  <View style={styles.modeToggleRow}>
+                    {availableMaps.slice(0, 4).map((mapOption) => (
+                      <TouchableOpacity
+                        key={mapOption.value}
+                        style={[
+                          styles.modeToggleButton,
+                          form.map === mapOption.value && styles.modeToggleActive,
+                        ]}
+                        onPress={() => setForm((prev) => ({ ...prev, map: mapOption.value }))}
+                      >
+                        <Text
+                          style={[
+                            styles.modeToggleText,
+                            form.map === mapOption.value && styles.modeToggleTextActive,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {mapOption.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {availableMaps.length > 4 ? (
+                    <RNPickerSelect
+                      onValueChange={(value) => value && setForm((prev) => ({ ...prev, map: value }))}
+                      items={availableMaps}
+                      value={form.map}
+                      placeholder={{ label: 'More maps...', value: null }}
+                      style={{
+                        inputIOS: styles.input,
+                        inputAndroid: styles.input,
+                        placeholder: { color: COLORS.gray },
+                      }}
+                    />
+                  ) : null}
                 </View>
               </View>
 
@@ -1272,22 +1500,40 @@ const TournamentManagement = ({ navigation }) => {
               <View style={styles.teamConfigSection}>
                 <View style={styles.teamConfigHeader}>
                   <MaterialCommunityIcons name="account-group" size={20} color={COLORS.accent} />
-                  <Text style={styles.teamConfigTitle}>Team Configuration</Text>
+                  <Text style={styles.teamConfigTitle}>
+                    {(form.category || form.tournamentType) === 'custom'
+                      ? 'Custom Match Teams'
+                      : 'Team Configuration'}
+                  </Text>
                 </View>
                 <View style={styles.teamConfigDetails}>
                   <View style={styles.teamConfigItem}>
                     <Text style={styles.teamConfigLabel}>Players per team:</Text>
-                    <Text style={styles.teamConfigValue}>{form.teamSize}</Text>
+                    <Text style={styles.teamConfigValue}>
+                      {(form.category || form.tournamentType) === 'custom'
+                        ? form.mode === 'squad'
+                          ? 4
+                          : 1
+                        : form.teamSize}
+                    </Text>
                   </View>
                   <View style={styles.teamConfigItem}>
                     <Text style={styles.teamConfigLabel}>Max teams:</Text>
                     <Text style={styles.teamConfigValue}>
-                      {form.maxParticipants ? Math.floor(parseInt(form.maxParticipants) / form.teamSize) : 0}
+                      {(form.category || form.tournamentType) === 'custom'
+                        ? 2
+                        : form.maxParticipants
+                          ? Math.floor(parseInt(form.maxParticipants) / form.teamSize)
+                          : 0}
                     </Text>
                   </View>
                   <View style={styles.teamConfigItem}>
                     <Text style={styles.teamConfigLabel}>Total slots:</Text>
-                    <Text style={styles.teamConfigValue}>{form.maxParticipants || 0}</Text>
+                    <Text style={styles.teamConfigValue}>
+                      {(form.category || form.tournamentType) === 'custom'
+                        ? (form.mode === 'squad' ? 8 : 2)
+                        : form.maxParticipants || 0}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -1466,6 +1712,10 @@ const TournamentManagement = ({ navigation }) => {
               />
             </View>
 
+            <Text style={styles.helperText}>
+              Players see Room ID & Password automatically 2 minutes before match start. You can update these anytime.
+            </Text>
+
             <View style={styles.formGroup}>
               <View style={styles.switchRow}>
                 <MaterialCommunityIcons 
@@ -1473,7 +1723,7 @@ const TournamentManagement = ({ navigation }) => {
                   size={20} 
                   color={roomForm.showRoomCredentials ? COLORS.accent : COLORS.gray} 
                 />
-                <Text style={styles.switchLabel}>Show Room Credentials to Players</Text>
+                <Text style={styles.switchLabel}>Force show now (override timer)</Text>
                 <Switch
                   value={roomForm.showRoomCredentials}
                   onValueChange={(value) => setRoomForm(prev => ({ ...prev, showRoomCredentials: value }))}
@@ -1968,6 +2218,9 @@ const styles = StyleSheet.create({
   statusupcoming: {
     backgroundColor: 'rgba(255, 193, 7, 0.2)',
   },
+  statusdraft: {
+    backgroundColor: 'rgba(108, 117, 125, 0.35)',
+  },
   statuslocked: {
     backgroundColor: 'rgba(255, 133, 0, 0.2)',
   },
@@ -1979,6 +2232,12 @@ const styles = StyleSheet.create({
   },
   statuscompleted: {
     backgroundColor: 'rgba(108, 117, 125, 0.2)',
+  },
+  statusresult_published: {
+    backgroundColor: 'rgba(13, 61, 46, 0.6)',
+  },
+  statuscancelled: {
+    backgroundColor: 'rgba(220, 53, 69, 0.25)',
   },
   statusText: {
     fontSize: 10,
@@ -2491,6 +2750,11 @@ const styles = StyleSheet.create({
   prizePoolValue: {
     fontSize: 12,
     color: COLORS.white,
+  },
+  prizePoolHint: {
+    fontSize: 11,
+    color: COLORS.gray,
+    marginTop: 2,
   },
   prizePoolTotal: {
     paddingTop: 8,

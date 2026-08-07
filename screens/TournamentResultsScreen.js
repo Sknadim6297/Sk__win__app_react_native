@@ -34,7 +34,15 @@ export default function TournamentResultsScreen({ navigation, route }) {
       const res = await tournamentService.getResults(tournamentId);
       setData(res);
     } catch (e) {
-      setError(e.message || 'Results not available');
+      if (/not published|result pending/i.test(e.message || '')) {
+        setData({
+          resultPending: true,
+          message: 'Result Pending',
+          tournament: { name: 'Results' },
+        });
+      } else {
+        setError(e.message || 'Results not available');
+      }
     } finally {
       setLoading(false);
     }
@@ -46,7 +54,7 @@ export default function TournamentResultsScreen({ navigation, route }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <ActivityIndicator size="large" color={CYAN} style={{ marginTop: 80 }} />
         <Text style={styles.loadingText}>Loading leaderboard…</Text>
       </SafeAreaView>
@@ -55,11 +63,33 @@ export default function TournamentResultsScreen({ navigation, route }) {
 
   if (error || !data) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <AppIcon name="arrow-left" size={24} color={COLORS.white} />
         </TouchableOpacity>
         <Text style={styles.errorText}>{error || 'No results'}</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (data.resultPending) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12}>
+            <AppIcon name="arrow-left" size={24} color={COLORS.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {data.tournament?.name || 'Results'}
+          </Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={styles.pendingWrap}>
+          <Text style={styles.pendingTitle}>Result Not Published Yet</Text>
+          <Text style={styles.pendingSub}>
+            The match is completed. Results will appear here once the admin publishes them.
+          </Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -91,10 +121,10 @@ export default function TournamentResultsScreen({ navigation, route }) {
           </LinearGradient>
           <View style={styles.row}>
             <View style={styles.rowBody}>
-              <Text style={styles.rowName}>Runner-Up</Text>
+              <Text style={styles.rowName}>Loser</Text>
               <Text style={styles.rowSub}>{runnerName}</Text>
             </View>
-            <Text style={styles.rowReward}>₹{customMatch.runnerUpPrize ?? 0}</Text>
+            <Text style={styles.rowReward}>₹0</Text>
           </View>
           <View style={styles.row}>
             <View style={styles.rowBody}>
@@ -201,6 +231,18 @@ const styles = StyleSheet.create({
   loadingText: { color: COLORS.gray, textAlign: 'center', marginTop: 12 },
   errorText: { color: COLORS.error, textAlign: 'center', marginTop: 80, paddingHorizontal: 24 },
   backBtn: { padding: 16 },
+  pendingWrap: {
+    marginTop: 80,
+    marginHorizontal: 24,
+    padding: 20,
+    borderRadius: 14,
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.4)',
+    alignItems: 'center',
+  },
+  pendingTitle: { color: '#F59E0B', fontFamily: FONTS.bold, fontSize: 20, marginBottom: 8 },
+  pendingSub: { color: COLORS.gray, textAlign: 'center', lineHeight: 20 },
   winnerCard: {
     borderRadius: 14,
     padding: 20,

@@ -8,6 +8,16 @@ const teamSchema = new mongoose.Schema({
     index: true,
   },
   name: { type: String, required: true, trim: true },
+  side: {
+    type: String,
+    enum: ['A', 'B'],
+  },
+  players: [
+    {
+      name: { type: String, required: true, trim: true },
+      gamingUID: { type: String, default: '', trim: true },
+    },
+  ],
   captainUserId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -23,5 +33,6 @@ const teamSchema = new mongoose.Schema({
 });
 
 teamSchema.index({ tournamentId: 1, name: 1 }, { unique: true });
+teamSchema.index({ tournamentId: 1, side: 1 }, { unique: true, partialFilterExpression: { status: 'registered' } });
 
 module.exports = mongoose.model('Team', teamSchema);

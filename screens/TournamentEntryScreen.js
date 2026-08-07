@@ -13,7 +13,8 @@ import AppIcon from '../components/ui/AppIcon';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { AuthContext } from '../context/AuthContext';
 import { tournamentService, walletService } from '../services/api';
-import { getPaymentSplit, getTeamSize, formatModeLabel } from '../utils/tournamentHelpers';
+import { getPaymentSplit, getTeamSize, formatModeLabel, isTeamEntryMode } from '../utils/tournamentHelpers';
+import { navigateToAddCoins } from '../utils/walletFlow';
 
 const CYAN = '#00E5FF';
 const PURPLE = '#7B61FF';
@@ -56,7 +57,7 @@ export default function TournamentEntryScreen({ navigation, route }) {
 
   if (loading || !tournament) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <ActivityIndicator size="large" color={CYAN} style={{ marginTop: 80 }} />
       </SafeAreaView>
     );
@@ -65,7 +66,8 @@ export default function TournamentEntryScreen({ navigation, route }) {
   const split = getPaymentSplit(tournament.entryFee, bonusBalance);
   const hasFunds = balance >= split.realRequired;
   const teamSize = getTeamSize(tournament.mode);
-  const totalPayable = split.totalPayable * teamSize;
+  const perTeam = isTeamEntryMode(tournament.mode);
+  const totalPayable = perTeam ? split.totalPayable : split.totalPayable;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -118,13 +120,20 @@ export default function TournamentEntryScreen({ navigation, route }) {
 
       <View style={styles.feeBlock}>
         <View style={styles.feeLine}>
-          <Text style={styles.feeText}>Match Entry Fee Per Player</Text>
+          <Text style={styles.feeText}>
+            {perTeam ? 'Team Entry Fee (captain pays once)' : 'Player Entry Fee'}
+          </Text>
           <CoinRow value={tournament.entryFee} />
         </View>
         <View style={styles.feeLine}>
           <Text style={styles.feeTextBold}>Total payable =</Text>
           <CoinRow value={totalPayable} />
         </View>
+        {perTeam ? (
+          <Text style={styles.feeHint}>
+            Covers all {teamSize} players on your team — teammates are not charged separately.
+          </Text>
+        ) : null}
         {!hasFunds && (
           <Text style={styles.insufficient}>You don&apos;t have sufficient balance</Text>
         )}
@@ -136,7 +145,13 @@ export default function TournamentEntryScreen({ navigation, route }) {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() => navigation.navigate('MainApp', { screen: 'WalletTab' })}
+          onPress={() =>
+            navigateToAddCoins(navigation, {
+              tournamentId,
+              returnScreen: 'TournamentDetails',
+              openAddCoins: true,
+            })
+          }
         >
           <Text style={styles.addBtnText}>ADD MONEY</Text>
         </TouchableOpacity>
@@ -190,6 +205,7 @@ const styles = StyleSheet.create({
   feeText: { color: COLORS.gray, fontSize: 14 },
   feeTextBold: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 15 },
   insufficient: { color: COLORS.error, fontSize: 14, marginTop: 8, textAlign: 'center' },
+  feeHint: { color: COLORS.gray, fontSize: 12, marginTop: 6, lineHeight: 18 },
   footer: { flexDirection: 'row', gap: 12, marginTop: 'auto', paddingBottom: 8 },
   cancelBtn: {
     flex: 1,

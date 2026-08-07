@@ -72,7 +72,7 @@ const LandingScreen = ({ navigation }) => {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor={ONBOARDING.colors.background} />
+      <StatusBar barStyle="light-content" backgroundColor={ONBOARDING.colors.background} translucent={false} />
       <BackgroundLayer />
 
       <ScrollView
@@ -94,7 +94,7 @@ const LandingScreen = ({ navigation }) => {
           </Animated.View>
 
           <Animated.View style={[styles.brandBlock, contentStyle]}>
-            <Text style={styles.brandName}>{BRAND.name}</Text>
+            <Text style={styles.brandTagline}>{BRAND.motto}</Text>
           </Animated.View>
         </Animated.View>
 
@@ -168,13 +168,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
   },
-  brandName: {
-    ...TYPO.display,
-    fontSize: 36,
-    lineHeight: 42,
-    color: ONBOARDING.colors.textPrimary,
-    letterSpacing: 2,
+  brandTagline: {
+    ...TYPO.bodyLg,
+    color: ONBOARDING.colors.textSecondary || COLORS.gray,
+    letterSpacing: 0.5,
     textAlign: 'center',
+    marginTop: 4,
   },
   featuresSection: {
     gap: 10,

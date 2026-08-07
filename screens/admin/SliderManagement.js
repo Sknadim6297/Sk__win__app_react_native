@@ -134,7 +134,7 @@ export default function SliderManagement({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
       <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hideToast} />
 

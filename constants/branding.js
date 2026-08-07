@@ -1,8 +1,8 @@
 /** App display names — use these for all user-facing copy */
 export const BRAND = {
-  name: 'SK WIN',
-  fullName: 'SK WIN',
-  tagline: 'Free Fire Tournament',
+  name: 'WAREZONE',
+  fullName: 'WAREZONE Tournament',
+  tagline: 'AMR Tournament',
   motto: 'Compete. Conquer. Win Big.',
 };
 

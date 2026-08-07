@@ -82,8 +82,8 @@ function brRankTiers(prizePool) {
 
 function customPrizeSplit(prizePool) {
   return {
-    winnerPrize: Math.floor(prizePool * 0.6),
-    runnerUpPrize: Math.floor(prizePool * 0.4),
+    winnerPrize: Number(prizePool) || 0,
+    runnerUpPrize: 0,
   };
 }
 

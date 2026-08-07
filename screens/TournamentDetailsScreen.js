@@ -14,21 +14,28 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native';
 import AppIcon from '../components/ui/AppIcon';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
-import { tournamentService, walletService } from '../services/api';
+import { tournamentService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import Toast from '../components/Toast';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import {
   parseRules,
-  getPaymentSplit,
   formatScheduleLine,
   formatModeLabel,
+  isCustomMatch,
+  isTeamEntryMode,
+  getTeamSize,
+  resolveDisplayPrizePool,
+  resolvePrizePlaces,
 } from '../utils/tournamentHelpers';
+import { fetchWalletForEntry } from '../utils/walletFlow';
+import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
 
 const CYAN = '#00E5FF';
 const { width: SCREEN_W } = Dimensions.get('window');
 
-const TABS = ['RULES', 'PLAYERS', 'PRIZE POOL'];
+const BR_TABS = ['RULES', 'PLAYERS', 'PRIZE POOL'];
+const CUSTOM_TABS = ['RULES', 'TEAMS', 'PRIZE POOL'];
 
 function CoinValue({ value, size = 18 }) {
   return (
@@ -40,7 +47,7 @@ function CoinValue({ value, size = 18 }) {
 }
 
 export default function TournamentDetailsScreen({ navigation, route }) {
-  const { tournamentId } = route.params || {};
+  const { tournamentId, walletRecharged } = route.params || {};
   const { user, isAdmin } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
   const [tournament, setTournament] = useState(null);
@@ -53,6 +60,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
   const showToast = (message, type = 'error') => setToast({ visible: true, message, type });
   const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
+  const { showInsufficientBalance, InsufficientBalanceDialog } = useInsufficientBalance(navigation);
 
   const loadDetails = useCallback(async () => {
     try {
@@ -82,7 +90,19 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     }, [loadDetails])
   );
 
+  useEffect(() => {
+    if (walletRecharged) {
+      showToast('Coins added successfully! You can join now.', 'success');
+      navigation.setParams({ walletRecharged: undefined });
+    }
+  }, [walletRecharged, navigation]);
+
   const handleJoinNow = async () => {
+    const status = tournament?.lifecycleStatus || tournament?.status;
+    if (status === 'completed' || status === 'result_published') {
+      navigation.navigate('TournamentResults', { tournamentId });
+      return;
+    }
     if (!user) {
       showToast('Please login to join', 'error');
       return;
@@ -98,23 +118,74 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     try {
       setJoining(true);
       const eligibility = await tournamentService.canJoin(tournamentId);
+      const isTeamFlow =
+        isCustomMatch(tournament) ||
+        eligibility?.isCustomMatch ||
+        eligibility?.usesTeamRegistration ||
+        isTeamEntryMode(tournament.mode);
+
+      const isInsufficient =
+        eligibility?.code === 'INSUFFICIENT_BALANCE' ||
+        /insufficient|balance/i.test(String(eligibility?.reason || ''));
+
       if (!eligibility?.canJoin) {
+        if (isInsufficient) {
+          showInsufficientBalance({
+            tournamentId,
+            returnScreen: isTeamFlow ? 'CustomMatchTeamRegister' : 'TournamentSlotBooking',
+            forTeam: isTeamFlow,
+            requiredAmount: eligibility?.realMoneyRequired ?? tournament.entryFee,
+            currentBalance: eligibility?.balance,
+          });
+          return;
+        }
         showToast(eligibility?.reason || 'This tournament is not open for joining', 'warning');
         return;
       }
 
-      const w = await walletService.getBalance();
-      const balance = w?.balance ?? 0;
-      const bonusBalance = w?.bonusBalance ?? 0;
-      const { realRequired } = getPaymentSplit(tournament.entryFee, bonusBalance);
-
-      if (balance < realRequired) {
-        navigation.navigate('TournamentEntry', { tournamentId });
-      } else {
-        navigation.navigate('TournamentSlotBooking', { tournamentId });
+      if (isTeamFlow) {
+        const walletCheck = await fetchWalletForEntry(tournament.entryFee);
+        if (!walletCheck.sufficient) {
+          showInsufficientBalance({
+            tournamentId,
+            returnScreen: 'CustomMatchTeamRegister',
+            forTeam: true,
+            requiredAmount: walletCheck.realRequired,
+            currentBalance: walletCheck.balance,
+          });
+          return;
+        }
+        navigation.navigate('CustomMatchTeamRegister', { tournamentId });
+        return;
       }
+
+      const walletCheck = await fetchWalletForEntry(tournament.entryFee);
+      if (!walletCheck.sufficient) {
+        showInsufficientBalance({
+          tournamentId,
+          returnScreen: 'TournamentSlotBooking',
+          forTeam: false,
+          requiredAmount: walletCheck.realRequired,
+          currentBalance: walletCheck.balance,
+        });
+        return;
+      }
+
+      navigation.navigate('TournamentSlotBooking', { tournamentId });
     } catch (e) {
-      showToast(e.message || 'Could not verify wallet', 'error');
+      const msg = e.message || 'Could not verify wallet';
+      if (/insufficient|balance/i.test(msg)) {
+        const isTeamFlow =
+          isCustomMatch(tournament) || isTeamEntryMode(tournament?.mode);
+        showInsufficientBalance({
+          tournamentId,
+          returnScreen: isTeamFlow ? 'CustomMatchTeamRegister' : 'TournamentSlotBooking',
+          forTeam: isTeamFlow,
+          requiredAmount: tournament?.entryFee,
+        });
+      } else {
+        showToast(msg, 'error');
+      }
     } finally {
       setJoining(false);
     }
@@ -122,7 +193,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <ActivityIndicator size="large" color={CYAN} style={{ marginTop: 80 }} />
       </SafeAreaView>
     );
@@ -130,7 +201,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
   if (error || !tournament) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <TouchableOpacity style={styles.backFab} onPress={() => navigation.goBack()}>
           <AppIcon name="arrow-left" size={24} color={COLORS.white} />
         </TouchableOpacity>
@@ -146,8 +217,15 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     null;
 
   const rules = parseRules(tournament.rules);
-  const overlayRules = rules.slice(0, 6);
-  const maxP = tournament.maxParticipants || tournament.slots?.length || 48;
+  const custom = isCustomMatch(tournament);
+  const teamEntry = custom || isTeamEntryMode(tournament.mode);
+  const tabs = teamEntry && custom ? CUSTOM_TABS : teamEntry ? ['RULES', 'TEAMS', 'PRIZE POOL'] : BR_TABS;
+  const maxP = teamEntry
+    ? tournament.maxTeams ||
+      (custom
+        ? 2
+        : Math.floor((tournament.maxParticipants || 50) / getTeamSize(tournament.mode)))
+    : tournament.maxParticipants || tournament.slots?.length || 48;
   const joined = tournament.participantCount || 0;
   const spotsLeft = Math.max(maxP - joined, 0);
   const fillPct = maxP > 0 ? Math.min((joined / maxP) * 100, 100) : 0;
@@ -156,30 +234,56 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     tournament.bannerTitle ||
     `FF ${(tournament.map || 'FULL MAP').toUpperCase()} | ${formatModeLabel(tournament.mode).toUpperCase()}`;
 
-  const totalPrize =
-    Number(tournament.prizePool) ||
-    (Number(tournament.prizes?.first || 0) +
-      Number(tournament.prizes?.second || 0) +
-      Number(tournament.prizes?.third || 0));
+  const totalPrize = resolveDisplayPrizePool(tournament);
 
   const lifecycleStatus = tournament.lifecycleStatus || tournament.status;
   const isJoinOpen = lifecycleStatus === 'upcoming' || lifecycleStatus === 'incoming';
-  const joinDisabled = hasJoined || joining || !isJoinOpen;
+  const canViewResults = lifecycleStatus === 'completed' || lifecycleStatus === 'result_published';
+  const resultsPublished = Boolean(tournament.resultsPublished) || lifecycleStatus === 'result_published';
+  const joinDisabled = canViewResults
+    ? false
+    : hasJoined || joining || !isJoinOpen;
   const statusButtonLabelMap = {
-    ongoing: 'ONGOING',
-    completed: 'COMPLETED',
-    result_published: 'RESULT PUBLISHED',
+    ongoing: 'LIVE',
+    live: 'LIVE',
+    completed: resultsPublished ? 'VIEW RESULT' : 'RESULT PENDING',
+    result_published: 'VIEW RESULT',
     cancelled: 'CANCELLED',
     draft: 'DRAFT',
     locked: 'LOCKED',
   };
-  const joinButtonLabel = hasJoined
-    ? 'JOINED'
-    : isJoinOpen
-      ? 'JOIN NOW'
-      : statusButtonLabelMap[lifecycleStatus] || String(lifecycleStatus || 'UNAVAILABLE').toUpperCase();
+  const joinButtonLabel = canViewResults
+    ? statusButtonLabelMap[lifecycleStatus] || (resultsPublished ? 'VIEW RESULT' : 'RESULT PENDING')
+    : hasJoined
+      ? 'JOINED'
+      : isJoinOpen
+        ? custom
+          ? 'REGISTER TEAM'
+          : isTeamEntryMode(tournament.mode)
+            ? 'REGISTER TEAM'
+            : 'JOIN NOW'
+        : statusButtonLabelMap[lifecycleStatus] ||
+          String(lifecycleStatus || 'UNAVAILABLE').toUpperCase();
 
   const renderTabContent = () => {
+    if (activeTab === 'TEAMS') {
+      const teams = tournament.teams || [];
+      if (!teams.length) {
+        return <Text style={styles.emptyTab}>No teams registered yet.</Text>;
+      }
+      return teams.map((team) => (
+        <View key={team._id || team.side} style={styles.teamCard}>
+          <Text style={styles.teamTitle}>
+            Team {team.side || '?'} · {team.name}
+          </Text>
+          {(team.players || []).map((p, i) => (
+            <Text key={`${team._id}-${i}`} style={styles.teamPlayer}>
+              {i + 1}. {p.name || p}
+            </Text>
+          ))}
+        </View>
+      ));
+    }
     if (activeTab === 'PLAYERS') {
       const list = tournament.participants || [];
       if (!list.length) {
@@ -193,18 +297,56 @@ export default function TournamentDetailsScreen({ navigation, route }) {
       ));
     }
     if (activeTab === 'PRIZE POOL') {
-      const prizes = tournament.prizes || {};
-      const firstPlace = Number(prizes.first || 0);
-      const hasPerKill = Number(tournament.perKill) > 0;
+      const places = resolvePrizePlaces(tournament);
+      const pool = places.pool;
+      const entry = Number(tournament.entryFee) || 0;
+      const hasPerKill = !custom && Number(tournament.perKill) > 0;
+
+      if (custom) {
+        const winnerPrize = places.winnerPrize || places.first || pool;
+        return (
+          <View style={styles.prizeBlock}>
+            <View style={styles.prizeDetailsBox}>
+              <Text style={styles.prizeDetailsTitle}>Prize Distribution</Text>
+              <Text style={styles.prizeDetailsLine}>
+                Entry Fee: ₹{entry.toLocaleString('en-IN')} (per team)
+              </Text>
+              <Text style={styles.prizeDetailsLine}>
+                Winner Prize: ₹{Number(winnerPrize).toLocaleString('en-IN')}
+              </Text>
+              <Text style={styles.prizeDetailsLine}>Loser: ₹0</Text>
+            </View>
+          </View>
+        );
+      }
+
+      const { first: firstPlace, second: secondPlace, third: thirdPlace } = places;
       return (
         <View style={styles.prizeBlock}>
           <View style={styles.prizeDetailsBox}>
-            <Text style={styles.prizeDetailsTitle}>Prize Distribution Details:</Text>
+            <Text style={styles.prizeDetailsTitle}>Prize Pool Details</Text>
+            <Text style={styles.prizeDetailsLine}>Total Prize Pool: ₹{pool.toLocaleString('en-IN')}</Text>
             <Text style={styles.prizeDetailsLine}>
-              {hasPerKill
-                ? `1st Place: INR ${firstPlace} + Kill Points`
-                : `1st Place: INR ${firstPlace}`}
+              Entry Fee: ₹{entry.toLocaleString('en-IN')} {teamEntry ? '(per team)' : '(per player)'}
             </Text>
+            {firstPlace > 0 ? (
+              <Text style={styles.prizeDetailsLine}>
+                {hasPerKill
+                  ? `1st Place: ₹${firstPlace.toLocaleString('en-IN')} + Kill Points`
+                  : `Winner (1st): ₹${firstPlace.toLocaleString('en-IN')}`}
+              </Text>
+            ) : null}
+            {secondPlace > 0 ? (
+              <Text style={styles.prizeDetailsLine}>2nd Place: ₹{secondPlace.toLocaleString('en-IN')}</Text>
+            ) : null}
+            {thirdPlace > 0 ? (
+              <Text style={styles.prizeDetailsLine}>3rd Place: ₹{thirdPlace.toLocaleString('en-IN')}</Text>
+            ) : null}
+            {hasPerKill ? (
+              <Text style={styles.prizeDetailsLine}>
+                Per Kill: ₹{Number(tournament.perKill).toLocaleString('en-IN')}
+              </Text>
+            ) : null}
           </View>
         </View>
       );
@@ -231,8 +373,8 @@ export default function TournamentDetailsScreen({ navigation, route }) {
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.backgroundDark} translucent={false} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
@@ -247,25 +389,11 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           )}
 
           <TouchableOpacity
-            style={[styles.backFab, { top: insets.top + 8 }]}
+            style={styles.backFab}
             onPress={() => navigation.goBack()}
           >
             <AppIcon name="arrow-left" size={24} color={COLORS.white} />
           </TouchableOpacity>
-
-          {overlayRules.length > 0 && (
-            <View style={styles.rulesOverlay}>
-              <Text style={styles.rulesOverlayTitle}>READ RULES BEFORE JOINING</Text>
-              {overlayRules.map((r, i) => (
-                <View key={i} style={styles.overlayRuleRow}>
-                  <AppIcon name="check" size={12} color={CYAN} />
-                  <Text style={styles.overlayRuleText} numberOfLines={2}>
-                    {r.length > 42 ? `${r.slice(0, 42)}…` : r}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          )}
 
           <View style={styles.heroTitleBlock}>
             <Text style={styles.heroTitle}>{displayTitle}</Text>
@@ -289,7 +417,11 @@ export default function TournamentDetailsScreen({ navigation, route }) {
         <View style={styles.joinStatusBlock}>
           <View style={styles.joinStatusRow}>
             <Text style={styles.joinStatusLabel}>Joining status</Text>
-            <Text style={styles.spotsLeft}>{spotsLeft} spots left</Text>
+            <Text style={styles.spotsLeft}>
+              {teamEntry
+                ? `${spotsLeft} team${spotsLeft === 1 ? '' : 's'} left`
+                : `${spotsLeft} spots left`}
+            </Text>
           </View>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${fillPct}%` }]} />
@@ -297,7 +429,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
         </View>
 
         <View style={styles.tabBar}>
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
@@ -310,23 +442,37 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
         <View style={styles.tabContent}>{renderTabContent()}</View>
 
-        {hasJoined && tournament.roomCredentialsVisible && tournament.roomId && (
+        {hasJoined && tournament.roomCredentialsVisible && (tournament.roomId || tournament.roomPassword) ? (
           <View style={styles.roomBox}>
             <Text style={styles.roomTitle}>Room credentials</Text>
-            <Text style={styles.roomLine} selectable>
-              ID: {tournament.roomId}
-            </Text>
+            {tournament.roomId ? (
+              <Text style={styles.roomLine} selectable>
+                ID: {tournament.roomId}
+              </Text>
+            ) : null}
             {tournament.roomPassword ? (
               <Text style={styles.roomLine} selectable>
                 Password: {tournament.roomPassword}
               </Text>
             ) : null}
           </View>
-        )}
+        ) : null}
+
+        {hasJoined && !tournament.roomCredentialsVisible ? (
+          <View style={styles.roomWaitBox}>
+            <Text style={styles.roomWaitText}>
+              {tournament.roomCredentialsMessage ||
+                'Please wait. Room details will be available 2 minutes before the match starts.'}
+            </Text>
+          </View>
+        ) : null}
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <TouchableOpacity style={styles.entriesBtn} onPress={() => setActiveTab('PLAYERS')}>
+        <TouchableOpacity
+          style={styles.entriesBtn}
+          onPress={() => setActiveTab(teamEntry ? 'TEAMS' : 'PLAYERS')}
+        >
           <Text style={styles.entriesBtnText}>ENTRIES</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -334,14 +480,19 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           onPress={handleJoinNow}
           disabled={joinDisabled}
         >
-          <CoinValue value={tournament.entryFee || 0} size={16} />
-          <View style={styles.joinDivider} />
+          {!canViewResults ? (
+            <>
+              <CoinValue value={tournament.entryFee || 0} size={16} />
+              <View style={styles.joinDivider} />
+            </>
+          ) : null}
           <Text style={styles.joinBtnText}>{joinButtonLabel}</Text>
         </TouchableOpacity>
       </View>
 
       <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hideToast} />
-    </View>
+      {InsufficientBalanceDialog}
+    </SafeAreaView>
   );
 }
 
@@ -353,6 +504,7 @@ const styles = StyleSheet.create({
   heroOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(5,5,16,0.55)' },
   backFab: {
     position: 'absolute',
+    top: 12,
     left: 16,
     zIndex: 10,
     width: 40,
@@ -504,6 +656,23 @@ const styles = StyleSheet.create({
   },
   roomTitle: { color: CYAN, fontFamily: FONTS.bold, marginBottom: 8 },
   roomLine: { color: COLORS.white, fontSize: 14, marginBottom: 4 },
+  roomWaitBox: {
+    margin: 16,
+    padding: 14,
+    backgroundColor: 'rgba(251,191,36,0.1)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.35)',
+  },
+  roomWaitText: { color: '#FBBF24', fontSize: 13, lineHeight: 19 },
+  teamCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+  },
+  teamTitle: { color: CYAN, fontFamily: FONTS.bold, marginBottom: 8 },
+  teamPlayer: { color: COLORS.white, marginBottom: 4, fontSize: 13 },
   bottomBar: {
     position: 'absolute',
     left: 0,

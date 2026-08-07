@@ -23,9 +23,9 @@ const ORANGE = '#FF8A00';
 const DEFAULT_BANNER = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
 
 const STATUS_TABS = [
-  { id: 'ongoing', label: 'ONGOING' },
+  { id: 'ongoing', label: 'LIVE' },
   { id: 'upcoming', label: 'UPCOMING' },
-  { id: 'results', label: 'RESULTS' },
+  { id: 'completed', label: 'COMPLETED' },
 ];
 
 const parseRules = (rules) => {
@@ -84,10 +84,9 @@ function TournamentCard({ item, gameModeImage, gameMode, onJoin }) {
   const isJoinOpen = lifecycleStatus === 'upcoming' || lifecycleStatus === 'incoming';
   const isJoined = Boolean(item.userJoined);
   const statusLabelMap = {
-    ongoing: 'ONGOING',
-    live: 'ONGOING',
+    ongoing: 'LIVE',
+    live: 'LIVE',
     completed: 'COMPLETED',
-    result_published: 'RESULTS',
     cancelled: 'CANCELLED',
     locked: 'LOCKED',
     draft: 'DRAFT',
@@ -233,16 +232,27 @@ export default function GameDetailsScreen({ navigation, route }) {
       }
 
       if (selectedTab === 'upcoming') {
-        filtered = filtered.filter(
-          (t) => t.status === 'incoming' || t.status === 'upcoming'
-        );
+        filtered = filtered.filter((t) => {
+          const s = t.lifecycleStatus || t.status;
+          return s === 'incoming' || s === 'upcoming';
+        });
       } else if (selectedTab === 'ongoing') {
-        filtered = filtered.filter(
-          (t) => t.status === 'ongoing' || t.status === 'live' || t.status === 'locked'
-        );
-      } else if (selectedTab === 'results') {
-        filtered = filtered.filter((t) => t.status === 'completed');
+        filtered = filtered.filter((t) => {
+          const s = t.lifecycleStatus || t.status;
+          return s === 'ongoing' || s === 'live';
+        });
+      } else if (selectedTab === 'completed') {
+        filtered = filtered.filter((t) => {
+          const s = t.lifecycleStatus || t.status;
+          return s === 'completed' || s === 'result_published';
+        });
       }
+
+      // Never show drafts on user panel
+      filtered = filtered.filter((t) => {
+        const s = t.lifecycleStatus || t.status;
+        return s !== 'draft';
+      });
 
       setTournaments(filtered);
     } catch (error) {

@@ -20,10 +20,12 @@ const customMatchResultSchema = new mongoose.Schema({
   mvpUserId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    required: false,
   },
   winnerPrize: { type: Number, default: 0, min: 0 },
   runnerUpPrize: { type: Number, default: 0, min: 0 },
+  /** Prevents double-crediting winner prize to wallet */
+  prizeCredited: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

@@ -13,6 +13,100 @@ export function getTeamSize(mode) {
   return 1;
 }
 
+/** Duo/Squad — captain pays once per team (Custom Match + Battle Royale). */
+export function isTeamEntryMode(mode) {
+  return getTeamSize(mode) > 1;
+}
+
+export function getPayingUnitCount(mode, maxParticipants = 50) {
+  const max = Number(maxParticipants) || 50;
+  const teamSize = getTeamSize(mode);
+  if (teamSize === 1) return max;
+  return Math.floor(max / teamSize);
+}
+
+/** Split prize pool into 1st / 2nd / 3rd (50% / 30% / 20%) — Battle Royale only. */
+export function getPrizeBreakdown(prizePool) {
+  const pool = Number(prizePool) || 0;
+  if (pool <= 0) {
+    return { pool: 0, first: 0, second: 0, third: 0 };
+  }
+  return {
+    pool,
+    first: Math.floor(pool * 0.5),
+    second: Math.floor(pool * 0.3),
+    third: Math.floor(pool * 0.2),
+  };
+}
+
+/** Custom Match: entire prize pool goes to the single winning team. */
+export function getCustomWinnerPrize(prizePool) {
+  return Math.max(0, Number(prizePool) || 0);
+}
+
+/** Build `prizes` object for create/update based on tournament type. */
+export function buildPrizesForCategory(category, prizePool) {
+  const pool = Number(prizePool) || 0;
+  const isCustom = category === 'custom' || category === 'custom_match';
+  if (isCustom) {
+    return { first: getCustomWinnerPrize(pool), second: 0, third: 0 };
+  }
+  const breakdown = getPrizeBreakdown(pool);
+  return { first: breakdown.first, second: breakdown.second, third: breakdown.third };
+}
+
+export function resolveDisplayPrizePool(tournament) {
+  const configured = Number(tournament?.prizePool) || 0;
+  const prizes = tournament?.prizes || {};
+  const splitTotal =
+    Number(prizes.first || 0) + Number(prizes.second || 0) + Number(prizes.third || 0);
+  return configured > 0 ? configured : splitTotal;
+}
+
+/**
+ * Prefer configured prize places; fall back to pool split when missing or misconfigured.
+ * Custom Match → winnerPrize only (100% of pool); 2nd/3rd always 0.
+ */
+export function resolvePrizePlaces(tournament) {
+  const pool = resolveDisplayPrizePool(tournament);
+  const isCustom =
+    tournament?.category === 'custom' ||
+    tournament?.category === 'custom_match' ||
+    tournament?.tournamentType === 'custom_match' ||
+    tournament?.isCustomMatch;
+
+  if (isCustom) {
+    const winnerPrize =
+      Number(tournament?.prizes?.first) > 0
+        ? Number(tournament.prizes.first)
+        : getCustomWinnerPrize(pool);
+    return { pool: pool || winnerPrize, first: winnerPrize, second: 0, third: 0, winnerPrize };
+  }
+
+  const configured = tournament?.prizes || {};
+  const fromConfig = {
+    first: Number(configured.first || 0),
+    second: Number(configured.second || 0),
+    third: Number(configured.third || 0),
+  };
+  const configSum = fromConfig.first + fromConfig.second + fromConfig.third;
+  const breakdown = getPrizeBreakdown(pool);
+  const entry = Number(tournament?.entryFee) || 0;
+  const looksLikeEntryFeeBug =
+    pool > entry && entry > 0 && fromConfig.first === entry && configSum <= entry * 1.5;
+
+  if (configSum > 0 && !looksLikeEntryFeeBug && (pool === 0 || configSum <= pool * 1.05)) {
+    return { pool: pool || configSum, ...fromConfig };
+  }
+
+  return {
+    pool,
+    first: breakdown.first,
+    second: breakdown.second,
+    third: breakdown.third,
+  };
+}
+
 export function getPaymentSplit(entryFee, bonusBalance = 0) {
   const fee = Number(entryFee) || 0;
   const bonus = Number(bonusBalance) || 0;
@@ -47,7 +141,13 @@ export function formatModeLabel(mode) {
 export function isBattleRoyaleMatch(tournamentOrMode) {
   if (!tournamentOrMode) return false;
   if (tournamentOrMode.category === 'battle_royale') return true;
-  if (tournamentOrMode.category === 'custom') return false;
+  if (
+    tournamentOrMode.category === 'custom' ||
+    tournamentOrMode.category === 'custom_match' ||
+    tournamentOrMode.tournamentType === 'custom_match'
+  ) {
+    return false;
+  }
   const name =
     tournamentOrMode.gameMode?.name ||
     tournamentOrMode.name ||
@@ -57,7 +157,8 @@ export function isBattleRoyaleMatch(tournamentOrMode) {
 }
 
 export function isCustomMatch(tournament) {
-  return tournament?.category === 'custom';
+  const c = tournament?.category || tournament?.tournamentType;
+  return c === 'custom' || c === 'custom_match' || !!tournament?.isCustomMatch;
 }
 
 const STATUS_LABELS = {
@@ -65,10 +166,9 @@ const STATUS_LABELS = {
   incoming: 'Upcoming',
   upcoming: 'Upcoming',
   locked: 'Upcoming',
-  ongoing: 'Ongoing',
-  live: 'Ongoing',
+  ongoing: 'Live',
+  live: 'Live',
   completed: 'Completed',
-  result_published: 'Result Published',
   cancelled: 'Cancelled',
 };
 
@@ -102,14 +202,11 @@ export function getJoinBlockReason(tournament) {
   if (status === 'draft') {
     return 'Tournament is not published yet';
   }
-  if (tournament.resultsPublished || status === 'result_published') {
-    return 'Results have been published for this match';
+  if (tournament.resultsPublished || status === 'completed' || status === 'cancelled') {
+    return 'This tournament is not open for joining';
   }
   if (status === 'ongoing' || status === 'live') {
     return 'Match is already ongoing';
-  }
-  if (status === 'completed' || status === 'cancelled') {
-    return 'This tournament is not open for joining';
   }
   if (status === 'locked') {
     return 'Registration is closed';

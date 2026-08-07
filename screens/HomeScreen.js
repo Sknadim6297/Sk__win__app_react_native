@@ -87,9 +87,18 @@ export default function HomeScreen({ navigation }) {
 
       const myTournamentsData = await tournamentService.getMyTournaments().catch(() => []);
       const tournamentList = Array.isArray(myTournamentsData) ? myTournamentsData : [];
-      setUpcomingCount(tournamentList.filter((t) => t.status === 'incoming' || t.status === 'upcoming').length);
-      setOngoingCount(tournamentList.filter((t) => t.status === 'ongoing' || t.status === 'live').length);
-      setCompletedCount(tournamentList.filter((t) => t.status === 'completed').length);
+      setUpcomingCount(tournamentList.filter((t) => {
+        const s = t.lifecycleStatus || t.status;
+        return s === 'incoming' || s === 'upcoming';
+      }).length);
+      setOngoingCount(tournamentList.filter((t) => {
+        const s = t.lifecycleStatus || t.status;
+        return s === 'ongoing' || s === 'live';
+      }).length);
+      setCompletedCount(tournamentList.filter((t) => {
+        const s = t.lifecycleStatus || t.status;
+        return s === 'completed' || s === 'result_published';
+      }).length);
     } catch (e) {
       console.error('Home load error:', e);
       setSlidersLoading(false);
@@ -239,17 +248,17 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.contestsRow}>
           {[
             { key: 'upcoming', label: 'Upcoming', icon: 'clock-outline', count: upcomingCount },
-            { key: 'ongoing', label: 'Ongoing', icon: 'broadcast', count: ongoingCount },
+            { key: 'live', label: 'Live', icon: 'broadcast', count: ongoingCount },
             { key: 'completed', label: 'Completed', icon: 'check-circle-outline', count: completedCount },
           ].map((item) => (
             <TouchableOpacity
               key={item.key}
               style={styles.contestCard}
-              onPress={() => navigation.navigate('History')}
+              onPress={() => navigation.navigate('MyContests', { initialTab: item.key })}
               activeOpacity={0.85}
             >
               <View style={styles.contestIconWrap}>
-                <AppIcon name={item.icon} size={52} accent="00F2FF" />
+                <AppIcon name={item.icon} size={44} accent="00F2FF" />
               </View>
               <Text style={styles.contestLabel}>{item.label}</Text>
               {item.count > 0 ? (

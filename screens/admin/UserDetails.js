@@ -81,7 +81,7 @@ const UserDetails = ({ navigation, route }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading user details...</Text>
@@ -92,7 +92,7 @@ const UserDetails = ({ navigation, route }) => {
 
   if (!userDetails) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
           <Ionicons name="alert-circle" size={60} color={COLORS.error} />
           <Text style={styles.errorText}>Failed to load user details</Text>
@@ -104,7 +104,7 @@ const UserDetails = ({ navigation, route }) => {
   const { user, tournaments, transactions, tournamentStats, walletStats } = userDetails;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
       <Toast 

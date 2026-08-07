@@ -22,18 +22,20 @@ module.exports = ({ config }) => ({
   ...config,
   splash: {
     ...(config.splash || {}),
-    image: './assets/logo/sk_win_logo.png',
+    image: './assets/logo/ROUND_GAME_LOGO.png',
     resizeMode: 'contain',
     backgroundColor: splashBg,
   },
   web: {
     ...(config.web || {}),
     backgroundColor: splashBg,
+    favicon: './assets/logo/ROUND_GAME_LOGO.png',
   },
   androidStatusBar: {
     ...(config.androidStatusBar || {}),
     backgroundColor: splashBg,
     barStyle: 'light-content',
+    translucent: false,
   },
   androidNavigationBar: {
     ...(config.androidNavigationBar || {}),
@@ -41,10 +43,9 @@ module.exports = ({ config }) => ({
   },
   android: {
     ...(config.android || {}),
-    usesCleartextTraffic: usesHttp,
     adaptiveIcon: {
       ...(config.android?.adaptiveIcon || {}),
-      foregroundImage: './assets/logo/sk_win_logo.png',
+      foregroundImage: './assets/logo/ROUND_GAME_LOGO.png',
       backgroundColor: splashBg,
     },
   },
@@ -54,9 +55,22 @@ module.exports = ({ config }) => ({
       'expo-splash-screen',
       {
         backgroundColor: splashBg,
-        image: './assets/logo/sk_win_logo.png',
+        image: './assets/logo/ROUND_GAME_LOGO.png',
         imageWidth: 220,
         resizeMode: 'contain',
+      },
+    ],
+    [
+      'expo-build-properties',
+      {
+        android: {
+          // Reanimated 4 (SDK 54) requires New Architecture
+          newArchEnabled: true,
+          usesCleartextTraffic: usesHttp,
+        },
+        ios: {
+          newArchEnabled: true,
+        },
       },
     ],
   ].filter((plugin, index, list) => {

@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "SK WIN",
+    "name": "WAREZONE",
     "slug": "sk-win",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo/sk_win_logo.png",
+    "icon": "./assets/logo/ROUND_GAME_LOGO.png",
     "userInterfaceStyle": "dark",
     "extra": {
       "eas": {
@@ -12,7 +12,7 @@
       }
     },
     "splash": {
-      "image": "./assets/logo/sk_win_logo.png",
+      "image": "./assets/logo/ROUND_GAME_LOGO.png",
       "resizeMode": "contain",
       "backgroundColor": "#0a0e1a"
     },
@@ -22,18 +22,20 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo/sk_win_logo.png",
+        "foregroundImage": "./assets/logo/ROUND_GAME_LOGO.png",
         "backgroundColor": "#0a0e1a"
       },
-      "package": "com.skwin.tournament"
+      "package": "com.skwin.tournament",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./assets/logo/ROUND_GAME_LOGO.png",
       "backgroundColor": "#0a0e1a"
     },
     "androidStatusBar": {
       "backgroundColor": "#0a0e1a",
-      "barStyle": "light-content"
+      "barStyle": "light-content",
+      "translucent": false
     },
     "androidNavigationBar": {
       "backgroundColor": "#0a0e1a"
@@ -43,19 +45,23 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#0a0e1a",
-          "image": "./assets/logo/sk_win_logo.png",
+          "image": "./assets/logo/ROUND_GAME_LOGO.png",
           "imageWidth": 220,
           "resizeMode": "contain"
         }
       ],
       [
+        "expo-font"
+      ],
+      [
         "expo-build-properties",
         {
           "android": {
-            "newArchEnabled": false
+            "newArchEnabled": true,
+            "usesCleartextTraffic": true
           },
           "ios": {
-            "newArchEnabled": false
+            "newArchEnabled": true
           }
         }
       ],

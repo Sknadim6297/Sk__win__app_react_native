@@ -36,9 +36,18 @@ router.get('/balance', authMiddleware, async (req, res) => {
   }
 });
 
-// Top up wallet
+// Top up wallet (legacy / demo only — blocked when Cashfree QR is enabled)
 router.post('/topup', authMiddleware, async (req, res) => {
   try {
+    const { getCashfreeConfig } = require('../config/cashfree');
+    if (getCashfreeConfig().ready) {
+      return res.status(403).json({
+        success: false,
+        code: 'USE_CASHFREE_QR',
+        message: 'Please complete payment via Cashfree QR. Direct top-up is disabled.',
+      });
+    }
+
     const { amount, paymentMethod = 'demo', transactionId = `TXN_${Date.now()}` } = req.body;
 
     // Validate amount

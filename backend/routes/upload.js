@@ -26,17 +26,33 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype || !file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image uploads are allowed'));
+    }
+    cb(null, true);
+  },
 });
 
-router.post('/', authMiddleware, upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
+router.post('/', authMiddleware, (req, res) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      const message =
+        err.code === 'LIMIT_FILE_SIZE'
+          ? 'Image must be 5MB or smaller'
+          : err.message || 'Upload failed';
+      return res.status(400).json({ error: message, message });
+    }
 
-  const base = getPublicBaseUrl(req);
-  const relativePath = `/uploads/${req.file.filename}`;
-  const fileUrl = `${base}${relativePath}`;
-  res.status(201).json({ url: fileUrl, path: relativePath, filename: req.file.filename });
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded', message: 'No file uploaded' });
+    }
+
+    const base = getPublicBaseUrl(req);
+    const relativePath = `/uploads/${req.file.filename}`;
+    const fileUrl = `${base}${relativePath}`;
+    res.status(201).json({ url: fileUrl, path: relativePath, filename: req.file.filename });
+  });
 });
 
 module.exports = router;

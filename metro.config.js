@@ -14,6 +14,15 @@ const defaultResolveRequest = config.resolver.resolveRequest;
 // source files to our themed wrapper, which injects the Orbitron font into all
 // Text and TextInput components without touching individual screen files (Lilita One).
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // qrcode's package "main" points at Node server (fs/png). RN/Expo needs the
+  // pure core used by react-native-qrcode-svg's genMatrix (QRCode.create only).
+  if (moduleName === 'qrcode') {
+    return {
+      filePath: path.resolve(projectRoot, 'node_modules/qrcode/lib/core/qrcode.js'),
+      type: 'sourceFile',
+    };
+  }
+
   const origin = context.originModulePath;
   const isProjectFile =
     origin.startsWith(projectRoot) &&

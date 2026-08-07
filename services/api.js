@@ -30,7 +30,10 @@ export const testAPIConnection = async () => {
   const base = getApiUrl();
   const started = Date.now();
   try {
-    const response = await fetch(`${base}/health`, { method: 'GET' });
+    const response = await fetch(`${base}/health`, {
+      method: 'GET',
+      headers: { 'ngrok-skip-browser-warning': '1' },
+    });
     const ms = Date.now() - started;
     console.log('[API] Health check', { url: `${base}/health`, status: response.status, ms });
     if (response.ok) return base;
@@ -57,6 +60,8 @@ export const apiCall = async (endpoint, options = {}) => {
 
     const headers = {
       'Content-Type': 'application/json',
+      // Free ngrok interstitial breaks JSON APIs on mobile without this header
+      'ngrok-skip-browser-warning': '1',
       ...options.headers,
     };
 
@@ -131,14 +136,27 @@ export const apiCall = async (endpoint, options = {}) => {
 };
 
 const getFileMetadata = (fileUri) => {
-  const uriParts = fileUri.split('/');
-  const fileName = uriParts[uriParts.length - 1] || `upload_${Date.now()}.jpg`;
-  const extension = fileName.split('.').pop()?.toLowerCase();
+  const cleanUri = (fileUri || '').split('?')[0];
+  const uriParts = cleanUri.split('/');
+  let fileName = uriParts[uriParts.length - 1] || `upload_${Date.now()}.jpg`;
+  // Strip React Native / Expo query junk and decode
+  try {
+    fileName = decodeURIComponent(fileName);
+  } catch {
+    /* keep raw */
+  }
+  let extension = fileName.split('.').pop()?.toLowerCase();
+  if (!extension || extension === fileName.toLowerCase() || extension.length > 5) {
+    extension = 'jpg';
+    fileName = `upload_${Date.now()}.jpg`;
+  }
   const typeMap = {
     jpg: 'image/jpeg',
     jpeg: 'image/jpeg',
     png: 'image/png',
     webp: 'image/webp',
+    heic: 'image/heic',
+    heif: 'image/heif',
   };
   const type = typeMap[extension] || 'image/jpeg';
   return { fileName, type };
@@ -161,6 +179,7 @@ export const uploadImageFile = async (fileUri) => {
     });
 
     const headers = {
+      'ngrok-skip-browser-warning': '1',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 
@@ -192,7 +211,14 @@ export const uploadImageFile = async (fileUri) => {
       message: error.message,
       ...getApiConfigDiagnostics(),
     });
-    throw new Error(formatNetworkError(error, 'POST', fullUrl));
+    if (
+      error.message?.includes('Network request failed') ||
+      error.message?.includes('Failed to fetch') ||
+      error.message?.includes('timeout')
+    ) {
+      throw new Error(formatNetworkError(error, 'POST', fullUrl));
+    }
+    throw error;
   }
 };
 
@@ -225,6 +251,22 @@ export const walletService = {
     method: 'POST',
     body: { packId },
   }),
+};
+
+/** Cashfree QR wallet top-up (backend-only credentials) */
+export const paymentService = {
+  getConfig: () => apiCall('/payments/config'),
+  createCashfreeQr: (data) =>
+    apiCall('/payments/cashfree/create-qr', {
+      method: 'POST',
+      body: data,
+    }),
+  getCashfreeStatus: (orderId) => apiCall(`/payments/cashfree/status/${orderId}`),
+  cancelCashfreeOrder: (orderId) =>
+    apiCall(`/payments/cashfree/cancel/${orderId}`, {
+      method: 'POST',
+      body: {},
+    }),
 };
 
 // Config Services
@@ -367,6 +409,19 @@ export const tournamentManagementService = {
     }),
   exportResults: (id) => apiCall(`/tournament-management/admin/${id}/results/export`),
   getPublicResults: (id) => apiCall(`/tournament-management/${id}/results`),
+  registerTeam: (id, data) =>
+    apiCall(`/tournament-management/${id}/register-team`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+export const mapService = {
+  getList: () => apiCall('/maps/list'),
+  getAll: () => apiCall('/maps/admin/all'),
+  create: (data) => apiCall('/maps/admin/create', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => apiCall(`/maps/admin/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  remove: (id) => apiCall(`/maps/admin/${id}`, { method: 'DELETE' }),
 };
 
 // Tutorial Services
@@ -431,4 +486,6 @@ export const gameService = {
   updateGameMode: (modeId, data) =>
     apiCall(`/games/modes/admin/${modeId}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteGameMode: (modeId) => apiCall(`/games/modes/admin/${modeId}`, { method: 'DELETE' }),
+  /** Alias used by Game Management image pickers */
+  uploadImage: uploadImageFile,
 };

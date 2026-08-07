@@ -1,20 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, StyleSheet, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, TYPO } from '../styles/theme';
 import AppIcon from './ui/AppIcon';
 
 const { width } = Dimensions.get('window');
 
 const Toast = ({ visible, message, type = 'error', onHide }) => {
-  const translateY = useRef(new Animated.Value(-100)).current;
+  const insets = useSafeAreaInsets();
+  const translateY = useRef(new Animated.Value(-120)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const topOffset = Math.max(insets.top, 12) + 8;
 
   useEffect(() => {
     if (visible) {
-      // Show toast
       Animated.parallel([
         Animated.timing(translateY, {
-          toValue: 50,
+          toValue: topOffset,
           duration: 300,
           useNativeDriver: true,
         }),
@@ -25,21 +27,19 @@ const Toast = ({ visible, message, type = 'error', onHide }) => {
         }),
       ]).start();
 
-      // Auto hide after 3 seconds
       const timer = setTimeout(() => {
         hideToast();
       }, 3000);
 
       return () => clearTimeout(timer);
-    } else {
-      hideToast();
     }
-  }, [visible]);
+    hideToast();
+  }, [visible, topOffset]);
 
   const hideToast = () => {
     Animated.parallel([
       Animated.timing(translateY, {
-        toValue: -100,
+        toValue: -120,
         duration: 300,
         useNativeDriver: true,
       }),
@@ -91,6 +91,7 @@ const Toast = ({ visible, message, type = 'error', onHide }) => {
           opacity,
         },
       ]}
+      pointerEvents="none"
     >
       <AppIcon name={getIcon()} size="md" style={styles.icon} />
       <Text style={styles.message}>{message}</Text>

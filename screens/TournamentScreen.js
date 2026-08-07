@@ -180,16 +180,29 @@ const TournamentScreen = ({ navigation }) => {
   };
 
   const getTournamentsByStatus = (status) => {
+    const getS = (t) => t.lifecycleStatus || t.status;
     if (status === 'my-contests') {
-      return myTournaments;
+      return myTournaments.filter((t) => getS(t) !== 'draft');
     }
     if (status === 'incoming') {
-      return tournaments.filter((t) => t.status === 'incoming' || t.status === 'upcoming');
+      return tournaments.filter((t) => {
+        const s = getS(t);
+        return s === 'incoming' || s === 'upcoming';
+      });
     }
     if (status === 'ongoing') {
-      return tournaments.filter((t) => t.status === 'ongoing' || t.status === 'live');
+      return tournaments.filter((t) => {
+        const s = getS(t);
+        return s === 'ongoing' || s === 'live';
+      });
     }
-    return tournaments.filter((t) => t.status === status);
+    if (status === 'completed') {
+      return tournaments.filter((t) => {
+        const s = getS(t);
+        return s === 'completed' || s === 'result_published';
+      });
+    }
+    return tournaments.filter((t) => getS(t) === status && getS(t) !== 'draft');
   };
 
   const isUserJoined = (tournamentId) => {
@@ -223,7 +236,7 @@ const TournamentScreen = ({ navigation }) => {
       let label = 'UNAVAILABLE';
       if (status === 'ongoing' || status === 'live') label = 'ONGOING';
       else if (status === 'completed') label = 'COMPLETED';
-      else if (status === 'result_published') label = 'RESULT PUBLISHED';
+      else if (status === 'completed' || status === 'result_published') label = 'COMPLETED';
       else if (status === 'cancelled') label = 'CANCELLED';
       else if (status === 'locked') label = 'LOCKED';
       else if (status === 'draft') label = 'DRAFT';
@@ -250,7 +263,7 @@ const TournamentScreen = ({ navigation }) => {
 
   if (loading && tournaments.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading tournaments...</Text>
@@ -355,7 +368,7 @@ const TournamentScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
       
       <Toast

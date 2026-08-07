@@ -1,4 +1,4 @@
-import React, { useContext, useState, useCallback } from 'react';
+import React, { useContext, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,16 +11,26 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS } from '../styles/theme';
-import { walletService, userService } from '../services/api';
+import AddCoinsModal from '../components/AddCoinsModal';
+import { walletService, userService, paymentService } from '../services/api';
+import { clearWalletReturnParams } from '../utils/walletFlow';
 
-const MyWalletScreen = ({ navigation }) => {
+const MyWalletScreen = ({ navigation, route }) => {
   const { user } = useContext(AuthContext);
+  const insets = useSafeAreaInsets();
+  const paymentInFlight = useRef(false);
+  const returnTournamentRef = useRef(null);
+  const returnScreenRef = useRef('TournamentDetails');
+  const returnToTournamentId =
+    route?.params?.returnToTournamentId || returnTournamentRef.current || null;
   const [walletData, setWalletData] = useState({
     balance: 0,
     bonusBalance: 0,
@@ -55,7 +65,17 @@ const MyWalletScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       loadWalletData();
-    }, [])
+      if (route.params?.returnToTournamentId) {
+        returnTournamentRef.current = route.params.returnToTournamentId;
+      }
+      if (route.params?.returnScreen) {
+        returnScreenRef.current = route.params.returnScreen;
+      }
+      if (route.params?.openAddCoins) {
+        setShowAddMoneyModal(true);
+        clearWalletReturnParams(navigation);
+      }
+    }, [route.params?.openAddCoins, route.params?.returnToTournamentId, route.params?.returnScreen, navigation])
   );
 
   const loadWalletData = async (silent = false) => {
@@ -174,6 +194,8 @@ const MyWalletScreen = ({ navigation }) => {
   };
 
   const handleAddMoney = async () => {
+    if (paymentInFlight.current || processing) return;
+
     const trimmedAmount = addAmount.trim();
     const amountNum = parseFloat(trimmedAmount);
     
@@ -193,28 +215,36 @@ const MyWalletScreen = ({ navigation }) => {
     }
 
     try {
+      paymentInFlight.current = true;
       setProcessing(true);
-      const transactionId = `TXN_${Date.now()}`;
-      const response = await walletService.topup({ 
-        amount: amountNum,
-        paymentMethod: 'manual',
-        transactionId: transactionId 
-      });
-      
-      if (response && response.success) {
-        Alert.alert('Success', `₹${amountNum} added to your wallet successfully`);
+
+      // Always use Cashfree QR when gateway is ready — never silent free top-up.
+      const cfg = await paymentService.getConfig();
+      if (cfg?.enabled) {
         setShowAddMoneyModal(false);
         setAddAmount('');
-        await loadWalletData(true);
-      } else {
-        const errorMsg = response?.message || 'Failed to add money. Please try again.';
-        Alert.alert('Error', errorMsg);
+        navigation.navigate('CashfreeQrPayment', {
+          amount: amountNum,
+          walletBalance: walletData.balance,
+          returnToTournamentId: returnTournamentRef.current || returnToTournamentId,
+          returnScreen: returnScreenRef.current,
+        });
+        return;
       }
+
+      Alert.alert(
+        'Payments unavailable',
+        'Cashfree QR is not enabled on the server. Set CASHFREE_ENABLED=true and restart the backend.'
+      );
     } catch (error) {
-      console.error('Error adding money:', error);
-      Alert.alert('Error', error.message || 'Failed to process payment. Please try again.');
+      console.error('Error starting payment:', error);
+      Alert.alert(
+        'Payment Failed',
+        error.message || 'Could not start payment. Check your connection and try again.'
+      );
     } finally {
       setProcessing(false);
+      paymentInFlight.current = false;
     }
   };
 
@@ -397,71 +427,21 @@ const MyWalletScreen = ({ navigation }) => {
       </ScrollView>
 
       {/* Add Money Modal */}
-      <Modal
+      <AddCoinsModal
         visible={showAddMoneyModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowAddMoneyModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Money</Text>
-            <Text style={styles.modalSubtitle}>Enter amount to add to your wallet</Text>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.currencySymbol}>₹</Text>
-              <TextInput
-                style={styles.amountInput}
-                placeholder="0.00"
-                placeholderTextColor="#666"
-                keyboardType="numeric"
-                value={addAmount}
-                onChangeText={(text) => setAddAmount(sanitizeAmountInput(text))}
-                editable={!processing}
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.quickAmounts}>
-              {[100, 500, 1000, 2000].map((val) => (
-                <TouchableOpacity
-                  key={val}
-                  style={styles.quickAmountBtn}
-                  onPress={() => setAddAmount(val.toString())}
-                  disabled={processing}
-                >
-                  <Text style={styles.quickAmountText}>₹{val}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowAddMoneyModal(false);
-                  setAddAmount('');
-                }}
-                disabled={processing}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleAddMoney}
-                disabled={processing}
-              >
-                {processing ? (
-                  <ActivityIndicator color={COLORS.white} />
-                ) : (
-                  <Text style={styles.confirmButtonText}>Add Money</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => {
+          if (processing) return;
+          setShowAddMoneyModal(false);
+          setAddAmount('');
+        }}
+        amount={addAmount}
+        onChangeAmount={(text) => setAddAmount(sanitizeAmountInput(text))}
+        onSubmit={handleAddMoney}
+        processing={processing}
+        title="Add Money"
+        hint="Enter amount to add to your wallet (₹10 – ₹10,000)"
+        submitLabel="Add Money"
+      />
 
       {/* Withdraw Modal */}
       <Modal
@@ -470,8 +450,12 @@ const MyWalletScreen = ({ navigation }) => {
         animationType="slide"
         onRequestClose={() => setShowWithdrawModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <Text style={styles.modalTitle}>Withdraw Money</Text>
             <Text style={styles.modalSubtitle}>
               Real Balance: ₹{walletData.balance.toFixed(2)} | Bonus: ₹{walletData.bonusBalance.toFixed(2)}
@@ -517,8 +501,9 @@ const MyWalletScreen = ({ navigation }) => {
                 )}
               </TouchableOpacity>
             </View>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

@@ -143,7 +143,7 @@ export default function AuthScreen({ navigation, route }) {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.backgroundDark} />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.backgroundDark} translucent={false} />
       <AuthBackground />
 
       <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hideToast} />

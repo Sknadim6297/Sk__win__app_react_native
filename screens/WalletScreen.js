@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
-  Modal,
   RefreshControl,
   ActivityIndicator,
   TextInput,
@@ -17,9 +16,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import AppHeader from '../components/navigation/AppHeader';
-import { walletService, configService } from '../services/api';
+import AddCoinsModal from '../components/AddCoinsModal';
+import CenterDialog from '../components/CenterDialog';
+import { walletService, configService, paymentService } from '../services/api';
+import { clearWalletReturnParams } from '../utils/walletFlow';
 
-const WalletScreen = ({ navigation }) => {
+const WalletScreen = ({ navigation, route }) => {
   const [balance, setBalance] = useState({
     totalBalance: 0,
     balance: 0,
@@ -39,6 +41,9 @@ const WalletScreen = ({ navigation }) => {
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
+  const paymentInFlight = useRef(false);
+  const returnTournamentRef = useRef(null);
+  const returnScreenRef = useRef('TournamentDetails');
 
   const loadData = useCallback(async (silent = false) => {
     try {
@@ -70,7 +75,17 @@ const WalletScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [loadData])
+      if (route.params?.returnToTournamentId) {
+        returnTournamentRef.current = route.params.returnToTournamentId;
+      }
+      if (route.params?.returnScreen) {
+        returnScreenRef.current = route.params.returnScreen;
+      }
+      if (route.params?.openAddCoins) {
+        setShowAddCoins(true);
+        clearWalletReturnParams(navigation);
+      }
+    }, [loadData, route.params?.openAddCoins, route.params?.returnToTournamentId, route.params?.returnScreen, navigation])
   );
 
   const onRefresh = () => {
@@ -86,6 +101,8 @@ const WalletScreen = ({ navigation }) => {
   };
 
   const handleAddCoins = async () => {
+    if (paymentInFlight.current || addingCoins) return;
+
     const trimmed = addAmount.trim();
     const amountNum = parseFloat(trimmed);
     if (!trimmed || Number.isNaN(amountNum) || amountNum <= 0) {
@@ -102,27 +119,47 @@ const WalletScreen = ({ navigation }) => {
     }
 
     try {
+      paymentInFlight.current = true;
       setAddingCoins(true);
-      const res = await walletService.topup({
-        amount: amountNum,
-        paymentMethod: 'manual',
-        transactionId: `TXN_${Date.now()}`,
-      });
-      if (res?.success === false) {
-        throw new Error(res.message || 'Failed to add coins');
+
+      // Always use Cashfree QR when gateway is ready — never silent free top-up.
+      const cfg = await paymentService.getConfig();
+      if (cfg?.enabled) {
+        setShowAddCoins(false);
+        setAddAmount('');
+        navigation.navigate('CashfreeQrPayment', {
+          amount: amountNum,
+          walletBalance: balance.totalBalance ?? balance.balance,
+          returnToTournamentId: returnTournamentRef.current,
+          returnScreen: returnScreenRef.current,
+        });
+        return;
       }
-      Alert.alert('Success', res?.message || `₹${amountNum} added to your wallet`);
-      setShowAddCoins(false);
-      setAddAmount('');
-      await loadData(true);
+
+      Alert.alert(
+        'Payments unavailable',
+        cfg?.message ||
+          'Cashfree QR is not enabled on the server. Set CASHFREE_ENABLED=true and restart the backend.'
+      );
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to add coins');
+      Alert.alert(
+        'Payment Failed',
+        err.message || 'Could not start payment. Check your connection and try again.'
+      );
     } finally {
       setAddingCoins(false);
+      paymentInFlight.current = false;
     }
   };
 
+  const closeAddCoins = () => {
+    if (addingCoins) return;
+    setShowAddCoins(false);
+    setAddAmount('');
+  };
+
   const handleWithdraw = async () => {
+    if (withdrawing) return;
     const amount = parseFloat(withdrawAmount);
     if (!amount || amount <= 0) {
       Alert.alert('Invalid', 'Enter a valid amount');
@@ -148,9 +185,10 @@ const WalletScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={COLORS.purple} />
+          <Text style={styles.loadingText}>Loading wallet…</Text>
         </View>
       </SafeAreaView>
     );
@@ -158,175 +196,165 @@ const WalletScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B0E1E" />
+      <StatusBar barStyle="light-content" backgroundColor="#0B0E1E" translucent={false} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.white} />
+        }
         contentContainerStyle={styles.scroll}
       >
         <AppHeader navigation={navigation} />
-        <View style={styles.balanceCard}>
-          <View style={styles.balanceRow}>
-            <View>
-              <Text style={styles.balanceLabel}>Total Balance</Text>
-              <Text style={styles.balanceValue}>{balance.totalBalance.toFixed(0)}</Text>
-            </View>
-            <TouchableOpacity style={styles.btnPurple} onPress={() => setShowTransactions(true)}>
-              <MaterialCommunityIcons name="history" size={16} color={COLORS.white} />
-              <Text style={styles.btnPurpleText}>Transaction</Text>
-            </TouchableOpacity>
+
+        <View style={styles.heroCard}>
+          <Text style={styles.heroLabel}>Total Balance</Text>
+          <View style={styles.heroAmountRow}>
+            <MaterialCommunityIcons name="circle-multiple" size={28} color="#FBBF24" />
+            <Text style={styles.heroAmount}>{balance.totalBalance.toFixed(0)}</Text>
           </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.balanceRow}>
-            <View>
-              <Text style={styles.balanceLabel}>Deposited</Text>
-              <Text style={styles.balanceValue}>{balance.totalDeposited.toFixed(0)}</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.btnGreen}
-              onPress={() => setShowAddCoins(true)}
-              activeOpacity={0.85}
-            >
-              <MaterialCommunityIcons name="wallet-plus" size={16} color={COLORS.white} />
-              <Text style={styles.btnGreenText}>Add Coins</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.balanceRow}>
-            <View>
-              <Text style={styles.balanceLabel}>Winning</Text>
-              <Text style={styles.balanceValue}>{balance.totalWinnings.toFixed(0)}</Text>
-            </View>
-            <TouchableOpacity style={styles.btnPurple} onPress={() => setShowWithdraw(true)}>
-              <MaterialCommunityIcons name="export" size={16} color={COLORS.white} />
-              <Text style={styles.btnPurpleText}>Withdraw</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.balanceRow}>
-            <View>
-              <Text style={styles.balanceLabel}>Bonus</Text>
-              <Text style={styles.balanceValue}>{balance.bonusBalance.toFixed(0)}</Text>
-            </View>
-          </View>
-
-          <Text style={styles.footerNote}>{footerNote}</Text>
-          <Text style={styles.securityNote}>{securityNote}</Text>
+          <Text style={styles.heroSub}>Real ₹{balance.balance.toFixed(0)} · Bonus ₹{balance.bonusBalance.toFixed(0)}</Text>
         </View>
+
+        <View style={styles.grid}>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Deposited</Text>
+            <Text style={styles.statValue}>{balance.totalDeposited.toFixed(0)}</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Winnings</Text>
+            <Text style={styles.statValue}>{balance.totalWinnings.toFixed(0)}</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Bonus</Text>
+            <Text style={styles.statValue}>{balance.bonusBalance.toFixed(0)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionGreen]}
+            onPress={() => setShowAddCoins(true)}
+            activeOpacity={0.88}
+          >
+            <MaterialCommunityIcons name="wallet-plus" size={20} color={COLORS.white} />
+            <Text style={styles.actionText}>Add Coins</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionPurple]}
+            onPress={() => setShowWithdraw(true)}
+            activeOpacity={0.88}
+          >
+            <MaterialCommunityIcons name="export" size={20} color={COLORS.white} />
+            <Text style={styles.actionText}>Withdraw</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.historyBtn}
+          onPress={() => setShowTransactions(true)}
+          activeOpacity={0.85}
+        >
+          <MaterialCommunityIcons name="history" size={20} color={COLORS.purple} />
+          <Text style={styles.historyText}>Transaction History</Text>
+          <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.gray} />
+        </TouchableOpacity>
+
+        <Text style={styles.footerNote}>{footerNote}</Text>
+        <Text style={styles.securityNote}>{securityNote}</Text>
       </ScrollView>
 
-      <Modal visible={showTransactions} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Transactions</Text>
-              <TouchableOpacity onPress={() => setShowTransactions(false)}>
-                <MaterialCommunityIcons name="close" size={24} color={COLORS.white} />
-              </TouchableOpacity>
+      <CenterDialog
+        visible={showTransactions}
+        onClose={() => setShowTransactions(false)}
+        style={styles.txDialog}
+      >
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Transactions</Text>
+          <TouchableOpacity onPress={() => setShowTransactions(false)} hitSlop={12}>
+            <MaterialCommunityIcons name="close" size={22} color={COLORS.gray} />
+          </TouchableOpacity>
+        </View>
+        <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+          {transactions.length === 0 ? (
+            <View style={styles.emptyWrap}>
+              <MaterialCommunityIcons name="receipt" size={40} color={COLORS.grayDim} />
+              <Text style={styles.emptyText}>No transactions yet</Text>
             </View>
-            <ScrollView style={styles.modalScroll}>
-              {transactions.length === 0 ? (
-                <Text style={styles.emptyText}>No transactions yet</Text>
-              ) : (
-                transactions.map((tx) => (
-                  <View key={tx._id || tx.id} style={styles.txRow}>
-                    <View>
-                      <Text style={styles.txDesc}>{tx.description || tx.type}</Text>
-                      <Text style={styles.txDate}>
-                        {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : ''}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.txAmount,
-                        tx.type === 'withdraw' ? styles.txNeg : styles.txPos,
-                      ]}
-                    >
-                      {tx.type === 'withdraw' ? '-' : '+'}₹{tx.amount}
-                    </Text>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+          ) : (
+            transactions.map((tx) => (
+              <View key={tx._id || tx.id} style={styles.txRow}>
+                <View style={styles.txLeft}>
+                  <Text style={styles.txDesc} numberOfLines={2}>
+                    {tx.description || tx.type}
+                  </Text>
+                  <Text style={styles.txDate}>
+                    {tx.createdAt ? new Date(tx.createdAt).toLocaleString('en-IN') : ''}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.txAmount,
+                    tx.type === 'withdraw' || tx.type === 'tournament_entry'
+                      ? styles.txNeg
+                      : styles.txPos,
+                  ]}
+                >
+                  {tx.type === 'withdraw' || tx.type === 'tournament_entry' ? '-' : '+'}₹{tx.amount}
+                </Text>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </CenterDialog>
 
-      <Modal visible={showAddCoins} animationType="fade" transparent onRequestClose={() => setShowAddCoins(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Coins</Text>
-              <TouchableOpacity onPress={() => setShowAddCoins(false)} hitSlop={12}>
-                <MaterialCommunityIcons name="close" size={24} color={COLORS.white} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.withdrawHint}>Enter amount to add to your wallet (₹10 – ₹10,000)</Text>
-            <TextInput
-              style={styles.withdrawInput}
-              placeholder="Amount in ₹"
-              placeholderTextColor="#64748B"
-              keyboardType="decimal-pad"
-              value={addAmount}
-              onChangeText={(v) => setAddAmount(sanitizeAmountInput(v))}
-            />
-            <TouchableOpacity
-              style={[styles.priceBtn, { marginTop: 16, width: '100%' }]}
-              onPress={handleAddCoins}
-              disabled={addingCoins}
-            >
-              {addingCoins ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text style={styles.priceText}>Add Coins</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddCoins(false)}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <AddCoinsModal
+        visible={showAddCoins}
+        onClose={closeAddCoins}
+        amount={addAmount}
+        onChangeAmount={(v) => setAddAmount(sanitizeAmountInput(v))}
+        onSubmit={handleAddCoins}
+        processing={addingCoins}
+      />
 
-      <Modal visible={showWithdraw} animationType="fade" transparent onRequestClose={() => setShowWithdraw(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Withdraw Winnings</Text>
-            <Text style={styles.withdrawHint}>
-              Available: ₹{balance.totalWinnings.toFixed(0)}
-            </Text>
-            <TextInput
-              style={styles.withdrawInput}
-              placeholder="Amount"
-              placeholderTextColor="#64748B"
-              keyboardType="numeric"
-              value={withdrawAmount}
-              onChangeText={setWithdrawAmount}
-            />
-            <TouchableOpacity
-              style={[styles.priceBtn, { marginTop: 16, width: '100%' }]}
-              onPress={handleWithdraw}
-              disabled={withdrawing}
-            >
-              {withdrawing ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text style={styles.priceText}>Request Withdrawal</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowWithdraw(false)}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+      <CenterDialog
+        visible={showWithdraw}
+        onClose={() => !withdrawing && setShowWithdraw(false)}
+        dismissOnOverlay={!withdrawing}
+      >
+        <Text style={styles.modalTitle}>Withdraw Winnings</Text>
+        <Text style={styles.withdrawHint}>Available: ₹{balance.totalWinnings.toFixed(0)}</Text>
+        <View style={styles.inputWrap}>
+          <Text style={styles.currency}>₹</Text>
+          <TextInput
+            style={styles.withdrawInput}
+            placeholder="Amount"
+            placeholderTextColor="#64748B"
+            keyboardType="numeric"
+            value={withdrawAmount}
+            onChangeText={setWithdrawAmount}
+            editable={!withdrawing}
+          />
         </View>
-      </Modal>
+        <TouchableOpacity
+          style={[styles.submitBtn, withdrawing && styles.submitDisabled]}
+          onPress={handleWithdraw}
+          disabled={withdrawing}
+        >
+          {withdrawing ? (
+            <ActivityIndicator color={COLORS.white} />
+          ) : (
+            <Text style={styles.submitText}>Request Withdrawal</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.cancelBtn}
+          onPress={() => setShowWithdraw(false)}
+          disabled={withdrawing}
+        >
+          <Text style={styles.cancelText}>Cancel</Text>
+        </TouchableOpacity>
+      </CenterDialog>
     </SafeAreaView>
   );
 };
@@ -343,73 +371,112 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  loadingText: {
+    marginTop: 12,
+    color: COLORS.gray,
+    ...TEXT.body,
+  },
   scroll: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 100,
+    paddingBottom: 110,
   },
-  balanceCard: {
-    backgroundColor: '#121B33',
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 24,
+  heroCard: {
+    backgroundColor: '#151D36',
+    borderRadius: 20,
+    padding: 22,
+    marginTop: 8,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(123,97,255,0.25)',
   },
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  balanceLabel: {
+  heroLabel: {
     ...TEXT.label,
     color: COLORS.gray,
+    marginBottom: 8,
   },
-  balanceValue: {
-    ...TEXT.stat,
-    color: COLORS.white,
-    marginTop: 6,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    marginVertical: 10,
-  },
-  btnPurple: {
+  heroAmountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#5B39A8',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 22,
-    gap: 8,
-    minHeight: 44,
+    gap: 10,
   },
-  btnPurpleText: {
-    ...TEXT.labelSm,
-    fontFamily: FONTS.semiBold,
+  heroAmount: {
+    fontFamily: FONTS.bold,
+    fontSize: 36,
     color: COLORS.white,
   },
-  btnGreen: {
+  heroSub: {
+    marginTop: 10,
+    ...TEXT.caption,
+    color: COLORS.grayDim,
+  },
+  grid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#121B33',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+  },
+  statLabel: {
+    ...TEXT.caption,
+    color: COLORS.gray,
+    marginBottom: 6,
+  },
+  statValue: {
+    fontFamily: FONTS.bold,
+    fontSize: 18,
+    color: COLORS.white,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14,
+  },
+  actionBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#00B368',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 22,
+    justifyContent: 'center',
     gap: 8,
-    minHeight: 44,
+    paddingVertical: 14,
+    borderRadius: 14,
+    minHeight: 52,
   },
-  btnGreenText: {
-    ...TEXT.labelSm,
+  actionGreen: { backgroundColor: '#00B368' },
+  actionPurple: { backgroundColor: '#5B39A8' },
+  actionText: {
+    fontFamily: FONTS.bold,
+    fontSize: 14,
+    color: COLORS.white,
+  },
+  historyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#121B33',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    gap: 12,
+  },
+  historyText: {
+    flex: 1,
     fontFamily: FONTS.semiBold,
+    fontSize: 15,
     color: COLORS.white,
   },
   footerNote: {
     ...TEXT.body,
     color: COLORS.white,
-    marginTop: 16,
+    marginTop: 20,
     textAlign: 'center',
   },
   securityNote: {
@@ -418,43 +485,32 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  priceBtn: {
-    marginTop: 14,
-    backgroundColor: '#00B368',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  priceText: {
-    ...TEXT.buttonSm,
-    color: COLORS.white,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalBox: {
-    backgroundColor: '#121B33',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '70%',
+  txDialog: {
+    maxHeight: '75%',
+    paddingBottom: 8,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   modalTitle: {
     ...TEXT.h3,
+    fontFamily: FONTS.bold,
     color: COLORS.white,
   },
   modalScroll: {
-    maxHeight: 400,
+    maxHeight: 360,
+  },
+  emptyWrap: {
+    alignItems: 'center',
+    paddingVertical: 36,
+  },
+  emptyText: {
+    ...TEXT.body,
+    color: COLORS.gray,
+    marginTop: 10,
   },
   txRow: {
     flexDirection: 'row',
@@ -462,7 +518,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
+    gap: 12,
   },
+  txLeft: { flex: 1 },
   txDesc: {
     ...TEXT.bodyMedium,
     color: COLORS.white,
@@ -473,36 +531,57 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   txAmount: {
-    ...TEXT.buttonSm,
     fontFamily: FONTS.bold,
+    fontSize: 14,
   },
   txPos: { color: '#4ADE80' },
   txNeg: { color: '#F87171' },
-  emptyText: {
-    ...TEXT.body,
-    color: COLORS.gray,
-    textAlign: 'center',
-    paddingVertical: 24,
-  },
   withdrawHint: {
     ...TEXT.body,
     color: COLORS.gray,
     marginTop: 8,
+    marginBottom: 12,
   },
-  withdrawInput: {
-    marginTop: 12,
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#0B0E1E',
-    borderRadius: 10,
-    padding: 16,
-    color: COLORS.white,
-    ...TEXT.bodyLg,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 14,
+  },
+  currency: {
+    fontFamily: FONTS.bold,
+    fontSize: 18,
+    color: COLORS.gray,
+    marginRight: 6,
+  },
+  withdrawInput: {
+    flex: 1,
+    color: COLORS.white,
+    ...TEXT.bodyLg,
+    paddingVertical: 14,
+  },
+  submitBtn: {
+    marginTop: 16,
+    backgroundColor: '#00B368',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    minHeight: 50,
+    justifyContent: 'center',
+  },
+  submitDisabled: { opacity: 0.65 },
+  submitText: {
+    fontFamily: FONTS.bold,
+    fontSize: 15,
+    color: COLORS.white,
   },
   cancelBtn: {
-    marginTop: 12,
+    marginTop: 10,
     alignItems: 'center',
-    padding: 12,
+    padding: 10,
   },
   cancelText: {
     ...TEXT.label,

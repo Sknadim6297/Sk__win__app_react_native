@@ -6,14 +6,13 @@ const PrizeDistribution = require('../models/PrizeDistribution');
 const BattleRoyaleResult = require('../models/BattleRoyaleResult');
 const CustomMatchResult = require('../models/CustomMatchResult');
 
-const LIFECYCLE = ['draft', 'upcoming', 'ongoing', 'completed', 'result_published', 'cancelled'];
+const LIFECYCLE = ['draft', 'upcoming', 'ongoing', 'completed', 'cancelled'];
 
 const TRANSITIONS = {
   draft: ['upcoming', 'cancelled'],
   upcoming: ['ongoing', 'cancelled', 'draft'],
   ongoing: ['completed', 'cancelled'],
-  completed: ['result_published', 'ongoing'],
-  result_published: [],
+  completed: ['ongoing'],
   cancelled: ['draft'],
 };
 
@@ -36,57 +35,149 @@ function getTournamentType(tournament) {
 
 function mapLegacyStatus(status) {
   if (!status) return null;
-  if (status === 'upcoming') return 'upcoming';
-  if (status === 'incoming' || status === 'locked') return 'upcoming';
+  if (status === 'upcoming' || status === 'incoming') return 'upcoming';
+  if (status === 'locked') return 'upcoming';
   if (status === 'live') return 'ongoing';
-  if (status === 'result_published') return 'result_published';
+  // Legacy: result_published was a status — treat as completed (results flag is separate)
+  if (status === 'result_published') return 'completed';
   if (['draft', 'ongoing', 'completed', 'cancelled'].includes(status)) return status;
   return null;
 }
 
 /**
+ * Normalize any admin/user status string to canonical lifecycle status.
+ */
+function normalizeLifecycleStatus(status) {
+  const mapped = mapLegacyStatus(status);
+  if (mapped) return mapped;
+  if (status === 'draft') return 'draft';
+  return null;
+}
+
+/**
  * Resolve lifecycle for API + transitions.
- * Old tournaments may have status=incoming but lifecycleStatus missing (lean) or default draft (findById).
+ * Prefer the further-along status when status and lifecycleStatus disagree.
+ * Results publishing is a boolean flag — never a separate tournament status.
  */
 function getEffectiveStatus(tournament) {
-  if (tournament.resultsPublished) return 'result_published';
-
   const legacy = mapLegacyStatus(tournament.status);
-  const lifecycle = tournament.lifecycleStatus;
+  const lifecycle = mapLegacyStatus(tournament.lifecycleStatus) || tournament.lifecycleStatus;
 
-  if (legacy === 'result_published') return 'result_published';
+  const ORDER = ['draft', 'upcoming', 'ongoing', 'completed', 'cancelled'];
+  const li = lifecycle ? ORDER.indexOf(lifecycle) : -1;
+  const si = legacy ? ORDER.indexOf(legacy) : -1;
 
-  // Default draft on load must not override a real legacy status (incoming, ongoing, etc.)
-  if (lifecycle === 'draft' && legacy && legacy !== 'draft') {
-    return legacy;
+  // If one side progressed past draft and the other is still draft, trust the progressed one
+  if (lifecycle === 'draft' && legacy && legacy !== 'draft') return legacy;
+  if (legacy === 'draft' && lifecycle && lifecycle !== 'draft') return lifecycle;
+
+  // Prefer the more advanced status when both are set
+  if (li >= 0 && si >= 0 && li !== si) {
+    if (lifecycle === 'cancelled' || legacy === 'cancelled') return 'cancelled';
+    return ORDER[Math.max(li, si)];
   }
 
-  if (lifecycle) return lifecycle;
+  if (lifecycle && ORDER.includes(lifecycle)) return lifecycle;
+  if (legacy) return legacy;
+  return 'draft';
+}
 
-  return legacy || 'draft';
+function areResultsPublished(tournament) {
+  if (!tournament) return false;
+  if (tournament.resultsPublished === true) return true;
+  // Legacy documents that still store result_published as status
+  return (
+    tournament.status === 'result_published' ||
+    tournament.lifecycleStatus === 'result_published'
+  );
 }
 
 /** Persist lifecycleStatus when it disagrees with resolved effective status (legacy data). */
 function ensureLifecycleSynced(tournament) {
-  const effective = getEffectiveStatus(tournament);
-  if (tournament.lifecycleStatus !== effective) {
-    syncLegacyFields(tournament, effective);
-    return true;
+  let changed = false;
+  // Migrate legacy result_published status → completed + resultsPublished
+  if (
+    tournament.lifecycleStatus === 'result_published' ||
+    tournament.status === 'result_published'
+  ) {
+    tournament.lifecycleStatus = 'completed';
+    tournament.status = 'completed';
+    tournament.resultsPublished = true;
+    if (!tournament.resultsPublishedAt) tournament.resultsPublishedAt = new Date();
+    changed = true;
   }
-  return false;
+
+  const effective = getEffectiveStatus(tournament);
+  if (tournament.lifecycleStatus !== effective || tournament.status !== effective) {
+    const keepPublished = areResultsPublished(tournament);
+    syncLegacyFields(tournament, effective);
+    if (effective === 'completed' && keepPublished) {
+      tournament.resultsPublished = true;
+    }
+    changed = true;
+  }
+  return changed;
 }
 
 function syncLegacyFields(tournament, lifecycleStatus) {
-  tournament.lifecycleStatus = lifecycleStatus;
-  tournament.status = lifecycleStatus;
-  tournament.resultsPublished = lifecycleStatus === 'result_published';
-  if (lifecycleStatus === 'ongoing' || lifecycleStatus === 'completed' || lifecycleStatus === 'result_published') {
+  let normalized = normalizeLifecycleStatus(lifecycleStatus) || lifecycleStatus;
+
+  // Publishing used to set status to result_published — map to completed + flag
+  if (normalized === 'result_published') {
+    tournament.lifecycleStatus = 'completed';
+    tournament.status = 'completed';
+    tournament.resultsPublished = true;
+    if (!tournament.resultsPublishedAt) tournament.resultsPublishedAt = new Date();
+    tournament.locked = true;
+    tournament.updatedAt = new Date();
+    return;
+  }
+
+  const keepPublished =
+    normalized === 'completed' && areResultsPublished(tournament);
+
+  tournament.lifecycleStatus = normalized;
+  tournament.status = normalized;
+
+  if (normalized === 'completed') {
+    tournament.resultsPublished = keepPublished;
+  } else {
+    tournament.resultsPublished = false;
+    tournament.resultsPublishedAt = undefined;
+  }
+
+  if (normalized === 'ongoing' || normalized === 'completed') {
     tournament.locked = true;
   }
-  if (lifecycleStatus === 'upcoming' || lifecycleStatus === 'draft') {
+  if (normalized === 'upcoming' || normalized === 'draft') {
     tournament.locked = false;
   }
   tournament.updatedAt = new Date();
+}
+
+/** Mark results visible without changing tournament status (stays Completed). */
+function markResultsPublished(tournament) {
+  const status = getEffectiveStatus(tournament);
+  if (status !== 'completed') {
+    return { ok: false, error: 'Tournament must be completed before publishing results' };
+  }
+  tournament.lifecycleStatus = 'completed';
+  tournament.status = 'completed';
+  tournament.resultsPublished = true;
+  tournament.resultsPublishedAt = new Date();
+  tournament.locked = true;
+  tournament.updatedAt = new Date();
+  return { ok: true };
+}
+
+/** Statuses that are visible on the user panel */
+function isUserVisibleStatus(status) {
+  const s = normalizeLifecycleStatus(status) || status;
+  return ['upcoming', 'ongoing', 'completed', 'locked', 'incoming', 'live'].includes(s);
+}
+
+function isDraftStatus(tournament) {
+  return getEffectiveStatus(tournament) === 'draft';
 }
 
 async function getParticipantCount(tournamentId) {
@@ -100,28 +191,34 @@ async function getTeamCount(tournamentId) {
   return Team.countDocuments({ tournamentId, status: 'registered' });
 }
 
-/** Join display + full check (supports legacy participant slots on custom matches). */
+/** Custom Match or BR Duo/Squad — one payment per team. */
+function usesTeamRegistration(tournament) {
+  if (isCustomMatch(tournament)) return true;
+  const m = String(tournament.mode || 'solo').toLowerCase();
+  return m === 'duo' || m === 'squad';
+}
+
+function getPlayersPerTeam(mode) {
+  const m = String(mode || 'solo').toLowerCase();
+  if (m === 'squad') return 4;
+  if (m === 'duo') return 2;
+  return 1;
+}
+
+/** Join display + full check */
 async function getJoinStats(tournamentId, tournament) {
-  if (isCustomMatch(tournament)) {
+  if (usesTeamRegistration(tournament)) {
     const teamCount = await getTeamCount(tournamentId);
-    const maxTeams = tournament.maxTeams || 2;
-    if (teamCount > 0) {
-      return {
-        joinedCount: teamCount,
-        capacity: maxTeams,
-        unit: 'teams',
-        isFull: teamCount >= maxTeams,
-        usesTeams: true,
-      };
-    }
-    const playerCount = await getParticipantCount(tournamentId);
-    const maxPlayers = tournament.maxParticipants || 48;
+    const perTeam = getPlayersPerTeam(tournament.mode);
+    const maxTeams =
+      tournament.maxTeams ||
+      (isCustomMatch(tournament) ? 2 : Math.floor((tournament.maxParticipants || 50) / perTeam));
     return {
-      joinedCount: playerCount,
-      capacity: maxPlayers,
-      unit: 'players',
-      isFull: playerCount >= maxPlayers,
-      usesTeams: false,
+      joinedCount: teamCount,
+      capacity: maxTeams,
+      unit: 'teams',
+      isFull: teamCount >= maxTeams,
+      usesTeams: true,
     };
   }
 
@@ -142,13 +239,63 @@ async function getJoinedCount(tournamentId, tournament) {
 }
 
 async function getCapacity(tournament) {
-  const id = tournament._id || tournament;
   if (isCustomMatch(tournament)) {
-    const teamCount = await getTeamCount(id);
-    if (teamCount > 0) return tournament.maxTeams || 2;
-    return tournament.maxParticipants || 48;
+    return tournament.maxTeams || 2;
   }
   return tournament.maxParticipants || 50;
+}
+
+/** Required roster size per team by mode */
+function getCustomMatchPlayersPerTeam(mode) {
+  return getPlayersPerTeam(mode);
+}
+
+const ROOM_VISIBLE_BEFORE_MS = 2 * 60 * 1000;
+
+/**
+ * Room ID/password become visible to joined users 2 minutes before start.
+ * Admin may force-show via showRoomCredentials.
+ */
+function getRoomCredentialsVisibility(tournament, { userJoined = false } = {}) {
+  const hasCreds = !!(tournament.roomId || tournament.roomPassword);
+  if (!hasCreds) {
+    return {
+      visible: false,
+      hasCredentials: false,
+      message: userJoined
+        ? 'Please wait. Room details will be available 2 minutes before the match starts.'
+        : null,
+      unlockAt: tournament.startDate
+        ? new Date(new Date(tournament.startDate).getTime() - ROOM_VISIBLE_BEFORE_MS)
+        : null,
+    };
+  }
+
+  if (!userJoined) {
+    return {
+      visible: false,
+      hasCredentials: true,
+      message: null,
+      unlockAt: null,
+    };
+  }
+
+  if (tournament.showRoomCredentials) {
+    return { visible: true, hasCredentials: true, message: null, unlockAt: null };
+  }
+
+  const start = new Date(tournament.startDate).getTime();
+  const unlockAt = new Date(start - ROOM_VISIBLE_BEFORE_MS);
+  if (Date.now() >= unlockAt.getTime()) {
+    return { visible: true, hasCredentials: true, message: null, unlockAt };
+  }
+
+  return {
+    visible: false,
+    hasCredentials: true,
+    message: 'Please wait. Room details will be available 2 minutes before the match starts.',
+    unlockAt,
+  };
 }
 
 function canJoin(lifecycleStatus) {
@@ -203,16 +350,21 @@ function validateBattleRoyaleResults(entries, joinedCount) {
 }
 
 function validateCustomResult(payload, teamIds) {
-  const { winnerTeamId, runnerUpTeamId, mvpUserId, winnerPrize, runnerUpPrize } = payload;
-  if (!winnerTeamId || !runnerUpTeamId || !mvpUserId) {
-    return { ok: false, error: 'Winner, runner-up, and MVP are required' };
-  }
-  if (String(winnerTeamId) === String(runnerUpTeamId)) {
-    return { ok: false, error: 'Winner and runner-up cannot be the same team' };
+  const { winnerTeamId, runnerUpTeamId, winnerPrize, runnerUpPrize } = payload;
+  if (!winnerTeamId) {
+    return { ok: false, error: 'Winning team is required' };
   }
   const teamSet = new Set(teamIds.map(String));
-  if (!teamSet.has(String(winnerTeamId)) || !teamSet.has(String(runnerUpTeamId))) {
-    return { ok: false, error: 'Teams must be registered participants' };
+  if (!teamSet.has(String(winnerTeamId))) {
+    return { ok: false, error: 'Winner must be a registered team' };
+  }
+  if (runnerUpTeamId) {
+    if (String(winnerTeamId) === String(runnerUpTeamId)) {
+      return { ok: false, error: 'Winner and runner-up cannot be the same team' };
+    }
+    if (!teamSet.has(String(runnerUpTeamId))) {
+      return { ok: false, error: 'Runner-up must be a registered team' };
+    }
   }
   if (Number(winnerPrize) < 0 || Number(runnerUpPrize || 0) < 0) {
     return { ok: false, error: 'Prize cannot be negative' };
@@ -238,15 +390,25 @@ module.exports = {
   isBattleRoyale,
   isCustomMatch,
   getTournamentType,
+  usesTeamRegistration,
+  getPlayersPerTeam,
   mapLegacyStatus,
+  normalizeLifecycleStatus,
   getEffectiveStatus,
+  areResultsPublished,
+  markResultsPublished,
   ensureLifecycleSynced,
   syncLegacyFields,
+  isUserVisibleStatus,
+  isDraftStatus,
   getParticipantCount,
   getTeamCount,
   getJoinStats,
   getJoinedCount,
   getCapacity,
+  getCustomMatchPlayersPerTeam,
+  getRoomCredentialsVisibility,
+  ROOM_VISIBLE_BEFORE_MS,
   canJoin,
   shouldShowFullBadge,
   getPrizeForRank,
