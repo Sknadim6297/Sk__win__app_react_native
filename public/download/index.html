@@ -2,364 +2,353 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Download WarZone AMR Tournament APK | India's Ultimate Esports Platform</title>
-  <meta name="description" content="Download WarZone AMR Tournament APK — create & join Free Fire tournaments, wallet top-up, live updates, and instant prize distribution." />
-  <meta name="theme-color" content="#0f172a" />
-  <meta property="og:title" content="WarZone AMR Tournament — Download APK" />
-  <meta property="og:description" content="India's Ultimate Esports Tournament Platform. Download the Android APK." />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Download WAREZONE | Android App</title>
+  <meta name="description" content="Download the official WAREZONE Android app. Install, create your account, and join Free Fire tournaments." />
+  <meta name="theme-color" content="#0B0E1E" />
+  <meta property="og:title" content="Download WAREZONE App" />
+  <meta property="og:description" content="Official Android APK — install and login to play tournaments." />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="/brand/logo.png" />
   <link rel="icon" href="/brand/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            ink: '#0f172a',
-            panel: '#111827',
-            purple: '#8750f7',
-            orange: '#FF6B00',
-          },
-          fontFamily: {
-            display: ['"DM Sans"', 'sans-serif'],
-            sans: ['"DM Sans"', 'sans-serif'],
-          },
-          boxShadow: {
-            glow: '0 0 40px rgba(135, 80, 247, 0.35)',
-            orange: '0 10px 40px rgba(255, 107, 0, 0.35)',
-          },
-        },
-      },
-    };
-  </script>
   <style>
-    :root { color-scheme: dark; }
+    :root {
+      --bg: #0B0E1E;
+      --card: #151D36;
+      --muted: #B8C5D9;
+      --dim: #8B9BB5;
+      --white: #ffffff;
+      --purple: #7B61FF;
+      --purple-deep: #5B39A8;
+      --green: #00B368;
+      --gold: #FBBF24;
+      --font: "DM Sans", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
-      font-family: "DM Sans", sans-serif;
-      background: #0f172a;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--white);
       min-height: 100vh;
-      overflow-x: hidden;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
-    .bg-mesh {
+    .atmosphere {
+      min-height: 100vh;
       background:
-        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(135, 80, 247, 0.35), transparent 50%),
-        radial-gradient(ellipse 60% 40% at 90% 10%, rgba(255, 107, 0, 0.22), transparent 45%),
-        radial-gradient(ellipse 50% 50% at 50% 100%, rgba(135, 80, 247, 0.12), transparent 50%),
-        #0f172a;
+        radial-gradient(ellipse 90% 55% at 50% -15%, rgba(123, 97, 255, 0.28), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 100% 20%, rgba(0, 179, 104, 0.08), transparent 50%),
+        var(--bg);
     }
-    .glass {
-      background: rgba(17, 24, 39, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
+    .wrap {
+      width: min(560px, 100%);
+      margin: 0 auto;
+      padding: 28px 20px 120px;
     }
-    .glass:hover {
-      border-color: rgba(135, 80, 247, 0.45);
-      transform: translateY(-4px);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 30px rgba(135, 80, 247, 0.15);
-    }
-    .card-anim { transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease; }
-    .btn-download {
-      background: linear-gradient(135deg, #8750f7 0%, #6d28d9 45%, #FF6B00 100%);
-      background-size: 200% 200%;
-      transition: transform 0.25s ease, box-shadow 0.25s ease, background-position 0.4s ease;
-    }
-    .btn-download:hover:not(:disabled) {
-      transform: translateY(-3px) scale(1.02);
-      background-position: 100% 0;
-      box-shadow: 0 16px 40px rgba(135, 80, 247, 0.45), 0 8px 24px rgba(255, 107, 0, 0.25);
-    }
-    .btn-download:disabled { opacity: 0.55; cursor: not-allowed; }
-    .logo-ring {
-      box-shadow: 0 0 0 3px rgba(135, 80, 247, 0.5), 0 0 40px rgba(255, 107, 0, 0.25);
-    }
-    .shot-track {
+    .brand {
       display: flex;
-      gap: 1rem;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
-      padding-bottom: 0.5rem;
-      -webkit-overflow-scrolling: touch;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding-top: 28px;
     }
-    .shot-track::-webkit-scrollbar { height: 6px; }
-    .shot-track::-webkit-scrollbar-thumb { background: rgba(135,80,247,0.5); border-radius: 999px; }
-    .shot {
-      scroll-snap-align: center;
-      flex: 0 0 auto;
-      width: min(240px, 70vw);
-      aspect-ratio: 9/16;
-      border-radius: 1.25rem;
-      overflow: hidden;
+    .logo {
+      width: 112px;
+      height: 112px;
+      border-radius: 28px;
+      object-fit: cover;
+      background: var(--card);
+      margin-bottom: 22px;
+    }
+    .brand-name {
+      font-size: clamp(2rem, 8vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      line-height: 1.1;
+    }
+    .brand-name span { color: var(--gold); }
+    .tagline {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 32ch;
+    }
+    .cta {
+      margin-top: 28px;
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 56px;
+      padding: 16px 24px;
+      border: none;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--purple) 0%, var(--purple-deep) 100%);
+      color: var(--white);
+      font-family: inherit;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .cta.secondary {
+      margin-top: 10px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.14);
+      min-height: 48px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .cta:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .cta:not(:disabled):active { transform: scale(0.98); }
+    .meta {
+      margin-top: 14px;
+      color: var(--dim);
+      font-size: 0.85rem;
+    }
+    .meta strong { color: var(--muted); font-weight: 600; }
+    .share-box {
+      margin-top: 22px;
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--card);
+      border-radius: 14px;
+      text-align: left;
+    }
+    .share-box label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 8px;
+    }
+    .share-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .share-row input {
+      flex: 1;
+      min-width: 0;
+      background: #0B0E1E;
       border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: var(--white);
+      font-family: inherit;
+      font-size: 0.82rem;
+      padding: 10px 12px;
     }
+    .share-row button {
+      flex-shrink: 0;
+      border: none;
+      border-radius: 10px;
+      background: rgba(123, 97, 255, 0.25);
+      color: var(--white);
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+    .steps { margin-top: 48px; }
+    .steps h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+      text-align: center;
+    }
+    .step {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 16px 0;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .step:last-child { border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .num {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--card);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      color: var(--purple);
+    }
+    .step h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .step p {
+      color: var(--dim);
+      font-size: 0.92rem;
+    }
+    .note {
+      margin-top: 28px;
+      padding: 16px 18px;
+      background: var(--card);
+      border-radius: 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .note strong { color: var(--white); }
+    .sticky-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(11,14,30,0.98), rgba(11,14,30,0.92));
+      backdrop-filter: blur(10px);
+    }
+    .sticky-bar .cta { margin-top: 0; }
     #loader {
-      position: fixed; inset: 0; z-index: 80;
-      display: flex; align-items: center; justify-content: center;
-      background: #0f172a;
-      transition: opacity 0.5s ease, visibility 0.5s ease;
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: grid;
+      place-items: center;
+      background: var(--bg);
+      transition: opacity 0.35s ease, visibility 0.35s ease;
     }
-    #loader.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+    #loader.hide {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
     .spin {
-      width: 56px; height: 56px; border-radius: 50%;
-      border: 3px solid rgba(135,80,247,0.2);
-      border-top-color: #8750f7;
-      border-right-color: #FF6B00;
-      animation: spin 0.85s linear infinite;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 3px solid rgba(123,97,255,0.2);
+      border-top-color: var(--purple);
+      animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .faq-item summary { list-style: none; cursor: pointer; }
-    .faq-item summary::-webkit-details-marker { display: none; }
-    .badge {
-      background: linear-gradient(90deg, rgba(135,80,247,0.25), rgba(255,107,0,0.2));
-      border: 1px solid rgba(135,80,247,0.4);
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.8rem;
+    }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 88px;
+      transform: translateX(-50%) translateY(12px);
+      background: var(--green);
+      color: #04140c;
+      font-weight: 700;
+      font-size: 0.85rem;
+      padding: 10px 16px;
+      border-radius: 999px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 60;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
   </style>
 </head>
-<body class="bg-mesh text-slate-100 antialiased">
+<body>
   <div id="loader" aria-live="polite" aria-busy="true">
-    <div class="text-center">
-      <div class="spin mx-auto mb-4"></div>
-      <p class="font-display text-sm tracking-widest text-purple">LOADING WAREZONE</p>
+    <div class="spin" role="status" aria-label="Loading"></div>
+  </div>
+  <div id="toast" class="toast" role="status">Link copied</div>
+
+  <div class="atmosphere">
+    <div class="wrap">
+      <header class="brand">
+        <img class="logo" src="/brand/logo.png" alt="WAREZONE" width="112" height="112" />
+        <h1 class="brand-name">WARE<span>ZONE</span></h1>
+        <p class="tagline">Download the official Android app, install, and login to join tournaments.</p>
+
+        <button id="downloadBtn" class="cta" type="button" disabled>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10 3a1 1 0 011 1v8.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V4a1 1 0 011-1z"/>
+            <path d="M4 16a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z"/>
+          </svg>
+          <span id="downloadBtnLabel">Download App</span>
+        </button>
+        <button id="copyPageBtn" class="cta secondary" type="button">Copy download page link</button>
+
+        <p class="meta" id="downloadHint">Checking latest release…</p>
+        <p class="meta">
+          Version <strong data-field="version">1.0.0</strong>
+          · <strong data-field="sizeLabel">—</strong>
+          · Android 8.0+
+        </p>
+
+        <div class="share-box">
+          <label for="pageUrl">Share this link with players</label>
+          <div class="share-row">
+            <input id="pageUrl" type="text" readonly value="" />
+            <button type="button" id="copyUrlBtn">Copy</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="steps" aria-labelledby="how-title">
+        <h2 id="how-title">How to install &amp; login</h2>
+        <div class="step">
+          <div class="num">1</div>
+          <div>
+            <h3>Download APK</h3>
+            <p>Tap Download App. Save the file on your Android phone.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <div>
+            <h3>Allow install</h3>
+            <p>If asked, allow install from Chrome / Files in Android settings.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <div>
+            <h3>Install WAREZONE</h3>
+            <p>Open the downloaded APK and tap Install.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <div>
+            <h3>Open &amp; login</h3>
+            <p>Launch the app, create an account or login, then join tournaments.</p>
+          </div>
+        </div>
+      </section>
+
+      <p class="note">
+        <strong>Tip:</strong> Always download from this official page only. After install, open WAREZONE and login to start playing.
+      </p>
+
+      <footer>© <span id="year"></span> WAREZONE · Official Android download</footer>
     </div>
   </div>
 
-  <header class="sticky top-0 z-40 border-b border-white/5 bg-ink/70 backdrop-blur-xl">
-    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-      <a href="/download" class="flex items-center gap-3">
-        <img src="/brand/logo.png" alt="WarZone AMR" class="h-10 w-10 rounded-full logo-ring object-cover" />
-        <span class="font-display text-sm font-bold tracking-wide sm:text-base">WarZone <span class="text-orange">AMR</span></span>
-      </a>
-      <a href="#download" class="rounded-full bg-purple/20 px-4 py-2 text-xs font-semibold text-purple ring-1 ring-purple/40 transition hover:bg-purple/30 sm:text-sm">Get APK</a>
-    </div>
-  </header>
-
-  <main>
-    <!-- Hero -->
-    <section class="relative mx-auto max-w-6xl px-4 pb-16 pt-12 sm:px-6 sm:pt-20">
-      <div class="flex flex-col items-center text-center">
-        <span id="versionBadge" class="badge mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-slate-200">
-          <span class="h-2 w-2 animate-pulse rounded-full bg-orange"></span>
-          Latest · v<span data-field="version">1.0.0</span>
-        </span>
-        <img src="/brand/logo.png" alt="WarZone AMR Tournament logo" class="mb-8 h-36 w-36 rounded-full logo-ring object-cover sm:h-44 sm:w-44" />
-        <h1 class="font-display text-3xl font-extrabold leading-tight tracking-wide sm:text-5xl">
-          WarZone <span class="bg-gradient-to-r from-purple to-orange bg-clip-text text-transparent">AMR</span> Tournament
-        </h1>
-        <p class="mt-3 font-display text-sm uppercase tracking-[0.2em] text-orange sm:text-base">
-          India's Ultimate Esports Tournament Platform
-        </p>
-        <p class="mt-5 max-w-2xl text-sm leading-relaxed text-slate-300 sm:text-base">
-          Compete in Free Fire tournaments, manage your wallet, track live matches, and claim prizes instantly —
-          all in one premium Android app built for serious players.
-        </p>
-        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <a href="#download" class="btn-download inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-sm font-bold text-white sm:text-base">
-            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3a1 1 0 011 1v8.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V4a1 1 0 011-1z"/><path d="M4 16a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z"/></svg>
-            Download APK
-          </a>
-          <a href="#features" class="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-slate-200 transition hover:border-purple/40 hover:bg-white/10">Explore Features</a>
-        </div>
-      </div>
-    </section>
-
-    <!-- App info -->
-    <section class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" id="info">
-      <div class="glass card-anim rounded-3xl p-6 sm:p-8">
-        <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
-          <h2 class="font-display text-xl font-bold sm:text-2xl">App Information</h2>
-          <span class="text-xs text-slate-400">Auto-synced from release</span>
-        </div>
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5">
-            <p class="text-xs uppercase tracking-wider text-slate-400">Current Version</p>
-            <p class="mt-1 font-display text-lg font-bold text-purple" data-field="version">1.0.0</p>
-          </div>
-          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5">
-            <p class="text-xs uppercase tracking-wider text-slate-400">APK Size</p>
-            <p class="mt-1 font-display text-lg font-bold text-orange" data-field="sizeLabel">—</p>
-          </div>
-          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5">
-            <p class="text-xs uppercase tracking-wider text-slate-400">Last Updated</p>
-            <p class="mt-1 font-display text-lg font-bold" data-field="lastUpdatedLabel">—</p>
-          </div>
-          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5">
-            <p class="text-xs uppercase tracking-wider text-slate-400">Android Requirement</p>
-            <p class="mt-1 text-base font-semibold" data-field="androidMin">Android 8.0+</p>
-          </div>
-          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5">
-            <p class="text-xs uppercase tracking-wider text-slate-400">Downloads</p>
-            <p class="mt-1 font-display text-lg font-bold text-purple" data-field="downloadCount">0</p>
-          </div>
-          <div class="rounded-2xl bg-black/25 p-4 ring-1 ring-white/5 sm:col-span-2 lg:col-span-1">
-            <p class="text-xs uppercase tracking-wider text-slate-400">Status</p>
-            <p class="mt-1 text-base font-semibold" id="apkStatus">Checking…</p>
-          </div>
-        </div>
-        <div class="mt-6 rounded-2xl border border-dashed border-purple/30 bg-purple/5 p-4">
-          <p class="text-xs font-semibold uppercase tracking-wider text-purple">Release Notes</p>
-          <p class="mt-2 text-sm leading-relaxed text-slate-300" data-field="releaseNotes">Loading…</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Screenshots -->
-    <section class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" id="screenshots">
-      <h2 class="mb-6 text-center font-display text-xl font-bold sm:text-2xl">App Screenshots</h2>
-      <div class="shot-track" id="shotTrack">
-        <div class="shot glass"><img src="/brand/logo.png" alt="WarZone AMR logo" class="h-full w-full object-cover" /></div>
-        <div class="shot glass flex items-center justify-center bg-gradient-to-br from-purple/40 to-orange/30 p-6 text-center">
-          <p class="font-display text-sm font-bold">Tournaments · Wallet · Live Matches</p>
-        </div>
-        <div class="shot glass flex items-center justify-center bg-gradient-to-br from-ink to-purple/40 p-6 text-center">
-          <p class="font-display text-sm font-bold">Secure · Fast · Competitive</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Features -->
-    <section class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" id="features">
-      <h2 class="mb-8 text-center font-display text-xl font-bold sm:text-2xl">Why Players Choose WarZone AMR</h2>
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <article class="glass card-anim rounded-3xl p-6">
-          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple/20 text-xl text-purple">🏆</div>
-          <h3 class="font-display text-base font-bold">Create Tournament</h3>
-          <p class="mt-2 text-sm text-slate-400">Host competitive Free Fire matches with custom rules and prize pools.</p>
-        </article>
-        <article class="glass card-anim rounded-3xl p-6">
-          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange/20 text-xl text-orange">🎮</div>
-          <h3 class="font-display text-base font-bold">Join Tournament</h3>
-          <p class="mt-2 text-sm text-slate-400">Find live contests, book slots, and enter with one tap.</p>
-        </article>
-        <article class="glass card-anim rounded-3xl p-6">
-          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple/20 text-xl text-purple">📡</div>
-          <h3 class="font-display text-base font-bold">Live Match Updates</h3>
-          <p class="mt-2 text-sm text-slate-400">Stay on top of room IDs, schedules, and results in real time.</p>
-        </article>
-        <article class="glass card-anim rounded-3xl p-6">
-          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange/20 text-xl text-orange">👛</div>
-          <h3 class="font-display text-base font-bold">Wallet System</h3>
-          <p class="mt-2 text-sm text-slate-400">Secure top-ups, entry fees, and transparent transaction history.</p>
-        </article>
-        <article class="glass card-anim rounded-3xl p-6">
-          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple/20 text-xl text-purple">⚡</div>
-          <h3 class="font-display text-base font-bold">Instant Prize Distribution</h3>
-          <p class="mt-2 text-sm text-slate-400">Winnings credited to your wallet after verified match results.</p>
-        </article>
-        <article class="glass card-anim rounded-3xl p-6">
-          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange/20 text-xl text-orange">🔐</div>
-          <h3 class="font-display text-base font-bold">Secure Login</h3>
-          <p class="mt-2 text-sm text-slate-400">Protected accounts with session auth and encrypted API access.</p>
-        </article>
-      </div>
-    </section>
-
-    <!-- Download CTA -->
-    <section class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" id="download">
-      <div class="glass card-anim relative overflow-hidden rounded-3xl p-8 text-center sm:p-12">
-        <div class="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-purple/20 blur-3xl"></div>
-        <div class="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-orange/15 blur-3xl"></div>
-        <h2 class="relative font-display text-2xl font-bold sm:text-3xl">Ready to Compete?</h2>
-        <p class="relative mx-auto mt-3 max-w-lg text-sm text-slate-300">
-          Download the latest Android APK. Direct install — no Play Store required.
-        </p>
-        <button
-          id="downloadBtn"
-          type="button"
-          class="btn-download relative mt-8 inline-flex items-center gap-3 rounded-2xl px-10 py-5 text-base font-bold text-white sm:text-lg"
-        >
-          <span id="downloadBtnLabel">Download WarZone AMR v1.0.0</span>
-        </button>
-        <p id="downloadHint" class="relative mt-4 text-xs text-slate-500">Preparing download link…</p>
-      </div>
-    </section>
-
-    <!-- Install guide -->
-    <section class="mx-auto max-w-6xl px-4 pb-16 sm:px-6" id="install">
-      <h2 class="mb-8 text-center font-display text-xl font-bold sm:text-2xl">Installation Guide</h2>
-      <ol class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <li class="glass card-anim rounded-3xl p-6">
-          <span class="font-display text-3xl font-bold text-purple">01</span>
-          <h3 class="mt-3 font-semibold">Download APK</h3>
-          <p class="mt-2 text-sm text-slate-400">Tap the download button and save the file to your phone.</p>
-        </li>
-        <li class="glass card-anim rounded-3xl p-6">
-          <span class="font-display text-3xl font-bold text-orange">02</span>
-          <h3 class="mt-3 font-semibold">Enable Unknown Apps</h3>
-          <p class="mt-2 text-sm text-slate-400">Allow install from your browser or file manager in Android settings.</p>
-        </li>
-        <li class="glass card-anim rounded-3xl p-6">
-          <span class="font-display text-3xl font-bold text-purple">03</span>
-          <h3 class="mt-3 font-semibold">Install</h3>
-          <p class="mt-2 text-sm text-slate-400">Open the APK and confirm installation when prompted.</p>
-        </li>
-        <li class="glass card-anim rounded-3xl p-6">
-          <span class="font-display text-3xl font-bold text-orange">04</span>
-          <h3 class="mt-3 font-semibold">Open WarZone AMR</h3>
-          <p class="mt-2 text-sm text-slate-400">Launch the app, sign in, and join your first tournament.</p>
-        </li>
-      </ol>
-    </section>
-
-    <!-- FAQ -->
-    <section class="mx-auto max-w-3xl px-4 pb-20 sm:px-6" id="faq">
-      <h2 class="mb-8 text-center font-display text-xl font-bold sm:text-2xl">FAQ</h2>
-      <div class="space-y-3">
-        <details class="faq-item glass card-anim rounded-2xl p-5" open>
-          <summary class="flex items-center justify-between font-semibold">
-            Is this app safe?
-            <span class="text-purple">+</span>
-          </summary>
-          <p class="mt-3 text-sm leading-relaxed text-slate-400">
-            Yes. The APK is published by the WarZone AMR team. Always download from this official page only.
-          </p>
-        </details>
-        <details class="faq-item glass card-anim rounded-2xl p-5">
-          <summary class="flex items-center justify-between font-semibold">
-            Does it require Play Store?
-            <span class="text-purple">+</span>
-          </summary>
-          <p class="mt-3 text-sm leading-relaxed text-slate-400">
-            No. Install directly via APK. You may need to allow “Install unknown apps” for your browser.
-          </p>
-        </details>
-        <details class="faq-item glass card-anim rounded-2xl p-5">
-          <summary class="flex items-center justify-between font-semibold">
-            How to update?
-            <span class="text-purple">+</span>
-          </summary>
-          <p class="mt-3 text-sm leading-relaxed text-slate-400">
-            Return to this page and download the newest version. Install over the existing app — your account stays intact.
-          </p>
-        </details>
-        <details class="faq-item glass card-anim rounded-2xl p-5">
-          <summary class="flex items-center justify-between font-semibold">
-            Is it free?
-            <span class="text-purple">+</span>
-          </summary>
-          <p class="mt-3 text-sm leading-relaxed text-slate-400">
-            The app is free to download. Tournament entry fees and wallet top-ups apply as shown in-app.
-          </p>
-        </details>
-      </div>
-    </section>
-  </main>
-
-  <footer class="border-t border-white/5 bg-black/30">
-    <div class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-10 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-      <p>© <span id="year"></span> WarZone AMR Tournament. All rights reserved.</p>
-      <nav class="flex flex-wrap gap-4">
-        <a class="hover:text-purple" href="mailto:support@warzoneamr.com">Contact</a>
-        <a class="hover:text-purple" href="#faq">Privacy Policy</a>
-        <a class="hover:text-purple" href="#faq">Terms</a>
-      </nav>
-    </div>
-  </footer>
+  <div class="sticky-bar">
+    <button id="downloadBtnSticky" class="cta" type="button" disabled>
+      <span id="downloadBtnStickyLabel">Download App</span>
+    </button>
+  </div>
 
   <script>
     (function () {
@@ -368,10 +357,39 @@
 
       const loader = document.getElementById('loader');
       const btn = document.getElementById('downloadBtn');
+      const btnSticky = document.getElementById('downloadBtnSticky');
       const btnLabel = document.getElementById('downloadBtnLabel');
+      const btnStickyLabel = document.getElementById('downloadBtnStickyLabel');
       const hint = document.getElementById('downloadHint');
-      const apkStatus = document.getElementById('apkStatus');
+      const pageUrlInput = document.getElementById('pageUrl');
+      const toast = document.getElementById('toast');
       let release = null;
+      let toastTimer = null;
+
+      const pageUrl = window.location.origin + '/download';
+      pageUrlInput.value = pageUrl;
+
+      function showToast(msg) {
+        toast.textContent = msg || 'Link copied';
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+      }
+
+      async function copyText(text) {
+        try {
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            pageUrlInput.focus();
+            pageUrlInput.select();
+            document.execCommand('copy');
+          }
+          showToast('Download link copied');
+        } catch (_) {
+          showToast('Copy failed — select the link manually');
+        }
+      }
 
       function setFields(data) {
         document.querySelectorAll('[data-field]').forEach((el) => {
@@ -380,48 +398,58 @@
         });
       }
 
+      function setEnabled(on) {
+        btn.disabled = !on;
+        btnSticky.disabled = !on;
+      }
+
+      function startDownload() {
+        if (!release || !release.apkExists) return;
+        const url = release.downloadUrl || ('/downloads/' + encodeURIComponent(release.fileName));
+        const a = document.createElement('a');
+        a.href = url;
+        a.setAttribute('download', release.fileName || 'WAREZONE.apk');
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+
       async function loadRelease() {
         try {
-          const res = await fetch('/api/download/release', { headers: { Accept: 'application/json' } });
+          const res = await fetch('/api/download/release', {
+            headers: {
+              Accept: 'application/json',
+              'ngrok-skip-browser-warning': '1',
+            },
+          });
           const json = await res.json();
           if (!json.success || !json.release) throw new Error(json.message || 'Failed');
           release = json.release;
           setFields(release);
-          btnLabel.textContent = release.downloadLabel || ('Download WarZone AMR v' + release.version);
+          const label = release.downloadLabel || ('Download WAREZONE v' + release.version);
+          btnLabel.textContent = label;
+          btnStickyLabel.textContent = label;
           if (release.apkExists) {
-            apkStatus.textContent = 'Available';
-            apkStatus.className = 'mt-1 text-base font-semibold text-emerald-400';
-            hint.textContent = 'Secure direct download · counted automatically';
-            btn.disabled = false;
+            hint.textContent = 'Ready · free download · then open & login';
+            setEnabled(true);
           } else {
-            apkStatus.textContent = 'APK pending upload';
-            apkStatus.className = 'mt-1 text-base font-semibold text-amber-400';
-            hint.textContent = 'Place the APK in public/downloads/' + release.fileName;
-            btn.disabled = true;
+            hint.textContent = 'APK file missing on server. Place WarZone-AMR-v1.0.0.apk in public/downloads.';
+            setEnabled(false);
           }
         } catch (e) {
-          apkStatus.textContent = 'Could not load release info';
-          apkStatus.className = 'mt-1 text-base font-semibold text-red-400';
-          hint.textContent = 'Check that the backend is running.';
-          btn.disabled = true;
+          hint.textContent = 'Could not reach server. Open: ' + pageUrl;
+          setEnabled(false);
         } finally {
           loader.classList.add('hide');
           loader.setAttribute('aria-busy', 'false');
         }
       }
 
-      btn.addEventListener('click', function () {
-        if (!release || !release.apkExists) return;
-        const url = release.downloadUrl || ('/downloads/' + encodeURIComponent(release.fileName));
-        window.location.href = url;
-        // Optimistic bump; next refresh shows server count
-        const countEl = document.querySelector('[data-field="downloadCount"]');
-        if (countEl) {
-          const n = parseInt(countEl.textContent, 10) || 0;
-          countEl.textContent = String(n + 1);
-        }
-      });
-
+      btn.addEventListener('click', startDownload);
+      btnSticky.addEventListener('click', startDownload);
+      document.getElementById('copyUrlBtn').addEventListener('click', () => copyText(pageUrl));
+      document.getElementById('copyPageBtn').addEventListener('click', () => copyText(pageUrl));
       loadRelease();
     })();
   </script>

@@ -75,6 +75,22 @@ function warnOnce(...args) {
  * Resolved API base including /api suffix, e.g. https://api.example.com/api
  */
 export function getApiUrl() {
+  // PC browser (admin web): use local backend on same machine — avoids ngrok 502 / interstitial.
+  // Override with EXPO_PUBLIC_API_URL_WEB if needed.
+  if (Platform.OS === 'web' && __DEV__ && typeof window !== 'undefined') {
+    const pageHost = String(window.location?.hostname || '').toLowerCase();
+    if (pageHost === 'localhost' || pageHost === '127.0.0.1') {
+      const webOverride = process.env.EXPO_PUBLIC_API_URL_WEB;
+      if (webOverride) {
+        return normalizeApiBase(webOverride);
+      }
+      warnOnce(
+        '[API] Web admin on localhost → using http://localhost:5000/api (start backend with npm run dev).'
+      );
+      return 'http://localhost:5000/api';
+    }
+  }
+
   const configured = normalizeApiBase(readConfiguredUrl());
   if (configured) {
     try {
@@ -144,7 +160,17 @@ export function getApiConfigDiagnostics() {
     protocol,
     isPrivate,
     platform: Platform.OS,
-    source: readConfiguredUrl() ? 'EXPO_PUBLIC_API_URL' : __DEV__ ? 'expo-dev-fallback' : 'missing',
+    source:
+      Platform.OS === 'web' &&
+      typeof window !== 'undefined' &&
+      ['localhost', '127.0.0.1'].includes(String(window.location?.hostname || '').toLowerCase()) &&
+      !process.env.EXPO_PUBLIC_API_URL_WEB
+        ? 'web-localhost'
+        : readConfiguredUrl()
+          ? 'EXPO_PUBLIC_API_URL'
+          : __DEV__
+            ? 'expo-dev-fallback'
+            : 'missing',
   };
 }
 

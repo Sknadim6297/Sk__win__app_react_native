@@ -1,7 +1,9 @@
 const crypto = require('crypto');
 const { assertCashfreeReady, getCashfreeConfig } = require('../config/cashfree');
+const { assertPaymentsEnabled } = require('../config/payments');
 
 async function cashfreeFetch(path, { method = 'GET', body } = {}) {
+  assertPaymentsEnabled();
   const cfg = assertCashfreeReady();
   const url = `${cfg.baseUrl}${path}`;
   const headers = {

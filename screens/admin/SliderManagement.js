@@ -15,10 +15,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { COLORS, TEXT, TYPO } from '../../styles/theme';
 import { sliderService, uploadImageFile } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import { ensureMediaLibraryPermission, launchImageLibrary } from '../../utils/imagePicker';
 import Toast from '../../components/Toast';
 
 export default function SliderManagement({ navigation }) {
@@ -60,22 +60,24 @@ export default function SliderManagement({ navigation }) {
 
   const pickImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
+      const allowed = await ensureMediaLibraryPermission();
+      if (!allowed) {
         showToast('Gallery permission required');
         return;
       }
-      const mediaTypes = ImagePicker.MediaType?.Images ?? ImagePicker.MediaTypeOptions?.Images;
-      const result = await ImagePicker.launchImageLibraryAsync({
-        ...(mediaTypes ? { mediaTypes } : {}),
+      const result = await launchImageLibrary({
         allowsEditing: true,
         aspect: [16, 9],
         quality: 0.85,
       });
       if (result.canceled || !result.assets?.length) return;
 
+      const asset = result.assets[0];
       setUploading(true);
-      const upload = await uploadImageFile(result.assets[0].uri);
+      const upload = await uploadImageFile(asset.uri, {
+        file: asset.file,
+        fileName: asset.fileName || asset.name,
+      });
       setForm((p) => ({ ...p, image: upload.url || upload.path }));
       showToast('Banner image uploaded', 'success');
     } catch (e) {

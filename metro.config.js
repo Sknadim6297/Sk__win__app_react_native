@@ -10,13 +10,21 @@ config.resolver.resolverMainFields = ['main', 'module', 'react-native'];
 
 const defaultResolveRequest = config.resolver.resolveRequest;
 
-// Redirect project `react-native` imports to themed wrapper (DM Sans on Text/TextInput).
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   // qrcode's package "main" points at Node server (fs/png). RN/Expo needs the
   // pure core used by react-native-qrcode-svg's genMatrix (QRCode.create only).
   if (moduleName === 'qrcode') {
     return {
       filePath: path.resolve(projectRoot, 'node_modules/qrcode/lib/core/qrcode.js'),
+      type: 'sourceFile',
+    };
+  }
+
+  // Only ship Ionicons + MaterialCommunityIcons fonts (saves ~3MB+ of unused .ttf).
+  // Deep paths like `@expo/vector-icons/Ionicons` still resolve normally.
+  if (moduleName === '@expo/vector-icons') {
+    return {
+      filePath: path.resolve(projectRoot, 'utils/expoVectorIcons.js'),
       type: 'sourceFile',
     };
   }

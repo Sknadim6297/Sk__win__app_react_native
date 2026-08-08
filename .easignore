@@ -1,11 +1,20 @@
 # Keep EAS upload slim (does not affect runtime features)
 dist/
 web-build/
+.apk-size-check/
 .expo/
+.expo-web-check/
+.expo-safe-check/
 *.original.*
 public/downloads/*.apk
 node_modules/
 backend/
 docs/
+download-site/
 **/*.md
 !README.md
+**/*.backup.js
+**/*Screen.backup.js
+screens/HomeScreenOld.js
+.git/
+*.apk

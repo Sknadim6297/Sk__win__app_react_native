@@ -278,7 +278,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           </Text>
           {(team.players || []).map((p, i) => (
             <Text key={`${team._id}-${i}`} style={styles.teamPlayer}>
-              {i + 1}. {p.name || p}
+              {`${i + 1}. ${p.name || p}`}
             </Text>
           ))}
         </View>
@@ -363,7 +363,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           ) : (
             rules.map((rule, idx) => (
               <Text key={idx} style={styles.ruleLine}>
-                {idx + 1}. {rule}
+                {`${idx + 1}. ${rule}`}
               </Text>
             ))
           )}

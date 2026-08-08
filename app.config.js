@@ -67,14 +67,26 @@ module.exports = ({ config }) => ({
           // Reanimated 4 (SDK 54) requires New Architecture
           newArchEnabled: true,
           usesCleartextTraffic: usesHttp,
-          // Release APK size / performance
+          // Compress native .so libs in APK (largest practical size win for sideload APKs)
+          useLegacyPackaging: true,
+          // Compress JS bundle inside APK
+          enableBundleCompression: true,
+          // R8 minify + resource shrink + PNG crunch
           enableMinifyInReleaseBuilds: true,
           enableShrinkResourcesInReleaseBuilds: true,
           enablePngCrunchInReleaseBuilds: true,
-          useLegacyPackaging: true,
-          // Phone APKs: arm64 only (drops 32-bit + emulator ABIs). Biggest native size cut.
-          // Trade-off: very old 32-bit-only Android devices cannot install this build.
-          abiFilters: ['arm64-v8a'],
+          // Disable network inspector tooling in release native builds
+          networkInspector: false,
+          // Phone APK: 64-bit only (drops armeabi-v7a / x86 / x86_64 from RN natives)
+          buildArchs: ['arm64-v8a'],
+          // Keep RN/Expo reflective entry points when R8 runs
+          extraProguardRules: [
+            '-keep class com.facebook.react.** { *; }',
+            '-keep class com.facebook.hermes.** { *; }',
+            '-keep class com.swmansion.** { *; }',
+            '-keep class com.th3rdwave.safeareacontext.** { *; }',
+            '-dontwarn com.facebook.react.**',
+          ].join('\n'),
         },
         ios: {
           newArchEnabled: true,
@@ -82,8 +94,11 @@ module.exports = ({ config }) => ({
       },
     ],
   ].filter((plugin, index, list) => {
+    // Prefer later entries (app.config.js overrides app.json duplicates)
     const name = Array.isArray(plugin) ? plugin[0] : plugin;
-    return list.findIndex((p) => (Array.isArray(p) ? p[0] : p) === name) === index;
+    return (
+      list.findLastIndex((p) => (Array.isArray(p) ? p[0] : p) === name) === index
+    );
   }),
   ios: {
     ...config.ios,
@@ -105,5 +120,12 @@ module.exports = ({ config }) => ({
     // still resolve it via Constants.expoConfig.extra even if env inlining fails.
     apiUrl: (apiUrl || process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '') || undefined,
     appName: process.env.EXPO_PUBLIC_APP_NAME || config.name || 'WAREZONE Tournament',
+    // Master payment switch (testing). Set EXPO_PUBLIC_PAYMENT_ENABLED=true to turn on.
+    paymentEnabled:
+      process.env.EXPO_PUBLIC_PAYMENT_ENABLED !== undefined
+        ? ['true', '1', 'yes', 'on'].includes(
+            String(process.env.EXPO_PUBLIC_PAYMENT_ENABLED).trim().toLowerCase()
+          )
+        : false,
   },
 });

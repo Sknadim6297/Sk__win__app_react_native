@@ -30,9 +30,13 @@ const UserDetails = ({ navigation, route }) => {
   const fetchUserDetails = async () => {
     try {
       setLoading(true);
-      console.log('Fetching user details for userId:', userId);
+      if (__DEV__) {
+        console.log('Fetching user details for userId:', userId);
+      }
       const data = await adminService.getUserDetails(userId);
-      console.log('User details fetched successfully:', data);
+      if (__DEV__) {
+        console.log('User details fetched successfully:', data);
+      }
       setUserDetails(data);
     } catch (error) {
       console.error('Error fetching user details:', error);

@@ -33,7 +33,7 @@ const AccountProfileScreen = ({ navigation }) => {
       const data = await userService.getProfile();
       setProfileData(data);
     } catch (error) {
-      console.log('Error loading profile:', error.message);
+      console.error('Error loading profile:', error.message);
     } finally {
       if (!silent) setLoading(false);
       setRefreshing(false);

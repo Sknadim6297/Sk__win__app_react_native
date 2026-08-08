@@ -8,9 +8,10 @@ import {
   StatusBar,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
 import { adminService } from '../../services/api';
 import { COLORS } from '../../styles/theme';
@@ -354,6 +355,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    ...(Platform.OS === 'web'
+      ? {
+          height: '100%',
+          minHeight: '100vh',
+          width: '100%',
+        }
+      : null),
   },
   scrollView: {
     flex: 1,
@@ -366,6 +374,13 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingTop: 15,
     backgroundColor: COLORS.primary,
+    ...(Platform.OS === 'web'
+      ? {
+          maxWidth: 1100,
+          width: '100%',
+          alignSelf: 'center',
+        }
+      : null),
   },
   headerContent: {
     flexDirection: 'row',
@@ -404,6 +419,13 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingTop: 20,
+    ...(Platform.OS === 'web'
+      ? {
+          maxWidth: 1100,
+          width: '100%',
+          alignSelf: 'center',
+        }
+      : null),
   },
   sectionTitle: {
     fontSize: 16,
@@ -421,7 +443,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   metricCard: {
-    width: '48%',
+    width: Platform.OS === 'web' ? '32%' : '48%',
+    minWidth: Platform.OS === 'web' ? 220 : undefined,
+    flexGrow: 1,
     backgroundColor: COLORS.lightGray,
     borderRadius: 14,
     padding: 12,
@@ -490,6 +514,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderRadius: 14,
     overflow: 'hidden',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : null),
   },
   actionGradient: {
     padding: 0,
@@ -533,6 +558,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 10,
     borderLeftWidth: 4,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : null),
   },
   secondaryIcon: {
     marginRight: 12,
@@ -554,6 +580,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: Platform.OS === 'web' ? 320 : undefined,
   },
   loadingText: {
     color: COLORS.white,

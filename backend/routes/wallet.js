@@ -4,6 +4,11 @@ const WalletTransaction = require('../models/WalletTransaction');
 const Notification = require('../models/Notification');
 const CoinPack = require('../models/CoinPack');
 const { authMiddleware } = require('../middleware/auth');
+const {
+  isPaymentEnabled,
+  PAYMENT_DISABLED_MESSAGE,
+  WITHDRAW_DISABLED_MESSAGE,
+} = require('../config/payments');
 const router = express.Router();
 
 // Get wallet balance
@@ -36,11 +41,12 @@ router.get('/balance', authMiddleware, async (req, res) => {
   }
 });
 
-// Top up wallet (legacy / demo only — blocked when Cashfree QR is enabled)
+// Top up wallet (testing / demo path — used when Cashfree QR gateway is not live)
 router.post('/topup', authMiddleware, async (req, res) => {
   try {
     const { getCashfreeConfig } = require('../config/cashfree');
-    if (getCashfreeConfig().ready) {
+    // When real gateway is live, force Cashfree QR — no direct credit shortcut
+    if (isPaymentEnabled() && getCashfreeConfig().ready) {
       return res.status(403).json({
         success: false,
         code: 'USE_CASHFREE_QR',
@@ -73,14 +79,18 @@ router.post('/topup', authMiddleware, async (req, res) => {
       });
     }
 
+    const methodLabel = isPaymentEnabled() ? paymentMethod : 'testing';
+
     // Create transaction
     const transaction = new WalletTransaction({
       userId: req.userId,
       type: 'deposit',
       amount: amountNum,
-      paymentMethod,
+      paymentMethod: methodLabel,
       transactionId,
-      description: `Wallet top-up via ${paymentMethod}`,
+      description: isPaymentEnabled()
+        ? `Wallet top-up via ${methodLabel}`
+        : `Testing top-up (gateway off) · ₹${amountNum}`,
       status: 'completed',
     });
 
@@ -90,7 +100,7 @@ router.post('/topup', authMiddleware, async (req, res) => {
       userId: req.userId,
       type: 'wallet',
       title: 'Wallet Top-up Successful',
-      message: `₹${amountNum} added to your wallet. Current balance: ₹${user.wallet.balance}.`,
+      message: `₹${amountNum} added to your wallet. Current balance: ₹${(user.wallet.balance || 0) + amountNum}.`,
     });
 
     // Update wallet
@@ -113,6 +123,14 @@ router.post('/topup', authMiddleware, async (req, res) => {
 // Withdraw from wallet
 router.post('/withdraw', authMiddleware, async (req, res) => {
   try {
+    if (!isPaymentEnabled()) {
+      return res.status(503).json({
+        success: false,
+        code: 'PAYMENT_DISABLED',
+        message: WITHDRAW_DISABLED_MESSAGE,
+      });
+    }
+
     const { amount, bankDetails } = req.body;
 
     // Validate amount
@@ -175,6 +193,14 @@ router.post('/withdraw', authMiddleware, async (req, res) => {
 // Buy coin pack (admin-configured)
 router.post('/buy-pack', authMiddleware, async (req, res) => {
   try {
+    if (!isPaymentEnabled()) {
+      return res.status(503).json({
+        success: false,
+        code: 'PAYMENT_DISABLED',
+        message: PAYMENT_DISABLED_MESSAGE,
+      });
+    }
+
     const { packId } = req.body;
     if (!packId) {
       return res.status(400).json({ success: false, message: 'Pack ID required' });

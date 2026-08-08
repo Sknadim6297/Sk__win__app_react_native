@@ -1,7 +1,13 @@
 import React, { useContext, useEffect } from 'react';
-import { InteractionManager, LogBox, View, StyleSheet, StatusBar } from 'react-native';
+import { InteractionManager, LogBox, View, StyleSheet, StatusBar, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
+import { enableScreens } from 'react-native-screens';
+
+// react-native-screens often blanks stack cards on web — disable native screens there.
+if (Platform.OS === 'web') {
+  enableScreens(false);
+}
 
 LogBox.ignoreLogs([
   "Codegen didn't run",
@@ -18,10 +24,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import {
   DMSans_400Regular,
+} from '@expo-google-fonts/dm-sans/400Regular';
+import {
   DMSans_500Medium,
+} from '@expo-google-fonts/dm-sans/500Medium';
+import {
   DMSans_600SemiBold,
+} from '@expo-google-fonts/dm-sans/600SemiBold';
+import {
   DMSans_700Bold,
-} from '@expo-google-fonts/dm-sans';
+} from '@expo-google-fonts/dm-sans/700Bold';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { logApiConfig } from './utils/apiConfig';
 // Eager: first paint / auth gate only
@@ -35,6 +47,7 @@ import { applyGlobalTypography } from './styles/typography';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+const IS_WEB = Platform.OS === 'web';
 
 /** Defer screen module evaluation until first navigation (faster cold start). */
 const screen = (loader) => ({ getComponent: loader });
@@ -47,7 +60,7 @@ function MainTabNavigator() {
       screenOptions={{
         headerShown: false,
         lazy: true,
-        freezeOnBlur: true,
+        freezeOnBlur: !IS_WEB,
       }}
     >
       <Tab.Screen name="HomeTab" component={HomeScreen} />
@@ -127,9 +140,16 @@ function AppNavigator() {
         screenOptions={{
           headerShown: false,
           gestureEnabled: false,
-          freezeOnBlur: true,
-          detachInactiveScreens: true,
-          cardStyle: { backgroundColor: WELCOME_BG },
+          // freeze/detach blank out screens on react-native-web
+          freezeOnBlur: !IS_WEB,
+          detachInactiveScreens: !IS_WEB,
+          cardStyle: { backgroundColor: WELCOME_BG, flex: 1 },
+          ...(IS_WEB
+            ? {
+                animationEnabled: false,
+                presentation: 'card',
+              }
+            : null),
         }}
       >
         {!isAuthenticated ? (
@@ -206,5 +226,12 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: WELCOME_BG,
+    ...(IS_WEB
+      ? {
+          height: '100%',
+          minHeight: '100vh',
+          width: '100%',
+        }
+      : null),
   },
 });

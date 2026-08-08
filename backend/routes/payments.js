@@ -5,6 +5,11 @@ const PaymentOrder = require('../models/PaymentOrder');
 const PaymentLog = require('../models/PaymentLog');
 const { authMiddleware } = require('../middleware/auth');
 const { getCashfreeConfig, assertCashfreeReady } = require('../config/cashfree');
+const {
+  isPaymentEnabled,
+  requirePaymentsEnabled,
+  PAYMENT_DISABLED_MESSAGE,
+} = require('../config/payments');
 const cashfree = require('../services/cashfreeService');
 const { creditWalletForPaymentOrder } = require('../services/walletCreditService');
 
@@ -27,6 +32,7 @@ async function writeLog(entry) {
 
 function userFacingError(code, fallback) {
   const map = {
+    PAYMENT_DISABLED: PAYMENT_DISABLED_MESSAGE,
     CASHFREE_DISABLED: 'QR payments are temporarily unavailable. Please try again later.',
     CASHFREE_NOT_CONFIGURED: 'Payment gateway is not configured yet. Please contact support.',
     CASHFREE_API_ERROR: 'Unable to reach the payment gateway. Please try again.',
@@ -48,15 +54,24 @@ function userFacingError(code, fallback) {
 /** Public status for app — no secrets */
 router.get('/config', authMiddleware, async (req, res) => {
   const cfg = getCashfreeConfig();
+  const paymentsOn = isPaymentEnabled();
   res.json({
     success: true,
-    enabled: cfg.ready,
+    /** Usable for real QR top-up only when master switch + Cashfree are both ready */
+    enabled: paymentsOn && cfg.ready,
+    paymentEnabled: paymentsOn,
+    cashfreeReady: cfg.ready,
     environment: cfg.env,
     minAmount: cfg.minAmount,
     maxAmount: cfg.maxAmount,
     currency: cfg.currency,
     qrExpiryMinutes: cfg.qrExpiryMinutes,
     paymentMethod: 'cashfree_qr',
+    message: paymentsOn
+      ? cfg.ready
+        ? 'Payments enabled'
+        : 'Payment gateway is not configured yet'
+      : 'Testing mode: use wallet top-up (dummy coins). Cashfree is off.',
   });
 });
 
@@ -65,7 +80,7 @@ router.get('/config', authMiddleware, async (req, res) => {
  * POST /api/payments/cashfree/create-qr
  * body: { amount }
  */
-router.post('/cashfree/create-qr', authMiddleware, async (req, res) => {
+router.post('/cashfree/create-qr', authMiddleware, requirePaymentsEnabled, async (req, res) => {
   try {
     const cfg = assertCashfreeReady();
     const amountNum = parseFloat(req.body?.amount);
@@ -231,7 +246,7 @@ router.post('/cashfree/create-qr', authMiddleware, async (req, res) => {
  * Poll / verify payment status. Credits wallet on SUCCESS (idempotent).
  * GET /api/payments/cashfree/status/:orderId
  */
-router.get('/cashfree/status/:orderId', authMiddleware, async (req, res) => {
+router.get('/cashfree/status/:orderId', authMiddleware, requirePaymentsEnabled, async (req, res) => {
   try {
     assertCashfreeReady();
     const { orderId } = req.params;
@@ -474,6 +489,20 @@ router.post('/cashfree/cancel/:orderId', authMiddleware, async (req, res) => {
  */
 router.post('/cashfree/webhook', async (req, res) => {
   try {
+    if (!isPaymentEnabled()) {
+      await writeLog({
+        event: 'WEBHOOK_REJECTED_PAYMENT_DISABLED',
+        source: 'webhook',
+        success: false,
+        errorCode: 'PAYMENT_DISABLED',
+      });
+      return res.status(503).json({
+        success: false,
+        code: 'PAYMENT_DISABLED',
+        message: PAYMENT_DISABLED_MESSAGE,
+      });
+    }
+
     const rawBody =
       typeof req.rawBody === 'string'
         ? req.rawBody

@@ -61,11 +61,13 @@
           "android": {
             "newArchEnabled": true,
             "usesCleartextTraffic": true,
+            "useLegacyPackaging": true,
+            "enableBundleCompression": true,
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
             "enablePngCrunchInReleaseBuilds": true,
-            "useLegacyPackaging": true,
-            "abiFilters": [
+            "networkInspector": false,
+            "buildArchs": [
               "arm64-v8a"
             ]
           },

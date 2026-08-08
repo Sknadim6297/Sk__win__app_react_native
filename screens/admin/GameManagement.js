@@ -16,9 +16,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { gameService, uploadImageFile } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import { ensureMediaLibraryPermission, launchImageLibrary } from '../../utils/imagePicker';
 import { COLORS } from '../../styles/theme';
 
 const GameManagement = ({ navigation }) => {
@@ -286,23 +286,26 @@ const GameManagement = ({ navigation }) => {
 
   const pickGameImage = async () => {
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
+      const allowed = await ensureMediaLibraryPermission();
+      if (!allowed) {
         Alert.alert('Permission Required', 'Please allow access to photo library');
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      const result = await launchImageLibrary({
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
         setUploading(true);
         try {
-          const uploadResult = await uploadImageFile(result.assets[0].uri);
+          const uploadResult = await uploadImageFile(asset.uri, {
+            file: asset.file,
+            fileName: asset.fileName || asset.name,
+          });
           const imageUrl = uploadResult.path || uploadResult.url;
           if (!imageUrl) throw new Error('Upload succeeded but no image URL returned');
           setFormData((prev) => ({ ...prev, image: imageUrl }));
@@ -321,23 +324,26 @@ const GameManagement = ({ navigation }) => {
 
   const pickModeImage = async () => {
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
+      const allowed = await ensureMediaLibraryPermission();
+      if (!allowed) {
         Alert.alert('Permission Required', 'Please allow access to photo library');
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      const result = await launchImageLibrary({
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
         setUploadingMode(true);
         try {
-          const uploadResult = await uploadImageFile(result.assets[0].uri);
+          const uploadResult = await uploadImageFile(asset.uri, {
+            file: asset.file,
+            fileName: asset.fileName || asset.name,
+          });
           const imageUrl = uploadResult.path || uploadResult.url;
           if (!imageUrl) throw new Error('Upload succeeded but no image URL returned');
           setModeFormData((prev) => ({ ...prev, image: imageUrl }));

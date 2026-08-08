@@ -4,11 +4,6 @@ import { navigateToAddCoins } from '../utils/walletFlow';
 
 /**
  * Hook: show a centered insufficient-balance modal and deep-link to Add Coins.
- *
- * Usage:
- *   const { showInsufficientBalance, InsufficientBalanceDialog } = useInsufficientBalance(navigation);
- *   showInsufficientBalance({ tournamentId, returnScreen, requiredAmount, balance, forTeam: true });
- *   return (... <>{InsufficientBalanceDialog}</>);
  */
 export function useInsufficientBalance(navigation) {
   const [state, setState] = useState({

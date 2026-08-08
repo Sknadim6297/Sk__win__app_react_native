@@ -17,6 +17,17 @@ import ScreenHeader from '../components/navigation/ScreenHeader';
 import { AuthContext } from '../context/AuthContext';
 import { userService } from '../services/api';
 import AppIcon from '../components/ui/AppIcon';
+import { getApiOrigin } from '../utils/apiConfig';
+
+function getDownloadPageUrl() {
+  try {
+    const origin = getApiOrigin();
+    if (!origin || origin.includes('CONFIGURE_EXPO_PUBLIC_API_URL')) return '';
+    return `${origin}/download`;
+  } catch {
+    return '';
+  }
+}
 
 const ShareAppScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
@@ -46,10 +57,33 @@ const ShareAppScreen = ({ navigation }) => {
 
   const handleShare = async () => {
     try {
+      const downloadUrl = getDownloadPageUrl();
+      const linkLine = downloadUrl
+        ? `\n\nDownload the app:\n${downloadUrl}`
+        : '\n\nAsk me for the official download link.';
       await Share.share({
-        message: `Join WarZone Free Fire Tournament and play for real rewards! Use my referral code ${referralCode} during signup. I get ₹25 referral bonus when you register with my code.`,
-        title: 'Share WarZone Free Fire Tournament',
+        message: `Join WAREZONE and play Free Fire tournaments for real rewards! Use my referral code ${referralCode} during signup.${linkLine}`,
+        title: 'Download WAREZONE',
+        url: downloadUrl || undefined,
       });
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    }
+  };
+
+  const handleCopyDownloadLink = async () => {
+    const downloadUrl = getDownloadPageUrl();
+    if (!downloadUrl) {
+      Alert.alert('Unavailable', 'Download link is not configured yet.');
+      return;
+    }
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(downloadUrl);
+        Alert.alert('Copied', 'Download page link copied');
+        return;
+      }
+      await Share.share({ message: downloadUrl, title: 'WAREZONE Download' });
     } catch (error) {
       Alert.alert('Error', error.message);
     }
@@ -78,7 +112,7 @@ const ShareAppScreen = ({ navigation }) => {
           <AppIcon name="share-variant" size={40} light />
           <Text style={styles.heroTitle}>Invite friends</Text>
           <Text style={styles.heroSub}>
-            Share WarZone and earn ₹25 bonus when they register with your code
+            Share WAREZONE and earn ₹25 bonus when they register with your code
           </Text>
         </View>
 
@@ -93,6 +127,21 @@ const ShareAppScreen = ({ navigation }) => {
               <Text style={styles.copyText}>Copy</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        <Text style={pageStyles.sectionTitle}>App download link</Text>
+        <View style={pageStyles.card}>
+          <Text style={styles.linkText} numberOfLines={3}>
+            {getDownloadPageUrl() || 'Not configured'}
+          </Text>
+          <TouchableOpacity
+            style={[styles.copyBtn, { alignSelf: 'flex-start', marginTop: 12 }]}
+            onPress={handleCopyDownloadLink}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="link-outline" size={18} color={COLORS.white} />
+            <Text style={styles.copyText}>Copy link</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={pageStyles.primaryBtn} onPress={handleShare} activeOpacity={0.88}>
@@ -139,6 +188,11 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: 22,
     color: PAGE.cyan,
+  },
+  linkText: {
+    ...TEXT.caption,
+    color: PAGE.muted,
+    lineHeight: 18,
   },
   copyBtn: {
     flexDirection: 'row',

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Platform, View } from 'react-native';
-import { FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ICON } from '../../styles/typography';
 import { getIcons8Uri, resolveIconSlug } from '../../constants/icons8Map';
 import { resolveMciIcon } from '../../constants/iconMciMap';
@@ -8,8 +8,10 @@ import { resolveMciIcon } from '../../constants/iconMciMap';
 const USE_VECTOR_ICONS = Platform.OS === 'android';
 const CDN_LOAD_TIMEOUT_MS = 4500;
 
-/** Brand glyphs — not available in MaterialCommunityIcons */
-const BRAND_FA5 = {
+/**
+ * Brand glyphs via MaterialCommunityIcons (avoids bundling FontAwesome5 fonts ~360KB).
+ */
+const BRAND_MCI = {
   whatsapp: 'whatsapp',
   telegram: 'telegram',
   instagram: 'instagram',
@@ -18,6 +20,7 @@ const BRAND_FA5 = {
 
 /**
  * App icons: vector on Android; Icons8 on iOS with vector fallback.
+ * Uses only MaterialCommunityIcons — do not import unused icon font families.
  */
 export default function AppIcon({
   name,
@@ -49,12 +52,11 @@ export default function AppIcon({
     return getIcons8Uri(slug, pixelSize);
   }, [slug, pixelSize, light, muted, accent]);
 
-  const mciName = resolveMciIcon(name);
+  const brandMci = BRAND_MCI[name] || BRAND_MCI[slug];
+  const mciName = brandMci || resolveMciIcon(name);
   const vectorColor =
     color ||
     (accent ? `#${String(accent).replace('#', '')}` : light || !muted ? '#FFFFFF' : '#9CA3AF');
-
-  const brandIcon = BRAND_FA5[name] || BRAND_FA5[slug];
 
   useEffect(() => {
     if (USE_VECTOR_ICONS || !uri) return undefined;
@@ -70,11 +72,7 @@ export default function AppIcon({
           style,
         ]}
       >
-        {brandIcon ? (
-          <FontAwesome5 name={brandIcon} size={pixelSize * 0.92} color={vectorColor} brand />
-        ) : (
-          <MaterialCommunityIcons name={mciName} size={pixelSize} color={vectorColor} />
-        )}
+        <MaterialCommunityIcons name={mciName} size={pixelSize} color={vectorColor} />
       </View>
     );
   }

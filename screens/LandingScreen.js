@@ -32,7 +32,7 @@ const FEATURES = [
 
 const LandingScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const { isAuthenticated } = useContext(AuthContext);
+  const { isAuthenticated, isAdmin } = useContext(AuthContext);
 
   const screenOpacity = useSharedValue(0);
   const logoY = useSharedValue(28);
@@ -41,7 +41,8 @@ const LandingScreen = ({ navigation }) => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigation.replace('MainApp');
+      // Admin must never be sent to MainApp (missing in admin stack → blank web screen)
+      navigation.replace(isAdmin() ? 'AdminDashboard' : 'MainApp');
       return;
     }
 
@@ -49,7 +50,7 @@ const LandingScreen = ({ navigation }) => {
     logoY.value = withDelay(80, withTiming(0, { duration: 600, easing: Easing.out(Easing.cubic) }));
     contentY.value = withDelay(160, withTiming(0, { duration: 580, easing: Easing.out(Easing.cubic) }));
     footerY.value = withDelay(260, withTiming(0, { duration: 520, easing: Easing.out(Easing.cubic) }));
-  }, [contentY, footerY, isAuthenticated, logoY, navigation, screenOpacity]);
+  }, [contentY, footerY, isAdmin, isAuthenticated, logoY, navigation, screenOpacity]);
 
   const fadeStyle = useAnimatedStyle(() => ({ opacity: screenOpacity.value }));
 

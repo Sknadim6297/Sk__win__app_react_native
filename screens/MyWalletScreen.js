@@ -21,6 +21,7 @@ import AddCoinsModal from '../components/AddCoinsModal';
 import CenterDialog from '../components/CenterDialog';
 import { walletService, userService, paymentService } from '../services/api';
 import { clearWalletReturnParams } from '../utils/walletFlow';
+import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE } from '../utils/paymentConfig';
 
 const formatAmount = (value) => {
   const n = Number(value) || 0;
@@ -150,6 +151,20 @@ const MyWalletScreen = ({ navigation, route }) => {
     try {
       paymentInFlight.current = true;
       setProcessing(true);
+
+      // Testing (PAYMENT_ENABLED=false): credit dummy coins immediately — no Cashfree / no block alert.
+      if (!isPaymentEnabled()) {
+        const res = await walletService.topup({
+          amount: amountNum,
+          paymentMethod: 'testing',
+        });
+        setShowAddMoneyModal(false);
+        setAddAmount('');
+        await loadWalletData(true);
+        Alert.alert('Success', res?.message || `₹${amountNum} added to your wallet`);
+        return;
+      }
+
       const cfg = await paymentService.getConfig();
       if (cfg?.enabled) {
         setShowAddMoneyModal(false);
@@ -162,12 +177,17 @@ const MyWalletScreen = ({ navigation, route }) => {
         });
         return;
       }
-      Alert.alert(
-        'Payments unavailable',
-        cfg?.message || 'Cashfree QR is not enabled on the server.'
-      );
+
+      const res = await walletService.topup({
+        amount: amountNum,
+        paymentMethod: 'testing',
+      });
+      setShowAddMoneyModal(false);
+      setAddAmount('');
+      await loadWalletData(true);
+      Alert.alert('Success', res?.message || `₹${amountNum} added to your wallet`);
     } catch (err) {
-      Alert.alert('Payment Failed', err.message || 'Could not start payment.');
+      Alert.alert('Could not add coins', err.message || 'Check your connection and try again.');
     } finally {
       setProcessing(false);
       paymentInFlight.current = false;
@@ -176,6 +196,10 @@ const MyWalletScreen = ({ navigation, route }) => {
 
   const handleWithdraw = async () => {
     if (processing) return;
+    if (!isPaymentEnabled()) {
+      Alert.alert('Testing mode', WITHDRAW_DISABLED_MESSAGE);
+      return;
+    }
     const amountNum = parseFloat(withdrawAmount.trim());
     if (!withdrawAmount.trim() || Number.isNaN(amountNum) || amountNum <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
@@ -290,7 +314,13 @@ const MyWalletScreen = ({ navigation, route }) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: PAGE.purple }]}
-            onPress={() => setShowWithdrawModal(true)}
+            onPress={() => {
+              if (!isPaymentEnabled()) {
+                Alert.alert('Testing mode', WITHDRAW_DISABLED_MESSAGE);
+                return;
+              }
+              setShowWithdrawModal(true);
+            }}
             activeOpacity={0.88}
           >
             <MaterialCommunityIcons name="export" size={22} color={COLORS.white} />

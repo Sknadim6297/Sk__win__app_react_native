@@ -204,7 +204,7 @@ function ContestCard({ item, onPress }) {
             <Text style={styles.teamDetailsTitle}>Team details</Text>
             {team.players.slice(0, 4).map((p, i) => (
               <Text key={`${team._id}-${i}`} style={styles.teamPlayer}>
-                {i + 1}. {p.name || p}
+                {`${i + 1}. ${p.name || p}`}
               </Text>
             ))}
           </View>

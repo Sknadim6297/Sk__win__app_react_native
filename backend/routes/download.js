@@ -13,10 +13,10 @@ const PAGE_PATH = path.join(PUBLIC_ROOT, 'download', 'index.html');
 const DEFAULT_RELEASE = {
   version: '1.0.0',
   fileName: 'WarZone-AMR-v1.0.0.apk',
-  title: 'WarZone AMR Tournament',
+  title: 'WAREZONE Tournament',
   androidMin: 'Android 8.0 (API 26)+',
   releaseNotes:
-    'Initial release — create & join tournaments, wallet top-up, live match updates, and instant prize distribution.',
+    'WAREZONE — create & join tournaments, wallet top-up, live match updates, and prize distribution.',
   isLatest: true,
   publishedAt: new Date(),
 };
@@ -90,7 +90,7 @@ router.get('/release', async (req, res) => {
             })
           : '—',
         downloadUrl: `/downloads/${encodeURIComponent(release.fileName)}`,
-        downloadLabel: `Download WarZone AMR v${release.version}`,
+        downloadLabel: `Download WAREZONE v${release.version}`,
       },
     });
   } catch (error) {

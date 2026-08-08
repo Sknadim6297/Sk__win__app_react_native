@@ -4,6 +4,37 @@ import { getApiUrl, getApiConfigDiagnostics } from '../utils/apiConfig';
 
 export const AuthContext = createContext();
 
+const AUTH_TIMEOUT_MS = 20000;
+
+/** Shared headers for browser + ngrok (CORS-safe when backend allows this header). */
+function authHeaders(extra = {}) {
+  return {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': '1',
+    ...extra,
+  };
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = AUTH_TIMEOUT_MS) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = setTimeout(() => {
+    try {
+      controller?.abort();
+    } catch {
+      /* ignore */
+    }
+  }, timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function parseJsonResponse(response) {
   const text = await response.text();
   if (!text) return {};
@@ -55,8 +86,8 @@ export const AuthProvider = ({ children }) => {
       }
 
       const apiUrl = getApiUrl();
-      const profileRes = await fetch(`${apiUrl}/users/profile`, {
-        headers: { Authorization: `Bearer ${savedToken}` },
+      const profileRes = await fetchWithTimeout(`${apiUrl}/users/profile`, {
+        headers: authHeaders({ Authorization: `Bearer ${savedToken}` }),
       });
 
       if (!profileRes.ok) {
@@ -82,6 +113,7 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
     } catch (error) {
       console.error('Error checking auth status:', error);
+      // Keep offline session briefly only if network flake — clear to avoid stuck blank admin/web
       await clearStoredSession().catch(() => {});
       resetSessionState();
     } finally {
@@ -113,9 +145,9 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const apiUrl = getApiUrl();
     try {
-      const response = await fetch(`${apiUrl}/auth/login`, {
+      const response = await fetchWithTimeout(`${apiUrl}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
 
@@ -150,12 +182,14 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Login error:', error);
       const diag = getApiConfigDiagnostics();
-      const message =
-        error.message?.includes('Network request failed') ||
-        error.message?.includes('Failed to fetch')
+      const aborted = error?.name === 'AbortError';
+      const message = aborted
+        ? `Login timed out talking to ${apiUrl}. Is the backend running on port 5000?`
+        : error.message?.includes('Network request failed') ||
+            error.message?.includes('Failed to fetch')
           ? diag.isPrivate
-            ? `Cannot reach server. The app is using a local/Wi‑Fi-only URL (${apiUrl}). On mobile data, set EXPO_PUBLIC_API_URL in .env to your public API (https://your-domain.com/api) and restart Expo.`
-            : `Cannot reach server at ${apiUrl}. Check internet connection and that the API is online.`
+            ? `Cannot reach server at ${apiUrl}. Start backend (npm run dev in /backend) and refresh.`
+            : `Cannot reach server at ${apiUrl}. Check internet / ngrok / CORS.`
           : error.message || 'Login failed';
       return { success: false, error: message };
     }
@@ -164,9 +198,9 @@ export const AuthProvider = ({ children }) => {
   const register = async (username, email, password, referralCode = '') => {
     const apiUrl = getApiUrl();
     try {
-      const response = await fetch(`${apiUrl}/auth/register`, {
+      const response = await fetchWithTimeout(`${apiUrl}/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({
           username: username.trim(),
           email: email.trim().toLowerCase(),
@@ -187,7 +221,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (data.token && data.user) {
-        const userRole = await persistSession(data);
+        await persistSession(data);
         applySession(data);
         return {
           success: true,
@@ -205,9 +239,11 @@ export const AuthProvider = ({ children }) => {
       };
     } catch (error) {
       console.error('Registration error:', error);
-      const message =
-        error.message?.includes('Network request failed') ||
-        error.message?.includes('Failed to fetch')
+      const aborted = error?.name === 'AbortError';
+      const message = aborted
+        ? `Registration timed out talking to ${apiUrl}.`
+        : error.message?.includes('Network request failed') ||
+            error.message?.includes('Failed to fetch')
           ? `Cannot reach server at ${apiUrl}. Start backend and check your network.`
           : error.message || 'Registration failed';
       return { success: false, error: message };

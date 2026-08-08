@@ -1,15 +1,31 @@
-# Place your Android APK here
+# Android APK downloads
 
-Expected default filename:
+## Share with users
 
-  WarZone-AMR-v1.0.0.apk
+| What | URL |
+|------|-----|
+| **Download page (share this)** | `https://stunning-glorifier-panama.ngrok-free.dev/download` |
+| Direct APK | `https://stunning-glorifier-panama.ngrok-free.dev/downloads/WarZone-AMR-v1.0.0.apk` |
+| Local (PC only) | `http://localhost:5000/download` |
 
-Download URL (after backend is running):
+Keep backend + ngrok running so phones can open the link.
 
-  http://YOUR_HOST:5000/downloads/WarZone-AMR-v1.0.0.apk
+## File required
 
-The download page is at:
+Place your EAS APK here (exact name):
 
-  http://YOUR_HOST:5000/download
+```
+public/downloads/WarZone-AMR-v1.0.0.apk
+```
 
-Each download increments the counter in MongoDB (`AppRelease`).
+Steps:
+1. Download APK from Expo build page
+2. Rename to `WarZone-AMR-v1.0.0.apk`
+3. Copy into `public/downloads/`
+4. Refresh `/download` — button becomes active
+
+## Rebuild
+
+```bash
+eas build --platform android --profile preview
+```

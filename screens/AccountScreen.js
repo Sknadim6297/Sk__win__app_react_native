@@ -68,7 +68,7 @@ const AccountScreen = ({ navigation }) => {
       const profileData = await userService.getProfile();
       setUserData(profileData);
     } catch (error) {
-      console.log('Error loading account data:', error.message);
+      console.error('Error loading account data:', error.message);
       Alert.alert('Error', 'Failed to load account data. Please refresh.');
     } finally {
       if (!silent) setLoading(false);

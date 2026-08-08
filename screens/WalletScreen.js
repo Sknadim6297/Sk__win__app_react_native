@@ -20,6 +20,20 @@ import AddCoinsModal from '../components/AddCoinsModal';
 import CenterDialog from '../components/CenterDialog';
 import { walletService, configService, paymentService } from '../services/api';
 import { clearWalletReturnParams } from '../utils/walletFlow';
+import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE } from '../utils/paymentConfig';
+
+/** Testing: credit wallet directly. Live: Cashfree QR when gateway is on. */
+async function creditOrOpenGateway({ amount, balance, navigation, returnTournamentId, returnScreen }) {
+  if (!isPaymentEnabled()) {
+    return walletService.topup({ amount, paymentMethod: 'testing' });
+  }
+  const cfg = await paymentService.getConfig();
+  if (cfg?.enabled) {
+    return { openCashfree: true, amount, balance, returnTournamentId, returnScreen };
+  }
+  // Gateway flag on but Cashfree not ready — still allow test credit
+  return walletService.topup({ amount, paymentMethod: 'testing' });
+}
 
 const WalletScreen = ({ navigation, route }) => {
   const [balance, setBalance] = useState({
@@ -122,11 +136,18 @@ const WalletScreen = ({ navigation, route }) => {
       paymentInFlight.current = true;
       setAddingCoins(true);
 
-      // Always use Cashfree QR when gateway is ready — never silent free top-up.
-      const cfg = await paymentService.getConfig();
-      if (cfg?.enabled) {
-        setShowAddCoins(false);
-        setAddAmount('');
+      const result = await creditOrOpenGateway({
+        amount: amountNum,
+        balance: balance.totalBalance ?? balance.balance,
+        navigation,
+        returnTournamentId: returnTournamentRef.current,
+        returnScreen: returnScreenRef.current,
+      });
+
+      setShowAddCoins(false);
+      setAddAmount('');
+
+      if (result?.openCashfree) {
         navigation.navigate('CashfreeQrPayment', {
           amount: amountNum,
           walletBalance: balance.totalBalance ?? balance.balance,
@@ -136,15 +157,12 @@ const WalletScreen = ({ navigation, route }) => {
         return;
       }
 
-      Alert.alert(
-        'Payments unavailable',
-        cfg?.message ||
-          'Cashfree QR is not enabled on the server. Set CASHFREE_ENABLED=true and restart the backend.'
-      );
+      await loadData(true);
+      Alert.alert('Success', result?.message || `₹${amountNum} added to your wallet`);
     } catch (err) {
       Alert.alert(
-        'Payment Failed',
-        err.message || 'Could not start payment. Check your connection and try again.'
+        'Could not add coins',
+        err.message || 'Check your connection and try again.'
       );
     } finally {
       setAddingCoins(false);
@@ -160,6 +178,10 @@ const WalletScreen = ({ navigation, route }) => {
 
   const handleWithdraw = async () => {
     if (withdrawing) return;
+    if (!isPaymentEnabled()) {
+      Alert.alert('Testing mode', WITHDRAW_DISABLED_MESSAGE);
+      return;
+    }
     const amount = parseFloat(withdrawAmount);
     if (!amount || amount <= 0) {
       Alert.alert('Invalid', 'Enter a valid amount');
@@ -275,19 +297,25 @@ const WalletScreen = ({ navigation, route }) => {
           </View>
 
           <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionGreen]}
-              onPress={() => setShowAddCoins(true)}
-              activeOpacity={0.88}
-            >
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionGreen]}
+            onPress={() => setShowAddCoins(true)}
+            activeOpacity={0.88}
+          >
               <MaterialCommunityIcons name="wallet-plus" size={22} color={COLORS.white} />
               <Text style={styles.actionText}>Add Coins</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionPurple]}
-              onPress={() => setShowWithdraw(true)}
-              activeOpacity={0.88}
-            >
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionPurple]}
+            onPress={() => {
+              if (!isPaymentEnabled()) {
+                Alert.alert('Testing mode', WITHDRAW_DISABLED_MESSAGE);
+                return;
+              }
+              setShowWithdraw(true);
+            }}
+            activeOpacity={0.88}
+          >
               <MaterialCommunityIcons name="export" size={22} color={COLORS.white} />
               <Text style={styles.actionText}>Withdraw</Text>
             </TouchableOpacity>

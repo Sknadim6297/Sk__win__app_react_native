@@ -17,13 +17,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import RNPickerSelect from 'react-native-picker-select';
-import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../../styles/theme';
 import { tournamentService, tournamentManagementService, gameService, uploadImageFile, mapService } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 import { getPrizeBreakdown, buildPrizesForCategory, getCustomWinnerPrize } from '../../utils/tournamentHelpers';
+import { ensureMediaLibraryPermission, launchImageLibrary } from '../../utils/imagePicker';
+import WebSafeDateTimePicker from '../../components/WebSafeDateTimePicker';
 import Toast from '../../components/Toast';
 
 const GAME_MODES = [
@@ -665,15 +665,13 @@ const TournamentManagement = ({ navigation }) => {
 
   const pickBannerImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
+      const allowed = await ensureMediaLibraryPermission();
+      if (!allowed) {
         showToast('Permission to access gallery is required', 'error');
         return;
       }
 
-      const mediaTypes = ImagePicker.MediaType?.Images ?? ImagePicker.MediaTypeOptions?.Images;
-      const result = await ImagePicker.launchImageLibraryAsync({
-        ...(mediaTypes ? { mediaTypes } : {}),
+      const result = await launchImageLibrary({
         allowsEditing: true,
         aspect: [16, 9],
         quality: 0.85,
@@ -681,8 +679,12 @@ const TournamentManagement = ({ navigation }) => {
 
       if (result.canceled || !result.assets?.length) return;
 
+      const asset = result.assets[0];
       setUploadingBanner(true);
-      const uploadResult = await uploadImageFile(result.assets[0].uri);
+      const uploadResult = await uploadImageFile(asset.uri, {
+        file: asset.file,
+        fileName: asset.fileName || asset.name,
+      });
       setForm((prev) => ({ ...prev, bannerImage: uploadResult.url }));
       showToast('Banner image uploaded', 'success');
     } catch (error) {
@@ -694,23 +696,25 @@ const TournamentManagement = ({ navigation }) => {
 
   const pickResultScreenshot = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
+      const allowed = await ensureMediaLibraryPermission();
+      if (!allowed) {
         showToast('Permission to access gallery is required', 'error');
         return;
       }
 
-      const mediaTypes = ImagePicker.MediaType?.Images ?? ImagePicker.MediaTypeOptions?.Images;
-      const result = await ImagePicker.launchImageLibraryAsync({
-        ...(mediaTypes ? { mediaTypes } : {}),
+      const result = await launchImageLibrary({
         allowsEditing: true,
         quality: 0.8,
       });
 
       if (result.canceled || !result.assets?.length) return;
 
+      const asset = result.assets[0];
       setUploadingResult(true);
-      const uploadResult = await uploadImageFile(result.assets[0].uri);
+      const uploadResult = await uploadImageFile(asset.uri, {
+        file: asset.file,
+        fileName: asset.fileName || asset.name,
+      });
       setResultScreenshotUrl(uploadResult.url);
       showToast('Result screenshot uploaded', 'success');
     } catch (error) {
@@ -1557,14 +1561,15 @@ const TournamentManagement = ({ navigation }) => {
                   </TouchableOpacity>
                 </View>
                 {showStartDatePicker && (
-                  <DateTimePicker
+                  <WebSafeDateTimePicker
                     value={form.startDate || new Date()}
                     mode="datetime"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                     onChange={(event, selectedDate) => {
-                      setShowStartDatePicker(Platform.OS === 'ios');
+                      if (Platform.OS !== 'web') {
+                        setShowStartDatePicker(Platform.OS === 'ios');
+                      }
                       if (selectedDate) {
-                        setForm(prev => ({ ...prev, startDate: selectedDate }));
+                        setForm((prev) => ({ ...prev, startDate: selectedDate }));
                       }
                     }}
                   />

@@ -8,7 +8,8 @@
       "env": {
         "NODE_ENV": "production",
         "EXPO_PUBLIC_API_URL": "https://stunning-glorifier-panama.ngrok-free.dev/api",
-        "EXPO_PUBLIC_APP_NAME": "WAREZONE Tournament"
+        "EXPO_PUBLIC_APP_NAME": "WAREZONE Tournament",
+        "EXPO_PUBLIC_PAYMENT_ENABLED": "false"
       },
       "android": {
         "releaseChannel": "production",
@@ -23,7 +24,8 @@
       "env": {
         "NODE_ENV": "production",
         "EXPO_PUBLIC_API_URL": "https://stunning-glorifier-panama.ngrok-free.dev/api",
-        "EXPO_PUBLIC_APP_NAME": "WAREZONE Tournament"
+        "EXPO_PUBLIC_APP_NAME": "WAREZONE Tournament",
+        "EXPO_PUBLIC_PAYMENT_ENABLED": "false"
       },
       "android": {
         "releaseChannel": "preview",

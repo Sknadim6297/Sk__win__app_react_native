@@ -12,9 +12,10 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import ScreenLayout from '../components/layout/ScreenLayout';
-import { paymentService } from '../services/api';
+import { paymentService, walletService } from '../services/api';
 import { navigateAfterWalletTopup } from '../utils/walletFlow';
 import { resolveQrDisplay } from '../utils/resolveQrDisplay';
+import { isPaymentEnabled } from '../utils/paymentConfig';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 
 /**
@@ -181,6 +182,16 @@ export default function CashfreeQrPaymentScreen({ navigation, route }) {
     setOrderId(null);
 
     try {
+      // Testing phase: credit dummy coins instead of showing “payment disabled”.
+      if (!isPaymentEnabled()) {
+        const res = await walletService.topup({ amount, paymentMethod: 'testing' });
+        finishSuccess({
+          message: res?.message || `₹${amount} added (testing)`,
+          balance: res?.balance,
+        });
+        return;
+      }
+
       const res = await paymentService.createCashfreeQr({ amount });
       if (!res?.success) {
         throw Object.assign(new Error(res?.message || 'Failed to create payment'), {
@@ -196,6 +207,23 @@ export default function CashfreeQrPaymentScreen({ navigation, route }) {
       setMessage(res.message || STATUS_COPY.PENDING);
       startPolling(res.orderId, res.expiresInSeconds || 600);
     } catch (err) {
+      // Gateway off / blocked → fall back to testing top-up so tournament testing works
+      if (err?.code === 'PAYMENT_DISABLED') {
+        try {
+          const res = await walletService.topup({ amount, paymentMethod: 'testing' });
+          finishSuccess({
+            message: res?.message || `₹${amount} added (testing)`,
+            balance: res?.balance,
+          });
+          return;
+        } catch (topupErr) {
+          clearTimers();
+          setPhase('ERROR');
+          setErrorCode(topupErr.code || 'ERROR');
+          setMessage(topupErr.message || STATUS_COPY.ERROR);
+          return;
+        }
+      }
       clearTimers();
       setPhase('ERROR');
       setErrorCode(err.code || 'ERROR');
@@ -203,7 +231,7 @@ export default function CashfreeQrPaymentScreen({ navigation, route }) {
     } finally {
       setCreating(false);
     }
-  }, [amount, clearTimers, creating, startPolling]);
+  }, [amount, clearTimers, creating, finishSuccess, startPolling]);
 
   useEffect(() => {
     createQr();

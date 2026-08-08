@@ -1,5 +1,11 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiUrl, getApiConfigDiagnostics, logApiConfig } from '../utils/apiConfig';
+import {
+  isPaymentEnabled,
+  PAYMENT_DISABLED_MESSAGE,
+  getPaymentDisabledError,
+} from '../utils/paymentConfig';
 
 let configLogged = false;
 
@@ -162,21 +168,41 @@ const getFileMetadata = (fileUri) => {
   return { fileName, type };
 };
 
-export const uploadImageFile = async (fileUri) => {
+export const uploadImageFile = async (fileUri, options = {}) => {
   const base = getApiUrl();
   const fullUrl = `${base}/upload`;
   const started = Date.now();
 
   try {
     const token = await AsyncStorage.getItem('token');
-    const { fileName, type } = getFileMetadata(fileUri);
+    const metaUri = fileUri || options.fileName || options.name || 'upload.jpg';
+    const { fileName, type } = getFileMetadata(options.fileName || options.name || metaUri);
 
     const formData = new FormData();
-    formData.append('image', {
-      uri: fileUri,
-      name: fileName,
-      type,
-    });
+
+    // Web needs a real Blob/File — RN-style { uri, name, type } is ignored by browsers → "No file uploaded"
+    if (Platform.OS === 'web') {
+      let blob = options.file || options.blob || null;
+      if (!blob && fileUri) {
+        const blobRes = await fetch(fileUri);
+        blob = await blobRes.blob();
+      }
+      if (!blob) {
+        throw new Error('No file to upload');
+      }
+      const webFile =
+        typeof File !== 'undefined' && !(blob instanceof File)
+          ? new File([blob], fileName, { type: blob.type || type })
+          : blob;
+      formData.append('image', webFile, fileName);
+    } else {
+      if (!fileUri) throw new Error('No file to upload');
+      formData.append('image', {
+        uri: fileUri,
+        name: fileName,
+        type,
+      });
+    }
 
     const headers = {
       'ngrok-skip-browser-warning': '1',
@@ -238,30 +264,61 @@ export const userService = {
 // Wallet Services
 export const walletService = {
   getBalance: () => apiCall('/wallet/balance'),
-  topup: (topupData) => apiCall('/wallet/topup', {
-    method: 'POST',
-    body: topupData,
-  }),
-  withdraw: (withdrawData) => apiCall('/wallet/withdraw', {
-    method: 'POST',
-    body: withdrawData,
-  }),
+  topup: (topupData) =>
+    apiCall('/wallet/topup', {
+      method: 'POST',
+      body: topupData,
+    }),
+  withdraw: (withdrawData) => {
+    if (!isPaymentEnabled()) {
+      return Promise.reject(getPaymentDisabledError('withdraw'));
+    }
+    return apiCall('/wallet/withdraw', {
+      method: 'POST',
+      body: withdrawData,
+    });
+  },
   getHistory: () => apiCall('/wallet/history'),
-  buyPack: (packId) => apiCall('/wallet/buy-pack', {
-    method: 'POST',
-    body: { packId },
-  }),
+  buyPack: (packId) => {
+    if (!isPaymentEnabled()) {
+      return Promise.reject(getPaymentDisabledError('deposit'));
+    }
+    return apiCall('/wallet/buy-pack', {
+      method: 'POST',
+      body: { packId },
+    });
+  },
 };
 
 /** Cashfree QR wallet top-up (backend-only credentials) */
 export const paymentService = {
-  getConfig: () => apiCall('/payments/config'),
-  createCashfreeQr: (data) =>
-    apiCall('/payments/cashfree/create-qr', {
+  getConfig: async () => {
+    if (!isPaymentEnabled()) {
+      return {
+        success: true,
+        enabled: false,
+        paymentEnabled: false,
+        // Soft message — app uses direct top-up in testing; do not treat as a user-facing block.
+        message: 'Testing mode: wallet top-up credits coins without Cashfree.',
+      };
+    }
+    return apiCall('/payments/config');
+  },
+  createCashfreeQr: (data) => {
+    if (!isPaymentEnabled()) {
+      return Promise.reject(getPaymentDisabledError('deposit'));
+    }
+    return apiCall('/payments/cashfree/create-qr', {
       method: 'POST',
       body: data,
-    }),
-  getCashfreeStatus: (orderId) => apiCall(`/payments/cashfree/status/${orderId}`),
+    });
+  },
+  getCashfreeStatus: (orderId) => {
+    if (!isPaymentEnabled()) {
+      return Promise.reject(getPaymentDisabledError('deposit'));
+    }
+    return apiCall(`/payments/cashfree/status/${orderId}`);
+  },
   cancelCashfreeOrder: (orderId) =>
     apiCall(`/payments/cashfree/cancel/${orderId}`, {
       method: 'POST',

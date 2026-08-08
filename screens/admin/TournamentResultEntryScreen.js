@@ -304,13 +304,13 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
                   </Text>
                   {(team.players || []).map((p, i) => (
                     <Text key={`${team._id}-p-${i}`} style={styles.playerLine}>
-                      {i + 1}. {p.name || p}
+                      {`${i + 1}. ${p.name || p}`}
                     </Text>
                   ))}
                   {(team.members || []).length > 0 && !(team.players || []).length
                     ? team.members.map((m, i) => (
                         <Text key={`${team._id}-m-${i}`} style={styles.playerLine}>
-                          {i + 1}. {m.gamingUsername || m.userId?.username || 'Player'}
+                          {`${i + 1}. ${m.gamingUsername || m.userId?.username || 'Player'}`}
                         </Text>
                       ))
                     : null}
