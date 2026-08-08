@@ -332,6 +332,18 @@ const AdminDashboard = ({ navigation }) => {
             </TouchableOpacity>
 
             <TouchableOpacity 
+              style={[styles.secondaryBtn, { borderLeftColor: '#A78BFA' }]}
+              onPress={() => navigateTo('AdminPushNotifications')}
+            >
+              <MaterialCommunityIcons name="bell-ring" size={24} color="#A78BFA" style={styles.secondaryIcon} />
+              <View style={styles.secondaryContent}>
+                <Text style={styles.secondaryTitle}>Push Notifications</Text>
+                <Text style={styles.secondarySubtitle}>Send to all, users, or tournament</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
               style={[styles.secondaryBtn, { borderLeftColor: '#00B368' }]}
               onPress={() => navigateTo('AppContentManagement')}
             >

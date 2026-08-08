@@ -1,9 +1,13 @@
 const express = require('express');
 const User = require('../models/User');
 const WalletTransaction = require('../models/WalletTransaction');
-const Notification = require('../models/Notification');
 const CoinPack = require('../models/CoinPack');
 const { authMiddleware } = require('../middleware/auth');
+const {
+  notifyWalletCredited,
+  notifyWalletDebited,
+} = require('../services/tournamentPushEvents');
+const { buildEventKey } = require('../services/notificationService');
 const {
   isPaymentEnabled,
   PAYMENT_DISABLED_MESSAGE,
@@ -96,12 +100,10 @@ router.post('/topup', authMiddleware, async (req, res) => {
 
     await transaction.save();
 
-    await Notification.create({
-      userId: req.userId,
-      type: 'wallet',
-      title: 'Wallet Top-up Successful',
-      message: `₹${amountNum} added to your wallet. Current balance: ₹${(user.wallet.balance || 0) + amountNum}.`,
-    });
+    await notifyWalletCredited(req.userId, amountNum, {
+      eventKey: buildEventKey(['wallet_topup', transaction._id]),
+      description: `₹${amountNum} has been credited to your wallet.`,
+    }).catch(() => {});
 
     // Update wallet
     user.wallet.balance += amountNum;
@@ -167,12 +169,10 @@ router.post('/withdraw', authMiddleware, async (req, res) => {
 
     await transaction.save();
 
-    await Notification.create({
-      userId: req.userId,
-      type: 'wallet',
-      title: 'Withdrawal Requested',
-      message: `Withdrawal request of ₹${amountNum} submitted. Current balance: ₹${user.wallet.balance}.`,
-    });
+    await notifyWalletDebited(req.userId, amountNum, {
+      eventKey: buildEventKey(['wallet_withdraw', transaction._id]),
+      description: `₹${amountNum} has been deducted from your wallet.`,
+    }).catch(() => {});
 
     // Update wallet
     user.wallet.balance -= amountNum;
@@ -237,12 +237,10 @@ router.post('/buy-pack', authMiddleware, async (req, res) => {
     user.wallet.totalDeposited += pack.priceInr;
     await user.save();
 
-    await Notification.create({
-      userId: req.userId,
-      type: 'wallet',
-      title: 'Coins Added',
-      message: `${coinsAdded} coins added to your wallet.`,
-    });
+    await notifyWalletCredited(req.userId, coinsAdded, {
+      eventKey: buildEventKey(['wallet_pack', transaction._id]),
+      description: `₹${coinsAdded} has been credited to your wallet.`,
+    }).catch(() => {});
 
     res.json({
       success: true,

@@ -62,6 +62,11 @@ const tournamentSchema = new mongoose.Schema({
   resultsPublishedAt: {
     type: Date,
   },
+  /** When true, PENDING winner payouts auto-credit on publish (TEST wallet). */
+  autoPaymentEnabled: {
+    type: Boolean,
+    default: true,
+  },
   map: {
     type: String,
     default: 'Bermuda',

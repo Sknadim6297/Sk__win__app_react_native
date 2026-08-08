@@ -140,27 +140,70 @@ router.post('/change-password', authMiddleware, async (req, res) => {
   }
 });
 
-// Save push notification token
+// Save push notification token (Expo Push Token or FCM device token)
 router.post('/push-token', authMiddleware, async (req, res) => {
   try {
-    const { fcmToken } = req.body;
-    if (!fcmToken) {
-      return res.status(400).json({ error: 'FCM token is required' });
+    const { fcmToken, pushToken, platform } = req.body;
+    const token = String(pushToken || fcmToken || '').trim();
+    if (!token) {
+      return res.status(400).json({ error: 'Push token is required' });
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      { fcmToken, updatedAt: Date.now() },
-      { new: true }
-    );
-
+    const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    user.fcmToken = token;
+    user.pushTokens = user.pushTokens || [];
+    const existingIdx = user.pushTokens.findIndex((t) => t.token === token);
+    if (existingIdx >= 0) {
+      user.pushTokens[existingIdx].platform = platform || user.pushTokens[existingIdx].platform;
+      user.pushTokens[existingIdx].updatedAt = new Date();
+    } else {
+      user.pushTokens.push({
+        token,
+        platform: platform || 'unknown',
+        updatedAt: new Date(),
+      });
+    }
+    // Keep last 5 devices
+    if (user.pushTokens.length > 5) {
+      user.pushTokens = user.pushTokens
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+        .slice(0, 5);
+    }
+    user.updatedAt = Date.now();
+    await user.save();
+
     res.json({ success: true });
   } catch (error) {
+    console.error('push-token:', error);
     res.status(500).json({ error: 'Failed to save push token' });
+  }
+});
+
+// Clear push token on logout
+router.delete('/push-token', authMiddleware, async (req, res) => {
+  try {
+    const { fcmToken, pushToken } = req.body || {};
+    const token = String(pushToken || fcmToken || '').trim();
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (token) {
+      user.pushTokens = (user.pushTokens || []).filter((t) => t.token !== token);
+      if (user.fcmToken === token) user.fcmToken = null;
+    } else {
+      user.fcmToken = null;
+      user.pushTokens = [];
+    }
+    await user.save();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to clear push token' });
   }
 });
 

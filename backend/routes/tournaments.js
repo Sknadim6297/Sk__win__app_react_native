@@ -11,8 +11,15 @@ const Team = require('../models/Team');
 const TeamMember = require('../models/TeamMember');
 const PrizeDistribution = require('../models/PrizeDistribution');
 const lifecycle = require('../services/tournamentLifecycle');
+const winnerPayoutService = require('../services/winnerPayoutService');
 const WalletTransaction = require('../models/WalletTransaction');
-const Notification = require('../models/Notification');
+const {
+  notifyTournamentJoined,
+  notifyRoomCredentialsAvailable,
+  notifyMatchLive,
+  notifyMatchCompleted,
+  notifyTournamentCancelled,
+} = require('../services/tournamentPushEvents');
 const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
 
@@ -714,6 +721,21 @@ router.put('/admin/:id/room', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Tournament not found' });
     }
 
+    const credentialsReady =
+      !!String(tournament.roomId || '').trim() &&
+      !!String(tournament.roomPassword || '').trim();
+    const shouldNotify =
+      credentialsReady &&
+      (showRoomCredentials === true ||
+        tournament.showRoomCredentials === true ||
+        (roomId != null && roomPassword != null));
+
+    if (shouldNotify) {
+      notifyRoomCredentialsAvailable(tournament).catch((e) =>
+        console.error('room credentials notify:', e.message)
+      );
+    }
+
     res.json({
       message: 'Room details updated. Players will see them 2 minutes before match start.',
       tournament: {
@@ -755,6 +777,7 @@ router.put('/admin/:id/status', authMiddleware, async (req, res) => {
 
     // If cancelling, refund all participants / teams
     if (next === 'cancelled') {
+      const refundedUserIds = [];
       const participants = await TournamentParticipant.find({ tournamentId: req.params.id });
       
       for (const participant of participants) {
@@ -771,6 +794,7 @@ router.put('/admin/:id/status', authMiddleware, async (req, res) => {
             description: `Refund for cancelled tournament: ${tournament.name}`,
             status: 'completed',
           });
+          refundedUserIds.push(String(participant.userId));
         }
       }
 
@@ -790,6 +814,7 @@ router.put('/admin/:id/status', authMiddleware, async (req, res) => {
             description: `Refund for cancelled tournament team: ${team.name}`,
             status: 'completed',
           });
+          refundedUserIds.push(String(team.captainUserId));
         }
       }
 
@@ -798,11 +823,22 @@ router.put('/admin/:id/status', authMiddleware, async (req, res) => {
         { status: 'disqualified' }
       );
       await Team.updateMany({ tournamentId: req.params.id }, { status: 'withdrawn' });
+
+      notifyTournamentCancelled(tournament, {
+        refundedUserIds: [...new Set(refundedUserIds)],
+        refundAmount: Number(tournament.entryFee) || 0,
+      }).catch((e) => console.error('cancel notify:', e.message));
     }
 
     lifecycle.syncLegacyFields(tournament, next);
     tournament.statusOverride = true;
     await tournament.save();
+
+    if (next === 'ongoing') {
+      notifyMatchLive(tournament).catch((e) => console.error('live notify:', e.message));
+    } else if (next === 'completed') {
+      notifyMatchCompleted(tournament).catch((e) => console.error('complete notify:', e.message));
+    }
 
     res.json({
       message: `Tournament status updated to ${next}`,
@@ -950,7 +986,7 @@ router.post('/admin/:id/publish-results', authMiddleware, async (req, res) => {
   }
 });
 
-// Distribute prizes (Admin)
+// Distribute prizes (Admin) — WinnerPayout lifecycle + optional auto-credit (TEST wallet)
 router.post('/admin/:id/distribute-prizes', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
@@ -972,59 +1008,71 @@ router.post('/admin/:id/distribute-prizes', authMiddleware, async (req, res) => 
       return res.status(400).json({ error: 'No prizes to distribute or already distributed' });
     }
 
-    const distributedPrizes = [];
+    if (!lifecycle.areResultsPublished(tournament)) {
+      const marked = lifecycle.markResultsPublished(tournament);
+      if (marked.ok) await tournament.save();
+    }
 
+    const payoutItems = [];
     for (const result of results) {
-      const user = await User.findById(result.userId);
-      if (user) {
-        const rewardAmount = result.totalReward || result.prizeAmount || 0;
-
-        if (rewardAmount > 0) {
-          // Credit reward to wallet
-          user.wallet.balance += rewardAmount;
-          user.tournament.wins += result.rank >= 1 && result.rank <= 3 ? 1 : 0;
-          user.tournament.earnings += rewardAmount;
-          await user.save();
-
-          // Create transaction
-          const transaction = await WalletTransaction.create({
-            userId: result.userId,
-            type: 'tournament_reward',
-            amount: rewardAmount,
-            tournamentId: req.params.id,
-            description: `Reward for ${tournament.name}`,
-            status: 'completed',
-          });
-
-          await Notification.create({
-            userId: result.userId,
-            tournamentId: tournament._id,
-            type: 'tournament_update',
-            title: 'Tournament Reward Credited',
-            message: `₹${rewardAmount} has been credited for ${tournament.name}.`,
-          });
-
-          // Mark prize as credited
-          result.prizeCredited = true;
-          result.prizeTransactionId = transaction._id;
-          await result.save();
-        } else {
-          result.prizeCredited = true;
-          await result.save();
-        }
-
-        distributedPrizes.push({
+      const rewardAmount = result.totalReward || result.prizeAmount || 0;
+      if (rewardAmount > 0) {
+        payoutItems.push({
+          tournamentId: tournament._id,
           userId: result.userId,
-          rank: result.rank,
-          prizeAmount: rewardAmount,
-          username: user.username,
+          resultId: result._id,
+          resultModel: 'TournamentResult',
+          amount: rewardAmount,
+          description: `Reward for ${tournament.name}`,
         });
+      } else {
+        result.prizeCredited = true;
+        await result.save();
       }
+    }
+
+    await winnerPayoutService.ensurePayoutRecords(payoutItems);
+    const credit = await winnerPayoutService.autoCreditPendingForTournament(tournament._id, {
+      tournamentName: tournament.name,
+    });
+
+    const WinnerPayout = require('../models/WinnerPayout');
+    const paid = await WinnerPayout.find({
+      tournamentId: tournament._id,
+      resultModel: 'TournamentResult',
+      status: 'PAID',
+    });
+
+    for (const p of paid) {
+      await TournamentResult.updateOne(
+        { _id: p.resultId },
+        {
+          $set: {
+            prizeCredited: true,
+            prizeTransactionId: p.walletTransactionId,
+          },
+        }
+      );
+    }
+
+    const distributedPrizes = [];
+    for (const result of results) {
+      const user = await User.findById(result.userId).select('username');
+      const rewardAmount = result.totalReward || result.prizeAmount || 0;
+      distributedPrizes.push({
+        userId: result.userId,
+        rank: result.rank,
+        prizeAmount: rewardAmount,
+        username: user?.username,
+      });
     }
 
     res.json({
       message: 'Prizes distributed successfully',
       distributedPrizes,
+      payoutsCredited: credit.credited || 0,
+      autoPaymentEnabled: tournament.autoPaymentEnabled !== false,
+      controlWindow: winnerPayoutService.getControlWindow(tournament),
     });
   } catch (error) {
     console.error('Error distributing prizes:', error);
@@ -1778,13 +1826,7 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
     });
     await transaction.save();
 
-    await Notification.create({
-      userId: req.userId,
-      tournamentId: tournament._id,
-      type: 'tournament_update',
-      title: 'Tournament Joined',
-      message: `You joined ${tournament.name}. Entry paid: ₹${tournament.entryFee} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired}).`,
-    });
+    await notifyTournamentJoined(req.userId, tournament).catch(() => {});
 
     // Add to tournament registeredPlayers array (for backward compatibility)
     tournament.registeredPlayers.push(req.userId);
@@ -2161,13 +2203,7 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
     });
     await participant.save();
 
-    await Notification.create({
-      userId: req.userId,
-      tournamentId: tournament._id,
-      type: 'tournament_update',
-      title: 'Slot Booked',
-      message: `Slot #${slotNumber} booked in ${tournament.name}. Entry paid: ₹${tournament.entryFee} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired}).`,
-    });
+    await notifyTournamentJoined(req.userId, tournament).catch(() => {});
 
     res.json({
       success: true,
@@ -2269,13 +2305,7 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
     });
     await participant.save();
 
-    await Notification.create({
-      userId: req.userId,
-      tournamentId: tournament._id,
-      type: 'tournament_update',
-      title: 'Slot Booked',
-      message: `Slot #${slotNumber} booked in ${tournament.name}. Entry paid: ₹${tournament.entryFee} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired}).`,
-    });
+    await notifyTournamentJoined(req.userId, tournament).catch(() => {});
 
     res.json({
       success: true,

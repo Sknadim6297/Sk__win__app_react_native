@@ -38,6 +38,19 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  /** Multiple device tokens (Expo or FCM). fcmToken stays as latest primary. */
+  pushTokens: [
+    {
+      token: { type: String, required: true },
+      platform: { type: String, default: 'unknown' },
+      updatedAt: { type: Date, default: Date.now },
+    },
+  ],
+  /** When false, skip push + in-app creation from notify service. */
+  notificationsEnabled: {
+    type: Boolean,
+    default: true,
+  },
   referralCode: {
     type: String,
     unique: true,

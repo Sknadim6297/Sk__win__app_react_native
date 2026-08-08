@@ -8,11 +8,20 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../styles/theme';
 import { tournamentManagementService } from '../../services/api';
+
+function formatRemaining(ms) {
+  if (!ms || ms <= 0) return 'Expired';
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')} left`;
+}
 
 export default function TournamentResultEntryScreen({ navigation, route }) {
   const { tournamentId } = route.params || {};
@@ -27,6 +36,29 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
     runnerUpPrize: '',
   });
   const [prizeTiers, setPrizeTiers] = useState([]);
+  const [payoutData, setPayoutData] = useState(null);
+  const [payoutBusyId, setPayoutBusyId] = useState(null);
+  const [autoPaymentBusy, setAutoPaymentBusy] = useState(false);
+  const [nowTick, setNowTick] = useState(Date.now());
+
+  const loadPayouts = useCallback(async () => {
+    try {
+      const data = await tournamentManagementService.getPayouts(tournamentId);
+      setPayoutData(data);
+    } catch {
+      setPayoutData(null);
+    }
+  }, [tournamentId]);
+
+  const applyPrizeTiers = (rows, tiers) => {
+    setEntries(
+      rows.map((row) => {
+        const pos = Number(row.position) || 0;
+        const tier = tiers.find((t) => pos >= t.rankFrom && pos <= t.rankTo);
+        return { ...row, prize: tier ? String(tier.prize) : row.prize || '0' };
+      })
+    );
+  };
 
   const load = useCallback(async () => {
     try {
@@ -85,27 +117,27 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
           runnerUpPrize: '0',
         });
       }
+
+      if (detail.resultsPublished || detail.tournament?.resultsPublished) {
+        await loadPayouts();
+      }
     } catch (e) {
       Alert.alert('Error', e.message || 'Failed to load');
       navigation.goBack();
     } finally {
       setLoading(false);
     }
-  }, [tournamentId, navigation]);
+  }, [tournamentId, navigation, loadPayouts]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const applyPrizeTiers = (rows, tiers) => {
-    setEntries(
-      rows.map((row) => {
-        const pos = Number(row.position) || 0;
-        const tier = tiers.find((t) => pos >= t.rankFrom && pos <= t.rankTo);
-        return { ...row, prize: tier ? String(tier.prize) : row.prize || '0' };
-      })
-    );
-  };
+  useEffect(() => {
+    if (!payoutData?.controlWindow?.expiresAt) return undefined;
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [payoutData?.controlWindow?.expiresAt]);
 
   const autofillPrizes = () => {
     if (!prizeTiers.length) {
@@ -131,8 +163,9 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
   const publishResults = async () => {
     try {
       await tournamentManagementService.publishResults(tournamentId);
-      Alert.alert('Published', 'Results are now visible to joined users');
-      navigation.goBack();
+      Alert.alert('Published', 'Results published. Use Payment Control below within 10 minutes.');
+      await load();
+      await loadPayouts();
     } catch (e) {
       Alert.alert('Publish Result', e.message);
     }
@@ -179,8 +212,9 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
         publish: !!publish,
       });
       if (publish) {
-        Alert.alert('Published', 'Result published. Tournament status stays Completed.');
-        navigation.goBack();
+        Alert.alert('Published', 'Result published. Use Payment Control below within 10 minutes.');
+        await load();
+        await loadPayouts();
       } else {
         Alert.alert('Saved', 'Results saved. Tap Publish Result when ready.', [
           { text: 'Publish Result', onPress: () => saveAndPublishCustom(true) },
@@ -192,6 +226,90 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const toggleAutoPayment = async (enabled) => {
+    setAutoPaymentBusy(true);
+    try {
+      await tournamentManagementService.setAutoPayment(tournamentId, enabled);
+      await loadPayouts();
+    } catch (e) {
+      Alert.alert('Auto Payment', e.message || 'Failed to update');
+    } finally {
+      setAutoPaymentBusy(false);
+    }
+  };
+
+  const confirmStopPayout = (payout) => {
+    Alert.alert(
+      'Stop Payment',
+      `Winner: ${payout.username || '—'}\nAmount: ₹${payout.amount}\n\nThis cancels the pending credit. No wallet change.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Stop Payment',
+          style: 'destructive',
+          onPress: async () => {
+            setPayoutBusyId(payout._id);
+            try {
+              await tournamentManagementService.stopPayout(payout._id);
+              Alert.alert('Stopped', 'Pending payout cancelled.');
+              await loadPayouts();
+            } catch (e) {
+              Alert.alert('Stop Payment', e.message || 'Failed');
+            } finally {
+              setPayoutBusyId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const confirmReversePayout = (payout) => {
+    const balance = Number(payout.currentWalletBalance) || 0;
+    const amount = Number(payout.amount) || 0;
+    const insufficient = balance < amount;
+
+    if (insufficient) {
+      Alert.alert(
+        'Unable to reverse payout',
+        `Winner: ${payout.username || '—'}\nAmount: ₹${amount}\nCurrent Wallet Balance: ₹${balance}\nStatus: INSUFFICIENT BALANCE\n\nReverse Payment is disabled. Wallet cannot go negative.`
+      );
+      return;
+    }
+
+    const remaining = balance - amount;
+    Alert.alert(
+      'Reverse Payment',
+      `Winner: ${payout.username || '—'}\nAmount: ₹${amount}\nCurrent Wallet Balance: ₹${balance}\nAmount to Reverse: ₹${amount}\n\nAfter confirmation: ₹${remaining} remaining`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reverse Payment',
+          style: 'destructive',
+          onPress: async () => {
+            setPayoutBusyId(payout._id);
+            try {
+              const res = await tournamentManagementService.reversePayout(payout._id);
+              Alert.alert(
+                'Reversed',
+                `₹${amount} deducted. New balance: ₹${res.walletBalance ?? remaining}`
+              );
+              await loadPayouts();
+            } catch (e) {
+              Alert.alert(
+                'Reverse Payment',
+                e.message || 'Unable to reverse payout. Insufficient wallet balance.'
+              );
+              await loadPayouts();
+            } finally {
+              setPayoutBusyId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -211,6 +329,10 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
   const category = tournament?.category || tournament?.tournamentType || meta?.tournamentType;
   const isBR = category !== 'custom' && category !== 'custom_match';
   const teams = meta?.teams || [];
+
+  const windowInfo = payoutData?.controlWindow;
+  const expiresAtMs = windowInfo?.expiresAt ? new Date(windowInfo.expiresAt).getTime() : 0;
+  const remainingMs = expiresAtMs ? Math.max(0, expiresAtMs - nowTick) : 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -244,6 +366,108 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
       ) : null}
 
       <ScrollView contentContainerStyle={styles.scroll}>
+        {resultsPublished ? (
+          <View style={styles.payoutPanel}>
+            <Text style={styles.sectionTitle}>Payment Control</Text>
+            <Text style={styles.helper}>
+              Backend window: 10 minutes after publish.
+              {expiresAtMs
+                ? ` ${remainingMs > 0 ? formatRemaining(remainingMs) : 'Expired — reverse/stop unavailable.'}`
+                : ''}
+            </Text>
+
+            <View style={styles.autoRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.autoLabel}>Auto Payment</Text>
+                <Text style={styles.helper}>
+                  {payoutData?.autoPaymentEnabled !== false
+                    ? 'ON — pending winners credit automatically'
+                    : 'OFF — pending payouts wait for manual control'}
+                </Text>
+              </View>
+              <Switch
+                value={payoutData?.autoPaymentEnabled !== false}
+                onValueChange={toggleAutoPayment}
+                disabled={autoPaymentBusy || !payoutData}
+                trackColor={{ false: '#475569', true: COLORS.primary }}
+              />
+            </View>
+
+            {(payoutData?.payouts || []).length === 0 ? (
+              <Text style={styles.helper}>No winner payouts for this tournament.</Text>
+            ) : (
+              (payoutData.payouts || []).map((p) => {
+                const busy = String(payoutBusyId) === String(p._id);
+                const balance = Number(p.currentWalletBalance) || 0;
+                const amount = Number(p.amount) || 0;
+                const insufficient = p.status === 'PAID' && balance < amount;
+                const showStop = p.canStop;
+                const showReverseBtn = p.status === 'PAID' && (p.canReverse || insufficient);
+
+                return (
+                  <View key={String(p._id)} style={styles.payoutCard}>
+                    <Text style={styles.payoutName}>{p.username || 'Winner'}</Text>
+                    <Text style={styles.payoutMeta}>
+                      Amount: ₹{amount} · Status: {p.status}
+                    </Text>
+                    <Text style={styles.payoutMeta}>
+                      Current Wallet Balance: ₹{balance}
+                    </Text>
+                    {insufficient ? (
+                      <Text style={styles.warnText}>
+                        Status: INSUFFICIENT BALANCE — Reverse Payment disabled
+                      </Text>
+                    ) : p.canReverse ? (
+                      <Text style={styles.payoutMeta}>
+                        After reverse: ₹{p.afterReverseBalance}
+                      </Text>
+                    ) : null}
+                    {p.status === 'REVERSED' ? (
+                      <Text style={styles.warnText}>Already reversed</Text>
+                    ) : null}
+
+                    <View style={styles.payoutActions}>
+                      {showStop ? (
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.stopBtn]}
+                          disabled={busy}
+                          onPress={() => confirmStopPayout(p)}
+                        >
+                          <Text style={styles.actionText}>
+                            {busy ? '…' : 'Stop Payment'}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {showReverseBtn ? (
+                        <TouchableOpacity
+                          style={[
+                            styles.actionBtn,
+                            styles.reverseBtn,
+                            (insufficient || !p.canReverse) && styles.disabledBtn,
+                          ]}
+                          disabled={busy || insufficient || !p.canReverse}
+                          onPress={() => confirmReversePayout(p)}
+                        >
+                          <Text style={styles.actionText}>
+                            {busy ? '…' : 'Reverse Payment'}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {!showStop && !showReverseBtn && p.status === 'PAID' && remainingMs <= 0 ? (
+                        <Text style={styles.helper}>Control window expired</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })
+            )}
+
+            <TouchableOpacity style={styles.refreshBtn} onPress={loadPayouts}>
+              <Text style={styles.autofillText}>Refresh payout status</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {isBR ? (
           <>
             <TouchableOpacity style={styles.autofillBtn} onPress={autofillPrizes}>
@@ -450,6 +674,48 @@ const styles = StyleSheet.create({
   blockedText: { color: COLORS.gray, fontSize: 13, lineHeight: 18 },
   scroll: { padding: 16, paddingBottom: 40 },
   sectionTitle: { color: COLORS.white, fontWeight: '700', fontSize: 16, marginBottom: 10 },
+  payoutPanel: {
+    marginBottom: 20,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(34,197,94,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.35)',
+  },
+  autoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  autoLabel: { color: COLORS.white, fontWeight: '700', marginBottom: 2 },
+  payoutCard: {
+    backgroundColor: '#1e293b',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+  },
+  payoutName: { color: COLORS.white, fontWeight: '700', fontSize: 15 },
+  payoutMeta: { color: COLORS.gray, fontSize: 13, marginTop: 4 },
+  warnText: { color: '#F59E0B', fontSize: 13, marginTop: 6, fontWeight: '600' },
+  payoutActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  actionBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  stopBtn: { backgroundColor: '#B45309' },
+  reverseBtn: { backgroundColor: '#DC2626' },
+  actionText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  refreshBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
   teamCard: {
     backgroundColor: '#1e293b',
     borderRadius: 10,

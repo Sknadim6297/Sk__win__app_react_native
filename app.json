@@ -56,6 +56,15 @@
         "expo-font"
       ],
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/logo/ROUND_GAME_LOGO.png",
+          "color": "#22C55E",
+          "sounds": [],
+          "defaultChannel": "default"
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {
@@ -78,6 +87,13 @@
       ],
       "@react-native-community/datetimepicker"
     ],
+    "scheme": "warezone",
+    "notification": {
+      "icon": "./assets/logo/ROUND_GAME_LOGO.png",
+      "color": "#22C55E",
+      "androidMode": "default",
+      "androidCollapsedTitle": "WAREZONE"
+    },
     "owner": "nadim123456"
   }
 }

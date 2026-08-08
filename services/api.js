@@ -464,6 +464,22 @@ export const tournamentManagementService = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  getPayouts: (id) => apiCall(`/tournament-management/admin/${id}/payouts`),
+  setAutoPayment: (id, enabled) =>
+    apiCall(`/tournament-management/admin/${id}/auto-payment`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled: !!enabled }),
+    }),
+  stopPayout: (payoutId, reason) =>
+    apiCall(`/tournament-management/admin/payouts/${payoutId}/stop`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || 'Stopped by admin' }),
+    }),
+  reversePayout: (payoutId, reason) =>
+    apiCall(`/tournament-management/admin/payouts/${payoutId}/reverse`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || 'Reversed by admin' }),
+    }),
   exportResults: (id) => apiCall(`/tournament-management/admin/${id}/results/export`),
   getPublicResults: (id) => apiCall(`/tournament-management/${id}/results`),
   registerTeam: (id, data) =>
@@ -492,10 +508,30 @@ export const tutorialService = {
 
 // Notification Services
 export const notificationService = {
-  getAll: () => apiCall('/notifications'),
+  getAll: (filter = 'all') =>
+    apiCall(`/notifications${filter && filter !== 'all' ? `?filter=${encodeURIComponent(filter)}` : ''}`),
   getUnreadCount: () => apiCall('/notifications/unread/count'),
   markRead: (id) => apiCall(`/notifications/${id}/read`, { method: 'PUT' }),
   markAllRead: () => apiCall('/notifications/read/all', { method: 'PUT' }),
+  adminSend: (payload) =>
+    apiCall('/notifications/admin/send', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+};
+
+// User Services — push token helpers also under userService
+export const pushTokenService = {
+  save: (token, platform) =>
+    apiCall('/users/push-token', {
+      method: 'POST',
+      body: JSON.stringify({ pushToken: token, fcmToken: token, platform }),
+    }),
+  clear: (token) =>
+    apiCall('/users/push-token', {
+      method: 'DELETE',
+      body: JSON.stringify({ pushToken: token }),
+    }),
 };
 
 // Admin Services

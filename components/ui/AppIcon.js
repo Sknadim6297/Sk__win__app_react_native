@@ -13,7 +13,7 @@ const CDN_LOAD_TIMEOUT_MS = 4500;
  */
 const BRAND_MCI = {
   whatsapp: 'whatsapp',
-  telegram: 'telegram',
+  telegram: 'send',
   instagram: 'instagram',
   'instagram-new': 'instagram',
 };

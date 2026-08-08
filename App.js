@@ -36,6 +36,12 @@ import {
 } from '@expo-google-fonts/dm-sans/700Bold';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { logApiConfig } from './utils/apiConfig';
+import { navigationRef } from './utils/navigationRef';
+import {
+  setupNotificationListeners,
+  syncPushTokenWithBackend,
+  handleInitialNotificationResponse,
+} from './utils/pushNotifications';
 // Eager: first paint / auth gate only
 import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
@@ -124,6 +130,14 @@ function AppNavigator() {
     }
   }, [isLoading]);
 
+  useEffect(() => {
+    if (!isAuthenticated || isAdmin()) return undefined;
+    const cleanup = setupNotificationListeners();
+    syncPushTokenWithBackend().catch(() => {});
+    handleInitialNotificationResponse().catch(() => {});
+    return cleanup;
+  }, [isAuthenticated]);
+
   if (isLoading) {
     return <AppLoadingScreen />;
   }
@@ -131,7 +145,7 @@ function AppNavigator() {
   const navKey = isAuthenticated ? (isAdmin() ? 'admin' : 'user') : 'guest';
 
   return (
-    <NavigationContainer key={navKey}>
+    <NavigationContainer key={navKey} ref={navigationRef}>
       <Stack.Navigator
         key={navKey}
         initialRouteName={
@@ -175,6 +189,7 @@ function AppNavigator() {
                 <Stack.Screen name="ReportedIssues" {...screen(() => require('./screens/admin/ReportedIssues').default)} />
                 <Stack.Screen name="SupportManagement" {...screen(() => require('./screens/admin/SupportManagement').default)} />
                 <Stack.Screen name="AnnouncementManagement" {...screen(() => require('./screens/admin/AnnouncementManagement').default)} />
+                <Stack.Screen name="AdminPushNotifications" {...screen(() => require('./screens/admin/AdminPushNotifications').default)} />
                 <Stack.Screen name="Analytics" {...screen(() => require('./screens/admin/Analytics').default)} />
                 <Stack.Screen name="AppContentManagement" {...screen(() => require('./screens/admin/AppContentManagement').default)} />
                 <Stack.Screen name="SliderManagement" {...screen(() => require('./screens/admin/SliderManagement').default)} />

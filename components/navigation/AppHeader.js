@@ -14,7 +14,19 @@ const formatBalance = (value) => {
 };
 
 export default function AppHeader({ navigation, style }) {
-  const { displayName, profilePhoto, walletBalance, supportBadgeCount } = useAppHeaderData();
+  const {
+    displayName,
+    profilePhoto,
+    walletBalance,
+    supportBadgeCount,
+    notificationBadgeCount,
+  } = useAppHeaderData();
+
+  const openNotifications = () => {
+    const parent = navigation.getParent?.();
+    if (parent?.navigate) parent.navigate('Notifications');
+    else navigation.navigate('Notifications');
+  };
 
   const renderAvatar = () => {
     if (profilePhoto) {
@@ -43,19 +55,36 @@ export default function AppHeader({ navigation, style }) {
 
       <View style={styles.actions}>
         <TouchableOpacity
-          style={styles.supportBtn}
+          style={styles.iconBtn}
+          onPress={openNotifications}
+          hitSlop={8}
+          activeOpacity={0.85}
+          accessibilityLabel="Notifications"
+        >
+          <AppIcon name="bell" size={22} light />
+          {notificationBadgeCount > 0 ? (
+            <View style={[styles.badge, notificationBadgeCount > 9 && styles.badgeWide]}>
+              <Text style={styles.badgeText} numberOfLines={1}>
+                {notificationBadgeCount > 99 ? '99+' : String(notificationBadgeCount)}
+              </Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.iconBtn}
           onPress={() => navigation.navigate('SupportTickets')}
           hitSlop={8}
           activeOpacity={0.85}
         >
-          <AppIcon name="headset" size={24} light />
-          {supportBadgeCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {supportBadgeCount > 99 ? '99' : supportBadgeCount}
+          <AppIcon name="headset" size={22} light />
+          {supportBadgeCount > 0 ? (
+            <View style={[styles.badge, supportBadgeCount > 9 && styles.badgeWide]}>
+              <Text style={styles.badgeText} numberOfLines={1}>
+                {supportBadgeCount > 99 ? '99+' : String(supportBadgeCount)}
               </Text>
             </View>
-          )}
+          ) : null}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -126,31 +155,41 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 6,
   },
-  supportBtn: {
+  iconBtn: {
     position: 'relative',
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
   badge: {
     position: 'absolute',
-    top: 2,
-    right: 0,
+    top: -1,
+    right: -2,
     minWidth: 16,
     height: 16,
     borderRadius: 8,
     backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#0B0E1E',
+  },
+  badgeWide: {
+    minWidth: 22,
+    paddingHorizontal: 5,
   },
   badgeText: {
     fontSize: 9,
+    lineHeight: 11,
     fontFamily: FONTS.bold,
     color: COLORS.white,
+    includeFontPadding: false,
+    textAlign: 'center',
   },
   walletPill: {
     flexDirection: 'row',

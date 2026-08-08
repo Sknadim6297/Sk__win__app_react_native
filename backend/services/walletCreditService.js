@@ -1,8 +1,9 @@
 const User = require('../models/User');
 const WalletTransaction = require('../models/WalletTransaction');
-const Notification = require('../models/Notification');
 const PaymentOrder = require('../models/PaymentOrder');
 const PaymentLog = require('../models/PaymentLog');
+const { notifyWalletCredited } = require('./tournamentPushEvents');
+const { buildEventKey } = require('./notificationService');
 
 /**
  * Idempotent wallet credit after verified Cashfree SUCCESS.
@@ -105,11 +106,9 @@ async function creditWalletForPaymentOrder(paymentOrder, { source = 'api', cfPay
     });
 
     try {
-      await Notification.create({
-        userId: claim.userId,
-        type: 'wallet',
-        title: 'Wallet Top-up Successful',
-        message: `₹${amount} added to your wallet via Cashfree QR. Current balance: ₹${user.wallet.balance}.`,
+      await notifyWalletCredited(claim.userId, amount, {
+        eventKey: buildEventKey(['wallet_cashfree', transaction._id]),
+        description: `₹${amount} has been credited to your wallet.`,
       });
     } catch (_) {
       /* non-fatal */

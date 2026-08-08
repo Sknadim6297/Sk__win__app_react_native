@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiUrl, getApiConfigDiagnostics } from '../utils/apiConfig';
+import { clearPushTokenOnLogout } from '../utils/pushNotifications';
 
 export const AuthContext = createContext();
 
@@ -252,6 +253,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      await clearPushTokenOnLogout().catch(() => {});
       await clearStoredSession();
       resetSessionState();
     } catch (error) {

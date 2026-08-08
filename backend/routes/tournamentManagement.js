@@ -7,10 +7,17 @@ const TeamMember = require('../models/TeamMember');
 const PrizeDistribution = require('../models/PrizeDistribution');
 const BattleRoyaleResult = require('../models/BattleRoyaleResult');
 const CustomMatchResult = require('../models/CustomMatchResult');
+const WinnerPayout = require('../models/WinnerPayout');
 const WalletTransaction = require('../models/WalletTransaction');
-const Notification = require('../models/Notification');
 const { authMiddleware } = require('../middleware/auth');
 const lifecycle = require('../services/tournamentLifecycle');
+const winnerPayoutService = require('../services/winnerPayoutService');
+const {
+  notifyMatchLive,
+  notifyMatchCompleted,
+  notifyResultsPublished,
+  notifyTournamentJoined,
+} = require('../services/tournamentPushEvents');
 
 const router = express.Router();
 
@@ -234,6 +241,12 @@ async function transitionStatus(req, res, nextStatus) {
   lifecycle.syncLegacyFields(tournament, nextStatus);
   await tournament.save();
 
+  if (nextStatus === 'ongoing') {
+    notifyMatchLive(tournament).catch((e) => console.error('live notify:', e.message));
+  } else if (nextStatus === 'completed') {
+    notifyMatchCompleted(tournament).catch((e) => console.error('complete notify:', e.message));
+  }
+
   res.json({
     message: `Tournament is now ${nextStatus}`,
     tournament,
@@ -298,11 +311,90 @@ router.post('/admin/:id/publish-results', authMiddleware, async (req, res) => {
     if (!marked.ok) return res.status(400).json({ error: marked.error });
     await tournament.save();
 
+    // Create WinnerPayout records + optional auto-credit (TEST wallet)
+    let payoutSummary = { credited: 0 };
+    try {
+      if (lifecycle.isBattleRoyale(tournament)) {
+        const brRows = await BattleRoyaleResult.find({ tournamentId: tournament._id });
+        await winnerPayoutService.ensurePayoutRecords(
+          brRows
+            .filter((r) => Number(r.prize) > 0)
+            .map((r) => ({
+              tournamentId: tournament._id,
+              userId: r.userId,
+              resultId: r._id,
+              resultModel: 'BattleRoyaleResult',
+              amount: Number(r.prize) || 0,
+              usernameSnapshot: r.gamingUsername || '',
+              description: `BR prize — ${tournament.name} (pos ${r.position})`,
+            }))
+        );
+      } else {
+        const custom = await CustomMatchResult.findOne({ tournamentId: tournament._id });
+        if (custom && Number(custom.winnerPrize) > 0) {
+          const winnerTeam = await Team.findById(custom.winnerTeamId);
+          if (winnerTeam?.captainUserId) {
+            await winnerPayoutService.ensurePayoutRecords([
+              {
+                tournamentId: tournament._id,
+                userId: winnerTeam.captainUserId,
+                resultId: custom._id,
+                resultModel: 'CustomMatchResult',
+                amount: Number(custom.winnerPrize) || 0,
+                usernameSnapshot: '',
+                description: `Custom Match winner prize — ${tournament.name}`,
+              },
+            ]);
+          }
+        }
+      }
+      payoutSummary = await winnerPayoutService.autoCreditPendingForTournament(tournament._id, {
+        tournamentName: tournament.name,
+      });
+
+      // Keep legacy prizeCredited flag in sync for custom matches
+      if (!lifecycle.isBattleRoyale(tournament)) {
+        const paid = await WinnerPayout.countDocuments({
+          tournamentId: tournament._id,
+          resultModel: 'CustomMatchResult',
+          status: 'PAID',
+        });
+        if (paid > 0) {
+          await CustomMatchResult.updateOne(
+            { tournamentId: tournament._id },
+            { $set: { prizeCredited: true } }
+          );
+        }
+      }
+    } catch (payoutErr) {
+      console.error('publish-results payout:', payoutErr);
+    }
+
+    try {
+      const paidPayouts = await WinnerPayout.find({
+        tournamentId: tournament._id,
+        status: { $in: ['PAID', 'PENDING'] },
+        amount: { $gt: 0 },
+      }).select('userId amount status');
+      const winnerAmounts = {};
+      const winnerUserIds = [];
+      paidPayouts.forEach((p) => {
+        winnerUserIds.push(String(p.userId));
+        winnerAmounts[String(p.userId)] = Number(p.amount) || 0;
+      });
+      await notifyResultsPublished(tournament, { winnerUserIds, winnerAmounts });
+    } catch (notifyErr) {
+      console.error('results published notify:', notifyErr.message);
+    }
+
     res.json({
       message: 'Results published',
       tournament,
       status: 'completed',
       resultsPublished: true,
+      payoutsCredited: payoutSummary.credited || 0,
+      autoPaymentEnabled: tournament.autoPaymentEnabled !== false,
+      controlWindow: winnerPayoutService.getControlWindow(tournament),
     });
   } catch (e) {
     res.status(500).json({ error: 'Failed to publish results' });
@@ -554,40 +646,47 @@ router.post('/admin/:id/results/custom-match', authMiddleware, async (req, res) 
       if (!marked.ok) return res.status(400).json({ error: marked.error });
       await tournament.save();
 
-      // Credit winner prize to team captain's wallet (once)
-      if (resolvedWinnerPrize > 0 && !doc.prizeCredited) {
+      // Winner payout via controlled lifecycle (TEST wallet; no Cashfree)
+      let winnerPrizeCredited = 0;
+      if (resolvedWinnerPrize > 0) {
         const winnerTeam = teams.find((t) => String(t._id) === String(winnerTeamId));
         const captainId = winnerTeam?.captainUserId;
         if (captainId) {
-          const captain = await User.findById(captainId);
-          if (captain) {
-            captain.wallet.balance = (captain.wallet.balance || 0) + resolvedWinnerPrize;
-            captain.wallet.totalWinnings = (captain.wallet.totalWinnings || 0) + resolvedWinnerPrize;
-            captain.tournament.wins = (captain.tournament.wins || 0) + 1;
-            captain.tournament.earnings = (captain.tournament.earnings || 0) + resolvedWinnerPrize;
-            await captain.save();
-
-            await WalletTransaction.create({
+          const captain = await User.findById(captainId).select('username');
+          await winnerPayoutService.ensurePayoutRecords([
+            {
+              tournamentId: tournament._id,
               userId: captainId,
-              type: 'tournament_reward',
+              resultId: doc._id,
+              resultModel: 'CustomMatchResult',
               amount: resolvedWinnerPrize,
-              tournamentId: tournament._id,
+              usernameSnapshot: captain?.username || '',
               description: `Custom Match winner prize — ${tournament.name}`,
-              status: 'completed',
-            });
-
-            await Notification.create({
-              userId: captainId,
-              tournamentId: tournament._id,
-              type: 'tournament_update',
-              title: 'Winner Prize Credited',
-              message: `₹${resolvedWinnerPrize} credited for winning ${tournament.name}.`,
-            });
-
+            },
+          ]);
+          const credit = await winnerPayoutService.autoCreditPendingForTournament(tournament._id, {
+            tournamentName: tournament.name,
+          });
+          winnerPrizeCredited = credit.credited > 0 ? resolvedWinnerPrize : 0;
+          if (credit.credited > 0) {
             doc.prizeCredited = true;
             await doc.save();
           }
         }
+      }
+
+      try {
+        const winnerTeam = teams.find((t) => String(t._id) === String(winnerTeamId));
+        const captainId = winnerTeam?.captainUserId;
+        const winnerAmounts = {};
+        const winnerUserIds = [];
+        if (captainId && resolvedWinnerPrize > 0) {
+          winnerUserIds.push(String(captainId));
+          winnerAmounts[String(captainId)] = resolvedWinnerPrize;
+        }
+        await notifyResultsPublished(tournament, { winnerUserIds, winnerAmounts });
+      } catch (notifyErr) {
+        console.error('custom results notify:', notifyErr.message);
       }
 
       return res.json({
@@ -595,7 +694,9 @@ router.post('/admin/:id/results/custom-match', authMiddleware, async (req, res) 
         result: doc,
         status: 'completed',
         resultsPublished: true,
-        winnerPrizeCredited: resolvedWinnerPrize,
+        winnerPrizeCredited,
+        autoPaymentEnabled: tournament.autoPaymentEnabled !== false,
+        controlWindow: winnerPayoutService.getControlWindow(tournament),
       });
     }
 
@@ -907,13 +1008,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
       status: 'completed',
     });
 
-    await Notification.create({
-      userId: req.userId,
-      tournamentId: tournament._id,
-      type: 'tournament_update',
-      title: 'Team Registered',
-      message: `Team "${team.name}"${sideLabel} registered for ${tournament.name}. Entry fee ₹${tournament.entryFee} paid once for your whole team.`,
-    });
+    await notifyTournamentJoined(req.userId, tournament).catch(() => {});
 
     tournament.currentParticipants = (teamCount + 1) * requiredPlayers;
     if (!tournament.registeredPlayers.some((id) => String(id) === String(req.userId))) {
@@ -942,6 +1037,95 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Team name or side is already taken for this match' });
     }
     res.status(500).json({ error: e.message || 'Failed to register team' });
+  }
+});
+
+// ——— Winner payout control (10-minute window after publish) ———
+
+router.get('/admin/:id/payouts', authMiddleware, async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    const data = await winnerPayoutService.listTournamentPayouts(req.params.id);
+    if (!data) return res.status(404).json({ error: 'Tournament not found' });
+    res.json(data);
+  } catch (e) {
+    console.error('list payouts:', e);
+    res.status(500).json({ error: e.message || 'Failed to load payouts' });
+  }
+});
+
+router.put('/admin/:id/auto-payment', authMiddleware, async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    const enabled = !!req.body?.enabled;
+    const tournament = await winnerPayoutService.setAutoPayment(req.params.id, enabled);
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+
+    let credit = { credited: 0 };
+    if (enabled && lifecycle.areResultsPublished(tournament)) {
+      const window = winnerPayoutService.getControlWindow(tournament);
+      if (window.open) {
+        credit = await winnerPayoutService.autoCreditPendingForTournament(tournament._id, {
+          tournamentName: tournament.name,
+        });
+      }
+    }
+
+    res.json({
+      message: `Auto Payment ${enabled ? 'ON' : 'OFF'}`,
+      autoPaymentEnabled: tournament.autoPaymentEnabled !== false,
+      payoutsCredited: credit.credited || 0,
+      controlWindow: winnerPayoutService.getControlWindow(tournament),
+    });
+  } catch (e) {
+    console.error('auto-payment:', e);
+    res.status(500).json({ error: e.message || 'Failed to update auto payment' });
+  }
+});
+
+router.post('/admin/payouts/:payoutId/stop', authMiddleware, async (req, res) => {
+  try {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    const payout = await winnerPayoutService.stopPendingPayout(
+      req.params.payoutId,
+      admin._id,
+      req.body?.reason || 'Stopped by admin'
+    );
+    res.json({
+      message: 'Payout stopped. No wallet credit will be issued.',
+      payout,
+    });
+  } catch (e) {
+    const status = e.status || 500;
+    res.status(status).json({
+      error: e.message || 'Failed to stop payout',
+      code: e.code,
+      payout: e.payout,
+    });
+  }
+});
+
+router.post('/admin/payouts/:payoutId/reverse', authMiddleware, async (req, res) => {
+  try {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    const result = await winnerPayoutService.reversePaidPayout(
+      req.params.payoutId,
+      admin._id,
+      req.body?.reason || 'Reversed by admin'
+    );
+    res.json({
+      message: 'Payout reversed successfully',
+      ...result,
+    });
+  } catch (e) {
+    const status = e.status || 500;
+    res.status(status).json({
+      error: e.message || 'Failed to reverse payout',
+      code: e.code,
+      details: e.details,
+    });
   }
 });
 

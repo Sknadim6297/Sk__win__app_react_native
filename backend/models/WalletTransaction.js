@@ -8,7 +8,16 @@ const walletTransactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['deposit', 'withdraw', 'tournament_entry', 'tournament_reward', 'refund', 'referral_bonus'],
+    enum: [
+      'deposit',
+      'withdraw',
+      'tournament_entry',
+      'tournament_reward',
+      'winning',
+      'winning_reversal',
+      'refund',
+      'referral_bonus',
+    ],
     required: true,
   },
   amount: {
@@ -18,7 +27,7 @@ const walletTransactionSchema = new mongoose.Schema({
   description: String,
   status: {
     type: String,
-    enum: ['pending', 'completed', 'failed'],
+    enum: ['pending', 'completed', 'failed', 'reversed'],
     default: 'pending',
   },
   paymentMethod: String,
@@ -28,6 +37,25 @@ const walletTransactionSchema = new mongoose.Schema({
     sparse: true,
   },
   tournamentId: mongoose.Schema.Types.ObjectId,
+  /** Links wallet txn to WinnerPayout (credit or reversal) */
+  payoutId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'WinnerPayout',
+    index: true,
+    sparse: true,
+  },
+  /** For winning_reversal: the original winning WalletTransaction */
+  originalTransactionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'WalletTransaction',
+    sparse: true,
+  },
+  adminId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    sparse: true,
+  },
+  reason: String,
   paymentOrderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'PaymentOrder',

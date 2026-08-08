@@ -37,6 +37,7 @@ const ACCOUNT_THEME = {
 
 const MENU_ITEMS = [
   { id: 'profile', title: 'My Profile', icon: 'account', screen: 'AccountProfile' },
+  { id: 'notifications', title: 'Notifications', icon: 'bell', screen: 'Notifications' },
   { id: 'wallet', title: 'My Wallet', icon: 'wallet', screen: 'MyWallet' },
   { id: 'matches', title: 'My Matches', icon: 'gamepad-variant', screen: 'History' },
   { id: 'announcement', title: 'Announcement', icon: 'flag', screen: 'ImportantUpdates' },
@@ -104,7 +105,9 @@ const AccountScreen = ({ navigation }) => {
       return;
     }
     if (item.screen) {
-      navigation.navigate(item.screen);
+      const parent = navigation.getParent?.();
+      if (parent?.navigate) parent.navigate(item.screen);
+      else navigation.navigate(item.screen);
     }
   };
 

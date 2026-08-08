@@ -1,7 +1,7 @@
 import { useCallback, useContext, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
-import { userService, walletService, supportService } from '../services/api';
+import { userService, walletService, supportService, notificationService } from '../services/api';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 
 export function useAppHeaderData() {
@@ -9,13 +9,15 @@ export function useAppHeaderData() {
   const [profile, setProfile] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [supportBadgeCount, setSupportBadgeCount] = useState(0);
+  const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
 
   const loadHeaderData = useCallback(async () => {
     try {
-      const [profileData, walletData, tickets] = await Promise.all([
+      const [profileData, walletData, tickets, unread] = await Promise.all([
         userService.getProfile().catch(() => null),
         walletService.getBalance().catch(() => ({ balance: 0 })),
         supportService.getMyTickets().catch(() => []),
+        notificationService.getUnreadCount().catch(() => ({ unreadCount: 0 })),
       ]);
 
       if (profileData) setProfile(profileData);
@@ -26,6 +28,7 @@ export function useAppHeaderData() {
         (t) => t.status === 'open' || t.status === 'in_progress'
       ).length;
       setSupportBadgeCount(openTickets);
+      setNotificationBadgeCount(Math.min(Math.max(Number(unread?.unreadCount) || 0, 0), 99));
     } catch {
       /* non-critical */
     }
@@ -46,6 +49,7 @@ export function useAppHeaderData() {
     profilePhoto,
     walletBalance,
     supportBadgeCount,
+    notificationBadgeCount,
     refreshHeader: loadHeaderData,
   };
 }
