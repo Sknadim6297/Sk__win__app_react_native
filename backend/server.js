@@ -28,6 +28,7 @@ const {
 const AppRelease = require('./models/AppRelease');
 const { initFcm } = require('./services/fcm');
 const { runTournamentNotifier } = require('./services/tournamentNotifier');
+const { processDuePayouts } = require('./services/winnerPayoutService');
 
 const app = express();
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/sk-win';
@@ -216,6 +217,14 @@ async function connectDatabase() {
 
   console.log('MongoDB connected:', mongoose.connection.host);
   console.log('Database:', mongoose.connection.name);
+
+  // Align Team indexes (BR allows many teams without side A/B)
+  try {
+    const Team = require('./models/Team');
+    await Team.syncIndexes();
+  } catch (idxErr) {
+    console.warn('Team.syncIndexes warning:', idxErr.message);
+  }
 }
 
 async function startServer() {
@@ -243,6 +252,14 @@ async function startServer() {
           await runTournamentNotifier();
         } catch (error) {
           console.error('Tournament notifier error:', error.message);
+        }
+        try {
+          const payoutResult = await processDuePayouts();
+          if (payoutResult.processed > 0) {
+            console.log(`[Payouts] Auto-credited ${payoutResult.processed} due payout(s)`);
+          }
+        } catch (error) {
+          console.error('Due payout processor error:', error.message);
         }
       });
     });

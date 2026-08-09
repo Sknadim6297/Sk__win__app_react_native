@@ -34,6 +34,7 @@ const GAME_MODES = [
 
 const CUSTOM_GAME_MODES = [
   { label: 'Solo', value: 'solo', teamSize: 1 },
+  { label: 'Duo', value: 'duo', teamSize: 2 },
   { label: 'Squad', value: 'squad', teamSize: 4 },
 ];
 
@@ -140,8 +141,9 @@ const TournamentManagement = ({ navigation }) => {
   useEffect(() => {
     const isCustom = (form.category || form.tournamentType) === 'custom';
     if (isCustom) {
-      const customMode = form.mode === 'squad' ? 'squad' : 'solo';
-      const perTeam = customMode === 'squad' ? 4 : 1;
+      const customMode =
+        form.mode === 'squad' ? 'squad' : form.mode === 'duo' ? 'duo' : 'solo';
+      const perTeam = customMode === 'squad' ? 4 : customMode === 'duo' ? 2 : 1;
       const nextMax = String(perTeam * 2);
       setForm((prev) => {
         if (
@@ -162,9 +164,12 @@ const TournamentManagement = ({ navigation }) => {
       });
       return;
     }
-    const suggestedMaxPlayers = MODE_MAX_PLAYERS[form.mode];
-    if (!suggestedMaxPlayers) return;
+    const suggestedMaxPlayers = MODE_MAX_PLAYERS[form.mode] || 50;
     const teamSize = form.mode === 'solo' ? 1 : form.mode === 'duo' ? 2 : 4;
+    const maxTeams =
+      form.mode === 'solo'
+        ? suggestedMaxPlayers
+        : Math.floor(suggestedMaxPlayers / teamSize);
     setForm((prev) => {
       if (isEditMode) {
         if (prev.teamSize === teamSize) return prev;
@@ -172,14 +177,16 @@ const TournamentManagement = ({ navigation }) => {
       }
       if (
         prev.teamSize === teamSize &&
-        String(prev.maxParticipants) === String(suggestedMaxPlayers)
+        String(prev.maxParticipants) === String(suggestedMaxPlayers) &&
+        String(prev.maxTeams) === String(maxTeams)
       ) {
         return prev;
       }
       return {
         ...prev,
         teamSize,
-        maxParticipants: suggestedMaxPlayers.toString(),
+        maxParticipants: String(suggestedMaxPlayers),
+        maxTeams: String(maxTeams),
       };
     });
   }, [form.mode, form.category, form.tournamentType, isEditMode]);
@@ -451,11 +458,14 @@ const TournamentManagement = ({ navigation }) => {
         perKill: (form.category || form.tournamentType) === 'custom' ? 0 : (parseFloat(form.perKill) || 0),
         maxParticipants:
           (form.category || form.tournamentType) === 'custom'
-            ? (form.mode === 'squad' ? 4 : 1) * 2
-            : parseInt(form.maxParticipants) || 50,
-        maxTeams: (form.category || form.tournamentType) === 'custom' ? 2 : form.mode === 'solo'
-          ? parseInt(form.maxParticipants) || 50
-          : Math.floor((parseInt(form.maxParticipants) || 50) / (form.teamSize || 1)),
+            ? (form.mode === 'squad' ? 4 : form.mode === 'duo' ? 2 : 1) * 2
+            : 50,
+        maxTeams:
+          (form.category || form.tournamentType) === 'custom'
+            ? 2
+            : form.mode === 'solo'
+              ? 50
+              : Math.floor(50 / (form.teamSize || (form.mode === 'duo' ? 2 : 4))),
         minimumBalance: parseFloat(form.minimumBalance) || parseFloat(form.entryFee) || 0,
         startDate: form.startDate.toISOString(),
         endDate: form.endDate ? form.endDate.toISOString() : null,
@@ -1517,7 +1527,9 @@ const TournamentManagement = ({ navigation }) => {
                       {(form.category || form.tournamentType) === 'custom'
                         ? form.mode === 'squad'
                           ? 4
-                          : 1
+                          : form.mode === 'duo'
+                            ? 2
+                            : 1
                         : form.teamSize}
                     </Text>
                   </View>

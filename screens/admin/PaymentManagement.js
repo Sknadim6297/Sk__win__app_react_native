@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -8,332 +8,384 @@ import {
   StatusBar,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS } from '../../styles/theme';
-import { adminService } from '../../services/api';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { COLORS, FONTS } from '../../styles/theme';
+import { adminService, tournamentManagementService } from '../../services/api';
 import Toast from '../../components/Toast';
 
-const PaymentManagement = ({ navigation }) => {
-  const [transactions, setTransactions] = useState([]);
+const TABS = [
+  { id: 'PENDING', label: 'Pending' },
+  { id: 'PAID', label: 'Completed' },
+  { id: 'BLOCKED', label: 'Blocked' },
+  { id: 'CANCELLED', label: 'Cancelled' },
+  { id: 'REJECTED', label: 'Rejected' },
+  { id: 'refunds', label: 'Refunds' },
+  { id: 'txns', label: 'Transactions' },
+];
+
+function formatTime(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatRemaining(ms) {
+  if (!ms || ms <= 0) return 'Due';
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
+export default function PaymentManagement({ navigation }) {
+  const [tab, setTab] = useState('PENDING');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState('all');
+  const [stats, setStats] = useState(null);
+  const [payouts, setPayouts] = useState([]);
+  const [refunds, setRefunds] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [search, setSearch] = useState('');
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [filter]);
-
-  const fetchTransactions = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
-      const params = filter === 'all' ? { limit: 200 } : { type: filter, limit: 200 };
-      const data = await adminService.getTransactions(params);
-      setTransactions(Array.isArray(data?.transactions) ? data.transactions : []);
-    } catch (error) {
-      setToast({ visible: true, message: error.message || 'Failed to load transactions', type: 'error' });
+      const paymentStats = await adminService.getPaymentStats().catch(() => null);
+      setStats(paymentStats);
+
+      if (tab === 'refunds') {
+        const data = await adminService.getRefunds({ limit: 50 });
+        setRefunds(data.refunds || []);
+      } else if (tab === 'txns') {
+        const data = await adminService.getTransactions({ limit: 50 });
+        setTransactions(data.transactions || []);
+      } else {
+        const data = await tournamentManagementService.listAllPayouts({
+          status: tab,
+          limit: 50,
+          ...(search.trim() ? { search: search.trim() } : {}),
+        });
+        setPayouts(data.payouts || []);
+      }
+    } catch (e) {
+      setToast({ visible: true, message: e.message || 'Failed to load', type: 'error' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [tab, search]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchTransactions();
+    await load();
     setRefreshing(false);
   };
 
-  const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
+  const confirmWithReason = (title, message, action) => {
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Continue',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert('Select reason', 'Required for audit log.', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Rule violation',
+              onPress: () => action('Rule violation'),
+            },
+            {
+              text: 'Suspicious activity',
+              onPress: () => action('Suspicious activity'),
+            },
+            {
+              text: 'Other / investigate',
+              onPress: () => action('Under investigation'),
+            },
+          ]);
+        },
+      },
+    ]);
+  };
 
-  const summary = transactions.reduce(
-    (acc, transaction) => {
-      acc.total += 1;
-      acc.amount += Number(transaction.amount || 0);
-      acc.byType[transaction.type] = (acc.byType[transaction.type] || 0) + 1;
-      return acc;
-    },
-    { total: 0, amount: 0, byType: {} }
-  );
+  const runPayoutAction = async (fn, successMsg) => {
+    try {
+      await fn();
+      setToast({ visible: true, message: successMsg, type: 'success' });
+      await load();
+    } catch (e) {
+      setToast({ visible: true, message: e.message || 'Action failed', type: 'error' });
+    }
+  };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading payment records...</Text>
+  const renderPayout = (p) => (
+    <View key={String(p._id)} style={styles.card}>
+      <Text style={styles.cardTitle}>{p.username || 'Winner'}</Text>
+      <Text style={styles.meta}>{p.tournamentName || p.tournamentId?.name || 'Tournament'}</Text>
+      <Text style={styles.meta}>
+        ₹{p.amount} · {p.status}
+        {p.status === 'PENDING' ? ` · Wait ${formatRemaining(p.remainingMs)}` : ''}
+      </Text>
+      <Text style={styles.metaSmall}>
+        Published: {formatTime(p.winnerPublishedAt)} · Due: {formatTime(p.scheduledPayoutAt)}
+      </Text>
+      {p.status === 'PENDING' ? (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnWarn]}
+            onPress={() =>
+              confirmWithReason('Block payout', 'Block automatic credit for this winner?', (reason) =>
+                runPayoutAction(
+                  () => tournamentManagementService.blockPayout(p._id, reason),
+                  'Payout blocked'
+                )
+              )
+            }
+          >
+            <Text style={styles.btnText}>Block</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnDanger]}
+            onPress={() =>
+              confirmWithReason('Cancel payout', 'Cancel this pending payout?', (reason) =>
+                runPayoutAction(
+                  () => tournamentManagementService.stopPayout(p._id, reason),
+                  'Payout cancelled'
+                )
+              )
+            }
+          >
+            <Text style={styles.btnText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btn, styles.btnMuted]}
+            onPress={() =>
+              confirmWithReason('Reject payout', 'Reject this pending payout?', (reason) =>
+                runPayoutAction(
+                  () => tournamentManagementService.rejectPayout(p._id, reason),
+                  'Payout rejected'
+                )
+              )
+            }
+          >
+            <Text style={styles.btnText}>Reject</Text>
+          </TouchableOpacity>
         </View>
-      </SafeAreaView>
-    );
-  }
+      ) : null}
+      {p.status === 'PAID' ? (
+        <TouchableOpacity
+          style={[styles.btn, styles.btnWarn, { marginTop: 8, alignSelf: 'flex-start' }]}
+          onPress={() =>
+            confirmWithReason(
+              'Freeze amount',
+              'Freeze this paid amount (no blind reverse)?',
+              (reason) =>
+                runPayoutAction(
+                  () =>
+                    adminService.freezeWallet({
+                      userId: p.userId?._id || p.userId,
+                      amount: p.amount,
+                      reason,
+                      payoutId: p._id,
+                    }),
+                  'Amount frozen'
+                )
+            )
+          }
+        >
+          <Text style={styles.btnText}>Freeze amount</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
-      <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hideToast} />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={() => setToast({ visible: false, message: '', type: 'error' })}
+      />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>
-        <View style={styles.headerTextBlock}>
-          <Text style={styles.headerTitle}>PAYMENT MANAGEMENT</Text>
-          <Text style={styles.headerSubtitle}>{summary.total} transactions</Text>
-        </View>
-        <TouchableOpacity onPress={onRefresh}>
-          <MaterialCommunityIcons name="refresh" size={24} color={COLORS.accent} />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Payment Management</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      <View style={styles.filters}>
-        {['all', 'deposit', 'withdraw', 'tournament_reward', 'tournament_entry'].map((item) => (
+      {stats ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsRow}>
+          <View style={styles.statChip}>
+            <Text style={styles.statVal}>{stats.payouts?.pending ?? 0}</Text>
+            <Text style={styles.statLbl}>Pending</Text>
+          </View>
+          <View style={styles.statChip}>
+            <Text style={styles.statVal}>{stats.payouts?.paid ?? 0}</Text>
+            <Text style={styles.statLbl}>Paid</Text>
+          </View>
+          <View style={styles.statChip}>
+            <Text style={styles.statVal}>{stats.payouts?.blocked ?? 0}</Text>
+            <Text style={styles.statLbl}>Blocked</Text>
+          </View>
+          <View style={styles.statChip}>
+            <Text style={styles.statVal}>{stats.refunds?.failed ?? 0}</Text>
+            <Text style={styles.statLbl}>Refund fail</Text>
+          </View>
+          <View style={styles.statChip}>
+            <Text style={styles.statVal}>₹{stats.payouts?.totalPrizePaid ?? 0}</Text>
+            <Text style={styles.statLbl}>Prize paid</Text>
+          </View>
+        </ScrollView>
+      ) : null}
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+        {TABS.map((t) => (
           <TouchableOpacity
-            key={item}
-            style={[styles.filterChip, filter === item && styles.filterChipActive]}
-            onPress={() => setFilter(item)}
+            key={t.id}
+            style={[styles.tab, tab === t.id && styles.tabActive]}
+            onPress={() => setTab(t.id)}
           >
-            <Text style={[styles.filterText, filter === item && styles.filterTextActive]}>
-              {item === 'all' ? 'All' : item.replace('_', ' ')}
-            </Text>
+            <Text style={[styles.tabText, tab === t.id && styles.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
-      </View>
-
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-      >
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{summary.total}</Text>
-            <Text style={styles.summaryLabel}>Records</Text>
-          </View>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>₹{summary.amount.toLocaleString()}</Text>
-            <Text style={styles.summaryLabel}>Volume</Text>
-          </View>
-        </View>
-
-        {transactions.length === 0 ? (
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="cash-multiple" size={56} color={COLORS.gray} />
-            <Text style={styles.emptyTitle}>No transactions found</Text>
-            <Text style={styles.emptyText}>Try a different filter or refresh the data.</Text>
-          </View>
-        ) : (
-          transactions.map((transaction) => {
-            const user = transaction.userId;
-            const isCredit = transaction.type === 'deposit' || transaction.type === 'tournament_reward' || transaction.type === 'referral_bonus';
-
-            return (
-              <View key={transaction._id} style={styles.transactionCard}>
-                <View style={styles.transactionTopRow}>
-                  <View style={styles.iconBubble}>
-                    <MaterialCommunityIcons
-                      name={isCredit ? 'arrow-down-bold-circle' : 'arrow-up-bold-circle'}
-                      size={24}
-                      color={isCredit ? COLORS.success : COLORS.error}
-                    />
-                  </View>
-                  <View style={styles.transactionInfo}>
-                    <Text style={styles.transactionType}>{transaction.type?.replace('_', ' ')}</Text>
-                    <Text style={styles.transactionUser}>{user?.username || 'Unknown user'}</Text>
-                    <Text style={styles.transactionMeta}>{user?.email || 'No email'}</Text>
-                  </View>
-                  <Text style={[styles.transactionAmount, { color: isCredit ? COLORS.success : COLORS.error }]}>
-                    {isCredit ? '+' : '-'}₹{Number(transaction.amount || 0).toLocaleString()}
-                  </Text>
-                </View>
-                <Text style={styles.transactionDescription}>{transaction.description || 'No description available'}</Text>
-                <View style={styles.transactionFooter}>
-                  <Text style={styles.transactionMeta}>{new Date(transaction.createdAt).toLocaleString()}</Text>
-                  <Text style={styles.statusBadge}>{transaction.status || 'pending'}</Text>
-                </View>
-              </View>
-            );
-          })
-        )}
-
-        <View style={{ height: 24 }} />
       </ScrollView>
+
+      {tab !== 'refunds' && tab !== 'txns' ? (
+        <TextInput
+          style={styles.search}
+          placeholder="Search winner username"
+          placeholderTextColor="#64748b"
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={load}
+        />
+      ) : null}
+
+      {loading ? (
+        <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+        >
+          {tab === 'refunds'
+            ? (refunds.length ? refunds : []).map((r) => (
+                <View key={String(r._id)} style={styles.card}>
+                  <Text style={styles.cardTitle}>{r.userId?.username || 'User'}</Text>
+                  <Text style={styles.meta}>
+                    {r.tournamentId?.name || 'Tournament'} · ₹{r.amount} · {r.status}
+                  </Text>
+                  {r.status === 'failed' ? (
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnWarn, { marginTop: 8, alignSelf: 'flex-start' }]}
+                      onPress={() =>
+                        runPayoutAction(() => adminService.retryRefund(r._id), 'Refund retried')
+                      }
+                    >
+                      <Text style={styles.btnText}>Retry</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ))
+            : tab === 'txns'
+              ? (transactions.length ? transactions : []).map((t) => (
+                  <View key={String(t._id)} style={styles.card}>
+                    <Text style={styles.cardTitle}>
+                      {t.userId?.username || 'User'} · {t.type}
+                    </Text>
+                    <Text style={styles.meta}>
+                      ₹{t.amount} · {t.status} · {formatTime(t.createdAt)}
+                    </Text>
+                  </View>
+                ))
+              : payouts.map(renderPayout)}
+
+          {!loading &&
+          ((tab === 'refunds' && !refunds.length) ||
+            (tab === 'txns' && !transactions.length) ||
+            (!['refunds', 'txns'].includes(tab) && !payouts.length)) ? (
+            <Text style={styles.empty}>No records in this tab.</Text>
+          ) : null}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: COLORS.white,
-    marginTop: 12,
-    fontSize: 14,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: COLORS.primary,
-  },
-  headerTextBlock: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  headerSubtitle: {
-    color: `${COLORS.white}80`,
-    marginTop: 3,
-    fontSize: 12,
-  },
-  filters: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-  },
-  filterChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: COLORS.lightGray,
-    borderWidth: 1,
-    borderColor: COLORS.darkGray,
-  },
-  filterChipActive: {
-    backgroundColor: `${COLORS.accent}20`,
-    borderColor: COLORS.accent,
-  },
-  filterText: {
-    color: COLORS.gray,
-    fontSize: 12,
-    textTransform: 'capitalize',
-  },
-  filterTextActive: {
-    color: COLORS.accent,
-    fontWeight: '700',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  summaryCard: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 18,
     padding: 16,
+  },
+  headerTitle: { color: COLORS.white, fontSize: 18, fontFamily: FONTS.bold },
+  statsRow: { paddingHorizontal: 12, gap: 8, paddingBottom: 8 },
+  statChip: {
+    backgroundColor: '#151D36',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minWidth: 88,
     borderWidth: 1,
-    borderColor: COLORS.darkGray,
-    marginBottom: 16,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
+  statVal: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 16 },
+  statLbl: { color: COLORS.gray, fontSize: 11, marginTop: 2 },
+  tabs: { paddingHorizontal: 12, gap: 8, paddingBottom: 8 },
+  tab: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: '#151D36',
   },
-  summaryValue: {
+  tabActive: { backgroundColor: 'rgba(91,57,168,0.4)', borderColor: '#7B61FF', borderWidth: 1 },
+  tabText: { color: COLORS.gray, fontSize: 12, fontFamily: FONTS.semiBold },
+  tabTextActive: { color: COLORS.white },
+  search: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: '#151D36',
+    borderRadius: 10,
+    padding: 12,
     color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '800',
   },
-  summaryLabel: {
-    color: COLORS.gray,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  transactionCard: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 18,
+  list: { padding: 16, paddingBottom: 40 },
+  card: {
+    backgroundColor: '#151D36',
+    borderRadius: 14,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: COLORS.darkGray,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  transactionTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconBubble: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.darkGray,
-    marginRight: 12,
-  },
-  transactionInfo: {
-    flex: 1,
-  },
-  transactionType: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '700',
-    textTransform: 'capitalize',
-  },
-  transactionUser: {
-    color: COLORS.accent,
-    marginTop: 2,
-    fontSize: 12,
-  },
-  transactionMeta: {
-    color: COLORS.gray,
-    marginTop: 2,
-    fontSize: 11,
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  transactionDescription: {
-    color: COLORS.white,
-    marginTop: 10,
-    fontSize: 13,
-  },
-  transactionFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  statusBadge: {
-    color: COLORS.accent,
-    textTransform: 'uppercase',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  emptyTitle: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 12,
-  },
-  emptyText: {
-    color: COLORS.gray,
-    fontSize: 13,
-    marginTop: 6,
-    textAlign: 'center',
-  },
+  cardTitle: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 15 },
+  meta: { color: COLORS.gray, marginTop: 4, fontSize: 13 },
+  metaSmall: { color: '#64748b', marginTop: 4, fontSize: 11 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  btn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  btnWarn: { backgroundColor: '#B45309' },
+  btnDanger: { backgroundColor: '#DC2626' },
+  btnMuted: { backgroundColor: '#475569' },
+  btnText: { color: '#fff', fontFamily: FONTS.bold, fontSize: 12 },
+  empty: { color: COLORS.gray, textAlign: 'center', marginTop: 40 },
 });
-
-export default PaymentManagement;

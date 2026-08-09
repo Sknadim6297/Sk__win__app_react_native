@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
 /**
- * Winner / prize payout lifecycle for admin control + wallet audit.
- * PENDING → PAID → REVERSED
- * PENDING → CANCELLED
- * PROCESSING is short-lived during credit/reverse races.
+ * Winner payout lifecycle:
+ * PENDING (10-min wait) → PAID
+ * PENDING → BLOCKED | CANCELLED | REJECTED | FAILED
+ * PAID → REVERSED (only if full balance available; prefer freeze for disputes)
  */
 const winnerPayoutSchema = new mongoose.Schema({
   tournamentId: {
@@ -19,15 +19,24 @@ const winnerPayoutSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
-  /** Source result document id */
   resultId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
   },
   resultModel: {
     type: String,
-    enum: ['CustomMatchResult', 'BattleRoyaleResult', 'TournamentResult'],
+    enum: [
+      'CustomMatchResult',
+      'BattleRoyaleResult',
+      'BattleRoyaleTeamResult',
+      'TournamentResult',
+    ],
     required: true,
+  },
+  matchType: {
+    type: String,
+    enum: ['solo', 'duo', 'squad', 'team', 'battle_royale', 'custom_match', 'other'],
+    default: 'other',
   },
   amount: {
     type: Number,
@@ -36,10 +45,21 @@ const winnerPayoutSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['PENDING', 'PROCESSING', 'PAID', 'REVERSED', 'CANCELLED', 'FAILED'],
+    enum: [
+      'PENDING',
+      'PROCESSING',
+      'PAID',
+      'BLOCKED',
+      'CANCELLED',
+      'REJECTED',
+      'REVERSED',
+      'FAILED',
+    ],
     default: 'PENDING',
     index: true,
   },
+  winnerPublishedAt: Date,
+  scheduledPayoutAt: { type: Date, index: true },
   walletTransactionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'WalletTransaction',
@@ -49,14 +69,21 @@ const winnerPayoutSchema = new mongoose.Schema({
     ref: 'WalletTransaction',
   },
   paidAt: Date,
-  reversedAt: Date,
+  blockedAt: Date,
+  blockedByAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  blockReason: String,
   cancelledAt: Date,
-  failedAt: Date,
-  reversedByAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   cancelledByAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  reverseReason: String,
   cancelReason: String,
+  rejectedAt: Date,
+  rejectedByAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  rejectReason: String,
+  reversedAt: Date,
+  reversedByAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  reverseReason: String,
+  failedAt: Date,
   failReason: String,
+  adminRemark: String,
   usernameSnapshot: String,
   description: String,
   createdAt: { type: Date, default: Date.now },
@@ -67,6 +94,7 @@ winnerPayoutSchema.index(
   { tournamentId: 1, resultId: 1, userId: 1 },
   { unique: true }
 );
+winnerPayoutSchema.index({ status: 1, scheduledPayoutAt: 1 });
 
 winnerPayoutSchema.pre('save', function (next) {
   this.updatedAt = new Date();

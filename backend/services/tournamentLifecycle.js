@@ -161,6 +161,13 @@ function markResultsPublished(tournament) {
   if (status !== 'completed') {
     return { ok: false, error: 'Tournament must be completed before publishing results' };
   }
+  if (areResultsPublished(tournament)) {
+    return {
+      ok: false,
+      error: 'Results already published — payouts will not run again',
+      alreadyPublished: true,
+    };
+  }
   tournament.lifecycleStatus = 'completed';
   tournament.status = 'completed';
   tournament.resultsPublished = true;
@@ -205,6 +212,68 @@ function getPlayersPerTeam(mode) {
   return 1;
 }
 
+/** BR fixed player capacity; Custom Match = 2 teams × players/team. */
+const BR_MAX_PLAYERS = 50;
+
+function resolveTournamentCapacity({ category, mode, maxParticipants, maxTeams }) {
+  const isCustom = category === 'custom' || category === 'custom_match';
+  const modeNorm = String(mode || 'solo').toLowerCase();
+  const perTeam = getPlayersPerTeam(modeNorm);
+
+  if (isCustom) {
+    if (!['solo', 'duo', 'squad'].includes(modeNorm)) {
+      return { ok: false, error: 'Custom Match supports Solo, Duo, or Squad only' };
+    }
+    return {
+      ok: true,
+      mode: modeNorm,
+      maxTeams: 2,
+      maxParticipants: perTeam * 2,
+      playersPerTeam: perTeam,
+      category: 'custom',
+    };
+  }
+
+  // Battle Royale
+  if (!['solo', 'duo', 'squad'].includes(modeNorm)) {
+    return { ok: false, error: 'Battle Royale supports Solo, Duo, or Squad only' };
+  }
+  const players = BR_MAX_PLAYERS;
+  const teams =
+    modeNorm === 'solo' ? players : Math.floor(players / perTeam);
+  return {
+    ok: true,
+    mode: modeNorm,
+    maxTeams: teams,
+    maxParticipants: players,
+    playersPerTeam: perTeam,
+    category: 'battle_royale',
+    // leftover slots when squad: 50 % 4 = 2 (informational)
+    leftoverPlayerSlots: modeNorm === 'solo' ? 0 : players - teams * perTeam,
+  };
+}
+
+function getPlacementPrize(tournament, position) {
+  const rank = Number(position) || 0;
+  if (rank === 1) return Number(tournament?.prizes?.first) || 0;
+  if (rank === 2) return Number(tournament?.prizes?.second) || 0;
+  if (rank === 3) return Number(tournament?.prizes?.third) || 0;
+  return 0;
+}
+
+function calculateBrReward({ placementPrize, kills, perKill }) {
+  const k = Math.max(0, Number(kills) || 0);
+  const pk = Math.max(0, Number(perKill) || 0);
+  const place = Math.max(0, Number(placementPrize) || 0);
+  return {
+    placementPrize: place,
+    killReward: k * pk,
+    totalReward: place + k * pk,
+    kills: k,
+    perKill: pk,
+  };
+}
+
 /** Join display + full check */
 async function getJoinStats(tournamentId, tournament) {
   if (usesTeamRegistration(tournament)) {
@@ -212,7 +281,10 @@ async function getJoinStats(tournamentId, tournament) {
     const perTeam = getPlayersPerTeam(tournament.mode);
     const maxTeams =
       tournament.maxTeams ||
-      (isCustomMatch(tournament) ? 2 : Math.floor((tournament.maxParticipants || 50) / perTeam));
+      (isCustomMatch(tournament)
+        ? 2
+        : Math.floor((tournament.maxParticipants || BR_MAX_PLAYERS) / perTeam) ||
+          (perTeam === 1 ? tournament.maxParticipants || BR_MAX_PLAYERS : 1));
     return {
       joinedCount: teamCount,
       capacity: maxTeams,
@@ -343,9 +415,48 @@ function validateBattleRoyaleResults(entries, joinedCount) {
     return { ok: false, error: 'Invalid position' };
   }
   for (const e of entries) {
-    if (Number(e.kills) < 0) return { ok: false, error: 'Kills cannot be negative' };
+    if (Number(e.kills) < 0 || Number.isNaN(Number(e.kills))) {
+      return { ok: false, error: 'Kills must be a non-negative number' };
+    }
     if (Number(e.prize) < 0) return { ok: false, error: 'Prize cannot be negative' };
   }
+  return { ok: true };
+}
+
+function validateBattleRoyaleTeamResults(entries, teamIds) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return { ok: false, error: 'Team results are required' };
+  }
+  const teamSet = new Set((teamIds || []).map(String));
+  const seenTeams = new Set();
+  const seenPositions = new Set();
+
+  for (const e of entries) {
+    const teamId = String(e.teamId || '');
+    const position = Number(e.position);
+    const kills = Number(e.kills);
+
+    if (!teamSet.has(teamId)) {
+      return { ok: false, error: 'All result teams must be registered for this tournament' };
+    }
+    if (seenTeams.has(teamId)) {
+      return { ok: false, error: 'Duplicate team in results' };
+    }
+    seenTeams.add(teamId);
+
+    if (!position || position < 1) {
+      return { ok: false, error: 'Invalid team placement' };
+    }
+    if (seenPositions.has(position)) {
+      return { ok: false, error: 'Duplicate placements are not allowed' };
+    }
+    seenPositions.add(position);
+
+    if (Number.isNaN(kills) || kills < 0) {
+      return { ok: false, error: 'Team kills must be a non-negative number' };
+    }
+  }
+
   return { ok: true };
 }
 
@@ -387,11 +498,15 @@ function assertTransition(tournament, nextStatus) {
 module.exports = {
   LIFECYCLE,
   TRANSITIONS,
+  BR_MAX_PLAYERS,
   isBattleRoyale,
   isCustomMatch,
   getTournamentType,
   usesTeamRegistration,
   getPlayersPerTeam,
+  resolveTournamentCapacity,
+  getPlacementPrize,
+  calculateBrReward,
   mapLegacyStatus,
   normalizeLifecycleStatus,
   getEffectiveStatus,
@@ -414,6 +529,7 @@ module.exports = {
   getPrizeForRank,
   validateRankTiers,
   validateBattleRoyaleResults,
+  validateBattleRoyaleTeamResults,
   validateCustomResult,
   assertTransition,
 };

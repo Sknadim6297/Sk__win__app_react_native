@@ -148,6 +148,27 @@ export default function TournamentManagementV2({ navigation }) {
           <ActionBtn label="Edit" onPress={() => navigation.navigate('TournamentManagement', { editId: id })} />
           <ActionBtn label="Participants" onPress={() => navigation.navigate('TournamentManagement', { viewParticipantsId: id })} />
           <ActionBtn label="Start" primary onPress={() => runAction('Start', () => tournamentManagementService.startMatch(id))} />
+          <ActionBtn
+            label="Cancel + Refund"
+            danger
+            onPress={() =>
+              Alert.alert(
+                'Cancel tournament',
+                'This refunds all entry fees once (idempotent). Continue?',
+                [
+                  { text: 'No', style: 'cancel' },
+                  {
+                    text: 'Cancel tournament',
+                    style: 'destructive',
+                    onPress: () =>
+                      runAction('Cancel', () =>
+                        tournamentManagementService.cancelTournament(id, 'Cancelled by admin')
+                      ),
+                  },
+                ]
+              )
+            }
+          />
           {commonDelete}
         </>
       );
@@ -165,6 +186,27 @@ export default function TournamentManagementV2({ navigation }) {
                 navigation.navigate('TournamentResultEntry', { tournamentId: id });
                 return res;
               })
+            }
+          />
+          <ActionBtn
+            label="Cancel + Refund"
+            danger
+            onPress={() =>
+              Alert.alert(
+                'Cancel tournament',
+                'This refunds all entry fees once. Continue?',
+                [
+                  { text: 'No', style: 'cancel' },
+                  {
+                    text: 'Cancel tournament',
+                    style: 'destructive',
+                    onPress: () =>
+                      runAction('Cancel', () =>
+                        tournamentManagementService.cancelTournament(id, 'Cancelled by admin')
+                      ),
+                  },
+                ]
+              )
             }
           />
           {commonDelete}

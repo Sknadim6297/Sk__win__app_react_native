@@ -236,12 +236,29 @@ router.post('/ban/:userId', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const { reason } = req.body;
+    const reason = req.body?.reason || 'Banned by admin';
     const user = await User.findByIdAndUpdate(
       req.params.userId,
-      { status: 'banned', banReason: reason },
+      {
+        status: 'banned',
+        banReason: reason,
+        bannedBy: admin._id,
+        bannedAt: new Date(),
+      },
       { new: true }
-    );
+    ).select('-password');
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    try {
+      const { logAdminAction } = require('../services/adminAudit');
+      await logAdminAction({
+        adminId: admin._id,
+        action: 'USER_BANNED',
+        userId: user._id,
+        reason,
+      });
+    } catch (_) { /* ignore */ }
 
     res.json({ message: 'User banned', user });
   } catch (error) {
@@ -437,6 +454,157 @@ router.delete('/coin-packs/:id', authMiddleware, requireAdmin, async (req, res) 
     res.json({ message: 'Coin pack deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete coin pack' });
+  }
+});
+
+// ——— Tournament payment ops ———
+router.get('/payment-stats', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const WinnerPayout = require('../models/WinnerPayout');
+    const TournamentRefund = require('../models/TournamentRefund');
+    const Tournament = require('../models/Tournament');
+
+    const [
+      pendingPayouts,
+      paidPayouts,
+      blockedPayouts,
+      cancelledPayouts,
+      rejectedPayouts,
+      pendingRefunds,
+      completedRefunds,
+      failedRefunds,
+      totalTournaments,
+      upcoming,
+      live,
+      completed,
+      cancelled,
+    ] = await Promise.all([
+      WinnerPayout.countDocuments({ status: 'PENDING' }),
+      WinnerPayout.countDocuments({ status: 'PAID' }),
+      WinnerPayout.countDocuments({ status: 'BLOCKED' }),
+      WinnerPayout.countDocuments({ status: 'CANCELLED' }),
+      WinnerPayout.countDocuments({ status: 'REJECTED' }),
+      TournamentRefund.countDocuments({ status: { $in: ['pending', 'processing'] } }),
+      TournamentRefund.countDocuments({ status: 'completed' }),
+      TournamentRefund.countDocuments({ status: 'failed' }),
+      Tournament.countDocuments(),
+      Tournament.countDocuments({ status: { $in: ['upcoming', 'incoming'] } }),
+      Tournament.countDocuments({ status: { $in: ['ongoing', 'live'] } }),
+      Tournament.countDocuments({ status: { $in: ['completed', 'result_published'] } }),
+      Tournament.countDocuments({ status: 'cancelled' }),
+    ]);
+
+    const prizeAgg = await WinnerPayout.aggregate([
+      { $match: { status: 'PAID' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+
+    res.json({
+      tournaments: { total: totalTournaments, upcoming, live, completed, cancelled },
+      payouts: {
+        pending: pendingPayouts,
+        paid: paidPayouts,
+        blocked: blockedPayouts,
+        cancelled: cancelledPayouts,
+        rejected: rejectedPayouts,
+        totalPrizePaid: prizeAgg[0]?.total || 0,
+      },
+      refunds: {
+        pending: pendingRefunds,
+        completed: completedRefunds,
+        failed: failedRefunds,
+      },
+    });
+  } catch (error) {
+    console.error('payment-stats:', error);
+    res.status(500).json({ error: 'Failed to load payment stats' });
+  }
+});
+
+router.get('/refunds', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const TournamentRefund = require('../models/TournamentRefund');
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 30);
+    const q = {};
+    if (req.query.status) q.status = req.query.status;
+    const [items, total] = await Promise.all([
+      TournamentRefund.find(q)
+        .populate('userId', 'username email')
+        .populate('tournamentId', 'name')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      TournamentRefund.countDocuments(q),
+    ]);
+    res.json({ refunds: items, page, limit, total, pages: Math.ceil(total / limit) || 1 });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load refunds' });
+  }
+});
+
+router.post('/refunds/:id/retry', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { retryFailedRefund } = require('../services/tournamentRefundService');
+    const result = await retryFailedRefund(req.params.id, req.userId);
+    res.json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message });
+  }
+});
+
+router.post('/wallet/freeze', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { freezeAmount } = require('../services/walletFreezeService');
+    const { userId, amount, reason, payoutId } = req.body || {};
+    if (!userId || !amount || !reason) {
+      return res.status(400).json({ error: 'userId, amount, and reason are required' });
+    }
+    const freeze = await freezeAmount({
+      userId,
+      amount,
+      reason,
+      adminId: req.userId,
+      payoutId,
+    });
+    res.json({ message: 'Amount frozen', freeze });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message, code: error.code });
+  }
+});
+
+router.post('/wallet/freeze/:id/release', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const { releaseFreeze } = require('../services/walletFreezeService');
+    const freeze = await releaseFreeze(req.params.id, req.userId);
+    res.json({ message: 'Freeze released', freeze });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message });
+  }
+});
+
+router.get('/audit-logs', authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const AdminAuditLog = require('../models/AdminAuditLog');
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 50);
+    const q = {};
+    if (req.query.action) q.action = req.query.action;
+    if (req.query.tournamentId) q.tournamentId = req.query.tournamentId;
+    const [items, total] = await Promise.all([
+      AdminAuditLog.find(q)
+        .populate('adminId', 'username')
+        .populate('userId', 'username')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      AdminAuditLog.countDocuments(q),
+    ]);
+    res.json({ logs: items, page, limit, total, pages: Math.ceil(total / limit) || 1 });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load audit logs' });
   }
 });
 

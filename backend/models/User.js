@@ -85,6 +85,12 @@ const userSchema = new mongoose.Schema({
       type: Number,
       default: 0,
     },
+    /** Sum of active WalletFreeze amounts — not withdrawable */
+    frozenBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     totalDeposited: {
       type: Number,
       default: 0,
@@ -131,6 +137,8 @@ const userSchema = new mongoose.Schema({
     default: 'active',
   },
   banReason: String,
+  bannedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  bannedAt: Date,
   createdAt: {
     type: Date,
     default: Date.now,

@@ -18,7 +18,6 @@ const {
   notifyRoomCredentialsAvailable,
   notifyMatchLive,
   notifyMatchCompleted,
-  notifyTournamentCancelled,
 } = require('../services/tournamentPushEvents');
 const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
@@ -323,22 +322,16 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
     const matchCategory =
       category === 'custom' || category === 'custom_match' ? 'custom' : 'battle_royale';
 
-    const modeNorm = String(mode || 'solo').toLowerCase();
-    let resolvedMaxParticipants = maxParticipants || 20;
-    let resolvedMaxTeams = matchCategory === 'custom' ? 2 : 2;
-    let resolvedMode = modeNorm;
-
-    if (matchCategory === 'custom') {
-      if (!['solo', 'squad'].includes(modeNorm)) {
-        return res.status(400).json({
-          error: 'Custom Match supports Solo (1 player/team) or Squad (4 players/team) only',
-        });
-      }
-      const perTeam = lifecycle.getCustomMatchPlayersPerTeam(modeNorm);
-      resolvedMaxTeams = 2;
-      resolvedMaxParticipants = perTeam * 2;
-      resolvedMode = modeNorm;
+    const capacity = lifecycle.resolveTournamentCapacity({
+      category: matchCategory,
+      mode: mode || 'solo',
+    });
+    if (!capacity.ok) {
+      return res.status(400).json({ error: capacity.error });
     }
+    const resolvedMode = capacity.mode;
+    const resolvedMaxTeams = capacity.maxTeams;
+    const resolvedMaxParticipants = capacity.maxParticipants;
 
     const tournamentData = {
       name,
@@ -476,11 +469,22 @@ router.put('/admin/:id', authMiddleware, async (req, res) => {
       tournament.statusOverride = statusOverrideInput;
     }
 
-    // Custom Match: keep prizes as winner-only (no 1st/2nd/3rd split)
+    // Custom Match / BR: enforce capacity from type + mode
     const matchCategory =
       tournament.category === 'custom' || tournament.category === 'custom_match'
         ? 'custom'
         : 'battle_royale';
+    const capacity = lifecycle.resolveTournamentCapacity({
+      category: matchCategory,
+      mode: tournament.mode || 'solo',
+    });
+    if (!capacity.ok) {
+      return res.status(400).json({ error: capacity.error });
+    }
+    tournament.mode = capacity.mode;
+    tournament.maxTeams = capacity.maxTeams;
+    tournament.maxParticipants = capacity.maxParticipants;
+
     if (matchCategory === 'custom') {
       const winnerPrize =
         Number(tournament.prizes?.first) || Number(tournament.prizePool) || 0;
@@ -498,6 +502,21 @@ router.put('/admin/:id', authMiddleware, async (req, res) => {
         },
         { upsert: true, new: true }
       );
+    } else {
+      // Keep BR prize places + kill reward configurable
+      if (tournament.perKill == null || Number(tournament.perKill) < 0) {
+        tournament.perKill = 0;
+      }
+      const first =
+        Number(tournament.prizes?.first) ||
+        (Number(tournament.prizePool) ? Math.floor(Number(tournament.prizePool) * 0.5) : 0);
+      const second =
+        Number(tournament.prizes?.second) ||
+        (Number(tournament.prizePool) ? Math.floor(Number(tournament.prizePool) * 0.3) : 0);
+      const third =
+        Number(tournament.prizes?.third) ||
+        (Number(tournament.prizePool) ? Math.floor(Number(tournament.prizePool) * 0.2) : 0);
+      tournament.prizes = { first, second, third };
     }
 
     // Keep status + lifecycleStatus in sync (fixes Draft stuck after Upcoming)
@@ -775,59 +794,27 @@ router.put('/admin/:id/status', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Tournament not found' });
     }
 
-    // If cancelling, refund all participants / teams
+    // If cancelling — idempotent refunds via TournamentRefund
     if (next === 'cancelled') {
-      const refundedUserIds = [];
-      const participants = await TournamentParticipant.find({ tournamentId: req.params.id });
-      
-      for (const participant of participants) {
-        const user = await User.findById(participant.userId);
-        if (user) {
-          user.wallet.balance += tournament.entryFee;
-          await user.save();
-
-          await WalletTransaction.create({
-            userId: participant.userId,
-            type: 'refund',
-            amount: tournament.entryFee,
-            tournamentId: req.params.id,
-            description: `Refund for cancelled tournament: ${tournament.name}`,
-            status: 'completed',
-          });
-          refundedUserIds.push(String(participant.userId));
-        }
-      }
-
-      const teamCaptains = await Team.find({ tournamentId: req.params.id, status: 'registered' });
-      for (const team of teamCaptains) {
-        const alreadyRefunded = participants.some((p) => String(p.userId) === String(team.captainUserId));
-        if (alreadyRefunded) continue;
-        const user = await User.findById(team.captainUserId);
-        if (user) {
-          user.wallet.balance += tournament.entryFee;
-          await user.save();
-          await WalletTransaction.create({
-            userId: team.captainUserId,
-            type: 'refund',
-            amount: tournament.entryFee,
-            tournamentId: req.params.id,
-            description: `Refund for cancelled tournament team: ${team.name}`,
-            status: 'completed',
-          });
-          refundedUserIds.push(String(team.captainUserId));
-        }
-      }
-
-      await TournamentParticipant.updateMany(
-        { tournamentId: req.params.id },
-        { status: 'disqualified' }
+      const { cancelTournamentWithRefunds } = require('../services/tournamentRefundService');
+      const result = await cancelTournamentWithRefunds(
+        tournament._id,
+        admin._id,
+        req.body?.reason || 'Cancelled by admin'
       );
-      await Team.updateMany({ tournamentId: req.params.id }, { status: 'withdrawn' });
-
-      notifyTournamentCancelled(tournament, {
-        refundedUserIds: [...new Set(refundedUserIds)],
-        refundAmount: Number(tournament.entryFee) || 0,
-      }).catch((e) => console.error('cancel notify:', e.message));
+      return res.json({
+        message: `Tournament status updated to cancelled`,
+        tournament: {
+          ...result.tournament.toObject(),
+          status: 'cancelled',
+          lifecycleStatus: 'cancelled',
+        },
+        refunds: {
+          completed: result.completed,
+          failed: result.failed,
+          skipped: result.skipped,
+        },
+      });
     }
 
     lifecycle.syncLegacyFields(tournament, next);
@@ -850,7 +837,7 @@ router.put('/admin/:id/status', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating status:', error);
-    res.status(500).json({ error: 'Failed to update tournament' });
+    res.status(error.status || 500).json({ error: error.message || 'Failed to update tournament', code: error.code });
   }
 });
 

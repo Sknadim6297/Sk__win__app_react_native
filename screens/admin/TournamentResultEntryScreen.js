@@ -29,17 +29,39 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
   const [saving, setSaving] = useState(false);
   const [meta, setMeta] = useState(null);
   const [entries, setEntries] = useState([]);
+  const [teamEntries, setTeamEntries] = useState([]);
+  const [isTeamBr, setIsTeamBr] = useState(false);
+  const [prizeConfig, setPrizeConfig] = useState({
+    first: 0,
+    second: 0,
+    third: 0,
+    perKill: 0,
+  });
   const [customForm, setCustomForm] = useState({
     winnerTeamId: '',
     runnerUpTeamId: '',
     winnerPrize: '',
     runnerUpPrize: '',
   });
-  const [prizeTiers, setPrizeTiers] = useState([]);
   const [payoutData, setPayoutData] = useState(null);
   const [payoutBusyId, setPayoutBusyId] = useState(null);
   const [autoPaymentBusy, setAutoPaymentBusy] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
+
+  const calcBrPrize = (position, kills) => {
+    const pos = Number(position) || 0;
+    const k = Math.max(0, Number(kills) || 0);
+    const place =
+      pos === 1
+        ? Number(prizeConfig.first) || 0
+        : pos === 2
+          ? Number(prizeConfig.second) || 0
+          : pos === 3
+            ? Number(prizeConfig.third) || 0
+            : 0;
+    const perKill = Number(prizeConfig.perKill) || 0;
+    return place + k * perKill;
+  };
 
   const loadPayouts = useCallback(async () => {
     try {
@@ -50,24 +72,11 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
     }
   }, [tournamentId]);
 
-  const applyPrizeTiers = (rows, tiers) => {
-    setEntries(
-      rows.map((row) => {
-        const pos = Number(row.position) || 0;
-        const tier = tiers.find((t) => pos >= t.rankFrom && pos <= t.rankTo);
-        return { ...row, prize: tier ? String(tier.prize) : row.prize || '0' };
-      })
-    );
-  };
-
   const load = useCallback(async () => {
     try {
       setLoading(true);
       const detail = await tournamentManagementService.getAdminDetail(tournamentId);
       setMeta(detail);
-
-      const prize = await tournamentManagementService.getPrizeDistribution(tournamentId);
-      if (prize?.rankTiers) setPrizeTiers(prize.rankTiers);
 
       const category = detail.tournament?.category || detail.tournament?.tournamentType;
       const isCustom =
@@ -77,28 +86,58 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
 
       if (!isCustom) {
         const br = await tournamentManagementService.getBattleRoyaleEntry(tournamentId);
-        const participants = br.participants || [];
-        const saved = br.results || [];
-        const savedMap = new Map(saved.map((r) => [String(r.userId?._id || r.userId), r]));
-
-        const rows = participants.map((p, idx) => {
-          const uid = p.userId?._id || p.userId;
-          const s = savedMap.get(String(uid));
-          return {
-            userId: uid,
-            participantId: p._id,
-            gamingUsername: p.gamingUsername || p.userId?.username || '',
-            gamingUID: p.gamingUID || '',
-            position: s ? String(s.position) : String(idx + 1),
-            kills: s ? String(s.kills) : '0',
-            prize: s ? String(s.prize) : '',
-          };
+        const teamMode = Boolean(br.isTeamMode);
+        setIsTeamBr(teamMode);
+        setPrizeConfig({
+          first: Number(br.prizeConfig?.first ?? detail.tournament?.prizes?.first) || 0,
+          second: Number(br.prizeConfig?.second ?? detail.tournament?.prizes?.second) || 0,
+          third: Number(br.prizeConfig?.third ?? detail.tournament?.prizes?.third) || 0,
+          perKill: Number(br.prizeConfig?.perKill ?? detail.tournament?.perKill) || 0,
         });
-        setEntries(rows);
-        if (prize?.rankTiers?.length && rows.some((r) => !r.prize)) {
-          applyPrizeTiers(rows, prize.rankTiers);
+
+        if (teamMode) {
+          const teams = br.teams || [];
+          const saved = br.teamResults || [];
+          const savedMap = new Map(saved.map((r) => [String(r.teamId), r]));
+          setMeta((prev) => ({ ...prev, teams }));
+          setTeamEntries(
+            teams.map((t, idx) => {
+              const s = savedMap.get(String(t._id));
+              return {
+                teamId: t._id,
+                teamName: t.name,
+                players: t.players || [],
+                members: t.members || [],
+                position: s ? String(s.position) : String(idx + 1),
+                kills: s ? String(s.teamKills ?? s.kills ?? 0) : '0',
+                prize: s ? String(s.totalPrize ?? 0) : '',
+              };
+            })
+          );
+          setEntries([]);
+        } else {
+          const participants = br.participants || [];
+          const saved = br.results || [];
+          const savedMap = new Map(saved.map((r) => [String(r.userId?._id || r.userId), r]));
+
+          const rows = participants.map((p, idx) => {
+            const uid = p.userId?._id || p.userId;
+            const s = savedMap.get(String(uid));
+            return {
+              userId: uid,
+              participantId: p._id,
+              gamingUsername: p.gamingUsername || p.userId?.username || '',
+              gamingUID: p.gamingUID || '',
+              position: s ? String(s.position) : String(idx + 1),
+              kills: s ? String(s.kills) : '0',
+              prize: s ? String(s.prize) : '',
+            };
+          });
+          setEntries(rows);
+          setTeamEntries([]);
         }
       } else {
+        setIsTeamBr(false);
         const cm = await tournamentManagementService.getCustomMatchEntry(tournamentId);
         const r = cm.result;
         const pd = cm.prizeDistribution;
@@ -140,21 +179,50 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
   }, [payoutData?.controlWindow?.expiresAt]);
 
   const autofillPrizes = () => {
-    if (!prizeTiers.length) {
-      Alert.alert('Prizes', 'Set prize tiers in tournament settings first');
+    if (isTeamBr) {
+      setTeamEntries((prev) =>
+        prev.map((row) => ({
+          ...row,
+          prize: String(calcBrPrize(row.position, row.kills)),
+        }))
+      );
       return;
     }
-    applyPrizeTiers(entries, prizeTiers);
+    setEntries((prev) =>
+      prev.map((row) => ({
+        ...row,
+        prize: String(calcBrPrize(row.position, row.kills)),
+      }))
+    );
   };
 
   const updateEntry = (index, field, value) => {
     setEntries((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
-      if (field === 'position' && prizeTiers.length) {
-        const pos = Number(value) || 0;
-        const tier = prizeTiers.find((t) => pos >= t.rankFrom && pos <= t.rankTo);
-        if (tier) next[index].prize = String(tier.prize);
+      if (field === 'position' || field === 'kills') {
+        next[index].prize = String(
+          calcBrPrize(
+            field === 'position' ? value : next[index].position,
+            field === 'kills' ? value : next[index].kills
+          )
+        );
+      }
+      return next;
+    });
+  };
+
+  const updateTeamEntry = (index, field, value) => {
+    setTeamEntries((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      if (field === 'position' || field === 'kills') {
+        next[index].prize = String(
+          calcBrPrize(
+            field === 'position' ? value : next[index].position,
+            field === 'kills' ? value : next[index].kills
+          )
+        );
       }
       return next;
     });
@@ -163,7 +231,7 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
   const publishResults = async () => {
     try {
       await tournamentManagementService.publishResults(tournamentId);
-      Alert.alert('Published', 'Results published. Use Payment Control below within 10 minutes.');
+      Alert.alert('Published', 'Results published. Winner payouts stay PENDING for 10 minutes, then auto-credit if Auto Payment is ON.');
       await load();
       await loadPayouts();
     } catch (e) {
@@ -172,15 +240,34 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
   };
 
   const saveBattleRoyale = async () => {
-    const payload = entries.map((e) => ({
-      userId: e.userId,
-      participantId: e.participantId,
-      position: Number(e.position),
-      kills: Number(e.kills) || 0,
-      prize: Number(e.prize) || 0,
-      gamingUsername: e.gamingUsername,
-      gamingUID: e.gamingUID,
-    }));
+    const payload = isTeamBr
+      ? teamEntries.map((e) => ({
+          teamId: e.teamId,
+          position: Number(e.position),
+          kills: Number(e.kills) || 0,
+          teamKills: Number(e.kills) || 0,
+        }))
+      : entries.map((e) => ({
+          userId: e.userId,
+          participantId: e.participantId,
+          position: Number(e.position),
+          kills: Number(e.kills) || 0,
+          gamingUsername: e.gamingUsername,
+          gamingUID: e.gamingUID,
+        }));
+
+    for (const e of payload) {
+      const kills = Number(e.kills ?? e.teamKills);
+      if (Number.isNaN(kills) || kills < 0) {
+        Alert.alert('Invalid kills', 'Kill count must be a non-negative number');
+        return;
+      }
+      if (!e.position || e.position < 1) {
+        Alert.alert('Invalid placement', 'Each entry needs a valid placement (1, 2, 3, …)');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       await tournamentManagementService.saveBattleRoyaleResults(tournamentId, payload);
@@ -188,6 +275,7 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
         { text: 'Publish Result', onPress: publishResults },
         { text: 'OK' },
       ]);
+      await load();
     } catch (e) {
       Alert.alert('Error', e.message);
     } finally {
@@ -212,7 +300,7 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
         publish: !!publish,
       });
       if (publish) {
-        Alert.alert('Published', 'Result published. Use Payment Control below within 10 minutes.');
+        Alert.alert('Published', 'Result published. Winner payouts stay PENDING for 10 minutes, then auto-credit if Auto Payment is ON.');
         await load();
         await loadPayouts();
       } else {
@@ -242,21 +330,37 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
 
   const confirmStopPayout = (payout) => {
     Alert.alert(
-      'Stop Payment',
+      'Cancel / Block Payment',
       `Winner: ${payout.username || '—'}\nAmount: ₹${payout.amount}\n\nThis cancels the pending credit. No wallet change.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Stop Payment',
+          text: 'Cancel payout',
           style: 'destructive',
           onPress: async () => {
             setPayoutBusyId(payout._id);
             try {
-              await tournamentManagementService.stopPayout(payout._id);
+              await tournamentManagementService.stopPayout(payout._id, 'Stopped by admin');
               Alert.alert('Stopped', 'Pending payout cancelled.');
               await loadPayouts();
             } catch (e) {
               Alert.alert('Stop Payment', e.message || 'Failed');
+            } finally {
+              setPayoutBusyId(null);
+            }
+          },
+        },
+        {
+          text: 'Block payout',
+          style: 'destructive',
+          onPress: async () => {
+            setPayoutBusyId(payout._id);
+            try {
+              await tournamentManagementService.blockPayout(payout._id, 'Blocked by admin');
+              Alert.alert('Blocked', 'Payout blocked — will not auto-credit.');
+              await loadPayouts();
+            } catch (e) {
+              Alert.alert('Block Payment', e.message || 'Failed');
             } finally {
               setPayoutBusyId(null);
             }
@@ -370,9 +474,9 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
           <View style={styles.payoutPanel}>
             <Text style={styles.sectionTitle}>Payment Control</Text>
             <Text style={styles.helper}>
-              Backend window: 10 minutes after publish.
+              10-minute verification wait after publish. Pending payouts auto-credit when due (if Auto Payment ON).
               {expiresAtMs
-                ? ` ${remainingMs > 0 ? formatRemaining(remainingMs) : 'Expired — reverse/stop unavailable.'}`
+                ? ` ${remainingMs > 0 ? formatRemaining(remainingMs) : 'Wait over — due payouts process via cron.'}`
                 : ''}
             </Text>
 
@@ -401,7 +505,7 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
                 const balance = Number(p.currentWalletBalance) || 0;
                 const amount = Number(p.amount) || 0;
                 const insufficient = p.status === 'PAID' && balance < amount;
-                const showStop = p.canStop;
+                const showStop = p.canStop || p.canBlock;
                 const showReverseBtn = p.status === 'PAID' && (p.canReverse || insufficient);
 
                 return (
@@ -434,7 +538,7 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
                           onPress={() => confirmStopPayout(p)}
                         >
                           <Text style={styles.actionText}>
-                            {busy ? '…' : 'Stop Payment'}
+                            {busy ? '…' : 'Cancel / Block'}
                           </Text>
                         </TouchableOpacity>
                       ) : null}
@@ -470,43 +574,109 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
 
         {isBR ? (
           <>
-            <TouchableOpacity style={styles.autofillBtn} onPress={autofillPrizes}>
-              <Text style={styles.autofillText}>Auto-fill prizes from tiers</Text>
-            </TouchableOpacity>
-            <View style={styles.tableHead}>
-              <Text style={[styles.th, { flex: 0.5 }]}>#</Text>
-              <Text style={[styles.th, { flex: 1.2 }]}>Player</Text>
-              <Text style={[styles.th, { flex: 0.6 }]}>Kills</Text>
-              <Text style={[styles.th, { flex: 0.7 }]}>Prize</Text>
+            <View style={styles.formulaBox}>
+              <Text style={styles.sectionTitle}>
+                {isTeamBr ? 'Team-wise Battle Royale Results' : 'Solo Battle Royale Results'}
+              </Text>
+              <Text style={styles.helper}>
+                Reward = Placement prize + (kills × ₹{prizeConfig.perKill || 0}). 1st ₹
+                {prizeConfig.first || 0} · 2nd ₹{prizeConfig.second || 0} · 3rd ₹
+                {prizeConfig.third || 0}. Non-top places still get kill reward only.
+              </Text>
             </View>
-            {entries.map((row, i) => (
-              <View key={String(row.userId)} style={styles.row}>
-                <TextInput
-                  style={[styles.input, { flex: 0.5 }]}
-                  keyboardType="number-pad"
-                  value={row.position}
-                  onChangeText={(v) => updateEntry(i, 'position', v)}
-                  editable={canPublish}
-                />
-                <Text style={[styles.player, { flex: 1.2 }]} numberOfLines={1}>
-                  {row.gamingUsername}
-                </Text>
-                <TextInput
-                  style={[styles.input, { flex: 0.6 }]}
-                  keyboardType="number-pad"
-                  value={row.kills}
-                  onChangeText={(v) => updateEntry(i, 'kills', v)}
-                  editable={canPublish}
-                />
-                <TextInput
-                  style={[styles.input, { flex: 0.7 }]}
-                  keyboardType="number-pad"
-                  value={row.prize}
-                  onChangeText={(v) => updateEntry(i, 'prize', v)}
-                  editable={canPublish}
-                />
-              </View>
-            ))}
+            <TouchableOpacity style={styles.autofillBtn} onPress={autofillPrizes}>
+              <Text style={styles.autofillText}>Recalculate prizes from formula</Text>
+            </TouchableOpacity>
+
+            {isTeamBr ? (
+              <>
+                {teamEntries.length === 0 ? (
+                  <Text style={styles.helper}>No teams registered yet.</Text>
+                ) : (
+                  teamEntries.map((row, i) => (
+                    <View key={String(row.teamId)} style={styles.teamCard}>
+                      <Text style={styles.teamName}>{row.teamName || 'Team'}</Text>
+                      {(row.players || []).map((p, pi) => (
+                        <Text key={`${row.teamId}-p-${pi}`} style={styles.playerLine}>
+                          {`${pi + 1}. ${p.name || p}`}
+                        </Text>
+                      ))}
+                      {(row.members || []).length > 0 && !(row.players || []).length
+                        ? row.members.map((m, mi) => (
+                            <Text key={`${row.teamId}-m-${mi}`} style={styles.playerLine}>
+                              {`${mi + 1}. ${m.gamingUsername || m.userId?.username || 'Player'}`}
+                            </Text>
+                          ))
+                        : null}
+                      <View style={styles.row}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.label}>Placement</Text>
+                          <TextInput
+                            style={styles.input}
+                            keyboardType="number-pad"
+                            value={row.position}
+                            onChangeText={(v) => updateTeamEntry(i, 'position', v)}
+                            editable={canPublish}
+                            placeholder="1 / 2 / 3"
+                            placeholderTextColor={COLORS.gray}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.label}>Team kills</Text>
+                          <TextInput
+                            style={styles.input}
+                            keyboardType="number-pad"
+                            value={row.kills}
+                            onChangeText={(v) => updateTeamEntry(i, 'kills', v)}
+                            editable={canPublish}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.label}>Prize</Text>
+                          <Text style={[styles.player, { marginTop: 10 }]}>
+                            ₹{row.prize !== '' ? row.prize : calcBrPrize(row.position, row.kills)}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </>
+            ) : (
+              <>
+                <View style={styles.tableHead}>
+                  <Text style={[styles.th, { flex: 0.5 }]}>#</Text>
+                  <Text style={[styles.th, { flex: 1.2 }]}>Player</Text>
+                  <Text style={[styles.th, { flex: 0.6 }]}>Kills</Text>
+                  <Text style={[styles.th, { flex: 0.7 }]}>Prize</Text>
+                </View>
+                {entries.map((row, i) => (
+                  <View key={String(row.userId)} style={styles.row}>
+                    <TextInput
+                      style={[styles.input, { flex: 0.5 }]}
+                      keyboardType="number-pad"
+                      value={row.position}
+                      onChangeText={(v) => updateEntry(i, 'position', v)}
+                      editable={canPublish}
+                    />
+                    <Text style={[styles.player, { flex: 1.2 }]} numberOfLines={1}>
+                      {row.gamingUsername}
+                    </Text>
+                    <TextInput
+                      style={[styles.input, { flex: 0.6 }]}
+                      keyboardType="number-pad"
+                      value={row.kills}
+                      onChangeText={(v) => updateEntry(i, 'kills', v)}
+                      editable={canPublish}
+                    />
+                    <Text style={[styles.player, { flex: 0.7 }]}>
+                      ₹{row.prize !== '' ? row.prize : calcBrPrize(row.position, row.kills)}
+                    </Text>
+                  </View>
+                ))}
+              </>
+            )}
+
             <TouchableOpacity
               style={[styles.saveBtn, !canPublish && styles.disabledBtn]}
               onPress={saveBattleRoyale}
@@ -735,6 +905,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   autofillText: { color: COLORS.primary, fontSize: 13 },
+  formulaBox: {
+    marginBottom: 8,
+  },
   tableHead: { flexDirection: 'row', marginBottom: 8 },
   th: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
   row: {

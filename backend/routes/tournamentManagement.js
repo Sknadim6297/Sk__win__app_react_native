@@ -6,12 +6,14 @@ const Team = require('../models/Team');
 const TeamMember = require('../models/TeamMember');
 const PrizeDistribution = require('../models/PrizeDistribution');
 const BattleRoyaleResult = require('../models/BattleRoyaleResult');
+const BattleRoyaleTeamResult = require('../models/BattleRoyaleTeamResult');
 const CustomMatchResult = require('../models/CustomMatchResult');
 const WinnerPayout = require('../models/WinnerPayout');
 const WalletTransaction = require('../models/WalletTransaction');
 const { authMiddleware } = require('../middleware/auth');
 const lifecycle = require('../services/tournamentLifecycle');
 const winnerPayoutService = require('../services/winnerPayoutService');
+const brReward = require('../services/battleRoyaleRewardService');
 const {
   notifyMatchLive,
   notifyMatchCompleted,
@@ -114,6 +116,22 @@ router.get('/admin/list', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('admin list:', error);
     res.status(500).json({ error: 'Failed to fetch tournaments' });
+  }
+});
+
+// Global payout list — MUST be before /admin/:id
+router.get('/admin/payouts', authMiddleware, async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    const data = await winnerPayoutService.listPayoutsAdmin({
+      status: req.query.status,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 30,
+      search: req.query.search,
+    });
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Failed to list payouts' });
   }
 });
 
@@ -293,12 +311,38 @@ router.post('/admin/:id/publish-results', authMiddleware, async (req, res) => {
     if (status !== 'completed') {
       return res.status(400).json({ error: 'Tournament must be completed before publishing results' });
     }
+    if (lifecycle.areResultsPublished(tournament)) {
+      return res.status(400).json({
+        error: 'Results already published — wallet payouts will not run again',
+        alreadyPublished: true,
+      });
+    }
+
+    const isTeamBr =
+      lifecycle.isBattleRoyale(tournament) && lifecycle.usesTeamRegistration(tournament);
 
     if (lifecycle.isBattleRoyale(tournament)) {
-      const joinedCount = await lifecycle.getJoinedCount(tournament._id, tournament);
-      const resultCount = await BattleRoyaleResult.countDocuments({ tournamentId: tournament._id });
-      if (joinedCount > 0 && resultCount < joinedCount) {
-        return res.status(400).json({ error: 'Save results for every joined player first' });
+      if (isTeamBr) {
+        const teamCount = await Team.countDocuments({
+          tournamentId: tournament._id,
+          status: 'registered',
+        });
+        const resultCount = await BattleRoyaleTeamResult.countDocuments({
+          tournamentId: tournament._id,
+        });
+        if (teamCount > 0 && resultCount < teamCount) {
+          return res.status(400).json({
+            error: 'Save placement and kills for every registered team first',
+          });
+        }
+      } else {
+        const joinedCount = await lifecycle.getJoinedCount(tournament._id, tournament);
+        const resultCount = await BattleRoyaleResult.countDocuments({
+          tournamentId: tournament._id,
+        });
+        if (joinedCount > 0 && resultCount < joinedCount) {
+          return res.status(400).json({ error: 'Save results for every joined player first' });
+        }
       }
     } else {
       const custom = await CustomMatchResult.findOne({ tournamentId: tournament._id });
@@ -315,20 +359,18 @@ router.post('/admin/:id/publish-results', authMiddleware, async (req, res) => {
     let payoutSummary = { credited: 0 };
     try {
       if (lifecycle.isBattleRoyale(tournament)) {
-        const brRows = await BattleRoyaleResult.find({ tournamentId: tournament._id });
-        await winnerPayoutService.ensurePayoutRecords(
-          brRows
-            .filter((r) => Number(r.prize) > 0)
-            .map((r) => ({
-              tournamentId: tournament._id,
-              userId: r.userId,
-              resultId: r._id,
-              resultModel: 'BattleRoyaleResult',
-              amount: Number(r.prize) || 0,
-              usernameSnapshot: r.gamingUsername || '',
-              description: `BR prize — ${tournament.name} (pos ${r.position})`,
-            }))
-        );
+        if (isTeamBr) {
+          const teamRows = await BattleRoyaleTeamResult.find({
+            tournamentId: tournament._id,
+          });
+          const items = await brReward.buildTeamPayoutItems(tournament, teamRows);
+          await winnerPayoutService.ensurePayoutRecords(items);
+        } else {
+          const brRows = await BattleRoyaleResult.find({ tournamentId: tournament._id });
+          await winnerPayoutService.ensurePayoutRecords(
+            brReward.buildSoloPayoutItems(tournament, brRows)
+          );
+        }
       } else {
         const custom = await CustomMatchResult.findOne({ tournamentId: tournament._id });
         if (custom && Number(custom.winnerPrize) > 0) {
@@ -408,6 +450,50 @@ router.get('/admin/:id/results/battle-royale', authMiddleware, async (req, res) 
 
     const tournament = await Tournament.findById(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+    if (!lifecycle.isBattleRoyale(tournament)) {
+      return res.status(400).json({ error: 'Not a Battle Royale tournament' });
+    }
+
+    const isTeamMode = lifecycle.usesTeamRegistration(tournament);
+    const prizeDistribution = await PrizeDistribution.findOne({
+      tournamentId: tournament._id,
+    }).lean();
+
+    const prizeConfig = {
+      first: Number(tournament.prizes?.first) || 0,
+      second: Number(tournament.prizes?.second) || 0,
+      third: Number(tournament.prizes?.third) || 0,
+      perKill: Number(tournament.perKill) || 0,
+    };
+
+    if (isTeamMode) {
+      const teams = await Team.find({
+        tournamentId: tournament._id,
+        status: 'registered',
+      }).lean();
+      const members = await TeamMember.find({ tournamentId: tournament._id })
+        .populate('userId', 'username')
+        .lean();
+      const saved = await BattleRoyaleTeamResult.find({ tournamentId: tournament._id })
+        .sort({ position: 1 })
+        .lean();
+
+      return res.json({
+        mode: tournament.mode,
+        isTeamMode: true,
+        teams: teams.map((t) => ({
+          ...t,
+          members: members.filter((m) => String(m.teamId) === String(t._id)),
+          players: t.players || [],
+        })),
+        teamResults: saved,
+        participants: [],
+        results: [],
+        prizeDistribution,
+        prizeConfig,
+        status: lifecycle.getEffectiveStatus(tournament),
+      });
+    }
 
     const participants = await TournamentParticipant.find({
       tournamentId: tournament._id,
@@ -420,15 +506,19 @@ router.get('/admin/:id/results/battle-royale', authMiddleware, async (req, res) 
       .populate('userId', 'username')
       .sort({ position: 1 });
 
-    const prizeDistribution = await PrizeDistribution.findOne({ tournamentId: tournament._id }).lean();
-
     res.json({
+      mode: tournament.mode,
+      isTeamMode: false,
       participants,
       results: saved,
+      teams: [],
+      teamResults: [],
       prizeDistribution,
+      prizeConfig,
       status: lifecycle.getEffectiveStatus(tournament),
     });
   } catch (e) {
+    console.error('load BR results:', e);
     res.status(500).json({ error: 'Failed to load result entry data' });
   }
 });
@@ -440,6 +530,9 @@ router.post('/admin/:id/results/battle-royale', authMiddleware, async (req, res)
     const { entries } = req.body;
     const tournament = await Tournament.findById(req.params.id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+    if (!lifecycle.isBattleRoyale(tournament)) {
+      return res.status(400).json({ error: 'Not a Battle Royale tournament' });
+    }
 
     const status = lifecycle.getEffectiveStatus(tournament);
     if (status !== 'completed') {
@@ -447,6 +540,55 @@ router.post('/admin/:id/results/battle-royale', authMiddleware, async (req, res)
     }
     if (lifecycle.areResultsPublished(tournament)) {
       return res.status(400).json({ error: 'Tournament is read-only after results are published' });
+    }
+
+    const isTeamMode = lifecycle.usesTeamRegistration(tournament);
+
+    if (isTeamMode) {
+      const teams = await Team.find({
+        tournamentId: tournament._id,
+        status: 'registered',
+      }).select('_id');
+      const teamIds = teams.map((t) => t._id);
+
+      const validation = lifecycle.validateBattleRoyaleTeamResults(entries, teamIds);
+      if (!validation.ok) return res.status(400).json({ error: validation.error });
+
+      if ((entries || []).length !== teamIds.length) {
+        return res.status(400).json({
+          error: `Every registered team needs a result (${teamIds.length} required)`,
+        });
+      }
+
+      const enriched = [];
+      for (const raw of entries) {
+        const out = brReward.enrichTeamEntry(tournament, raw);
+        if (!out.ok) return res.status(400).json({ error: out.error });
+        enriched.push(out.entry);
+      }
+
+      await BattleRoyaleTeamResult.deleteMany({ tournamentId: tournament._id });
+      // Clear any leftover solo rows from mode changes
+      await BattleRoyaleResult.deleteMany({ tournamentId: tournament._id });
+
+      const docs = await BattleRoyaleTeamResult.insertMany(
+        enriched.map((e) => ({
+          tournamentId: tournament._id,
+          teamId: e.teamId,
+          position: e.position,
+          teamKills: e.teamKills,
+          placementPrize: e.placementPrize,
+          killReward: e.killReward,
+          totalPrize: e.totalPrize,
+          playerKills: e.playerKills || [],
+        }))
+      );
+
+      return res.json({
+        message: 'Battle Royale team results saved',
+        isTeamMode: true,
+        results: docs,
+      });
     }
 
     const joinedCount = await lifecycle.getJoinedCount(tournament._id, tournament);
@@ -462,16 +604,21 @@ router.post('/admin/:id/results/battle-royale', authMiddleware, async (req, res)
       ).map((p) => String(p.userId))
     );
 
+    const enriched = [];
     for (const e of entries) {
       if (!participantUserIds.has(String(e.userId))) {
         return res.status(400).json({ error: 'All result players must be joined participants' });
       }
+      const out = brReward.enrichSoloEntry(tournament, e);
+      if (!out.ok) return res.status(400).json({ error: out.error });
+      enriched.push(out.entry);
     }
 
     await BattleRoyaleResult.deleteMany({ tournamentId: tournament._id });
+    await BattleRoyaleTeamResult.deleteMany({ tournamentId: tournament._id });
 
     const docs = await BattleRoyaleResult.insertMany(
-      entries.map((e) => ({
+      enriched.map((e) => ({
         tournamentId: tournament._id,
         userId: e.userId,
         participantId: e.participantId,
@@ -483,7 +630,7 @@ router.post('/admin/:id/results/battle-royale', authMiddleware, async (req, res)
       }))
     );
 
-    for (const e of entries) {
+    for (const e of enriched) {
       await TournamentParticipant.findOneAndUpdate(
         { tournamentId: tournament._id, userId: e.userId },
         {
@@ -494,24 +641,33 @@ router.post('/admin/:id/results/battle-royale', authMiddleware, async (req, res)
       );
     }
 
-    res.json({ message: 'Battle Royale results saved', results: docs });
+    res.json({ message: 'Battle Royale results saved', isTeamMode: false, results: docs });
   } catch (e) {
     console.error('save BR results:', e);
     res.status(500).json({ error: 'Failed to save results' });
   }
 });
 
-// Auto-fill prizes from tiers
+// Auto-fill prizes from placement + kill formula (and optional tiers for placement override)
 router.post('/admin/:id/results/battle-royale/prize-preview', authMiddleware, async (req, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
-    const { positions } = req.body;
-    const prizeDistribution = await PrizeDistribution.findOne({ tournamentId: req.params.id }).lean();
-    const preview = (positions || []).map((rank) => ({
-      position: rank,
-      prize: lifecycle.getPrizeForRank(prizeDistribution, rank),
-    }));
-    res.json({ preview });
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+
+    const { positions, kills } = req.body;
+    const preview = (positions || []).map((rank, idx) => {
+      const k = Array.isArray(kills) ? Number(kills[idx]) || 0 : 0;
+      const reward = brReward.computeReward(tournament, rank, k);
+      return {
+        position: rank,
+        kills: k,
+        placementPrize: reward.placementPrize,
+        killReward: reward.killReward,
+        prize: reward.totalReward,
+      };
+    });
+    res.json({ preview, perKill: Number(tournament.perKill) || 0 });
   } catch (e) {
     res.status(500).json({ error: 'Failed to preview prizes' });
   }
@@ -737,6 +893,58 @@ router.get('/:id/results', async (req, res) => {
     const type = lifecycle.getTournamentType(tournament);
 
     if (type === 'battle_royale') {
+      const isTeamMode = lifecycle.usesTeamRegistration(tournament);
+
+      if (isTeamMode) {
+        const teamRows = await BattleRoyaleTeamResult.find({ tournamentId: req.params.id })
+          .populate('teamId')
+          .sort({ position: 1 })
+          .lean();
+        const members = await TeamMember.find({ tournamentId: req.params.id })
+          .populate('userId', 'username')
+          .lean();
+
+        const leaderboard = teamRows.map((r) => {
+          const team = r.teamId;
+          const teamMembers = members.filter(
+            (m) => String(m.teamId) === String(team?._id || r.teamId)
+          );
+          return {
+            rank: r.position,
+            position: r.position,
+            teamId: team?._id || r.teamId,
+            teamName: team?.name || 'Team',
+            players: team?.players || [],
+            members: teamMembers.map((m) => ({
+              userId: m.userId?._id || m.userId,
+              username: m.userId?.username || m.gamingUsername,
+            })),
+            kills: r.teamKills,
+            placementPrize: r.placementPrize,
+            killReward: r.killReward,
+            prize: r.totalPrize,
+            totalReward: r.totalPrize,
+          };
+        });
+
+        const winner = leaderboard.find((e) => e.rank === 1) || null;
+
+        return res.json({
+          tournament: {
+            _id: tournament._id,
+            name: tournament.name,
+            category: tournament.category,
+            mode: tournament.mode,
+            status,
+          },
+          tournamentType: 'battle_royale',
+          isBattleRoyale: true,
+          isTeamMode: true,
+          winner,
+          leaderboard,
+        });
+      }
+
       const results = await BattleRoyaleResult.find({ tournamentId: req.params.id })
         .populate('userId', 'username')
         .sort({ position: 1 })
@@ -765,6 +973,7 @@ router.get('/:id/results', async (req, res) => {
         },
         tournamentType: 'battle_royale',
         isBattleRoyale: true,
+        isTeamMode: false,
         winner,
         leaderboard,
       });
@@ -1040,7 +1249,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
   }
 });
 
-// ——— Winner payout control (10-minute window after publish) ———
+// ——— Winner payout control (10-minute wait then auto-credit) ———
 
 router.get('/admin/:id/payouts', authMiddleware, async (req, res) => {
   try {
@@ -1061,20 +1270,12 @@ router.put('/admin/:id/auto-payment', authMiddleware, async (req, res) => {
     const tournament = await winnerPayoutService.setAutoPayment(req.params.id, enabled);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
 
-    let credit = { credited: 0 };
-    if (enabled && lifecycle.areResultsPublished(tournament)) {
-      const window = winnerPayoutService.getControlWindow(tournament);
-      if (window.open) {
-        credit = await winnerPayoutService.autoCreditPendingForTournament(tournament._id, {
-          tournamentName: tournament.name,
-        });
-      }
-    }
-
     res.json({
       message: `Auto Payment ${enabled ? 'ON' : 'OFF'}`,
       autoPaymentEnabled: tournament.autoPaymentEnabled !== false,
-      payoutsCredited: credit.credited || 0,
+      note: enabled
+        ? 'Due PENDING payouts will credit automatically after the 10-minute wait.'
+        : 'PENDING payouts will not auto-credit until Auto Payment is turned ON.',
       controlWindow: winnerPayoutService.getControlWindow(tournament),
     });
   } catch (e) {
@@ -1083,26 +1284,76 @@ router.put('/admin/:id/auto-payment', authMiddleware, async (req, res) => {
   }
 });
 
+router.post('/admin/:id/cancel', authMiddleware, async (req, res) => {
+  try {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    const { cancelTournamentWithRefunds } = require('../services/tournamentRefundService');
+    const result = await cancelTournamentWithRefunds(
+      req.params.id,
+      admin._id,
+      req.body?.reason || 'Cancelled by admin'
+    );
+    res.json({
+      message: 'Tournament cancelled. Entry fees refunded where applicable.',
+      ...result,
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message, code: e.code });
+  }
+});
+
 router.post('/admin/payouts/:payoutId/stop', authMiddleware, async (req, res) => {
   try {
     const admin = await requireAdmin(req, res);
     if (!admin) return;
+    if (!req.body?.reason) {
+      return res.status(400).json({ error: 'Reason is required' });
+    }
     const payout = await winnerPayoutService.stopPendingPayout(
       req.params.payoutId,
       admin._id,
-      req.body?.reason || 'Stopped by admin'
+      req.body.reason
     );
-    res.json({
-      message: 'Payout stopped. No wallet credit will be issued.',
-      payout,
-    });
+    res.json({ message: 'Payout cancelled. No wallet credit will be issued.', payout });
   } catch (e) {
-    const status = e.status || 500;
-    res.status(status).json({
-      error: e.message || 'Failed to stop payout',
-      code: e.code,
-      payout: e.payout,
-    });
+    res.status(e.status || 500).json({ error: e.message, code: e.code, payout: e.payout });
+  }
+});
+
+router.post('/admin/payouts/:payoutId/block', authMiddleware, async (req, res) => {
+  try {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    if (!req.body?.reason) {
+      return res.status(400).json({ error: 'Reason is required' });
+    }
+    const payout = await winnerPayoutService.blockPayout(
+      req.params.payoutId,
+      admin._id,
+      req.body.reason
+    );
+    res.json({ message: 'Payout blocked', payout });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message, code: e.code });
+  }
+});
+
+router.post('/admin/payouts/:payoutId/reject', authMiddleware, async (req, res) => {
+  try {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+    if (!req.body?.reason) {
+      return res.status(400).json({ error: 'Reason is required' });
+    }
+    const payout = await winnerPayoutService.rejectPayout(
+      req.params.payoutId,
+      admin._id,
+      req.body.reason
+    );
+    res.json({ message: 'Payout rejected', payout });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message, code: e.code });
   }
 });
 
@@ -1115,13 +1366,9 @@ router.post('/admin/payouts/:payoutId/reverse', authMiddleware, async (req, res)
       admin._id,
       req.body?.reason || 'Reversed by admin'
     );
-    res.json({
-      message: 'Payout reversed successfully',
-      ...result,
-    });
+    res.json({ message: 'Payout reversed successfully', ...result });
   } catch (e) {
-    const status = e.status || 500;
-    res.status(status).json({
+    res.status(e.status || 500).json({
       error: e.message || 'Failed to reverse payout',
       code: e.code,
       details: e.details,

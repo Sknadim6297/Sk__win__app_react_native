@@ -61,8 +61,8 @@ async function notifyMatchLive(tournament) {
 async function notifyMatchCompleted(tournament) {
   const name = tournament.name || 'Tournament';
   return notifyTournamentParticipants(tournament._id, {
-    title: 'Match Completed 🏁',
-    message: `${name} has been completed. Results will be available soon.`,
+    title: 'Tournament Completed 🏁',
+    message: `The tournament has been completed. Winner details will be published soon.`,
     type: 'tournament_update',
     eventKeyBase: buildEventKey(['match_completed', tournament._id]),
     deepLink: SCREENS.TOURNAMENT_DETAILS,

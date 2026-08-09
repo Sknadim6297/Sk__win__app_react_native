@@ -33,6 +33,16 @@ const teamSchema = new mongoose.Schema({
 });
 
 teamSchema.index({ tournamentId: 1, name: 1 }, { unique: true });
-teamSchema.index({ tournamentId: 1, side: 1 }, { unique: true, partialFilterExpression: { status: 'registered' } });
+// Only Custom Match uses side A/B. BR teams omit side — do not unique on null.
+teamSchema.index(
+  { tournamentId: 1, side: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: 'registered',
+      side: { $type: 'string' },
+    },
+  }
+);
 
 module.exports = mongoose.model('Team', teamSchema);

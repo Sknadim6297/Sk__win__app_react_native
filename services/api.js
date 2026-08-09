@@ -465,15 +465,34 @@ export const tournamentManagementService = {
       body: JSON.stringify(payload),
     }),
   getPayouts: (id) => apiCall(`/tournament-management/admin/${id}/payouts`),
+  listAllPayouts: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return apiCall(`/tournament-management/admin/payouts${query ? `?${query}` : ''}`);
+  },
   setAutoPayment: (id, enabled) =>
     apiCall(`/tournament-management/admin/${id}/auto-payment`, {
       method: 'PUT',
       body: JSON.stringify({ enabled: !!enabled }),
     }),
+  cancelTournament: (id, reason) =>
+    apiCall(`/tournament-management/admin/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || 'Cancelled by admin' }),
+    }),
   stopPayout: (payoutId, reason) =>
     apiCall(`/tournament-management/admin/payouts/${payoutId}/stop`, {
       method: 'POST',
-      body: JSON.stringify({ reason: reason || 'Stopped by admin' }),
+      body: JSON.stringify({ reason }),
+    }),
+  blockPayout: (payoutId, reason) =>
+    apiCall(`/tournament-management/admin/payouts/${payoutId}/block`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  rejectPayout: (payoutId, reason) =>
+    apiCall(`/tournament-management/admin/payouts/${payoutId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
     }),
   reversePayout: (payoutId, reason) =>
     apiCall(`/tournament-management/admin/payouts/${payoutId}/reverse`, {
@@ -538,16 +557,30 @@ export const pushTokenService = {
 export const adminService = {
   getAllUsers: () => apiCall('/admin/all'),
   getStats: () => apiCall('/admin/stats'),
+  getPaymentStats: () => apiCall('/admin/payment-stats'),
   getTransactions: (filters = {}) => {
     const query = new URLSearchParams(filters).toString();
     return apiCall(`/admin/transactions${query ? `?${query}` : ''}`);
   },
+  getRefunds: (filters = {}) => {
+    const query = new URLSearchParams(filters).toString();
+    return apiCall(`/admin/refunds${query ? `?${query}` : ''}`);
+  },
+  retryRefund: (id) => apiCall(`/admin/refunds/${id}/retry`, { method: 'POST' }),
+  freezeWallet: (payload) =>
+    apiCall('/admin/wallet/freeze', { method: 'POST', body: JSON.stringify(payload) }),
+  releaseFreeze: (id) =>
+    apiCall(`/admin/wallet/freeze/${id}/release`, { method: 'POST' }),
+  getAuditLogs: (filters = {}) => {
+    const query = new URLSearchParams(filters).toString();
+    return apiCall(`/admin/audit-logs${query ? `?${query}` : ''}`);
+  },
   getUserDetails: (userId) => apiCall(`/admin/user/${userId}/details`),
-  suspendUser: (userId) => apiCall(`/admin/suspend/${userId}`, { method: 'PUT' }),
+  suspendUser: (userId) => apiCall(`/admin/suspend/${userId}`, { method: 'POST' }),
   banUser: (userId, reason) =>
-    apiCall(`/admin/ban/${userId}`, { method: 'PUT', body: JSON.stringify({ reason }) }),
-  activateUser: (userId) => apiCall(`/admin/activate/${userId}`, { method: 'PUT' }),
-  verifyUser: (userId) => apiCall(`/admin/verify/${userId}`, { method: 'PUT' }),
+    apiCall(`/admin/ban/${userId}`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  activateUser: (userId) => apiCall(`/admin/activate/${userId}`, { method: 'POST' }),
+  verifyUser: (userId) => apiCall(`/admin/verify/${userId}`, { method: 'POST' }),
   setTournamentWinners: (tournamentId, winners) =>
     apiCall(`/admin/tournaments/${tournamentId}/set-winners`, {
       method: 'POST',

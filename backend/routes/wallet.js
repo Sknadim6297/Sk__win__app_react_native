@@ -158,6 +158,18 @@ router.post('/withdraw', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Insufficient real balance. Bonus balance cannot be withdrawn.' });
     }
 
+    const frozen = Number(user.wallet.frozenBalance) || 0;
+    const available = Math.max(0, (user.wallet.balance || 0) - frozen);
+    if (amountNum > available) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient withdrawable balance. ₹${frozen} is frozen. Available: ₹${available}.`,
+        code: 'FROZEN_BALANCE',
+        frozen,
+        available,
+      });
+    }
+
     // Create transaction
     const transaction = new WalletTransaction({
       userId: req.userId,
