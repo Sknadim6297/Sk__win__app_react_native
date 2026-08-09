@@ -1,14 +1,20 @@
 # Render Blueprint — WAREZONE (SK-Win)
-# Dashboard: New → Blueprint → connect this GitHub repo
 #
-# Frontend (sk-win-web) serves the APK download landing page at `/`
-# (not the Expo web app homepage). Expo web remains available locally via `npm run web`.
+# Frontend (sk-win-web): static APK download landing at `/`
+#   Build:  node scripts/build-render-frontend.js
+#   Publish: dist/
+#   No start command (Static Site / CDN)
 #
-# After first deploy:
-# 1. Set MONGODB_URI (MongoDB Atlas) on sk-win-api
-# 2. Confirm PUBLIC_BASE_URL = your API URL (https://sk-win-api.onrender.com)
-# 3. Optional on sk-win-web: APK_DOWNLOAD_URL if the APK is hosted elsewhere
-# 4. Keep EXPO_PUBLIC_API_URL=https://sk-win-api.onrender.com/api (mobile/EAS builds)
+# Backend (sk-win-api): Node API only — NOT the download page
+#   Build:  npm install
+#   Start:  npm start
+#
+# Architecture:
+#   Browser  → https://sk-win-app-react-native-65a3.onrender.com  (download page)
+#   Android  → https://sk-win-api.onrender.com/api                (API)
+#
+# APK must exist at: public/downloads/WAREZONE-v1.0.0.apk
+# (build fails if missing so production never shows a broken download button)
 
 services:
   - type: web
@@ -41,12 +47,18 @@ services:
     runtime: static
     plan: free
     region: singapore
+    # Static site — no startCommand. Serves files from dist/ after build.
     buildCommand: node scripts/build-render-frontend.js
     staticPublishPath: dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    # No SPA catch-all rewrite: /downloads/*.apk must be served as binary files.
+    # Render serves existing files as-is; index.html is used for /.
+    headers:
+      - path: /downloads/*
+        name: Content-Type
+        value: application/vnd.android.package-archive
+      - path: /downloads/*
+        name: Content-Disposition
+        value: attachment; filename="WAREZONE-v1.0.0.apk"
     envVars:
       - key: NODE_VERSION
         value: "20.18.0"
@@ -60,8 +72,5 @@ services:
         value: "1.0.0"
       - key: APK_FILE_NAME
         value: WAREZONE-v1.0.0.apk
-      # Optional override. If unset, build copies public/downloads/<APK_FILE_NAME> into dist.
-      - key: APK_DOWNLOAD_URL
-        sync: false
       - key: CI
         value: "1"

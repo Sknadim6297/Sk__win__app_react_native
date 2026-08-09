@@ -92,9 +92,11 @@ function main() {
     if (!sizeLabel) sizeLabel = '';
     console.log('Local APK missing; using APK_DOWNLOAD_URL only');
   } else {
-    console.warn(
-      `APK not found at ${localApkPath} and APK_DOWNLOAD_URL is unset. Download button will be disabled.`
+    console.error(
+      `FATAL: APK not found at ${localApkPath}.\n` +
+        'Place WAREZONE-v1.0.0.apk in public/downloads/ before deploying the Render frontend.'
     );
+    process.exit(1);
   }
 
   let html = fs.readFileSync(TEMPLATE, 'utf8');
