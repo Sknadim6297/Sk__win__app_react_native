@@ -4,28 +4,27 @@
 
 | What | URL |
 |------|-----|
-| **Download page (share this)** | `https://stunning-glorifier-panama.ngrok-free.dev/download` |
-| Direct APK | `https://stunning-glorifier-panama.ngrok-free.dev/downloads/WarZone-AMR-v1.0.0.apk` |
-| Local (PC only) | `http://localhost:5000/download` |
-
-Keep backend + ngrok running so phones can open the link.
+| **Download page (share this)** | Your Render frontend root URL |
+| Direct APK | `/downloads/WAREZONE-v1.0.0.apk` |
 
 ## File required
 
-Place your EAS APK here (exact name):
+Place the optimized EAS APK here (exact name):
 
 ```
-public/downloads/WarZone-AMR-v1.0.0.apk
+public/downloads/WAREZONE-v1.0.0.apk
 ```
+
+Current optimized build (arm64-v8a, Hermes, R8): **~16.3 MB**
 
 Steps:
-1. Download APK from Expo build page
-2. Rename to `WarZone-AMR-v1.0.0.apk`
+1. Download APK from Expo build page (or use `eas build`)
+2. Rename/copy to `WAREZONE-v1.0.0.apk`
 3. Copy into `public/downloads/`
-4. Refresh `/download` — button becomes active
+4. Redeploy Render frontend (`npm run build:render-web`)
 
 ## Rebuild
 
 ```bash
-eas build --platform android --profile preview
+npm run build:android:size
 ```

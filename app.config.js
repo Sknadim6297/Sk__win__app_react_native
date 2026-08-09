@@ -50,13 +50,14 @@ module.exports = ({ config }) => ({
     },
   },
   plugins: [
+    './plugins/withArm64CompressedApk',
     ...(config.plugins || []),
     [
       'expo-splash-screen',
       {
         backgroundColor: splashBg,
         image: './assets/logo/ROUND_GAME_LOGO.png',
-        imageWidth: 200,
+        imageWidth: 180,
         resizeMode: 'contain',
       },
     ],
@@ -96,6 +97,10 @@ module.exports = ({ config }) => ({
   ].filter((plugin, index, list) => {
     // Prefer later entries (app.config.js overrides app.json duplicates)
     const name = Array.isArray(plugin) ? plugin[0] : plugin;
+    // Always keep our ABI plugin (string path) even if duplicated
+    if (name === './plugins/withArm64CompressedApk') {
+      return list.indexOf(plugin) === index;
+    }
     return (
       list.findLastIndex((p) => (Array.isArray(p) ? p[0] : p) === name) === index
     );

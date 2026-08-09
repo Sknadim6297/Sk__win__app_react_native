@@ -34,6 +34,15 @@ const app = express();
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/sk-win';
 const PORT = process.env.PORT || 5000;
 
+// Render / reverse proxies: prefer explicit PUBLIC_BASE_URL, else platform URL
+if (!process.env.PUBLIC_BASE_URL && process.env.RENDER_EXTERNAL_URL) {
+  process.env.PUBLIC_BASE_URL = process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '');
+}
+
+if (process.env.TRUST_PROXY === '1' || process.env.RENDER) {
+  app.set('trust proxy', 1);
+}
+
 app.use(
   cors({
     origin: true,
@@ -101,7 +110,7 @@ app.get(['/download', '/download/'], (req, res) => {
 
 /**
  * Serve APK and increment download counter first.
- * GET /downloads/WarZone-AMR-v1.0.0.apk
+ * GET /downloads/WAREZONE-v1.0.0.apk
  */
 app.get('/downloads/:fileName', async (req, res) => {
   try {

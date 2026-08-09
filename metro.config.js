@@ -8,6 +8,19 @@ const projectRoot = __dirname;
 // whose TypeScript sources are not always resolved by Metro on Windows.
 config.resolver.resolverMainFields = ['main', 'module', 'react-native'];
 
+// Block unused @expo/vector-icons font files from the asset graph / APK.
+// App only uses Ionicons + MaterialCommunityIcons (~1.7MB); other families ~2.2MB+.
+const existingBlockList = config.resolver.blockList;
+config.resolver.blockList = [
+  ...(Array.isArray(existingBlockList)
+    ? existingBlockList
+    : existingBlockList
+      ? [existingBlockList]
+      : []),
+  /node_modules[\\/]@expo[\\/]vector-icons[\\/].*[\\/]Fonts[\\/](?!Ionicons\.ttf$|MaterialCommunityIcons\.ttf$).*/,
+  /node_modules[\\/]react-native-vector-icons[\\/]Fonts[\\/](?!Ionicons\.ttf$|MaterialCommunityIcons\.ttf$).*/,
+];
+
 const defaultResolveRequest = config.resolver.resolveRequest;
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
@@ -26,6 +39,19 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     return {
       filePath: path.resolve(projectRoot, 'utils/expoVectorIcons.js'),
       type: 'sourceFile',
+    };
+  }
+
+  // Prevent accidental deep imports of unused icon families.
+  if (
+    typeof moduleName === 'string' &&
+    moduleName.startsWith('@expo/vector-icons/') &&
+    !['@expo/vector-icons/Ionicons', '@expo/vector-icons/MaterialCommunityIcons'].includes(
+      moduleName
+    )
+  ) {
+    return {
+      type: 'empty',
     };
   }
 

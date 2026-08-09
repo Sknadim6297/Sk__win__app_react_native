@@ -2,6 +2,9 @@
   "name": "sk-win",
   "version": "1.0.0",
   "main": "index.js",
+  "engines": {
+    "node": ">=20.18.0"
+  },
   "scripts": {
     "start": "expo start",
     "start:clear": "expo start -c",
@@ -11,7 +14,11 @@
     "admin:web": "expo start --web",
     "build": "expo export --platform web",
     "build:web": "expo export --platform web",
-    "build:android": "eas build --platform android --profile preview"
+    "build:render-web": "node scripts/build-render-frontend.js",
+    "build:android": "eas build --platform android --profile preview",
+    "optimize:assets": "node scripts/optimize-assets.js",
+    "build:android:size": "eas build --platform android --profile preview --clear-cache",
+    "eas-build-post-install": "node scripts/strip-unused-icon-fonts.js"
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "^0.4.2",
@@ -31,7 +38,6 @@
     "expo-linear-gradient": "~15.0.8",
     "expo-notifications": "~0.32.17",
     "expo-splash-screen": "~31.0.13",
-    "expo-status-bar": "~3.0.9",
     "expo-system-ui": "~6.0.9",
     "react": "19.1.0",
     "react-dom": "19.1.0",

@@ -1,24 +1,325 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>WAREZONE Tournament</title>
-    <style>
-      html,
-      body,
-      #root {
-        background-color: #0a0e1a !important;
-        margin: 0;
-        padding: 0;
-        min-height: 100%;
-        height: 100%;
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Download WAREZONE | Android App</title>
+  <meta name="description" content="Download the official WAREZONE Android app and install it to join tournaments." />
+  <meta name="theme-color" content="#0B0E1E" />
+  <meta name="robots" content="index,follow" />
+  <meta property="og:title" content="Download WAREZONE" />
+  <meta property="og:description" content="Official Android APK — install and join Free Fire tournaments." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/brand/logo.png" />
+  <link rel="icon" href="/brand/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,500..800;1,9..40,500..800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0B0E1E;
+      --card: #151D36;
+      --muted: #B8C5D9;
+      --dim: #8B9BB5;
+      --white: #ffffff;
+      --purple: #7B61FF;
+      --purple-deep: #5B39A8;
+      --green: #00B368;
+      --gold: #FBBF24;
+      --font: "DM Sans", system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--white);
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .atmosphere {
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse 90% 55% at 50% -15%, rgba(123, 97, 255, 0.28), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 100% 20%, rgba(0, 179, 104, 0.08), transparent 50%),
+        var(--bg);
+    }
+    .wrap {
+      width: min(560px, 100%);
+      margin: 0 auto;
+      padding: 28px 20px 120px;
+    }
+    .brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding-top: 36px;
+    }
+    .logo {
+      width: 112px;
+      height: 112px;
+      border-radius: 28px;
+      object-fit: cover;
+      background: var(--card);
+      margin-bottom: 22px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    }
+    .brand-name {
+      font-size: clamp(2rem, 8vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      line-height: 1.1;
+    }
+    .brand-name span { color: var(--gold); }
+    .tagline {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 34ch;
+    }
+    .cta {
+      margin-top: 28px;
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 56px;
+      padding: 16px 24px;
+      border: none;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--purple) 0%, var(--purple-deep) 100%);
+      color: var(--white);
+      font-family: inherit;
+      font-size: 1.02rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cta:disabled,
+    .cta[aria-disabled="true"] {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .cta:not(:disabled):active { transform: scale(0.98); }
+    .meta {
+      margin-top: 14px;
+      color: var(--dim);
+      font-size: 0.88rem;
+    }
+    .meta strong { color: var(--muted); font-weight: 600; }
+    .steps { margin-top: 48px; }
+    .steps h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+      text-align: center;
+    }
+    .step {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 16px 0;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      text-align: left;
+    }
+    .step:last-child { border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .num {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--card);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      color: var(--purple);
+    }
+    .step h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .step p {
+      color: var(--dim);
+      font-size: 0.92rem;
+    }
+    .note {
+      margin-top: 28px;
+      padding: 16px 18px;
+      background: var(--card);
+      border-radius: 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: left;
+    }
+    .note strong { color: var(--white); }
+    .sticky-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(11,14,30,0.98), rgba(11,14,30,0.92));
+      backdrop-filter: blur(10px);
+      z-index: 20;
+    }
+    .sticky-bar .cta { margin-top: 0; }
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.8rem;
+    }
+  </style>
+  <script>
+    // Injected at build time by scripts/build-render-frontend.js
+    window.__WAREZONE_APK__ = {
+      version: "1.0.0",
+      downloadUrl: "/downloads/WAREZONE-v1.0.0.apk",
+      sizeLabel: "16.3 MB",
+      fileName: "WAREZONE-v1.0.0.apk",
+      androidMin: "Android 8.0+",
+      ready: true
+    };
+  </script>
+</head>
+<body>
+  <div class="atmosphere">
+    <div class="wrap">
+      <header class="brand">
+        <img class="logo" src="/brand/logo.png" alt="WAREZONE" width="112" height="112" />
+        <h1 class="brand-name">WARE<span>ZONE</span></h1>
+        <p class="tagline">Download the official Android app and install it to join tournaments.</p>
+
+        <a
+          id="downloadBtn"
+          class="cta"
+          href="#"
+          role="button"
+          aria-disabled="true"
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10 3a1 1 0 011 1v8.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V4a1 1 0 011-1z"/>
+            <path d="M4 16a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z"/>
+          </svg>
+          <span id="downloadBtnLabel">DOWNLOAD WAREZONE</span>
+        </a>
+
+        <p class="meta" id="metaLine">
+          Version <strong id="versionText">—</strong>
+          · <strong id="sizeText">—</strong>
+          · <span id="androidText">Android 8.0+</span>
+        </p>
+        <p class="meta" id="statusHint"></p>
+      </header>
+
+      <section class="steps" aria-labelledby="how-title">
+        <h2 id="how-title">How to install</h2>
+        <div class="step">
+          <div class="num">1</div>
+          <div>
+            <h3>Download APK</h3>
+            <p>Tap the download button and save the file on your Android phone.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <div>
+            <h3>Open the downloaded APK</h3>
+            <p>Open the file from your Downloads folder or Chrome notification.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <div>
+            <h3>Allow installation from this source</h3>
+            <p>If Android asks, allow install from Chrome / Files for this install.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <div>
+            <h3>Install WAREZONE</h3>
+            <p>Tap Install and wait until setup finishes.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="num">5</div>
+          <div>
+            <h3>Open WAREZONE and login/register</h3>
+            <p>Launch the app, create an account or login, then join tournaments.</p>
+          </div>
+        </div>
+      </section>
+
+      <p class="note">
+        <strong>Tip:</strong> Always download from this official page only. After install, open WAREZONE and login/register to start playing.
+      </p>
+
+      <footer>© <span id="year"></span> WAREZONE · Official Android download</footer>
+    </div>
+  </div>
+
+  <div class="sticky-bar">
+    <a id="downloadBtnSticky" class="cta" href="#" role="button" aria-disabled="true">
+      <span id="downloadBtnStickyLabel">DOWNLOAD WAREZONE</span>
+    </a>
+  </div>
+
+  <script>
+    (function () {
+      var cfg = window.__WAREZONE_APK__ || {};
+      var yearEl = document.getElementById('year');
+      if (yearEl) yearEl.textContent = String(new Date().getFullYear());
+
+      var version = cfg.version || '1.0.0';
+      var url = String(cfg.downloadUrl || '').trim();
+      var sizeLabel = String(cfg.sizeLabel || '').trim();
+      var ready = cfg.ready === true && !!url && url.indexOf('__APK_') === -1;
+      var label = 'DOWNLOAD WAREZONE v' + version;
+
+      document.getElementById('versionText').textContent = version;
+      document.getElementById('androidText').textContent = cfg.androidMin || 'Android 8.0+';
+      document.getElementById('sizeText').textContent =
+        sizeLabel && sizeLabel.indexOf('__APK_') === -1 ? sizeLabel : 'Size on download';
+      document.getElementById('downloadBtnLabel').textContent = label;
+      document.getElementById('downloadBtnStickyLabel').textContent = label;
+
+      var btn = document.getElementById('downloadBtn');
+      var sticky = document.getElementById('downloadBtnSticky');
+      var hint = document.getElementById('statusHint');
+
+      function enable(on) {
+        [btn, sticky].forEach(function (el) {
+          if (!el) return;
+          if (on) {
+            el.href = url;
+            el.setAttribute('download', cfg.fileName || ('WAREZONE-v' + version + '.apk'));
+            el.removeAttribute('aria-disabled');
+            el.classList.remove('is-disabled');
+          } else {
+            el.href = '#';
+            el.setAttribute('aria-disabled', 'true');
+            el.addEventListener('click', function (e) { e.preventDefault(); });
+          }
+        });
       }
-    </style>
-  <link rel="icon" href="/favicon.ico" /></head>
-  <body>
-    <div id="root"></div>
-  <script src="/_expo/static/js/web/index-78e6e541f9e75c8cf35b3aa8f71e1d93.js" defer></script>
+
+      if (ready) {
+        enable(true);
+        hint.textContent = 'Free download · then install & login in the app';
+      } else {
+        enable(false);
+        hint.textContent =
+          'APK not configured. Set APK_DOWNLOAD_URL or place the APK in public/downloads before building.';
+      }
+    })();
+  </script>
 </body>
 </html>

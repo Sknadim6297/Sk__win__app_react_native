@@ -12,7 +12,7 @@ const PAGE_PATH = path.join(PUBLIC_ROOT, 'download', 'index.html');
 
 const DEFAULT_RELEASE = {
   version: '1.0.0',
-  fileName: 'WarZone-AMR-v1.0.0.apk',
+  fileName: 'WAREZONE-v1.0.0.apk',
   title: 'WAREZONE Tournament',
   androidMin: 'Android 8.0 (API 26)+',
   releaseNotes:
