@@ -73,8 +73,16 @@
       line-height: 1.1;
     }
     .brand-name span { color: var(--gold); }
+    .eyebrow {
+      margin-top: 10px;
+      color: var(--gold);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
     .tagline {
-      margin-top: 14px;
+      margin-top: 12px;
       color: var(--muted);
       font-size: 1.05rem;
       max-width: 34ch;
@@ -195,51 +203,52 @@
       <header class="brand">
         <img class="logo" src="/brand/logo.png" alt="WAREZONE" width="112" height="112" />
         <h1 class="brand-name">WARE<span>ZONE</span></h1>
-        <p class="tagline">Download the official Android app and install it to join tournaments.</p>
+        <p class="eyebrow">Official Android App</p>
+        <p class="tagline">Download the official WAREZONE Android app, install it, and login to join tournaments.</p>
 
         <a
           id="downloadBtn"
           class="cta"
-          href="#"
+          href="/downloads/WAREZONE-v1.0.0.apk"
+          download="WAREZONE-v1.0.0.apk"
           role="button"
-          aria-disabled="true"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path d="M10 3a1 1 0 011 1v8.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V4a1 1 0 011-1z"/>
             <path d="M4 16a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z"/>
           </svg>
-          <span id="downloadBtnLabel">DOWNLOAD WAREZONE</span>
+          <span id="downloadBtnLabel">DOWNLOAD APP</span>
         </a>
 
         <p class="meta" id="metaLine">
-          Version <strong id="versionText">—</strong>
-          · <strong id="sizeText">—</strong>
+          Version <strong id="versionText">1.0.0</strong>
           · <span id="androidText">Android 8.0+</span>
+          · <strong id="sizeText">—</strong>
         </p>
         <p class="meta" id="statusHint"></p>
       </header>
 
       <section class="steps" aria-labelledby="how-title">
-        <h2 id="how-title">How to install</h2>
+        <h2 id="how-title">Installation</h2>
         <div class="step">
           <div class="num">1</div>
           <div>
             <h3>Download APK</h3>
-            <p>Tap the download button and save the file on your Android phone.</p>
+            <p>Tap DOWNLOAD APP and save the file on your Android phone.</p>
           </div>
         </div>
         <div class="step">
           <div class="num">2</div>
           <div>
             <h3>Open the downloaded APK</h3>
-            <p>Open the file from your Downloads folder or Chrome notification.</p>
+            <p>Open the file from Chrome or your Downloads folder.</p>
           </div>
         </div>
         <div class="step">
           <div class="num">3</div>
           <div>
             <h3>Allow installation from this source</h3>
-            <p>If Android asks, allow install from Chrome / Files for this install.</p>
+            <p>If Android asks, allow installation from this source.</p>
           </div>
         </div>
         <div class="step">
@@ -252,14 +261,14 @@
         <div class="step">
           <div class="num">5</div>
           <div>
-            <h3>Open WAREZONE and login/register</h3>
-            <p>Launch the app, create an account or login, then join tournaments.</p>
+            <h3>Open the app and Login/Register</h3>
+            <p>Launch WAREZONE, create an account or login, then join tournaments.</p>
           </div>
         </div>
       </section>
 
       <p class="note">
-        <strong>Tip:</strong> Always download from this official page only. After install, open WAREZONE and login/register to start playing.
+        Always download WAREZONE from this official page.
       </p>
 
       <footer>© <span id="year"></span> WAREZONE · Official Android download</footer>
@@ -267,8 +276,14 @@
   </div>
 
   <div class="sticky-bar">
-    <a id="downloadBtnSticky" class="cta" href="#" role="button" aria-disabled="true">
-      <span id="downloadBtnStickyLabel">DOWNLOAD WAREZONE</span>
+    <a
+      id="downloadBtnSticky"
+      class="cta"
+      href="/downloads/WAREZONE-v1.0.0.apk"
+      download="WAREZONE-v1.0.0.apk"
+      role="button"
+    >
+      <span id="downloadBtnStickyLabel">DOWNLOAD APP</span>
     </a>
   </div>
 
@@ -279,45 +294,38 @@
       if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
       var version = cfg.version || '1.0.0';
-      var url = String(cfg.downloadUrl || '').trim();
+      var url = String(cfg.downloadUrl || '/downloads/WAREZONE-v1.0.0.apk').trim();
+      if (!url || url.indexOf('__APK_') !== -1) {
+        url = '/downloads/WAREZONE-v1.0.0.apk';
+      }
       var sizeLabel = String(cfg.sizeLabel || '').trim();
-      var ready = cfg.ready === true && !!url && url.indexOf('__APK_') === -1;
-      var label = 'DOWNLOAD WAREZONE v' + version;
+      var ready = cfg.ready === true;
+      var label = 'DOWNLOAD APP';
 
       document.getElementById('versionText').textContent = version;
       document.getElementById('androidText').textContent = cfg.androidMin || 'Android 8.0+';
       document.getElementById('sizeText').textContent =
-        sizeLabel && sizeLabel.indexOf('__APK_') === -1 ? sizeLabel : 'Size on download';
+        sizeLabel && sizeLabel.indexOf('__APK_') === -1 ? sizeLabel : 'APK';
       document.getElementById('downloadBtnLabel').textContent = label;
       document.getElementById('downloadBtnStickyLabel').textContent = label;
 
       var btn = document.getElementById('downloadBtn');
       var sticky = document.getElementById('downloadBtnSticky');
       var hint = document.getElementById('statusHint');
+      var fileName = cfg.fileName || 'WAREZONE-v1.0.0.apk';
 
-      function enable(on) {
-        [btn, sticky].forEach(function (el) {
-          if (!el) return;
-          if (on) {
-            el.href = url;
-            el.setAttribute('download', cfg.fileName || ('WAREZONE-v' + version + '.apk'));
-            el.removeAttribute('aria-disabled');
-            el.classList.remove('is-disabled');
-          } else {
-            el.href = '#';
-            el.setAttribute('aria-disabled', 'true');
-            el.addEventListener('click', function (e) { e.preventDefault(); });
-          }
-        });
-      }
+      [btn, sticky].forEach(function (el) {
+        if (!el) return;
+        el.href = url;
+        el.setAttribute('download', fileName);
+        el.removeAttribute('aria-disabled');
+      });
 
       if (ready) {
-        enable(true);
-        hint.textContent = 'Free download · then install & login in the app';
+        hint.textContent = 'Official free download · then install & login in the app';
       } else {
-        enable(false);
         hint.textContent =
-          'APK not configured. Set APK_DOWNLOAD_URL or place the APK in public/downloads before building.';
+          'Place WAREZONE-v1.0.0.apk in public/downloads/ before deploying.';
       }
     })();
   </script>

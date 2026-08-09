@@ -12,12 +12,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../styles/theme';
+import { SUPPORT_CONTACTS } from '../constants/supportContacts';
 
 const ContactUsScreen = ({ navigation }) => {
   const contacts = [
-    { type: 'email', label: 'Email Support', value: 'support@warzoneff.com', icon: 'email' },
-    { type: 'phone', label: 'Phone', value: '+91 6297616918', icon: 'phone' },
-    { type: 'whatsapp', label: 'WhatsApp', value: '+91 6297616918', icon: 'whatsapp' },
+    { type: 'email', label: 'Email Support', value: SUPPORT_CONTACTS.email, icon: 'email' },
+    { type: 'phone', label: 'Phone', value: SUPPORT_CONTACTS.phoneDisplay, icon: 'phone' },
+    { type: 'whatsapp', label: 'WhatsApp', value: SUPPORT_CONTACTS.phoneDisplay, icon: 'whatsapp' },
   ];
 
   const handleContact = (type, value) => {

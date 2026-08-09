@@ -25,6 +25,7 @@ import AuthTextField from '../components/auth/AuthTextField';
 import PrimaryButton from '../components/auth/PrimaryButton';
 import GoogleLoginButton from '../components/auth/GoogleLoginButton';
 import OrDivider from '../components/auth/OrDivider';
+import ForgotPasswordModal from '../components/ForgotPasswordModal';
 
 export default function AuthScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
@@ -39,6 +40,7 @@ export default function AuthScreen({ navigation, route }) {
   const [showPassword, setShowPassword] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
   const [submitting, setSubmitting] = useState(false);
+  const [forgotVisible, setForgotVisible] = useState(false);
 
   const screenOpacity = useSharedValue(0);
   const contentY = useSharedValue(24);
@@ -139,7 +141,7 @@ export default function AuthScreen({ navigation, route }) {
   };
 
   const handleGoogleLogin = () => showToast('Google sign-in coming soon', 'warning');
-  const handleForgotPassword = () => showToast('Password reset coming soon', 'warning');
+  const handleForgotPassword = () => setForgotVisible(true);
 
   return (
     <View style={styles.root}>
@@ -147,6 +149,11 @@ export default function AuthScreen({ navigation, route }) {
       <AuthBackground />
 
       <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hideToast} />
+      <ForgotPasswordModal
+        visible={forgotVisible}
+        onClose={() => setForgotVisible(false)}
+        initialEmail={email}
+      />
 
       <KeyboardAvoidingView
         style={styles.flex}
