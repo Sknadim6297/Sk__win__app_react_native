@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
 
 /**
- * Tracks Cashfree wallet top-up orders (QR).
- * Wallet is credited only after verified SUCCESS and walletCredited=false → true (idempotent).
+ * Tracks Cashfree orders (wallet top-up OR tournament entry Pay & Join).
+ * Wallet top-up: credit after SUCCESS via walletCredited flag.
+ * Tournament entry: join after SUCCESS/PAID via tournamentJoined flag (no wallet credit).
  */
 const paymentOrderSchema = new mongoose.Schema(
   {
@@ -17,6 +18,18 @@ const paymentOrderSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
       index: true,
+    },
+    purpose: {
+      type: String,
+      enum: ['wallet_topup', 'tournament_entry'],
+      default: 'wallet_topup',
+      index: true,
+    },
+    tournamentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tournament',
+      index: true,
+      sparse: true,
     },
     amount: {
       type: Number,
@@ -60,6 +73,11 @@ const paymentOrderSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    tournamentJoined: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     walletTransactionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'WalletTransaction',
@@ -74,6 +92,7 @@ const paymentOrderSchema = new mongoose.Schema(
 );
 
 paymentOrderSchema.index({ userId: 1, createdAt: -1 });
+paymentOrderSchema.index({ userId: 1, tournamentId: 1, purpose: 1, status: 1 });
 paymentOrderSchema.index({ cashfreePaymentId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('PaymentOrder', paymentOrderSchema);

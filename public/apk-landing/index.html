@@ -229,46 +229,39 @@
       </header>
 
       <section class="steps" aria-labelledby="how-title">
-        <h2 id="how-title">Installation</h2>
+        <h2 id="how-title">Installation (Android 8–14)</h2>
         <div class="step">
           <div class="num">1</div>
           <div>
             <h3>Download APK</h3>
-            <p>Tap DOWNLOAD APP and save the file on your Android phone.</p>
+            <p>Tap DOWNLOAD APP. Wait until the file finishes (about 16 MB). Name must end with <strong>.apk</strong>.</p>
           </div>
         </div>
         <div class="step">
           <div class="num">2</div>
           <div>
-            <h3>Open the downloaded APK</h3>
-            <p>Open the file from Chrome or your Downloads folder.</p>
+            <h3>If Chrome says “Can't open file”</h3>
+            <p>This is common on Android 12+. Do <strong>not</strong> open from Chrome preview. Open the <strong>Files</strong> / <strong>My Files</strong> app → <strong>Downloads</strong> → tap <strong>WAREZONE-v1.0.0.apk</strong>.</p>
           </div>
         </div>
         <div class="step">
           <div class="num">3</div>
           <div>
-            <h3>Allow installation from this source</h3>
-            <p>If Android asks, allow installation from this source.</p>
+            <h3>Allow install from this source</h3>
+            <p>Settings → Apps → Special app access → Install unknown apps → enable for <strong>Files</strong> (or Chrome). Then tap Install.</p>
           </div>
         </div>
         <div class="step">
           <div class="num">4</div>
           <div>
             <h3>Install WAREZONE</h3>
-            <p>Tap Install and wait until setup finishes.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="num">5</div>
-          <div>
-            <h3>Open the app and Login/Register</h3>
-            <p>Launch WAREZONE, create an account or login, then join tournaments.</p>
+            <p>Tap Install and wait until setup finishes. Then open the app and Login / Register.</p>
           </div>
         </div>
       </section>
 
       <p class="note">
-        Always download WAREZONE from this official page.
+        Always download WAREZONE from this official page. Android 8.0+ required. If install fails, delete the old download and tap DOWNLOAD APP again.
       </p>
 
       <footer>© <span id="year"></span> WAREZONE · Official Android download</footer>
@@ -317,7 +310,12 @@
       [btn, sticky].forEach(function (el) {
         if (!el) return;
         el.href = url;
-        el.setAttribute('download', fileName);
+        // Keep filename for same-origin; absolute API URLs rely on Content-Disposition
+        if (url.indexOf('http') === 0) {
+          el.removeAttribute('download');
+        } else {
+          el.setAttribute('download', fileName);
+        }
         el.removeAttribute('aria-disabled');
       });
 

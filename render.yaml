@@ -59,6 +59,9 @@ services:
       - path: /downloads/*
         name: Content-Disposition
         value: attachment; filename="WAREZONE-v1.0.0.apk"
+      - path: /downloads/*
+        name: X-Content-Type-Options
+        value: nosniff
     envVars:
       - key: NODE_VERSION
         value: "20.18.0"
@@ -72,5 +75,8 @@ services:
         value: "1.0.0"
       - key: APK_FILE_NAME
         value: WAREZONE-v1.0.0.apk
+      # Prefer API host — sets Content-Disposition so Android 12 Chrome saves a real .apk
+      - key: APK_DOWNLOAD_URL
+        value: https://sk-win-api.onrender.com/downloads/WAREZONE-v1.0.0.apk
       - key: CI
         value: "1"

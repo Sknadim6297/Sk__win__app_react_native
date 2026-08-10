@@ -332,6 +332,15 @@ export const paymentService = {
       body: data,
     });
   },
+  createCashfreeOrder: (data) => {
+    if (!isPaymentEnabled()) {
+      return Promise.reject(getPaymentDisabledError('deposit'));
+    }
+    return apiCall('/payments/cashfree/create-order', {
+      method: 'POST',
+      body: data,
+    });
+  },
   getCashfreeStatus: (orderId) => {
     if (!isPaymentEnabled()) {
       return Promise.reject(getPaymentDisabledError('deposit'));

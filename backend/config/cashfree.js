@@ -1,9 +1,13 @@
 const truthy = (v) => String(v || '').toLowerCase() === 'true' || v === '1';
 
 function getCashfreeConfig() {
-  const appId = process.env.CASHFREE_APP_ID || process.env.CASHFREE_CLIENT_ID || '';
-  const secretKey = process.env.CASHFREE_SECRET_KEY || '';
-  const env = (process.env.CASHFREE_ENV || 'production').toLowerCase();
+  const appId = String(
+    process.env.CASHFREE_APP_ID || process.env.CASHFREE_CLIENT_ID || ''
+  ).trim();
+  const secretKey = String(
+    process.env.CASHFREE_SECRET_KEY || process.env.CASHFREE_CLIENT_SECRET || ''
+  ).trim();
+  const env = (process.env.CASHFREE_ENV || 'sandbox').toLowerCase();
   const enabled = truthy(process.env.CASHFREE_ENABLED);
   const configured = Boolean(appId && secretKey);
 
@@ -22,7 +26,7 @@ function getCashfreeConfig() {
     ready: enabled && configured,
     appId,
     secretKey,
-    env: env === 'sandbox' ? 'sandbox' : 'production',
+    env: env === 'production' ? 'production' : 'sandbox',
     baseUrl,
     apiVersion: process.env.CASHFREE_API_VERSION || '2023-08-01',
     webhookSecret: process.env.CASHFREE_WEBHOOK_SECRET || secretKey,
@@ -31,6 +35,26 @@ function getCashfreeConfig() {
     maxAmount: 10000,
     currency: 'INR',
   };
+}
+
+/** Safe auth diagnostics — never logs the secret value */
+function logCashfreeAuthDiagnostics(extra = {}) {
+  const cfg = getCashfreeConfig();
+  console.log(`[CASHFREE] ENV=${cfg.env}`);
+  console.log(`[CASHFREE] CLIENT_ID_PRESENT=${Boolean(cfg.appId)}`);
+  console.log(`[CASHFREE] CLIENT_SECRET_PRESENT=${Boolean(cfg.secretKey)}`);
+  console.log(`[CASHFREE] CLIENT_ID_PREFIX=${cfg.appId ? String(cfg.appId).slice(0, 8) + '…' : '(missing)'}`);
+  console.log(`[CASHFREE] API_VERSION=${cfg.apiVersion}`);
+  console.log(`[CASHFREE] BASE_URL=${cfg.baseUrl}`);
+  if (extra.httpStatus != null) {
+    console.log(`[CASHFREE] Cashfree HTTP status=${extra.httpStatus}`);
+  }
+  if (extra.path) {
+    console.log(`[CASHFREE] PATH=${extra.path}`);
+  }
+  if (extra.message) {
+    console.log(`[CASHFREE] RESPONSE_MESSAGE=${extra.message}`);
+  }
 }
 
 function assertCashfreeReady() {
@@ -43,7 +67,7 @@ function assertCashfreeReady() {
   }
   if (!cfg.configured) {
     const err = new Error(
-      'Cashfree credentials missing. Set CASHFREE_APP_ID and CASHFREE_SECRET_KEY in backend/.env'
+      'Cashfree credentials missing. Set CASHFREE_APP_ID (or CASHFREE_CLIENT_ID) and CASHFREE_SECRET_KEY (or CASHFREE_CLIENT_SECRET) in backend/.env'
     );
     err.code = 'CASHFREE_NOT_CONFIGURED';
     err.status = 503;
@@ -55,4 +79,5 @@ function assertCashfreeReady() {
 module.exports = {
   getCashfreeConfig,
   assertCashfreeReady,
+  logCashfreeAuthDiagnostics,
 };

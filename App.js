@@ -202,6 +202,7 @@ function AppNavigator() {
                 <Stack.Screen name="EditProfile" {...screen(() => require('./screens/EditProfileScreen').default)} />
                 <Stack.Screen name="MyWallet" {...screen(() => require('./screens/MyWalletScreen').default)} />
                 <Stack.Screen name="CashfreeQrPayment" {...screen(() => require('./screens/CashfreeQrPaymentScreen').default)} />
+                <Stack.Screen name="TournamentPayJoin" {...screen(() => require('./screens/TournamentPayJoinScreen').default)} />
                 <Stack.Screen name="MyStatistics" {...screen(() => require('./screens/MyStatisticsScreen').default)} />
                 <Stack.Screen name="TopPlayers" {...screen(() => require('./screens/TopPlayersScreen').default)} />
                 <Stack.Screen name="Notifications" {...screen(() => require('./screens/NotificationsScreen').default)} />

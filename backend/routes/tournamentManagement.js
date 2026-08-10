@@ -1063,7 +1063,7 @@ router.get('/admin/:id/results/export', authMiddleware, async (req, res) => {
   }
 });
 
-// Register team (Custom Match) — Team Name + Side + player names
+// Register team — Team Name + Side (custom) + Game ID + UID for every player
 router.post('/:id/register-team', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -1110,22 +1110,33 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
       return res.status(400).json({
         error:
           modeLabel === 'squad'
-            ? 'Squad requires exactly 4 player names per team'
+            ? 'Squad requires exactly 4 players (Game ID + UID each)'
             : modeLabel === 'duo'
-              ? 'Duo requires exactly 2 player names per team'
-              : 'Solo requires exactly 1 player name',
+              ? 'Duo requires exactly 2 players (Game ID + UID each)'
+              : 'Solo requires exactly 1 player (Game ID + UID)',
         requiredPlayers,
       });
     }
 
     const normalizedPlayers = players.map((p, idx) => {
       const name = String(typeof p === 'string' ? p : p?.name || p?.gamingUsername || '').trim();
-      const gamingUID = String(typeof p === 'object' ? p?.gamingUID || '' : '').trim();
+      const gamingUID = String(
+        typeof p === 'object' ? p?.gamingUID || p?.uid || p?.gameUID || '' : ''
+      ).trim();
       return { name, gamingUID, index: idx };
     });
 
-    if (normalizedPlayers.some((p) => !p.name)) {
-      return res.status(400).json({ error: 'All player name fields are required' });
+    const missingName = normalizedPlayers.find((p) => !p.name || p.name.length < 3);
+    if (missingName) {
+      return res.status(400).json({
+        error: `Player ${missingName.index + 1}: Game ID (in-game name) is required (min 3 characters)`,
+      });
+    }
+    const missingUid = normalizedPlayers.find((p) => !p.gamingUID || p.gamingUID.length < 3);
+    if (missingUid) {
+      return res.status(400).json({
+        error: `Player ${missingUid.index + 1}: Game UID is required (min 3 characters)`,
+      });
     }
 
     const teamCount = await Team.countDocuments({ tournamentId: tournament._id, status: 'registered' });

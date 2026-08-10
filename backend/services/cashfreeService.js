@@ -1,5 +1,9 @@
 const crypto = require('crypto');
-const { assertCashfreeReady, getCashfreeConfig } = require('../config/cashfree');
+const {
+  assertCashfreeReady,
+  getCashfreeConfig,
+  logCashfreeAuthDiagnostics,
+} = require('../config/cashfree');
 const { assertPaymentsEnabled } = require('../config/payments');
 
 async function cashfreeFetch(path, { method = 'GET', body } = {}) {
@@ -13,6 +17,8 @@ async function cashfreeFetch(path, { method = 'GET', body } = {}) {
     'x-client-id': cfg.appId,
     'x-client-secret': cfg.secretKey,
   };
+
+  logCashfreeAuthDiagnostics({ path: `${method} ${url}` });
 
   const res = await fetch(url, {
     method,
@@ -29,14 +35,29 @@ async function cashfreeFetch(path, { method = 'GET', body } = {}) {
   }
 
   if (!res.ok) {
-    const message =
+    const rawMessage =
       data?.message ||
       data?.error?.message ||
       (Array.isArray(data?.message) ? data.message.join(', ') : null) ||
       `Cashfree API error (${res.status})`;
+
+    logCashfreeAuthDiagnostics({
+      path: `${method} ${url}`,
+      httpStatus: res.status,
+      message: String(rawMessage).slice(0, 200),
+    });
+
+    const isAuthFail =
+      res.status === 401 ||
+      /authentication\s*failed/i.test(String(rawMessage));
+
+    const message = isAuthFail
+      ? 'Cashfree authentication Failed. Use Payment Gateway (PG) Test API keys from Payments → Developers → API Keys — NOT Payouts API keys. Keys must match sandbox.cashfree.com/pg.'
+      : rawMessage;
+
     const err = new Error(message);
     err.status = res.status;
-    err.code = data?.code || 'CASHFREE_API_ERROR';
+    err.code = isAuthFail ? 'CASHFREE_AUTH_FAILED' : data?.code || 'CASHFREE_API_ERROR';
     err.payload = data;
     throw err;
   }
@@ -46,6 +67,8 @@ async function cashfreeFetch(path, { method = 'GET', body } = {}) {
 
 /**
  * Create Cashfree order → returns payment_session_id
+ * POST https://sandbox.cashfree.com/pg/orders
+ * Headers: x-client-id, x-client-secret, x-api-version
  */
 async function createOrder({ orderId, amount, currency, customer, notifyUrl, returnUrl }) {
   const cfg = assertCashfreeReady();
@@ -67,7 +90,7 @@ async function createOrder({ orderId, amount, currency, customer, notifyUrl, ret
       return_url: returnUrl || undefined,
       payment_methods: 'upi',
     },
-    order_note: 'SK Win wallet top-up',
+    order_note: 'WAREZONE tournament / wallet payment',
   };
 
   const order = await cashfreeFetch('/orders', { method: 'POST', body });

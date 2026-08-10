@@ -18,11 +18,15 @@ import Toast from '../components/Toast';
 import { getTeamSize, isCustomMatch, isTeamEntryMode } from '../utils/tournamentHelpers';
 import { fetchWalletForEntry } from '../utils/walletFlow';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
+import { isPaymentEnabled } from '../utils/paymentConfig';
 
 const CYAN = '#00E5FF';
+const WARN = '#FBBF24';
+
+const emptyPlayer = () => ({ name: '', gamingUID: '' });
 
 export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
-  const { tournamentId, walletRecharged } = route.params || {};
+  const { tournamentId, walletRecharged, payWithCashfree } = route.params || {};
   const { user, isAdmin } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
 
@@ -31,7 +35,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
   const [submitting, setSubmitting] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [teamSide, setTeamSide] = useState('A');
-  const [playerNames, setPlayerNames] = useState(['']);
+  const [players, setPlayers] = useState([emptyPlayer()]);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
 
   const showToast = (message, type = 'error') => setToast({ visible: true, message, type });
@@ -50,7 +54,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
         const data = await tournamentService.getDetails(tournamentId);
         setTournament(data);
         const count = getTeamSize(data.mode);
-        setPlayerNames(Array.from({ length: count }, () => ''));
+        setPlayers(Array.from({ length: count }, () => emptyPlayer()));
       } catch (e) {
         showToast(e.message || 'Failed to load match');
       } finally {
@@ -74,8 +78,8 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
     return sides;
   }, [tournament?.teams]);
 
-  const updatePlayerName = (index, value) => {
-    setPlayerNames((prev) => prev.map((n, i) => (i === index ? value : n)));
+  const updatePlayer = (index, field, value) => {
+    setPlayers((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
   };
 
   const handleRegister = async () => {
@@ -99,13 +103,43 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       showToast(`Team ${teamSide} is already taken`);
       return;
     }
-    if (playerNames.some((n) => !n.trim())) {
-      showToast(`Enter all ${playersPerTeam} player name(s)`);
-      return;
+
+    for (let i = 0; i < players.length; i += 1) {
+      const name = String(players[i].name || '').trim();
+      const uid = String(players[i].gamingUID || '').trim();
+      if (name.length < 3) {
+        showToast(`Player ${i + 1}: enter Game ID (min 3 characters)`, 'warning');
+        return;
+      }
+      if (uid.length < 3) {
+        showToast(`Player ${i + 1}: enter Game UID (min 3 characters)`, 'warning');
+        return;
+      }
     }
 
     try {
       setSubmitting(true);
+
+      const roster = players.map((p) => ({
+        name: p.name.trim(),
+        gamingUID: p.gamingUID.trim(),
+      }));
+
+      // Cashfree Sandbox Pay & Join for team entry
+      if (isPaymentEnabled() || payWithCashfree) {
+        navigation.navigate('TournamentPayJoin', {
+          tournamentId,
+          tournamentName: tournament?.name,
+          amount: tournament?.entryFee,
+          joinKind: 'team',
+          teamName: teamName.trim(),
+          teamSide,
+          players: roster,
+          skipForm: true,
+        });
+        return;
+      }
+
       const walletCheck = await fetchWalletForEntry(tournament.entryFee);
       if (!walletCheck.sufficient) {
         showInsufficientBalance({
@@ -121,7 +155,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       await tournamentManagementService.registerTeam(tournamentId, {
         teamName: teamName.trim(),
         teamSide,
-        players: playerNames.map((name) => ({ name: name.trim() })),
+        players: roster,
       });
 
       showToast('Team registered successfully!', 'success');
@@ -163,6 +197,14 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
           {isCustom ? ' · Max 2 teams' : ''}
           {'\n'}Entry fee ₹{tournament?.entryFee || 0} — paid once by team captain
         </Text>
+
+        <View style={styles.warnBox}>
+          <Text style={styles.warnTitle}>Mandatory Game ID & UID</Text>
+          <Text style={styles.warnText}>
+            Enter correct Free Fire Game ID and UID for every player. Wrong name or UID can get the
+            player removed from the match by the organizer.
+          </Text>
+        </View>
 
         <Text style={styles.label}>Team Name *</Text>
         <TextInput
@@ -209,17 +251,32 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
         ) : null}
 
         <Text style={styles.label}>
-          Player Names * ({playersPerTeam}/{playersPerTeam})
+          Team Players * ({playersPerTeam}/{playersPerTeam}) — Game ID + UID required
         </Text>
-        {playerNames.map((name, index) => (
-          <TextInput
-            key={`player-${index}`}
-            style={styles.input}
-            value={name}
-            onChangeText={(text) => updatePlayerName(index, text)}
-            placeholder={index === 0 ? 'Player 1 (Captain / You)' : `Player ${index + 1}`}
-            placeholderTextColor={COLORS.gray}
-          />
+        {players.map((player, index) => (
+          <View key={`player-${index}`} style={styles.playerCard}>
+            <Text style={styles.playerTitle}>
+              Player {index + 1}
+              {index === 0 ? ' (Captain / You)' : ''}
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={player.name}
+              onChangeText={(text) => updatePlayer(index, 'name', text)}
+              placeholder="Game ID (in-game name)"
+              placeholderTextColor={COLORS.gray}
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={[styles.input, styles.inputLast]}
+              value={player.gamingUID}
+              onChangeText={(text) => updatePlayer(index, 'gamingUID', text)}
+              placeholder="Game UID"
+              placeholderTextColor={COLORS.gray}
+              autoCapitalize="none"
+              keyboardType="default"
+            />
+          </View>
         ))}
       </ScrollView>
 
@@ -233,7 +290,9 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
             <ActivityIndicator color="#050510" />
           ) : (
             <Text style={styles.submitText}>
-              PAY TEAM ENTRY · ₹{tournament?.entryFee || 0}
+              {isPaymentEnabled() || payWithCashfree
+                ? `PAY & JOIN · ₹${tournament?.entryFee || 0}`
+                : `PAY TEAM ENTRY · ₹${tournament?.entryFee || 0}`}
             </Text>
           )}
         </TouchableOpacity>
@@ -265,8 +324,32 @@ const styles = StyleSheet.create({
   headerTitle: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 17 },
   content: { padding: 16, paddingBottom: 40 },
   matchName: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 20, marginBottom: 6 },
-  meta: { color: COLORS.gray, marginBottom: 20, fontSize: 13 },
+  meta: { color: COLORS.gray, marginBottom: 16, fontSize: 13 },
+  warnBox: {
+    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.35)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 18,
+  },
+  warnTitle: { color: WARN, fontFamily: FONTS.bold, fontSize: 13, marginBottom: 6 },
+  warnText: { color: COLORS.gray, fontSize: 12, lineHeight: 18 },
   label: { color: COLORS.white, marginBottom: 8, fontFamily: FONTS.bold },
+  playerCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 12,
+    marginBottom: 12,
+  },
+  playerTitle: {
+    color: CYAN,
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    marginBottom: 10,
+  },
   input: {
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 10,
@@ -277,6 +360,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 12,
   },
+  inputLast: { marginBottom: 0 },
   sideRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
   sideBtn: {
     flex: 1,

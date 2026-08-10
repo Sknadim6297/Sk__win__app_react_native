@@ -30,6 +30,7 @@ import {
 } from '../utils/tournamentHelpers';
 import { fetchWalletForEntry } from '../utils/walletFlow';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
+import { isPaymentEnabled } from '../utils/paymentConfig';
 
 const CYAN = '#00E5FF';
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -47,7 +48,7 @@ function CoinValue({ value, size = 18 }) {
 }
 
 export default function TournamentDetailsScreen({ navigation, route }) {
-  const { tournamentId, walletRecharged } = route.params || {};
+  const { tournamentId, walletRecharged, joinedSuccess } = route.params || {};
   const { user, isAdmin } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
   const [tournament, setTournament] = useState(null);
@@ -97,6 +98,14 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     }
   }, [walletRecharged, navigation]);
 
+  useEffect(() => {
+    if (joinedSuccess) {
+      showToast('Joined Successfully ✅', 'success');
+      navigation.setParams({ joinedSuccess: undefined });
+      loadDetails();
+    }
+  }, [joinedSuccess, navigation, loadDetails]);
+
   const handleJoinNow = async () => {
     const status = tournament?.lifecycleStatus || tournament?.status;
     if (status === 'completed' || status === 'result_published') {
@@ -123,6 +132,31 @@ export default function TournamentDetailsScreen({ navigation, route }) {
         eligibility?.isCustomMatch ||
         eligibility?.usesTeamRegistration ||
         isTeamEntryMode(tournament.mode);
+
+      // Cashfree Sandbox Pay & Join (when payment gateway enabled)
+      if (isPaymentEnabled() && !isTeamFlow) {
+        if (!eligibility?.canJoin && eligibility?.code !== 'INSUFFICIENT_BALANCE') {
+          const isInsufficient =
+            eligibility?.code === 'INSUFFICIENT_BALANCE' ||
+            /insufficient|balance/i.test(String(eligibility?.reason || ''));
+          if (!isInsufficient) {
+            showToast(eligibility?.reason || 'This tournament is not open for joining', 'warning');
+            return;
+          }
+        }
+        navigation.navigate('TournamentPayJoin', {
+          tournamentId,
+          tournamentName: tournament?.name,
+          amount: tournament?.entryFee,
+          joinKind: 'solo',
+        });
+        return;
+      }
+
+      if (isPaymentEnabled() && isTeamFlow) {
+        navigation.navigate('CustomMatchTeamRegister', { tournamentId, payWithCashfree: true });
+        return;
+      }
 
       const isInsufficient =
         eligibility?.code === 'INSUFFICIENT_BALANCE' ||
@@ -257,11 +291,15 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     : hasJoined
       ? 'JOINED'
       : isJoinOpen
-        ? custom
-          ? 'REGISTER TEAM'
-          : isTeamEntryMode(tournament.mode)
+        ? isPaymentEnabled()
+          ? custom || isTeamEntryMode(tournament.mode)
+            ? 'PAY & REGISTER TEAM'
+            : 'PAY & JOIN'
+          : custom
             ? 'REGISTER TEAM'
-            : 'JOIN NOW'
+            : isTeamEntryMode(tournament.mode)
+              ? 'REGISTER TEAM'
+              : 'JOIN NOW'
         : statusButtonLabelMap[lifecycleStatus] ||
           String(lifecycleStatus || 'UNAVAILABLE').toUpperCase();
 
