@@ -41,6 +41,12 @@ services:
         value: "false"
       - key: TRUST_PROXY
         value: "1"
+      - key: GOOGLE_WEB_CLIENT_ID
+        sync: false
+      - key: GOOGLE_ANDROID_CLIENT_ID
+        sync: false
+      - key: GOOGLE_IOS_CLIENT_ID
+        sync: false
 
   - type: web
     name: sk-win-web

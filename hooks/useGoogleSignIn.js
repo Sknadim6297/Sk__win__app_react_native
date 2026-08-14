@@ -4,7 +4,8 @@ import * as Google from 'expo-auth-session/providers/google';
 import { getGoogleClientIds } from '../utils/googleConfig';
 import { getGoogleSignInEnvironmentMessage, isExpoGo } from '../utils/googleEnvironment';
 import {
-  getGoogleOAuthRedirectUri,
+  getGoogleAndroidRedirectUri,
+  getGoogleIosRedirectUri,
   getGoogleRedirectUriOptions,
 } from '../utils/googleRedirectUri';
 
@@ -30,14 +31,11 @@ export function useGoogleSignIn({ onToken, onError } = {}) {
   const expoGoBlocked = isExpoGo();
   const handledRef = useRef(false);
 
-  const redirectUri = useMemo(
-    () =>
-      getGoogleOAuthRedirectUri({
-        iosClientId: ids.iosClientId,
-        androidClientId: ids.androidClientId,
-      }),
-    [ids.androidClientId, ids.iosClientId]
-  );
+  const redirectUri = useMemo(() => {
+    if (Platform.OS === 'android') return getGoogleAndroidRedirectUri(ids.androidClientId);
+    if (Platform.OS === 'ios') return getGoogleIosRedirectUri(ids.iosClientId);
+    return undefined;
+  }, [ids.androidClientId, ids.iosClientId]);
 
   const redirectUriOptions = useMemo(
     () =>

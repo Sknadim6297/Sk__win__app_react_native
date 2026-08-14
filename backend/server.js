@@ -204,6 +204,55 @@ app.use('/api/support', supportRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/download', downloadApiRouter);
 
+/** Google OAuth browser callback — opens the app via custom URI scheme (APK / dev build). */
+function googleReversedScheme(clientId) {
+  const id = String(clientId || '').trim();
+  if (!id.endsWith('.apps.googleusercontent.com')) return '';
+  return `com.googleusercontent.apps.${id.replace('.apps.googleusercontent.com', '')}`;
+}
+
+app.get('/api/oauthredirect', (req, res) => {
+  const nativeScheme =
+    googleReversedScheme(process.env.GOOGLE_ANDROID_CLIENT_ID) ||
+    googleReversedScheme(process.env.GOOGLE_IOS_CLIENT_ID) ||
+    'com.googleusercontent.apps.188535028372-vgg0o270r97e3qtg21ilpt0m6dj1t37j';
+  const qs = new URLSearchParams(req.query).toString();
+  const nativeLink = `${nativeScheme}:/oauthredirect${qs ? `?${qs}` : ''}`;
+  const appLink = `warezone://oauthredirect${qs ? `?${qs}` : ''}`;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.status(200).send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Returning to WAREZONE</title>
+  <style>
+    body{font-family:system-ui,sans-serif;background:#0a0e1a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px;text-align:center}
+    a{color:#22c55e;font-weight:600}
+  </style>
+  <script>
+    (function () {
+      var targets = [${JSON.stringify(nativeLink)}, ${JSON.stringify(appLink)}];
+      var i = 0;
+      function next() {
+        if (i >= targets.length) return;
+        window.location.href = targets[i++];
+        setTimeout(next, 700);
+      }
+      next();
+    })();
+  </script>
+</head>
+<body>
+  <div>
+    <h1>Returning to WAREZONE…</h1>
+    <p>If the app does not open, <a href="${nativeLink}">tap here to continue</a>.</p>
+  </div>
+</body>
+</html>`);
+});
+
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API endpoint not found' });
 });

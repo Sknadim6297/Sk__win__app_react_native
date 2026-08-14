@@ -263,6 +263,15 @@ export const AuthProvider = ({ children }) => {
       const data = await parseJsonResponse(response);
 
       if (!response.ok) {
+        if (response.status === 404) {
+          return {
+            success: false,
+            error:
+              'Google sign-in API is not deployed on this server. Redeploy the backend to Render and set GOOGLE_* environment variables.',
+            status: 404,
+            code: data.code,
+          };
+        }
         return {
           success: false,
           error: data.error || data.message || 'Google sign-in failed',
