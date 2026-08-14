@@ -6,16 +6,18 @@ import { COLORS, TYPO, ICON } from '../../styles/theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export default function GoogleLoginButton({ onPress }) {
+export default function GoogleLoginButton({ onPress, disabled = false, loading = false }) {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
+    opacity: disabled || loading ? 0.65 : 1,
   }));
 
   return (
     <AnimatedPressable
       onPress={onPress}
+      disabled={disabled || loading}
       onPressIn={() => {
         scale.value = withSpring(0.98, { damping: 14, stiffness: 300 });
       }}
@@ -29,7 +31,9 @@ export default function GoogleLoginButton({ onPress }) {
       <View style={styles.iconWrap}>
         <MaterialCommunityIcons name="google" size={ICON.sm} color="#EA4335" />
       </View>
-      <Text style={styles.label}>Continue with Google</Text>
+      <Text style={styles.label}>
+        {loading ? 'Signing in with Google…' : 'Continue with Google'}
+      </Text>
     </AnimatedPressable>
   );
 }

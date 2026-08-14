@@ -1,5 +1,20 @@
 /** Expo loads EXPO_PUBLIC_* from .env automatically when you run `npx expo start`. */
 const { background: splashBg } = require('./constants/brandColors.cjs');
+
+function googleReversedClientId(clientId) {
+  const id = String(clientId || '').trim();
+  if (!id.endsWith('.apps.googleusercontent.com')) return null;
+  return `com.googleusercontent.apps.${id.replace('.apps.googleusercontent.com', '')}`;
+}
+
+const googleIosClientId =
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  '';
+const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
+const googleUrlScheme = googleReversedClientId(googleIosClientId);
+const googleAndroidScheme = googleReversedClientId(googleAndroidClientId);
+
 const apiUrl = process.env.EXPO_PUBLIC_API_URL || '';
 const usesHttp = apiUrl.startsWith('http://');
 
@@ -48,9 +63,33 @@ module.exports = ({ config }) => ({
       foregroundImage: './assets/logo/ROUND_GAME_LOGO.png',
       backgroundColor: splashBg,
     },
+    ...(googleAndroidScheme
+      ? {
+          intentFilters: [
+            ...((config.android?.intentFilters || []).filter(
+              (entry) =>
+                !entry?.data?.some((d) =>
+                  String(d?.scheme || '').startsWith('com.googleusercontent.apps.')
+                )
+            )),
+            {
+              action: 'VIEW',
+              autoVerify: false,
+              data: [
+                {
+                  scheme: googleAndroidScheme,
+                  pathPrefix: '/oauthredirect',
+                },
+              ],
+              category: ['BROWSABLE', 'DEFAULT'],
+            },
+          ],
+        }
+      : {}),
   },
   plugins: [
     './plugins/withArm64CompressedApk',
+    'expo-web-browser',
     ...(config.plugins || []),
     [
       'expo-splash-screen',
@@ -109,6 +148,21 @@ module.exports = ({ config }) => ({
     ...config.ios,
     infoPlist: {
       ...(config.ios?.infoPlist || {}),
+      ...(googleUrlScheme
+        ? {
+            CFBundleURLTypes: [
+              ...((config.ios?.infoPlist?.CFBundleURLTypes || []).filter(
+                (entry) =>
+                  !entry?.CFBundleURLSchemes?.some((s) =>
+                    String(s).startsWith('com.googleusercontent.apps.')
+                  )
+              )),
+              {
+                CFBundleURLSchemes: [googleUrlScheme],
+              },
+            ],
+          }
+        : {}),
       ...(usesHttp
         ? {
             NSAppTransportSecurity: {
@@ -132,5 +186,8 @@ module.exports = ({ config }) => ({
             String(process.env.EXPO_PUBLIC_PAYMENT_ENABLED).trim().toLowerCase()
           )
         : false,
+    googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || undefined,
+    googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || undefined,
+    googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined,
   },
 });

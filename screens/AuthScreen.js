@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -24,12 +24,14 @@ import AuthBackground from '../components/auth/AuthBackground';
 import AuthTextField from '../components/auth/AuthTextField';
 import PrimaryButton from '../components/auth/PrimaryButton';
 import GoogleLoginButton from '../components/auth/GoogleLoginButton';
+import GoogleSignInBridge from '../components/auth/GoogleSignInBridge';
 import OrDivider from '../components/auth/OrDivider';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
+import { isGoogleSignInConfigured } from '../utils/googleConfig';
 
 export default function AuthScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { login, register } = useContext(AuthContext);
+  const { login, register, loginWithGoogle } = useContext(AuthContext);
   const initialLogin = route.params?.mode !== 'register';
   const [isLogin, setIsLogin] = useState(initialLogin);
   const [username, setUsername] = useState('');
@@ -40,6 +42,7 @@ export default function AuthScreen({ navigation, route }) {
   const [showPassword, setShowPassword] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [forgotVisible, setForgotVisible] = useState(false);
 
   const screenOpacity = useSharedValue(0);
@@ -140,7 +143,47 @@ export default function AuthScreen({ navigation, route }) {
     setReferralCode('');
   };
 
-  const handleGoogleLogin = () => showToast('Google sign-in coming soon', 'warning');
+  const onGoogleToken = useCallback(
+    async (idToken) => {
+      try {
+        const result = await loginWithGoogle(idToken);
+        if (result.success) {
+          const isAdminUser = result.user?.role === 'admin' || result.role === 'admin';
+          showToast(
+            isAdminUser
+              ? 'Welcome, Admin!'
+              : result.isNewUser
+                ? 'Welcome to WAREZONE!'
+                : 'Signed in with Google',
+            'success'
+          );
+        } else {
+          showToast(result.error || 'Google sign-in failed', 'error');
+        }
+      } finally {
+        setGoogleLoading(false);
+      }
+    },
+    [loginWithGoogle]
+  );
+
+  const onGoogleError = useCallback((message) => {
+    setGoogleLoading(false);
+    if (message && !/cancel/i.test(message)) {
+      showToast(message, 'warning');
+    }
+  }, []);
+
+  const googleConfigured = isGoogleSignInConfigured();
+
+  const handleGoogleLogin = () => {
+    if (submitting || googleLoading) return;
+    showToast(
+      'Google Sign-In not configured. Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID to .env and restart Expo (npx expo start -c).',
+      'warning'
+    );
+  };
+
   const handleForgotPassword = () => setForgotVisible(true);
 
   return (
@@ -231,7 +274,21 @@ export default function AuthScreen({ navigation, route }) {
             />
 
             <OrDivider label={isLogin ? 'or Login' : 'or SignUp'} />
-            <GoogleLoginButton onPress={handleGoogleLogin} />
+            {googleConfigured ? (
+              <GoogleSignInBridge
+                onToken={onGoogleToken}
+                onError={onGoogleError}
+                disabled={submitting}
+                loading={googleLoading}
+                onLoadingChange={setGoogleLoading}
+              />
+            ) : (
+              <GoogleLoginButton
+                onPress={handleGoogleLogin}
+                disabled={submitting || googleLoading}
+                loading={googleLoading}
+              />
+            )}
 
             <TouchableOpacity style={styles.switchRow} onPress={toggleAuthMode} activeOpacity={0.8}>
               <Text style={styles.switchMuted}>

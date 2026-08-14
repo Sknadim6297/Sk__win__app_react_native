@@ -251,6 +251,55 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = async (idToken) => {
+    const apiUrl = getApiUrl();
+    try {
+      const response = await fetchWithTimeout(`${apiUrl}/auth/google`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ idToken }),
+      });
+
+      const data = await parseJsonResponse(response);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || data.message || 'Google sign-in failed',
+          status: response.status,
+          code: data.code,
+        };
+      }
+
+      if (!data.token || !data.user) {
+        return { success: false, error: 'Invalid server response' };
+      }
+
+      await persistSession(data);
+      applySession(data);
+
+      return {
+        success: true,
+        user: data.user,
+        role: data.user?.role || 'user',
+        isNewUser: Boolean(data.isNewUser),
+      };
+    } catch (error) {
+      console.error('Google login error:', error);
+      const diag = getApiConfigDiagnostics();
+      const aborted = error?.name === 'AbortError';
+      const message = aborted
+        ? `Google sign-in timed out talking to ${apiUrl}.`
+        : error.message?.includes('Network request failed') ||
+            error.message?.includes('Failed to fetch')
+          ? diag.isPrivate
+            ? `Cannot reach server at ${apiUrl}. Start backend and try again.`
+            : `Cannot reach server at ${apiUrl}. Check internet / ngrok.`
+          : error.message || 'Google sign-in failed';
+      return { success: false, error: message };
+    }
+  };
+
   const logout = async () => {
     try {
       await clearPushTokenOnLogout().catch(() => {});
@@ -273,6 +322,7 @@ export const AuthProvider = ({ children }) => {
         role,
         isLoading,
         login,
+        loginWithGoogle,
         register,
         logout,
         getAuthToken,

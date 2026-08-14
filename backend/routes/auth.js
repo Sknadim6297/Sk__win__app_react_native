@@ -6,6 +6,7 @@ const Notification = require('../models/Notification');
 const WalletTransaction = require('../models/WalletTransaction');
 const AdminPasswordReset = require('../models/AdminPasswordReset');
 const adminReset = require('../services/adminPasswordReset');
+const { verifyGoogleIdToken, isGoogleAuthConfigured } = require('../services/googleAuth');
 const { getUniqueReferralCode, ensureUserReferralCode } = require('../utils/referral');
 const router = express.Router();
 
@@ -157,7 +158,14 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    // Check password
+    // Check password (Google-only accounts must use Google sign-in)
+    if (user.authProvider === 'google' || !user.password) {
+      return res.status(400).json({
+        error: 'This account uses Google sign-in. Tap Continue with Google.',
+        code: 'GOOGLE_AUTH_REQUIRED',
+      });
+    }
+
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
       return res.status(400).json({ error: 'Invalid email or password' });
@@ -207,6 +215,152 @@ router.post('/login', async (req, res) => {
         : 'Login failed',
       message: error.message,
     });
+  }
+});
+
+async function buildUniqueUsername(baseRaw) {
+  const base =
+    String(baseRaw || 'player')
+      .replace(/[^a-zA-Z0-9_]/g, '')
+      .slice(0, 14) || 'player';
+  let candidate = base.length >= 3 ? base : `${base}user`;
+  for (let i = 0; i < 20; i += 1) {
+    const exists = await User.findOne({ username: candidate }).select('_id');
+    if (!exists) return candidate;
+    candidate = `${base}${i + 1}`.slice(0, 20);
+  }
+  return `user${Date.now().toString(36).slice(-6)}`;
+}
+
+function formatAuthUser(user) {
+  return {
+    id: user._id,
+    username: user.username,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    verified: user.verified,
+    wallet: user.wallet,
+    referralCode: user.referralCode,
+    authProvider: user.authProvider,
+    profilePhoto: user.profilePhoto,
+  };
+}
+
+// Google Sign-In — verify ID token, login or register user
+router.post('/google', async (req, res) => {
+  try {
+    const idToken = String(req.body?.idToken || '').trim();
+    if (!idToken) {
+      return res.status(400).json({ error: 'Google ID token is required' });
+    }
+    if (!isGoogleAuthConfigured()) {
+      return res.status(503).json({
+        error: 'Google Sign-In is not configured on the server',
+        code: 'GOOGLE_NOT_CONFIGURED',
+      });
+    }
+
+    let payload;
+    try {
+      payload = await verifyGoogleIdToken(idToken);
+    } catch (verifyErr) {
+      console.error('Google token verify failed:', verifyErr.message);
+      return res.status(verifyErr.status || 401).json({
+        error: verifyErr.message || 'Google sign-in failed',
+        code: verifyErr.code || 'GOOGLE_TOKEN_INVALID',
+      });
+    }
+
+    const googleId = payload.sub;
+    const email = String(payload.email).trim().toLowerCase();
+    const displayName = String(payload.name || payload.given_name || '').trim();
+    const picture = payload.picture ? String(payload.picture) : '';
+
+    let isNewUser = false;
+    let user =
+      (await User.findOne({ googleId })) ||
+      (await User.findOne({
+        email: { $regex: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      }));
+
+    if (user) {
+      if (user.role === 'admin') {
+        return res.status(403).json({ error: 'Admins must use email/password login' });
+      }
+      if (user.status === 'banned') {
+        return res.status(403).json({ error: `Account banned: ${user.banReason}` });
+      }
+      if (user.status === 'suspended') {
+        return res.status(403).json({ error: 'Account suspended' });
+      }
+
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.authProvider = user.password ? user.authProvider : 'google';
+      }
+      if (displayName && !user.name) user.name = displayName;
+      if (picture && !user.profilePhoto) user.profilePhoto = picture;
+      user.verified = true;
+      user.updatedAt = new Date();
+      await user.save();
+    } else {
+      isNewUser = true;
+      const username = await buildUniqueUsername(
+        payload.given_name || email.split('@')[0] || 'player'
+      );
+      const referralCode = await getUniqueReferralCode(username);
+
+      user = new User({
+        username,
+        email,
+        password: '',
+        googleId,
+        authProvider: 'google',
+        name: displayName || username,
+        profilePhoto: picture,
+        role: 'user',
+        verified: true,
+        referralCode,
+        wallet: {
+          balance: 0,
+          bonusBalance: 0,
+          bonusUsed: 0,
+          totalDeposited: 0,
+          totalWithdrawn: 0,
+          totalWinnings: 0,
+        },
+      });
+      await user.save();
+
+      await Notification.create({
+        userId: user._id,
+        type: 'system',
+        title: 'Welcome to WarZone Free Fire Tournament',
+        message: 'Google sign-in successful. Join tournaments from the home screen.',
+      });
+    }
+
+    await ensureUserReferralCode(user);
+
+    const token = jwt.sign(
+      { userId: user._id, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    res.json({
+      message: 'Google sign-in successful',
+      token,
+      user: formatAuthUser(user),
+      isNewUser,
+    });
+  } catch (error) {
+    console.error('Google auth error:', error);
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'Account already exists with this email' });
+    }
+    res.status(500).json({ error: 'Google sign-in failed' });
   }
 });
 

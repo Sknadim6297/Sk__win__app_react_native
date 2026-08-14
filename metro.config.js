@@ -24,11 +24,25 @@ config.resolver.blockList = [
 const defaultResolveRequest = config.resolver.resolveRequest;
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  const origin = context.originModulePath || '';
+
   // qrcode's package "main" points at Node server (fs/png). RN/Expo needs the
   // pure core used by react-native-qrcode-svg's genMatrix (QRCode.create only).
   if (moduleName === 'qrcode') {
     return {
       filePath: path.resolve(projectRoot, 'node_modules/qrcode/lib/core/qrcode.js'),
+      type: 'sourceFile',
+    };
+  }
+
+  // expo-web-browser: Metro on Windows can fail to resolve ./WebBrowser.types → WebBrowser.types.js
+  if (
+    typeof moduleName === 'string' &&
+    (moduleName === './WebBrowser.types' || moduleName.endsWith('/WebBrowser.types')) &&
+    origin.replace(/\\/g, '/').includes('node_modules/expo-web-browser/')
+  ) {
+    return {
+      filePath: path.resolve(projectRoot, 'node_modules/expo-web-browser/build/WebBrowser.types.js'),
       type: 'sourceFile',
     };
   }
@@ -55,7 +69,6 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     };
   }
 
-  const origin = context.originModulePath;
   const isProjectFile =
     origin.startsWith(projectRoot) &&
     !origin.includes('node_modules') &&
