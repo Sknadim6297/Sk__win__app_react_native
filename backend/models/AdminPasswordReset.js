@@ -10,6 +10,8 @@ const adminPasswordResetSchema = new mongoose.Schema({
   resetTokenHash: { type: String, default: null },
   resetTokenExpiresAt: { type: Date, default: null },
   used: { type: Boolean, default: false },
+  channel: { type: String, default: 'auto' },
+  phone: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now },
 });
 

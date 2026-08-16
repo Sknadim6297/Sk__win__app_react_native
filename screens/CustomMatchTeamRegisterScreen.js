@@ -10,8 +10,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import AppIcon from '../components/ui/AppIcon';
+import ScreenHeader from '../components/navigation/ScreenHeader';
 import { COLORS, FONTS } from '../styles/theme';
+import { PAGE, pageStyles } from '../styles/pageTheme';
 import { tournamentService, tournamentManagementService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import Toast from '../components/Toast';
@@ -19,9 +20,6 @@ import { getTeamSize, isCustomMatch, isTeamEntryMode } from '../utils/tournament
 import { fetchWalletForEntry } from '../utils/walletFlow';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
 import { isPaymentEnabled } from '../utils/paymentConfig';
-
-const CYAN = '#00E5FF';
-const WARN = '#FBBF24';
 
 const emptyPlayer = () => ({ name: '', gamingUID: '' });
 
@@ -170,7 +168,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <ActivityIndicator size="large" color={CYAN} style={{ marginTop: 80 }} />
+        <ActivityIndicator size="large" color={PAGE.cyan} style={{ marginTop: 80 }} />
       </SafeAreaView>
     );
   }
@@ -179,14 +177,11 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
   const showSidePicker = isCustom;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" translucent={false} />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <AppIcon name="arrow-left" size={22} color={COLORS.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Register Team</Text>
-        <View style={{ width: 40 }} />
+    <SafeAreaView style={pageStyles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
+      <ScreenHeader title="Joining Match" onBack={() => navigation.goBack()} />
+      <View style={styles.selectBanner}>
+        <Text style={styles.selectBannerText}>Select Match Position</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -212,7 +207,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
           value={teamName}
           onChangeText={setTeamName}
           placeholder="Enter team name"
-          placeholderTextColor={COLORS.gray}
+          placeholderTextColor={PAGE.muted}
         />
 
         {showSidePicker ? (
@@ -255,27 +250,32 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
         </Text>
         {players.map((player, index) => (
           <View key={`player-${index}`} style={styles.playerCard}>
-            <Text style={styles.playerTitle}>
-              Player {index + 1}
-              {index === 0 ? ' (Captain / You)' : ''}
-            </Text>
-            <TextInput
-              style={styles.input}
-              value={player.name}
-              onChangeText={(text) => updatePlayer(index, 'name', text)}
-              placeholder="Game ID (in-game name)"
-              placeholderTextColor={COLORS.gray}
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={[styles.input, styles.inputLast]}
-              value={player.gamingUID}
-              onChangeText={(text) => updatePlayer(index, 'gamingUID', text)}
-              placeholder="Game UID"
-              placeholderTextColor={COLORS.gray}
-              autoCapitalize="none"
-              keyboardType="default"
-            />
+            <View style={styles.detailsHead}>
+              <Text style={styles.detailsHeadText}>
+                Player {index + 1}
+                {index === 0 ? ' (Captain)' : ''}
+              </Text>
+            </View>
+            <View style={styles.playerBody}>
+              <Text style={styles.fieldLabel}>inGameName</Text>
+              <TextInput
+                style={styles.underlineInput}
+                value={player.name}
+                onChangeText={(text) => updatePlayer(index, 'name', text)}
+                placeholder="Game ID (in-game name)"
+                placeholderTextColor={PAGE.muted}
+                autoCapitalize="none"
+              />
+              <Text style={styles.fieldLabel}>inGameId</Text>
+              <TextInput
+                style={styles.underlineInput}
+                value={player.gamingUID}
+                onChangeText={(text) => updatePlayer(index, 'gamingUID', text)}
+                placeholder="Game UID"
+                placeholderTextColor={PAGE.muted}
+                autoCapitalize="none"
+              />
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -287,13 +287,9 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
           disabled={submitting}
         >
           {submitting ? (
-            <ActivityIndicator color="#050510" />
+            <ActivityIndicator color={COLORS.white} />
           ) : (
-            <Text style={styles.submitText}>
-              {isPaymentEnabled() || payWithCashfree
-                ? `PAY & JOIN · ₹${tournament?.entryFee || 0}`
-                : `PAY TEAM ENTRY · ₹${tournament?.entryFee || 0}`}
-            </Text>
+            <Text style={styles.submitText}>Join Now</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -305,26 +301,19 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.backgroundDark || COLORS.background },
-  header: {
-    flexDirection: 'row',
+  selectBanner: {
+    backgroundColor: PAGE.cyan,
+    paddingVertical: 12,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+  selectBannerText: {
+    fontFamily: FONTS.bold,
+    fontSize: 16,
+    color: COLORS.white,
   },
-  headerTitle: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 17 },
   content: { padding: 16, paddingBottom: 40 },
-  matchName: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 20, marginBottom: 6 },
-  meta: { color: COLORS.gray, marginBottom: 16, fontSize: 13 },
+  matchName: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 18, marginBottom: 6 },
+  meta: { color: PAGE.muted, marginBottom: 16, fontSize: 13, lineHeight: 20 },
   warnBox: {
     backgroundColor: 'rgba(251, 191, 36, 0.1)',
     borderWidth: 1,
@@ -333,60 +322,73 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 18,
   },
-  warnTitle: { color: WARN, fontFamily: FONTS.bold, fontSize: 13, marginBottom: 6 },
-  warnText: { color: COLORS.gray, fontSize: 12, lineHeight: 18 },
+  warnTitle: { color: PAGE.gold, fontFamily: FONTS.bold, fontSize: 13, marginBottom: 6 },
+  warnText: { color: PAGE.muted, fontSize: 12, lineHeight: 18 },
   label: { color: COLORS.white, marginBottom: 8, fontFamily: FONTS.bold },
-  playerCard: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 12,
-    marginBottom: 12,
-  },
-  playerTitle: {
-    color: CYAN,
-    fontFamily: FONTS.bold,
-    fontSize: 13,
-    marginBottom: 10,
-  },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: PAGE.cardAlt,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: PAGE.border,
     color: COLORS.white,
     paddingHorizontal: 12,
     paddingVertical: 12,
+    marginBottom: 14,
+    fontFamily: FONTS.bold,
+  },
+  playerCard: {
+    backgroundColor: PAGE.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+    overflow: 'hidden',
     marginBottom: 12,
   },
-  inputLast: { marginBottom: 0 },
+  detailsHead: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  detailsHeadText: { fontFamily: FONTS.bold, fontSize: 13, color: COLORS.white },
+  playerBody: { padding: 12 },
+  fieldLabel: { fontFamily: FONTS.bold, fontSize: 13, color: COLORS.white, marginTop: 6 },
+  underlineInput: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.35)',
+    color: COLORS.white,
+    fontFamily: FONTS.bold,
+    fontSize: 15,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
   sideRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
   sideBtn: {
     flex: 1,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: PAGE.border,
+    backgroundColor: PAGE.cardAlt,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  sideBtnActive: { borderColor: CYAN, backgroundColor: 'rgba(0,229,255,0.12)' },
+  sideBtnActive: { borderColor: PAGE.cyan, backgroundColor: 'rgba(79,209,197,0.12)' },
   sideBtnTaken: { opacity: 0.4 },
-  sideBtnText: { color: COLORS.gray, fontFamily: FONTS.bold },
-  sideBtnTextActive: { color: CYAN },
-  sideBtnTextTaken: { color: COLORS.gray },
+  sideBtnText: { color: PAGE.muted, fontFamily: FONTS.bold },
+  sideBtnTextActive: { color: PAGE.cyan },
+  sideBtnTextTaken: { color: PAGE.muted },
   footer: {
     paddingHorizontal: 16,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: PAGE.border,
+    backgroundColor: PAGE.bg,
   },
   submitBtn: {
-    backgroundColor: CYAN,
+    backgroundColor: '#E11D48',
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 15,
     alignItems: 'center',
   },
   submitDisabled: { opacity: 0.6 },
-  submitText: { color: '#050510', fontFamily: FONTS.bold, fontSize: 15 },
+  submitText: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 16 },
 });

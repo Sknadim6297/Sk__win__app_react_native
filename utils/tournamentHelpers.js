@@ -179,19 +179,27 @@ export function getDisplayStatus(status) {
 export function getCountdownParts(targetDate) {
   const diff = new Date(targetDate).getTime() - Date.now();
   if (diff <= 0) {
-    return { hours: 0, minutes: 0, seconds: 0, expired: true };
+    return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true };
   }
-  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-  return { hours, minutes, seconds, expired: false };
+  return { days, hours, minutes, seconds, expired: false };
+}
+
+export function formatTimeLeft(targetDate) {
+  const { days, hours, minutes, seconds, expired } = getCountdownParts(targetDate);
+  if (expired) return '0d 0h 0m 0s';
+  return `${days}d ${hours}h ${minutes}m ${seconds}s`;
 }
 
 export function formatCountdown(targetDate) {
-  const { hours, minutes, seconds, expired } = getCountdownParts(targetDate);
+  const { days, hours, minutes, seconds, expired } = getCountdownParts(targetDate);
   if (expired) return '00h : 00m : 00s';
   const pad = (n) => String(n).padStart(2, '0');
-  return `${pad(hours)}h : ${pad(minutes)}m : ${pad(seconds)}s`;
+  const h = days * 24 + hours;
+  return `${pad(h)}h : ${pad(minutes)}m : ${pad(seconds)}s`;
 }
 
 /** Client-side join block (mirrors backend messages). */

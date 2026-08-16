@@ -6,6 +6,7 @@ const Notification = require('../models/Notification');
 const WalletTransaction = require('../models/WalletTransaction');
 const AdminPasswordReset = require('../models/AdminPasswordReset');
 const adminReset = require('../services/adminPasswordReset');
+const otpDelivery = require('../services/otpDelivery');
 const { verifyGoogleIdToken, isGoogleAuthConfigured } = require('../services/googleAuth');
 const { getUniqueReferralCode, ensureUserReferralCode } = require('../utils/referral');
 const router = express.Router();
@@ -364,30 +365,59 @@ router.post('/google', async (req, res) => {
   }
 });
 
-// Forgot password — users: contact support; admins: email OTP → reset
+// Forgot password — all users: OTP via WhatsApp / SMS / email
 router.post('/forgot-password', async (req, res) => {
   try {
-    const emailRaw = String(req.body?.email || '').trim().toLowerCase();
-    if (!emailRaw || !emailRaw.includes('@')) {
-      return res.status(400).json({ error: 'Please enter a valid email' });
+    const identifier = String(req.body?.identifier || req.body?.email || req.body?.phone || '')
+      .trim()
+      .toLowerCase();
+    const channel = String(req.body?.channel || 'auto').trim().toLowerCase();
+    if (!identifier) {
+      return res.status(400).json({ error: 'Enter your email or mobile number' });
     }
 
-    const support = {
-      email: process.env.SUPPORT_EMAIL || 'support@warzoneff.com',
-      phone: process.env.SUPPORT_PHONE || '+91 6297616918',
-      teamLabel: 'WAREZONE Support Team',
-    };
+    const isEmail = identifier.includes('@');
+    const phoneDigits = isEmail ? '' : otpDelivery.normalizePhone(identifier);
 
-    const user = await User.findOne({
-      email: { $regex: new RegExp(`^${emailRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-    });
+    let user = null;
+    if (isEmail) {
+      user = await User.findOne({ email: identifier });
+    } else if (phoneDigits.length >= 10) {
+      const last10 = phoneDigits.slice(-10);
+      user = await User.findOne({
+        $or: [
+          { phone: phoneDigits },
+          { phone: `+${phoneDigits}` },
+          { phone: last10 },
+          { phoneNumber: phoneDigits },
+          { phoneNumber: last10 },
+          { phone: { $regex: `${last10}$` } },
+          { phoneNumber: { $regex: `${last10}$` } },
+        ],
+      });
+    }
 
-    // Non-admin (or unknown): contact team — no self-serve reset
-    if (!user || user.role !== 'admin') {
-      return res.json({
-        type: 'user',
-        message: 'Password reset for players is handled by our team. Please contact support.',
-        support,
+    if (!user) {
+      return res.status(404).json({ error: 'No account found with this email or mobile number' });
+    }
+
+    if (user.authProvider === 'google' && !user.password) {
+      return res.status(400).json({
+        error: 'This account uses Google sign-in. Tap Continue with Google on the login screen.',
+        code: 'GOOGLE_AUTH_REQUIRED',
+      });
+    }
+
+    if (user.status === 'banned' || user.status === 'suspended') {
+      return res.status(403).json({ error: 'This account cannot reset password right now' });
+    }
+
+    const phone = user.phone || user.phoneNumber || (!isEmail ? phoneDigits : '');
+    const emailRaw = String(user.email || '').toLowerCase();
+
+    if ((channel === 'sms' || channel === 'whatsapp') && !phone) {
+      return res.status(400).json({
+        error: 'No mobile number on this account. Use email, or add a phone in Edit Profile.',
       });
     }
 
@@ -401,15 +431,35 @@ router.post('/forgot-password', async (req, res) => {
       userId: user._id,
       otpHash,
       otpExpiresAt,
+      channel,
+      phone: phone ? otpDelivery.normalizePhone(phone) : '',
     });
 
-    const delivery = await adminReset.deliverAdminOtp(emailRaw, otp);
-    const payload = {
-      type: 'admin',
-      message: delivery.sent
-        ? 'OTP sent to your admin email. Enter it to reset your password.'
-        : 'OTP generated. Check your email (or server logs if SMTP is not configured).',
+    const delivery = await otpDelivery.deliverOtp({
       email: emailRaw,
+      phone,
+      otp,
+      channel,
+    });
+
+    const labels = {
+      whatsapp: 'WhatsApp',
+      sms: 'SMS',
+      email: 'email',
+    };
+    const sentLabels = (delivery.channels.length ? delivery.channels : [channel === 'auto' ? 'email' : channel])
+      .map((c) => labels[c] || c)
+      .join(' and ');
+
+    const payload = {
+      type: user.role === 'admin' ? 'admin' : 'user',
+      message: delivery.sent
+        ? `OTP sent on ${sentLabels}. Enter the 6-digit code to reset your password.`
+        : `OTP created. Check ${sentLabels} (or server logs if SMS/WhatsApp is not configured yet).`,
+      email: emailRaw,
+      channel,
+      sentVia: delivery.channels,
+      destinations: delivery.destinations,
       expiresInSeconds: Math.floor(adminReset.OTP_TTL_MS / 1000),
     };
     if (adminReset.shouldExposeDebugOtp()) {
@@ -422,7 +472,7 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
-router.post('/admin/verify-otp', async (req, res) => {
+async function verifyResetOtp(req, res) {
   try {
     const emailRaw = String(req.body?.email || '').trim().toLowerCase();
     const otp = String(req.body?.otp || '').trim();
@@ -468,9 +518,9 @@ router.post('/admin/verify-otp', async (req, res) => {
     console.error('verify-otp:', error);
     res.status(500).json({ error: 'OTP verification failed' });
   }
-});
+}
 
-router.post('/admin/reset-password', async (req, res) => {
+async function completePasswordReset(req, res) {
   try {
     const emailRaw = String(req.body?.email || '').trim().toLowerCase();
     const resetToken = String(req.body?.resetToken || '').trim();
@@ -506,11 +556,12 @@ router.post('/admin/reset-password', async (req, res) => {
     }
 
     const user = await User.findById(record.userId);
-    if (!user || user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin account not found' });
+    if (!user) {
+      return res.status(404).json({ error: 'Account not found' });
     }
 
     user.password = await bcrypt.hash(password, 10);
+    user.authProvider = user.authProvider === 'google' ? 'google' : 'local';
     user.updatedAt = new Date();
     await user.save();
 
@@ -521,11 +572,16 @@ router.post('/admin/reset-password', async (req, res) => {
       { $set: { used: true } }
     );
 
-    res.json({ message: 'Admin password updated. You can login now.' });
+    res.json({ message: 'Password updated. You can login now.' });
   } catch (error) {
     console.error('reset-password:', error);
     res.status(500).json({ error: 'Password reset failed' });
   }
-});
+}
+
+router.post('/verify-otp', verifyResetOtp);
+router.post('/admin/verify-otp', verifyResetOtp);
+router.post('/reset-password', completePasswordReset);
+router.post('/admin/reset-password', completePasswordReset);
 
 module.exports = router;

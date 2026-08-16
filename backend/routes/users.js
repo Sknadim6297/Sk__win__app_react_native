@@ -6,6 +6,72 @@ const { authMiddleware } = require('../middleware/auth');
 const { ensureUserReferralCode } = require('../utils/referral');
 const router = express.Router();
 
+// Public player leaderboard
+router.get('/leaderboard', async (req, res) => {
+  try {
+    const period = String(req.query.period || 'all').toLowerCase();
+    const now = new Date();
+    let since = null;
+    if (period === 'week') since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    if (period === 'month') since = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const match = {
+      role: { $ne: 'admin' },
+      status: { $nin: ['banned'] },
+      $or: [
+        { 'tournament.wins': { $gt: 0 } },
+        { 'tournament.participatedCount': { $gt: 0 } },
+        { 'wallet.totalWinnings': { $gt: 0 } },
+      ],
+    };
+    if (since) {
+      match.$and = [
+        {
+          $or: [
+            { 'gameStats.lastMatchDate': { $gte: since } },
+            { 'tournament.wins': { $gt: 0 }, updatedAt: { $gte: since } },
+            { 'wallet.totalWinnings': { $gt: 0 }, updatedAt: { $gte: since } },
+          ],
+        },
+      ];
+    }
+
+    const users = await User.find(match)
+      .select('username name profilePhoto tournament wallet gameStats')
+      .sort({
+        'tournament.wins': -1,
+        'wallet.totalWinnings': -1,
+        'tournament.participatedCount': -1,
+      })
+      .limit(50)
+      .lean();
+
+    const players = users
+      .map((u) => {
+        const wins = Number(u.tournament?.wins || 0);
+        const earnings = Number(u.wallet?.totalWinnings || u.tournament?.earnings || 0);
+        const matches = Number(u.tournament?.participatedCount || 0);
+        return {
+          id: String(u._id),
+          name: u.name || u.username || 'Player',
+          username: u.username || '',
+          photo: u.profilePhoto || '',
+          wins,
+          matches,
+          earnings,
+          points: Math.round(wins * 120 + earnings + matches * 10),
+        };
+      })
+      .filter((p) => p.wins > 0 || p.matches > 0 || p.earnings > 0)
+      .map((p, i) => ({ ...p, rank: i + 1 }));
+
+    res.json({ success: true, period, players });
+  } catch (error) {
+    console.error('leaderboard:', error);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
 // Get user profile
 router.get('/profile', authMiddleware, async (req, res) => {
   try {
@@ -45,7 +111,11 @@ router.put('/profile', authMiddleware, async (req, res) => {
 
     // Update fields
     if (name) user.name = name;
-    if (phone) user.phone = phone;
+    if (phone) {
+      const digits = String(phone).replace(/\D/g, '');
+      user.phone = digits.length === 10 ? `91${digits}` : digits;
+      user.phoneNumber = user.phone;
+    }
     if (dateOfBirth) user.dateOfBirth = dateOfBirth;
     user.updatedAt = Date.now();
 

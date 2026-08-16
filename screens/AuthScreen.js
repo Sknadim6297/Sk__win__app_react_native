@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     ...TYPO.label,
-    color: COLORS.white,
+    color: COLORS.purple,
   },
   switchRow: {
     flexDirection: 'row',

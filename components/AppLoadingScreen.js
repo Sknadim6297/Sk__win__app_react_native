@@ -14,8 +14,8 @@ import SKWinLogo from './SKWinLogo';
 
 export const WELCOME_BG = BRAND_COLORS.background;
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-const LOGO_SIZE = Math.min(SCREEN_W * 0.78, SCREEN_H * 0.38, 320);
+const { width: SCREEN_W } = Dimensions.get('window');
+const LOGO_SIZE = Math.min(SCREEN_W * 0.34, 128);
 
 const AppLoadingScreen = ({ subtitle = 'Loading battleground...' }) => {
   const insets = useSafeAreaInsets();

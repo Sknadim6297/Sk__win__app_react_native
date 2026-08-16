@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useContext, useState } from 'react';
 import {
   View,
   Text,
@@ -6,199 +6,350 @@ import {
   StyleSheet,
   StatusBar,
   FlatList,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { COLORS } from '../styles/theme';
+import { COLORS, FONTS, TEXT } from '../styles/theme';
+import { PAGE, pageStyles } from '../styles/pageTheme';
 import AppHeader from '../components/navigation/AppHeader';
+import DefaultAvatar from '../components/ui/DefaultAvatar';
+import BrandCoin from '../components/ui/BrandCoin';
+import { AuthContext } from '../context/AuthContext';
+import { userService } from '../services/api';
+import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import { LIST_PERF } from '../utils/listPerf';
 
-const LeaderboardScreen = ({ navigation }) => {
-  const [leaderboardData, setLeaderboardData] = useState([
-    { id: 1, rank: 1, name: 'Champion Player', points: 9500, wins: 45, trend: 'up' },
-    { id: 2, rank: 2, name: 'Elite Gamer', points: 8900, wins: 42, trend: 'up' },
-    { id: 3, rank: 3, name: 'Pro Master', points: 8500, wins: 40, trend: 'down' },
-    { id: 4, rank: 4, name: 'Gaming Legend', points: 8100, wins: 38, trend: 'up' },
-    { id: 5, rank: 5, name: 'Victory Seeker', points: 7800, wins: 35, trend: 'stable' },
-    { id: 6, rank: 6, name: 'Skill Warrior', points: 7400, wins: 32, trend: 'up' },
-    { id: 7, rank: 7, name: 'Tournament Star', points: 7000, wins: 30, trend: 'down' },
-    { id: 8, rank: 8, name: 'Rising Star', points: 6600, wins: 28, trend: 'up' },
-  ]);
+const PERIODS = [
+  { id: 'all', label: 'All time' },
+  { id: 'month', label: 'This month' },
+  { id: 'week', label: 'This week' },
+];
+
+const PODIUM_COLORS = {
+  1: '#FBBF24',
+  2: '#C0C8D4',
+  3: '#CD7F32',
+};
+
+function formatPoints(n) {
+  return Number(n || 0).toLocaleString('en-IN');
+}
+
+export default function LeaderboardScreen({ navigation }) {
+  const { user } = useContext(AuthContext);
+  const [period, setPeriod] = useState('all');
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async (nextPeriod, silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const data = await userService.getLeaderboard(nextPeriod);
+      setPlayers(Array.isArray(data?.players) ? data.players : []);
+    } catch {
+      setPlayers([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      // Load leaderboard
-    }, [])
+      load(period);
+    }, [load, period])
   );
 
-  const getTrendIcon = (trend) => {
-    switch (trend) {
-      case 'up':
-        return 'trending-up';
-      case 'down':
-        return 'trending-down';
-      default:
-        return 'minus';
-    }
-  };
+  const top3 = players.slice(0, 3);
+  const rest = players.slice(3);
+  const myId = user?.id || user?._id;
+  const me = players.find((p) => String(p.id) === String(myId));
+  const podiumPlayers =
+    top3.length === 1
+      ? [top3[0]]
+      : top3.length === 2
+        ? [top3[1], top3[0]]
+        : [top3[1], top3[0], top3[2]].filter(Boolean);
 
-  const getTrendColor = (trend) => {
-    switch (trend) {
-      case 'up':
-        return '#4CAF50';
-      case 'down':
-        return '#FF6B6B';
-      default:
-        return COLORS.gray;
-    }
-  };
-
-  const renderLeaderboardItem = ({ item }) => (
-    <View style={styles.leaderboardCard}>
-      <View style={styles.rankBadge}>
-        <Text style={[styles.rankText, item.rank <= 3 && styles.topRank]}>
-          #{item.rank}
+  const renderRow = ({ item }) => {
+    const isMe = String(item.id) === String(myId);
+    return (
+      <View style={[styles.row, isMe && styles.rowMe]}>
+        <Text style={[styles.rank, item.rank <= 3 && { color: PODIUM_COLORS[item.rank] }]}>
+          {item.rank}
         </Text>
-        {item.rank <= 3 && (
-          <MaterialCommunityIcons 
-            name={item.rank === 1 ? 'crown' : 'medal'} 
-            size={14} 
-            color={item.rank === 1 ? '#FFD700' : item.rank === 2 ? '#C0C0C0' : '#CD7F32'}
-            style={styles.medalIcon}
-          />
-        )}
-      </View>
-
-      <View style={styles.playerInfo}>
-        <Text style={styles.playerName}>{item.name}</Text>
-        <View style={styles.playerStats}>
-          <Text style={styles.statText}>{item.wins} Wins</Text>
-          <Text style={styles.statDot}>•</Text>
-          <Text style={styles.statText}>{item.points} Points</Text>
+        <DefaultAvatar uri={resolveMediaUrl(item.photo)} size={40} />
+        <View style={styles.rowCopy}>
+          <Text style={styles.name} numberOfLines={1}>
+            {item.name}
+            {isMe ? '  · You' : ''}
+          </Text>
+          <Text style={styles.meta}>
+            {item.wins} wins · {item.matches} matches
+          </Text>
+        </View>
+        <View style={styles.pointsWrap}>
+          <BrandCoin size={16} />
+          <Text style={styles.points}>{formatPoints(item.points)}</Text>
         </View>
       </View>
-
-      <View style={[styles.trendBadge, { borderColor: getTrendColor(item.trend) }]}>
-        <MaterialCommunityIcons name={getTrendIcon(item.trend)} size={16} color={getTrendColor(item.trend)} />
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container} edges={[]}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B1224" />
+    <SafeAreaView style={pageStyles.container} edges={[]}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
       <AppHeader navigation={navigation} />
 
-      <View style={styles.filterTabs}>
-        <TouchableOpacity style={[styles.tab, styles.activeTab]}>
-          <Text style={[styles.tabText, styles.activeTabText]}>All Time</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab}>
-          <Text style={styles.tabText}>This Month</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab}>
-          <Text style={styles.tabText}>This Week</Text>
-        </TouchableOpacity>
+      <View style={styles.tabs}>
+        {PERIODS.map((tab) => {
+          const active = period === tab.id;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={[styles.tab, active && styles.tabActive]}
+              onPress={() => setPeriod(tab.id)}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
-      {/* Leaderboard List */}
-      <FlatList
-        data={leaderboardData}
-        renderItem={renderLeaderboardItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading && !refreshing ? (
+        <View style={pageStyles.centered}>
+          <ActivityIndicator color={PAGE.cyan} />
+          <Text style={pageStyles.loadingText}>Loading ranks…</Text>
+        </View>
+      ) : (
+        <FlatList
+          {...LIST_PERF}
+          data={rest}
+          keyExtractor={(item) => item.id}
+          renderItem={renderRow}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load(period, true);
+              }}
+              tintColor={PAGE.cyan}
+            />
+          }
+          ListHeaderComponent={
+            players.length ? (
+              <View>
+                <Text style={styles.pageTitle}>Leaderboard</Text>
+                <View style={[styles.podium, top3.length === 1 && styles.podiumSingle]}>
+                  {podiumPlayers.map((player) => {
+                    const first = player.rank === 1;
+                    return (
+                      <View
+                        key={player.id}
+                        style={[
+                          styles.podiumCard,
+                          first && styles.podiumFirst,
+                          top3.length === 1 && styles.podiumOnly,
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name={player.rank === 1 ? 'crown' : 'medal'}
+                          size={first ? 22 : 18}
+                          color={PODIUM_COLORS[player.rank]}
+                        />
+                        <DefaultAvatar
+                          uri={resolveMediaUrl(player.photo)}
+                          size={first ? 64 : 52}
+                          style={{
+                            borderWidth: 2,
+                            borderColor: PODIUM_COLORS[player.rank],
+                            marginVertical: 8,
+                          }}
+                        />
+                        <Text style={styles.podiumName} numberOfLines={1}>
+                          {player.name}
+                        </Text>
+                        <Text style={styles.podiumPts}>{formatPoints(player.points)}</Text>
+                        <Text style={styles.podiumWins}>{player.wins} wins</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+                {rest.length > 0 ? <Text style={styles.listLabel}>Ranks 4+</Text> : null}
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            !loading && players.length === 0 ? (
+              <View style={pageStyles.emptyWrap}>
+                <MaterialCommunityIcons name="trophy-outline" size={48} color={PAGE.muted} />
+                <Text style={pageStyles.emptyTitle}>No ranks yet</Text>
+                <Text style={pageStyles.emptyText}>
+                  Play tournaments to appear on the leaderboard for this period.
+                </Text>
+              </View>
+            ) : null
+          }
+          ListFooterComponent={
+            me ? (
+              <View style={styles.meBar}>
+                <Text style={styles.meLabel}>Your rank</Text>
+                <View style={styles.meRow}>
+                  <Text style={styles.meRank}>#{me.rank}</Text>
+                  <Text style={styles.meName} numberOfLines={1}>
+                    {me.name}
+                  </Text>
+                  <Text style={styles.mePts}>{formatPoints(me.points)} pts</Text>
+                </View>
+              </View>
+            ) : null
+          }
+        />
+      )}
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  filterTabs: {
+  tabs: {
     flexDirection: 'row',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    backgroundColor: COLORS.darkGray,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    backgroundColor: PAGE.cardAlt,
+    borderRadius: 14,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: PAGE.border,
   },
   tab: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-    borderRadius: 20,
-    backgroundColor: 'transparent',
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
   },
-  activeTab: {
-    backgroundColor: COLORS.accent,
+  tabActive: {
+    backgroundColor: PAGE.purple,
   },
   tabText: {
+    fontFamily: FONTS.bold,
     fontSize: 12,
-    color: COLORS.gray,
-    fontWeight: '600',
+    color: PAGE.muted,
   },
-  activeTabText: {
+  tabTextActive: {
     color: COLORS.white,
   },
-  listContainer: {
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-  },
-  leaderboardCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.darkGray,
-    padding: 12,
-    marginBottom: 10,
-    borderRadius: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.accent,
-  },
-  rankBadge: {
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  rankText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.gray,
-  },
-  topRank: {
-    color: COLORS.accent,
-    fontSize: 18,
-  },
-  medalIcon: {
-    marginTop: 2,
-  },
-  playerInfo: {
-    flex: 1,
-  },
-  playerName: {
-    fontSize: 15,
-    fontWeight: 'bold',
+  pageTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 20,
     color: COLORS.white,
+    marginTop: 10,
     marginBottom: 4,
   },
-  playerStats: {
+  listLabel: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: PAGE.muted,
+    marginBottom: 10,
+  },
+  list: {
+    paddingHorizontal: 16,
+    paddingBottom: 28,
+  },
+  podium: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 18,
+  },
+  podiumSingle: {
+    justifyContent: 'center',
+  },
+  podiumOnly: {
+    flex: 0,
+    width: 160,
+  },
+  podiumCard: {
+    flex: 1,
+    backgroundColor: PAGE.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+  },
+  podiumFirst: {
+    borderColor: 'rgba(251, 191, 36, 0.45)',
+    paddingVertical: 16,
+    marginBottom: 8,
+  },
+  podiumName: {
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
+  podiumPts: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: PAGE.gold,
+    marginTop: 4,
+  },
+  podiumWins: {
+    ...TEXT.caption,
+    color: PAGE.muted,
+    marginTop: 2,
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  statText: {
-    fontSize: 12,
-    color: COLORS.gray,
-  },
-  statDot: {
-    color: COLORS.gray,
-    marginHorizontal: 6,
-  },
-  trendBadge: {
-    padding: 8,
-    borderRadius: 8,
+    gap: 10,
+    backgroundColor: PAGE.cardAlt,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.gray,
+    borderColor: PAGE.border,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
   },
+  rowMe: {
+    borderColor: PAGE.borderAccent,
+    backgroundColor: 'rgba(123, 97, 255, 0.12)',
+  },
+  rank: {
+    width: 28,
+    fontFamily: FONTS.bold,
+    fontSize: 15,
+    color: PAGE.muted,
+    textAlign: 'center',
+  },
+  rowCopy: { flex: 1 },
+  name: { fontFamily: FONTS.bold, fontSize: 14, color: COLORS.white },
+  meta: { ...TEXT.caption, color: PAGE.muted, marginTop: 2 },
+  pointsWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  points: { fontFamily: FONTS.bold, fontSize: 13, color: PAGE.gold },
+  meBar: {
+    marginTop: 10,
+    backgroundColor: PAGE.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: PAGE.borderAccent,
+    padding: 14,
+  },
+  meLabel: { ...TEXT.overline, color: PAGE.cyan, marginBottom: 8 },
+  meRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  meRank: { fontFamily: FONTS.bold, fontSize: 18, color: PAGE.gold },
+  meName: { flex: 1, fontFamily: FONTS.bold, fontSize: 15, color: COLORS.white },
+  mePts: { fontFamily: FONTS.bold, fontSize: 14, color: COLORS.white },
 });
-
-export default LeaderboardScreen;

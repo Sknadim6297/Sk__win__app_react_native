@@ -13,15 +13,34 @@ function withNormalizedImage(doc, req) {
   return obj;
 }
 
+/** Green badge on mode cards: live matches only (never draft / upcoming / completed). */
+const LIVE_MATCH_STATUSES = ['ongoing', 'live'];
+
+function liveMatchFilter(idField, ids) {
+  return {
+    [idField]: { $in: ids },
+    $and: [
+      {
+        $or: [
+          { status: { $in: LIVE_MATCH_STATUSES } },
+          { lifecycleStatus: { $in: LIVE_MATCH_STATUSES } },
+        ],
+      },
+      { status: { $nin: ['draft', 'upcoming', 'incoming', 'completed', 'result_published', 'cancelled'] } },
+      {
+        $or: [
+          { lifecycleStatus: { $exists: false } },
+          { lifecycleStatus: { $in: LIVE_MATCH_STATUSES } },
+        ],
+      },
+    ],
+  };
+}
+
 async function countTournamentsByGame(gameIds) {
   if (!gameIds.length) return new Map();
   const rows = await Tournament.aggregate([
-    {
-      $match: {
-        game: { $in: gameIds },
-        status: { $ne: 'cancelled' },
-      },
-    },
+    { $match: liveMatchFilter('game', gameIds) },
     { $group: { _id: '$game', count: { $sum: 1 } } },
   ]);
   return new Map(rows.map((r) => [String(r._id), r.count]));
@@ -30,12 +49,7 @@ async function countTournamentsByGame(gameIds) {
 async function countTournamentsByMode(modeIds) {
   if (!modeIds.length) return new Map();
   const rows = await Tournament.aggregate([
-    {
-      $match: {
-        gameMode: { $in: modeIds },
-        status: { $ne: 'cancelled' },
-      },
-    },
+    { $match: liveMatchFilter('gameMode', modeIds) },
     { $group: { _id: '$gameMode', count: { $sum: 1 } } },
   ]);
   return new Map(rows.map((r) => [String(r._id), r.count]));

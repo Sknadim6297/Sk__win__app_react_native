@@ -152,15 +152,29 @@ async function ensureGameAndModes() {
     });
   }
 
-  let fullMapMode = await GameMode.findOne({ game: game._id, name: 'Full Map' });
+  let fullMapMode = await GameMode.findOne({
+    game: game._id,
+    name: { $regex: /full\s*map/i },
+  }).sort({ createdAt: 1 });
   if (!fullMapMode) {
     fullMapMode = await GameMode.create({
       game: game._id,
-      name: 'Full Map Battle Royale',
+      name: 'BR FULL MAP',
       description: 'Classic BR — prize pool + per kill',
       image: BANNER_IMAGES[2],
       status: 'active',
     });
+  }
+
+  const duplicateFullMap = await GameMode.find({
+    game: game._id,
+    name: { $regex: /full\s*map/i },
+    _id: { $ne: fullMapMode._id },
+  });
+  for (const extra of duplicateFullMap) {
+    await Tournament.updateMany({ gameMode: extra._id }, { $set: { gameMode: fullMapMode._id, game: game._id } });
+    await extra.deleteOne();
+    console.log(`Merged duplicate mode "${extra.name}" into "${fullMapMode.name}"`);
   }
 
   return { game, loneWolfMode, fullMapMode };
@@ -513,11 +527,14 @@ async function seedTournaments() {
       prizePool: 800,
       perKill: 5,
       maxParticipants: 48,
-      lifecycleStatus: 'upcoming',
-      startDate: minutesFromNow(30),
-      endDate: hoursFromNow(3),
-      bookings: [],
-      description: 'Upcoming BR — empty slots.',
+      lifecycleStatus: 'ongoing',
+      startDate: hoursAgo(0.2),
+      endDate: hoursFromNow(2),
+      bookings: makeBookings(players.slice(0, 12), 12),
+      roomId: 'FFBERM01',
+      roomPassword: 'live01',
+      showRoomCredentials: true,
+      description: 'Live Full Map BR — Bermuda.',
     },
     {
       name: 'Purgatory Survival',
@@ -527,11 +544,14 @@ async function seedTournaments() {
       entryFee: 10,
       prizePool: 1200,
       perKill: 8,
-      lifecycleStatus: 'upcoming',
-      startDate: hoursFromNow(2),
-      endDate: hoursFromNow(5),
+      lifecycleStatus: 'ongoing',
+      startDate: hoursAgo(0.15),
+      endDate: hoursFromNow(2),
       bookings: makeBookings(players.slice(4), 24),
-      description: 'Half-filled BR — prize tiers configured.',
+      roomId: 'FFPURG02',
+      roomPassword: 'live02',
+      showRoomCredentials: true,
+      description: 'Live Full Map BR — Purgatory.',
     },
     {
       name: 'Kalahari Rush',
@@ -542,10 +562,13 @@ async function seedTournaments() {
       prizePool: 1500,
       perKill: 10,
       lifecycleStatus: 'ongoing',
-      startDate: hoursAgo(0.2),
+      startDate: hoursAgo(0.1),
       endDate: hoursFromNow(2),
       bookings: makeBookings(players, 40),
-      description: 'Ongoing BR — nearly full lobby.',
+      roomId: 'FFKALA03',
+      roomPassword: 'live03',
+      showRoomCredentials: true,
+      description: 'Live Full Map BR — Kalahari.',
     },
     {
       name: 'Alpine Warzone',
@@ -555,12 +578,14 @@ async function seedTournaments() {
       entryFee: 15,
       prizePool: 2000,
       perKill: 12,
-      lifecycleStatus: 'completed',
-      startDate: hoursAgo(5),
-      endDate: hoursAgo(2),
-      bookings: makeBookings(players, 8),
-      seedResults: true,
-      description: 'Completed BR with saved placements — ready to publish results.',
+      lifecycleStatus: 'ongoing',
+      startDate: hoursAgo(0.05),
+      endDate: hoursFromNow(3),
+      bookings: makeBookings(players.slice(8), 18),
+      roomId: 'FFALPI04',
+      roomPassword: 'live04',
+      showRoomCredentials: true,
+      description: 'Live Full Map BR — Alpine.',
     },
     {
       name: 'Nextterra Championship',
@@ -570,12 +595,14 @@ async function seedTournaments() {
       entryFee: 20,
       prizePool: 3000,
       perKill: 15,
-      lifecycleStatus: 'result_published',
-      startDate: hoursAgo(8),
-      endDate: hoursAgo(4),
-      bookings: makeBookings(players, 48, 1),
-      seedResults: true,
-      description: 'Full lobby BR — published leaderboard.',
+      lifecycleStatus: 'ongoing',
+      startDate: hoursAgo(0.08),
+      endDate: hoursFromNow(3),
+      bookings: makeBookings(players, 32),
+      roomId: 'FFNEXT05',
+      roomPassword: 'live05',
+      showRoomCredentials: true,
+      description: 'Live Full Map BR — Nextterra.',
     },
   ];
 
@@ -595,8 +622,8 @@ async function seedTournaments() {
   }
 
   console.log('\n✅ Seed complete — 10 tournaments (v2 lifecycle models)');
-  console.log('   Custom: save results on "Desert Duel" before Publish Results');
-  console.log('   BR: "Alpine Warzone" has results saved; "Nextterra" is fully published');
+  console.log('   Custom: mixed upcoming / live / completed (Lone Wolf)');
+  console.log('   Full Map: 5 live dummy BR matches (home badge counts live only)');
   console.log('   Test login: seed_player_1 … seed_player_50 / test1234');
   console.log('   Admin: admin@skwin.com / admin123\n');
 

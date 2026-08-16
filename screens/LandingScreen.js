@@ -69,7 +69,7 @@ const LandingScreen = ({ navigation }) => {
     transform: [{ translateY: footerY.value }],
   }));
 
-  const logoSize = Math.min(ONBOARDING.layout.width * 0.52, 220);
+  const logoSize = Math.min(ONBOARDING.layout.width * 0.28, 112);
 
   return (
     <View style={styles.root}>
@@ -156,13 +156,13 @@ const styles = StyleSheet.create({
   logoWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 14,
   },
   logoGlow: {
     position: 'absolute',
-    width: ONBOARDING.layout.width * 0.55,
-    height: ONBOARDING.layout.width * 0.55,
-    borderRadius: ONBOARDING.layout.width * 0.275,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
     backgroundColor: ONBOARDING.colors.purpleGlow,
   },
   brandBlock: {

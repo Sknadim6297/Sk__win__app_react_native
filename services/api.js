@@ -249,20 +249,20 @@ export const uploadImageFile = async (fileUri, options = {}) => {
   }
 };
 
-// Auth — forgot password (admin OTP reset; players get support contact only)
+// Auth — forgot password (OTP via WhatsApp / SMS / email)
 export const authService = {
-  forgotPassword: (email) =>
+  forgotPassword: (identifier, channel = 'auto') =>
     apiCall('/auth/forgot-password', {
       method: 'POST',
-      body: { email },
+      body: { identifier, email: identifier, channel },
     }),
   verifyAdminOtp: (email, otp) =>
-    apiCall('/auth/admin/verify-otp', {
+    apiCall('/auth/verify-otp', {
       method: 'POST',
       body: { email, otp },
     }),
   resetAdminPassword: ({ email, resetToken, password, confirmPassword }) =>
-    apiCall('/auth/admin/reset-password', {
+    apiCall('/auth/reset-password', {
       method: 'POST',
       body: { email, resetToken, password, confirmPassword },
     }),
@@ -271,6 +271,8 @@ export const authService = {
 // User Services
 export const userService = {
   getProfile: () => apiCall('/users/profile'),
+  getLeaderboard: (period = 'all') =>
+    apiCall(`/users/leaderboard?period=${encodeURIComponent(period)}`),
   updateProfile: (profileData) => apiCall('/users/profile', {
     method: 'PUT',
     body: profileData,
