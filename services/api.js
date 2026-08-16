@@ -65,6 +65,7 @@ export const apiCall = async (endpoint, options = {}) => {
     const token = await AsyncStorage.getItem('token');
 
     const headers = {
+      Accept: 'application/json',
       'Content-Type': 'application/json',
       // Free ngrok interstitial breaks JSON APIs on mobile without this header
       'ngrok-skip-browser-warning': '1',

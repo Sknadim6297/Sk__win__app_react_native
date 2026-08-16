@@ -10,6 +10,7 @@ const AUTH_TIMEOUT_MS = 20000;
 /** Shared headers for browser + ngrok (CORS-safe when backend allows this header). */
 function authHeaders(extra = {}) {
   return {
+    Accept: 'application/json',
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': '1',
     ...extra,
@@ -42,6 +43,16 @@ async function parseJsonResponse(response) {
   try {
     return JSON.parse(text);
   } catch {
+    if (/ERR_NGROK_6030|multiple endpoints/i.test(text)) {
+      throw new Error(
+        'Ngrok has two tunnels on the same URL. Stop extra ngrok windows and keep only one: ngrok http 5000'
+      );
+    }
+    if (/ngrok|You are about to visit/i.test(text)) {
+      throw new Error(
+        'Ngrok blocked this request. Keep one ngrok tunnel running to port 5000, then try login again.'
+      );
+    }
     throw new Error('Server returned an invalid response. Is the backend running?');
   }
 }

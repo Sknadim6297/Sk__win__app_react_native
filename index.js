@@ -1,3 +1,4 @@
+import './utils/silenceExpoGoLogs';
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import Constants from 'expo-constants';

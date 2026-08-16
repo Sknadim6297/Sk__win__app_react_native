@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Platform, View, StyleSheet } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS } from '../styles/theme';
@@ -7,16 +7,27 @@ function pad(n) {
   return String(n).padStart(2, '0');
 }
 
+function toSafeDate(value) {
+  const d = value instanceof Date ? value : value ? new Date(value) : new Date();
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+}
+
+function mergeDateAndTime(datePart, timePart) {
+  const next = new Date(datePart);
+  next.setHours(timePart.getHours(), timePart.getMinutes(), 0, 0);
+  return next;
+}
+
 /** datetime-local value: YYYY-MM-DDTHH:mm */
 export function toDatetimeLocalValue(date) {
   if (!date) return '';
-  const d = date instanceof Date ? date : new Date(date);
-  if (Number.isNaN(d.getTime())) return '';
+  const d = toSafeDate(date);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /**
- * Native DateTimePicker on iOS/Android; HTML datetime-local on web (native picker unsupported).
+ * Native pickers on iOS/Android; HTML datetime-local on web.
+ * Android has no combined datetime dialog — date then time, and cancel is a no-op.
  */
 export default function WebSafeDateTimePicker({
   value,
@@ -25,7 +36,9 @@ export default function WebSafeDateTimePicker({
   display,
   style,
 }) {
-  const date = value instanceof Date ? value : value ? new Date(value) : new Date();
+  const date = toSafeDate(value);
+  const pendingDate = useRef(date);
+  const [androidStep, setAndroidStep] = useState(mode === 'time' ? 'time' : 'date');
 
   if (Platform.OS === 'web') {
     const inputType = mode === 'date' ? 'date' : mode === 'time' ? 'time' : 'datetime-local';
@@ -59,12 +72,37 @@ export default function WebSafeDateTimePicker({
     );
   }
 
+  const nativeMode =
+    Platform.OS === 'android' && mode === 'datetime' ? androidStep : mode === 'datetime' && Platform.OS !== 'ios' ? 'date' : mode;
+
+  const handleChange = (event, selectedDate) => {
+    if (event?.type === 'dismissed' || !selectedDate) {
+      onChange?.({ type: 'dismissed' }, undefined);
+      return;
+    }
+
+    if (Platform.OS === 'android' && mode === 'datetime' && androidStep === 'date') {
+      pendingDate.current = selectedDate;
+      setAndroidStep('time');
+      return;
+    }
+
+    if (Platform.OS === 'android' && mode === 'datetime' && androidStep === 'time') {
+      onChange?.({ type: 'set' }, mergeDateAndTime(pendingDate.current, selectedDate));
+      return;
+    }
+
+    onChange?.(event, selectedDate);
+  };
+
   return (
     <DateTimePicker
-      value={Number.isNaN(date.getTime()) ? new Date() : date}
-      mode={mode}
+      key={nativeMode}
+      value={androidStep === 'time' ? pendingDate.current : date}
+      mode={nativeMode}
       display={display || (Platform.OS === 'ios' ? 'spinner' : 'default')}
-      onChange={onChange}
+      is24Hour
+      onChange={handleChange}
     />
   );
 }

@@ -31,6 +31,7 @@ export default function AddCoinsModal({
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   useEffect(() => {
+    if (!Keyboard?.addListener) return undefined;
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
     const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
     return () => {
@@ -74,7 +75,7 @@ export default function AddCoinsModal({
             onChangeText={onChangeAmount}
             editable={!processing}
             returnKeyType="done"
-            onSubmitEditing={Keyboard.dismiss}
+            onSubmitEditing={() => Keyboard?.dismiss?.()}
             autoFocus={false}
           />
         </View>

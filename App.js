@@ -15,6 +15,7 @@ LogBox.ignoreLogs([
   'Splashscreen.setOptions',
   'SplashScreen.setOptions',
   'cannot be used in Expo Go',
+  'expo-notifications',
 ]);
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';

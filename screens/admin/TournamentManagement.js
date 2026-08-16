@@ -1577,11 +1577,14 @@ const TournamentManagement = ({ navigation }) => {
                     value={form.startDate || new Date()}
                     mode="datetime"
                     onChange={(event, selectedDate) => {
-                      if (Platform.OS !== 'web') {
-                        setShowStartDatePicker(Platform.OS === 'ios');
+                      const cancelled = event?.type === 'dismissed' || !selectedDate;
+                      if (cancelled) {
+                        setShowStartDatePicker(false);
+                        return;
                       }
-                      if (selectedDate) {
-                        setForm((prev) => ({ ...prev, startDate: selectedDate }));
+                      setForm((prev) => ({ ...prev, startDate: selectedDate }));
+                      if (Platform.OS !== 'ios') {
+                        setShowStartDatePicker(false);
                       }
                     }}
                   />
