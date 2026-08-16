@@ -1,3 +1,0 @@
-The url 'https://stunning-glorifier-panama.ngrok-free.dev' has multiple endpoints, but they do not all have pooling enabled.
-
-ERR_NGROK_6030
