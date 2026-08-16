@@ -17,6 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
 import ScreenHeader from '../components/navigation/ScreenHeader';
+import BrandCoin from '../components/ui/BrandCoin';
 import AddCoinsModal from '../components/AddCoinsModal';
 import CenterDialog from '../components/CenterDialog';
 import { walletService, userService, paymentService } from '../services/api';
@@ -257,7 +258,7 @@ const MyWalletScreen = ({ navigation, route }) => {
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Total Balance</Text>
           <View style={styles.heroAmountRow}>
-            <MaterialCommunityIcons name="circle-multiple" size={32} color={PAGE.gold} />
+            <BrandCoin size={32} />
             <Text style={styles.heroAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55}>
               {formatAmount(totalBalance)}
             </Text>

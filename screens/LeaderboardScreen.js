@@ -4,14 +4,14 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   StatusBar,
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../styles/theme';
+import AppHeader from '../components/navigation/AppHeader';
 
 const LeaderboardScreen = ({ navigation }) => {
   const [leaderboardData, setLeaderboardData] = useState([
@@ -24,8 +24,6 @@ const LeaderboardScreen = ({ navigation }) => {
     { id: 7, rank: 7, name: 'Tournament Star', points: 7000, wins: 30, trend: 'down' },
     { id: 8, rank: 8, name: 'Rising Star', points: 6600, wins: 28, trend: 'up' },
   ]);
-
-  const [walletBalance, setWalletBalance] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -87,22 +85,10 @@ const LeaderboardScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.darkGray} />
-      
-      {/* Header with Wallet Balance */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Leaderboard</Text>
-          <Text style={styles.headerSubtitle}>Global Rankings</Text>
-        </View>
-        <TouchableOpacity style={styles.walletBadge} onPress={() => navigation.navigate('MyWallet')}>
-          <MaterialCommunityIcons name="wallet" size={18} color={COLORS.white} />
-          <Text style={styles.walletText}>₹{walletBalance}</Text>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B1224" />
+      <AppHeader navigation={navigation} />
 
-      {/* Filter Tabs */}
       <View style={styles.filterTabs}>
         <TouchableOpacity style={[styles.tab, styles.activeTab]}>
           <Text style={[styles.tabText, styles.activeTabText]}>All Time</Text>
@@ -131,39 +117,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginTop: 3,
-  },
-  walletBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  walletText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 6,
   },
   filterTabs: {
     flexDirection: 'row',

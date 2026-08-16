@@ -98,7 +98,7 @@ export default function CashfreeQrPaymentScreen({ navigation, route }) {
       setTimeout(() => {
         const returned = navigateAfterWalletTopup(navigation, returnToTournamentId, returnScreen);
         if (!returned) {
-          navigation.navigate('MainTabs', { screen: 'WalletTab' });
+          navigation.navigate('Wallet');
         }
       }, 1800);
     },

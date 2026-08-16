@@ -13,6 +13,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import AppIcon from '../components/ui/AppIcon';
+import BrandCoin from '../components/ui/BrandCoin';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { tournamentService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
@@ -41,7 +42,7 @@ const CUSTOM_TABS = ['RULES', 'TEAMS', 'PRIZE POOL'];
 function CoinValue({ value, size = 18 }) {
   return (
     <View style={styles.coinRow}>
-      <AppIcon name="coins" size={size} color="#FBBF24" />
+      <BrandCoin size={size} />
       <Text style={styles.coinText}>{value ?? 0}</Text>
     </View>
   );

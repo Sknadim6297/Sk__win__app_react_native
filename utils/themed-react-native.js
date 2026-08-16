@@ -5,12 +5,12 @@
 const RN = require('react-native');
 const React = require('react');
 
-const APP_FONT = 'DMSans_400Regular';
+const APP_FONT = 'DMSans_700Bold';
 const BASE_TEXT = {
   fontFamily: APP_FONT,
   fontWeight: 'normal',
-  fontSize: 16,
-  lineHeight: 24,
+  fontSize: 14,
+  lineHeight: 21,
 };
 
 function wrapWithFont(Component) {

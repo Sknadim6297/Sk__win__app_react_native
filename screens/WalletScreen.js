@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import AppHeader from '../components/navigation/AppHeader';
+import BrandCoin from '../components/ui/BrandCoin';
 import AddCoinsModal from '../components/AddCoinsModal';
 import CenterDialog from '../components/CenterDialog';
 import { walletService, configService, paymentService } from '../services/api';
@@ -207,7 +208,8 @@ const WalletScreen = ({ navigation, route }) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={[]}>
+        <AppHeader navigation={navigation} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={COLORS.purple} />
           <Text style={styles.loadingText}>Loading wallet…</Text>
@@ -222,8 +224,9 @@ const WalletScreen = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B0E1E" translucent={false} />
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B1224" translucent={false} />
+      <AppHeader navigation={navigation} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -233,13 +236,11 @@ const WalletScreen = ({ navigation, route }) => {
         contentContainerStyle={styles.scroll}
         bounces
       >
-        <AppHeader navigation={navigation} />
-
         <View style={styles.body}>
           <View style={styles.heroCard}>
             <Text style={styles.heroLabel}>Total Balance</Text>
             <View style={styles.heroAmountRow}>
-              <MaterialCommunityIcons name="circle-multiple" size={32} color="#FBBF24" />
+              <BrandCoin size={32} />
               <Text
                 style={styles.heroAmount}
                 numberOfLines={1}

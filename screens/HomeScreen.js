@@ -6,7 +6,6 @@ import {
   StyleSheet,
   StatusBar,
   ScrollView,
-  Image,
   Share,
   Linking,
   Dimensions,
@@ -18,7 +17,7 @@ import { AuthContext } from '../context/AuthContext';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import AppIcon from '../components/ui/AppIcon';
 import AppHeader from '../components/navigation/AppHeader';
-import SKWinLogo from '../components/SKWinLogo';
+import GameModePoster from '../components/home/GameModePoster';
 import { BRAND } from '../constants/branding';
 import {
   tournamentService,
@@ -31,25 +30,13 @@ import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 
 const { width } = Dimensions.get('window');
 
-const CARD_GRADIENTS = [
-  ['#FF6B00', '#E55A00'],
-  ['#22C55E', '#16A34A'],
-  ['#2563EB', '#1D4ED8'],
-  ['#A855F7', '#7C3AED'],
-];
-
-const QUICK_LINKS = [
-  { id: 'support', label: 'Support', icon: 'headset', route: 'SupportTickets' },
-  { id: 'whatsapp', label: 'Whatsapp', icon: 'whatsapp', action: 'whatsapp' },
-  { id: 'telegram', label: 'Telegram', icon: 'telegram', action: 'telegram' },
-  { id: 'wallet', label: 'My Wallet', icon: 'wallet', route: 'WalletTab' },
-];
-
-const EXCLUSIVE_CARD_WIDTH = (width - 32 - 12) / 2;
+const MODE_CARD_WIDTH = (width - 32 - 12) / 2;
+const MODE_CARD_HEIGHT = MODE_CARD_WIDTH * 0.72;
 
 export default function HomeScreen({ navigation }) {
   const { user } = useContext(AuthContext);
-  const [popularGames, setPopularGames] = useState([]);
+  const [esportsModes, setEsportsModes] = useState([]);
+  const [esportsGameId, setEsportsGameId] = useState(null);
   const [upcomingCount, setUpcomingCount] = useState(0);
   const [ongoingCount, setOngoingCount] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
@@ -62,7 +49,7 @@ export default function HomeScreen({ navigation }) {
     try {
       setSlidersLoading(true);
       const [gamesData, homeConfig, slidersData] = await Promise.all([
-        gameService.getPopularGames().catch(() => []),
+        gameService.getGamesList().catch(() => []),
         configService.getHome().catch(() => ({})),
         sliderService.getActive().catch(() => []),
       ]);
@@ -72,7 +59,22 @@ export default function HomeScreen({ navigation }) {
       if (__DEV__) {
         console.log('[Home] sliders loaded:', sliderList.length, sliderList[0]?.image?.slice?.(0, 60));
       }
-      setPopularGames(Array.isArray(gamesData) && gamesData.length > 0 ? gamesData : []);
+      const games = Array.isArray(gamesData) ? gamesData : [];
+      const freeFire =
+        games.find((g) => /free\s*fire/i.test(String(g.name || ''))) || games[0] || null;
+      setEsportsGameId(freeFire?._id || null);
+      if (freeFire?._id) {
+        const modesData = await gameService.getGameModes(freeFire._id).catch(() => []);
+        const modes = (Array.isArray(modesData) ? modesData : []).map((mode, index) => ({
+          id: mode._id || mode.id || String(index),
+          name: (mode.name || 'GAME MODE').toUpperCase(),
+          tournamentCount: mode.tournamentCount ?? mode.liveCount ?? mode.activeTournaments ?? 0,
+          image: mode.image ? { uri: resolveMediaUrl(mode.image) } : null,
+        }));
+        setEsportsModes(modes);
+      } else {
+        setEsportsModes([]);
+      }
       if (homeConfig.latestNews) {
         const tickerText =
           homeConfig.latestAnnouncementTitle?.trim() ||
@@ -111,29 +113,12 @@ export default function HomeScreen({ navigation }) {
     }, [loadHomeData])
   );
 
-  const exclusiveGames = popularGames
-    .filter((g) => g?.name && g?.image)
-    .map((g, index) => ({
-      id: g._id,
-      name: g.name,
-      image: { uri: resolveMediaUrl(g.image) },
-      gradient: CARD_GRADIENTS[index % CARD_GRADIENTS.length],
-    }));
-
-  const handleQuickLink = (item) => {
-    if (item.route) {
-      navigation.navigate(item.route);
-      return;
-    }
-    if (item.action === 'whatsapp') {
-      const url = supportLinks.whatsapp || 'https://wa.me/';
-      Linking.openURL(url.startsWith('http') ? url : `https://wa.me/${url}`).catch(() => {});
-      return;
-    }
-    if (item.action === 'telegram') {
-      const url = supportLinks.telegram || 'https://t.me/';
-      Linking.openURL(url.startsWith('http') ? url : `https://t.me/${url}`).catch(() => {});
-    }
+  const openMode = (mode) => {
+    if (!mode?.id || !esportsGameId) return;
+    navigation.navigate('GameDetails', {
+      gameMode: { ...mode, _id: mode.id },
+      gameId: esportsGameId,
+    });
   };
 
   const handleShare = async () => {
@@ -147,24 +132,18 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const openGame = (gameId) => {
-    if (gameId) {
-      navigation.navigate('GameModes', { gameId });
-    }
-  };
-
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.backgroundDark} />
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B1224" />
       <View style={styles.glowPurple} pointerEvents="none" />
       <View style={styles.glowOrange} pointerEvents="none" />
+      <AppHeader navigation={navigation} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
         contentContainerStyle={styles.scroll}
       >
-        <AppHeader navigation={navigation} />
 
         {latestNews?.isActive !== false && (
           <TouchableOpacity
@@ -184,57 +163,7 @@ export default function HomeScreen({ navigation }) {
 
         <HomeImageSlider sliders={homeSliders} loading={slidersLoading} />
 
-        {/* Quick links — squircle tiles */}
-        <View style={styles.quickRow}>
-          {QUICK_LINKS.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.quickTile}
-              activeOpacity={0.85}
-              onPress={() => handleQuickLink(item)}
-            >
-              <View style={styles.quickIconSquircle}>
-                <AppIcon name={item.icon} size={40} light />
-              </View>
-              <Text style={styles.quickLabel}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {exclusiveGames.length > 0 && (
-          <>
-            <View style={styles.sectionHead}>
-              <View style={styles.sectionTitleRow}>
-                <Text style={styles.contestsTitle}>Exclusive</Text>
-                <View style={styles.liveBadge}>
-                  <Text style={styles.liveText}>LIVE</Text>
-                </View>
-              </View>
-              <Text style={styles.contestsSub}>Big Winnings For ALL</Text>
-            </View>
-
-            <View style={styles.gamesRow}>
-              {exclusiveGames.map((game) => (
-                <TouchableOpacity
-                  key={game.id}
-                  style={styles.gameCard}
-                  activeOpacity={0.9}
-                  onPress={() => openGame(game.id)}
-                >
-                  <Image source={game.image} style={styles.gameCardImage} resizeMode="cover" />
-                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.gameOverlay} />
-                  <View style={styles.fairPlayBadge}>
-                    <AppIcon name="shield-check" size={18} color="#4ADE80" />
-                    <Text style={styles.fairPlayText}>FairPlay : ON</Text>
-                  </View>
-                  <Text style={styles.gameCardTitle}>{game.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* My Contests */}
+        {/* My Contests — directly after banner */}
         <View style={styles.contestsSectionHead}>
           <View style={styles.sectionTitleRow}>
             <Text style={styles.contestsTitle}>My Contests</Text>
@@ -269,6 +198,30 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Esports Games — all active games */}
+        <View style={styles.sectionHead}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.contestsTitle}>Esports Games</Text>
+          </View>
+          <Text style={styles.contestsSub}>Choose a game and join tournaments</Text>
+        </View>
+
+        {esportsModes.length > 0 ? (
+          <View style={styles.gamesRow}>
+            {esportsModes.map((mode) => (
+              <GameModePoster
+                key={mode.id}
+                item={mode}
+                width={MODE_CARD_WIDTH}
+                height={MODE_CARD_HEIGHT}
+                onPress={() => openMode(mode)}
+              />
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.emptyGames}>No Free Fire modes available yet.</Text>
+        )}
 
         {/* Share + WhatsApp + social */}
         <View style={styles.bottomActionsBlock}>
@@ -335,14 +288,6 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
       </ScrollView>
-
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('SupportTickets')}
-        activeOpacity={0.9}
-      >
-        <AppIcon name="headset" size={32} light />
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -403,38 +348,6 @@ const styles = StyleSheet.create({
     ...TEXT.bodyMedium,
     color: COLORS.white,
   },
-  quickRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 26,
-    gap: 10,
-  },
-  quickTile: {
-    flex: 1,
-    alignItems: 'center',
-    maxWidth: (width - 32 - 30) / 4,
-  },
-  quickIconSquircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    backgroundColor: '#5E69C1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#5E69C1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  quickLabel: {
-    marginTop: 8,
-    fontSize: 13,
-    fontFamily: FONTS.bold,
-    fontWeight: '700',
-    color: COLORS.white,
-    textAlign: 'center',
-  },
   sectionHead: {
     marginBottom: 12,
   },
@@ -479,60 +392,16 @@ const styles = StyleSheet.create({
     marginTop: 5,
     letterSpacing: 0.1,
   },
-  liveBadge: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  liveText: {
-    ...TEXT.overline,
-    fontSize: 11,
-    color: COLORS.white,
-  },
   gamesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
     marginBottom: 26,
   },
-  gameCard: {
-    width: EXCLUSIVE_CARD_WIDTH,
-    height: width * 0.4,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: COLORS.surfaceDark,
-  },
-  gameCardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  gameOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  fairPlayBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(88, 50, 140, 0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  fairPlayText: {
-    ...TEXT.labelSm,
-    fontFamily: FONTS.semiBold,
-    color: COLORS.white,
-  },
-  gameCardTitle: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    ...TEXT.h3,
-    color: COLORS.white,
+  emptyGames: {
+    ...TEXT.body,
+    color: COLORS.gray,
+    marginBottom: 26,
   },
   contestsRow: {
     flexDirection: 'row',
@@ -649,23 +518,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-  },
-  fab: {
-    position: 'absolute',
-    right: 18,
-    bottom: 96,
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: '#25D366',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 10,
-    shadowColor: '#25D366',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
 });

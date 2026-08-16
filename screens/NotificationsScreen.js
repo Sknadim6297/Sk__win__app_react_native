@@ -16,6 +16,7 @@ import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
 import ScreenHeader from '../components/navigation/ScreenHeader';
 import AppIcon from '../components/ui/AppIcon';
+import BrandBell from '../components/ui/BrandBell';
 import { notificationService } from '../services/api';
 import { LIST_PERF } from '../utils/listPerf';
 import { handleNotificationNavigation } from '../utils/navigationRef';
@@ -204,7 +205,7 @@ export default function NotificationsScreen({ navigation }) {
           }
           ListEmptyComponent={
             <View style={pageStyles.emptyWrap}>
-              <AppIcon name="bell" size={48} light />
+              <BrandBell size={48} />
               <Text style={pageStyles.emptyText}>No notifications yet.</Text>
             </View>
           }

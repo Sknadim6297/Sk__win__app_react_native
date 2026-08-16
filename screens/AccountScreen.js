@@ -18,9 +18,10 @@ import Constants from 'expo-constants';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS, FONTS } from '../styles/theme';
 import { userService } from '../services/api';
-import SKWinLogo from '../components/SKWinLogo';
-import AppIcon from '../components/ui/AppIcon';
 import AppHeader from '../components/navigation/AppHeader';
+import AppIcon from '../components/ui/AppIcon';
+import BrandCoin from '../components/ui/BrandCoin';
+import DefaultAvatar from '../components/ui/DefaultAvatar';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 
 const ACCOUNT_THEME = {
@@ -132,12 +133,13 @@ const AccountScreen = ({ navigation }) => {
         />
       );
     }
-    return <SKWinLogo size={size} rounded={rounded} backgroundColor="transparent" />;
+    return <DefaultAvatar size={size} rounded={rounded} />;
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={ACCOUNT_THEME.bg} />
+    <SafeAreaView style={styles.container} edges={[]}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B1224" />
+      <AppHeader navigation={navigation} />
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -156,8 +158,6 @@ const AccountScreen = ({ navigation }) => {
             />
           }
         >
-          <AppHeader navigation={navigation} style={styles.appHeader} />
-
           <View style={styles.profileSection}>
             <View style={styles.mainAvatarWrap}>{renderAvatar(108)}</View>
             <Text style={styles.mainUsername}>{displayName}</Text>
@@ -176,7 +176,7 @@ const AccountScreen = ({ navigation }) => {
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <View style={styles.amountRow}>
-                <AppIcon name="coins" size={18} />
+                <BrandCoin size={18} />
                 <Text style={styles.statValue}>{amountWon}</Text>
               </View>
               <Text style={styles.statLabel}>Amount Won</Text>
@@ -234,9 +234,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 24,
-  },
-  appHeader: {
-    marginBottom: 24,
   },
   profileSection: {
     alignItems: 'center',

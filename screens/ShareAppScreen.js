@@ -14,6 +14,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
 import ScreenHeader from '../components/navigation/ScreenHeader';
+import AppHeader from '../components/navigation/AppHeader';
 import { AuthContext } from '../context/AuthContext';
 import { userService } from '../services/api';
 import AppIcon from '../components/ui/AppIcon';
@@ -29,7 +30,8 @@ function getDownloadPageUrl() {
   }
 }
 
-const ShareAppScreen = ({ navigation }) => {
+const ShareAppScreen = ({ navigation, route }) => {
+  const isTab = route?.name === 'EarnTab';
   const { user } = useContext(AuthContext);
   const [referralCode, setReferralCode] = useState(user?.referralCode || '…');
 
@@ -103,9 +105,13 @@ const ShareAppScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={pageStyles.container} edges={['top']}>
+    <SafeAreaView style={pageStyles.container} edges={isTab ? [] : ['top']}>
       <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
-      <ScreenHeader title="My Referrals" onBack={() => navigation.goBack()} />
+      {isTab ? (
+        <AppHeader navigation={navigation} />
+      ) : (
+        <ScreenHeader title="My Referrals" onBack={() => navigation.goBack()} />
+      )}
 
       <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>

@@ -1,16 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Image, Platform, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Image, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ICON } from '../../styles/typography';
 import { getIcons8Uri, resolveIconSlug } from '../../constants/icons8Map';
 import { resolveMciIcon } from '../../constants/iconMciMap';
 
-const USE_VECTOR_ICONS = Platform.OS === 'android';
-const CDN_LOAD_TIMEOUT_MS = 4500;
+const CDN_LOAD_TIMEOUT_MS = 12000;
 
-/**
- * Brand glyphs via MaterialCommunityIcons (avoids bundling FontAwesome5 fonts ~360KB).
- */
 const BRAND_MCI = {
   whatsapp: 'whatsapp',
   telegram: 'send',
@@ -18,9 +14,11 @@ const BRAND_MCI = {
   'instagram-new': 'instagram',
 };
 
+const COLOR_BRAND_ICONS = new Set(['whatsapp', 'telegram', 'instagram', 'instagram-new']);
+
 /**
- * App icons: vector on Android; Icons8 on iOS with vector fallback.
- * Uses only MaterialCommunityIcons — do not import unused icon font families.
+ * Colorful Icons8 fluency glyphs stay on screen once loaded.
+ * Vector outlines are used only if the image never arrives.
  */
 export default function AppIcon({
   name,
@@ -35,7 +33,8 @@ export default function AppIcon({
   family: _family,
   ..._props
 }) {
-  const [failed, setFailed] = useState(USE_VECTOR_ICONS);
+  const loadedRef = useRef(false);
+  const [failed, setFailed] = useState(false);
 
   const pixelSize = useMemo(() => {
     if (important) return 28;
@@ -44,13 +43,14 @@ export default function AppIcon({
   }, [important, size]);
 
   const slug = resolveIconSlug(name);
+  const keepColorBrand = COLOR_BRAND_ICONS.has(name) || COLOR_BRAND_ICONS.has(slug);
   const uri = useMemo(() => {
-    if (USE_VECTOR_ICONS) return null;
+    if (keepColorBrand) return getIcons8Uri(slug, pixelSize);
     if (muted) return getIcons8Uri(slug, pixelSize, { accent: '9CA3AF' });
     if (light) return getIcons8Uri(slug, pixelSize, { light: true });
     if (accent) return getIcons8Uri(slug, pixelSize, { accent });
     return getIcons8Uri(slug, pixelSize);
-  }, [slug, pixelSize, light, muted, accent]);
+  }, [slug, pixelSize, light, muted, accent, keepColorBrand]);
 
   const brandMci = BRAND_MCI[name] || BRAND_MCI[slug];
   const mciName = brandMci || resolveMciIcon(name);
@@ -59,8 +59,12 @@ export default function AppIcon({
     (accent ? `#${String(accent).replace('#', '')}` : light || !muted ? '#FFFFFF' : '#9CA3AF');
 
   useEffect(() => {
-    if (USE_VECTOR_ICONS || !uri) return undefined;
-    const timer = setTimeout(() => setFailed(true), CDN_LOAD_TIMEOUT_MS);
+    loadedRef.current = false;
+    setFailed(false);
+    if (!uri) return undefined;
+    const timer = setTimeout(() => {
+      if (!loadedRef.current) setFailed(true);
+    }, CDN_LOAD_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [uri]);
 
@@ -89,7 +93,10 @@ export default function AppIcon({
         style={[{ width: pixelSize, height: pixelSize }, imageStyle]}
         resizeMode="contain"
         onError={() => setFailed(true)}
-        onLoad={() => setFailed(false)}
+        onLoad={() => {
+          loadedRef.current = true;
+          setFailed(false);
+        }}
         accessibilityRole="image"
         accessibilityLabel={name}
       />

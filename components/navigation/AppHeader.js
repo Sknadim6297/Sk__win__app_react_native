@@ -1,10 +1,14 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AppIcon from '../ui/AppIcon';
-import SKWinLogo from '../SKWinLogo';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONTS } from '../../styles/theme';
+import { BRAND } from '../../constants/branding';
 import { useAppHeaderData } from '../../hooks/useAppHeaderData';
+import { getRootNavigation } from '../../utils/walletFlow';
+import BrandCoin from '../ui/BrandCoin';
+import BrandBell from '../ui/BrandBell';
+import DefaultAvatar from '../ui/DefaultAvatar';
 
 const formatBalance = (value) => {
   const n = Number(value) || 0;
@@ -14,13 +18,8 @@ const formatBalance = (value) => {
 };
 
 export default function AppHeader({ navigation, style }) {
-  const {
-    displayName,
-    profilePhoto,
-    walletBalance,
-    supportBadgeCount,
-    notificationBadgeCount,
-  } = useAppHeaderData();
+  const insets = useSafeAreaInsets();
+  const { profilePhoto, walletBalance, notificationBadgeCount } = useAppHeaderData();
 
   const openNotifications = () => {
     const parent = navigation.getParent?.();
@@ -28,40 +27,51 @@ export default function AppHeader({ navigation, style }) {
     else navigation.navigate('Notifications');
   };
 
-  const renderAvatar = () => {
-    if (profilePhoto) {
-      return <Image source={{ uri: profilePhoto }} style={styles.avatarImage} resizeMode="cover" />;
-    }
-    return <SKWinLogo size={34} rounded backgroundColor="transparent" />;
+  const openWallet = () => {
+    const root = getRootNavigation(navigation);
+    if (root?.navigate) root.navigate('MyWallet');
+    else navigation.navigate('MyWallet');
+  };
+
+  const openMenu = () => {
+    const parent = navigation.getParent?.();
+    if (parent?.navigate) parent.navigate('MenuTab');
+    else navigation.navigate('MenuTab');
   };
 
   return (
-    <View style={[styles.container, style]}>
-      <TouchableOpacity
-        style={styles.profileSection}
-        activeOpacity={0.85}
-        onPress={() => navigation.navigate('AccountTab')}
-      >
-        <View style={styles.avatar}>{renderAvatar()}</View>
-        <View style={styles.nameBlock}>
-          <Text style={styles.greeting} numberOfLines={1}>
-            Hi,
-          </Text>
-          <Text style={styles.username} numberOfLines={1}>
-            {displayName}
-          </Text>
-        </View>
+    <LinearGradient
+      colors={['#1A2744', '#0B1224', '#070B16']}
+      start={{ x: 0.5, y: 0 }}
+      end={{ x: 0.5, y: 1 }}
+      style={[styles.bar, { paddingTop: Math.max(insets.top, 8) }, style]}
+    >
+      <TouchableOpacity style={styles.left} activeOpacity={0.85} onPress={openMenu}>
+        <DefaultAvatar uri={profilePhoto} size={46} style={styles.avatarRing} />
+        <Text style={styles.brand} numberOfLines={1}>
+          {BRAND.name}
+        </Text>
       </TouchableOpacity>
 
-      <View style={styles.actions}>
+      <View style={styles.right}>
+        <TouchableOpacity style={styles.coinWrap} onPress={openWallet} activeOpacity={0.88}>
+          <View style={styles.coinBox}>
+            <Text style={styles.coinValue} numberOfLines={1}>
+              {formatBalance(walletBalance)}
+            </Text>
+          </View>
+          <View style={styles.coinImageWrap}>
+            <BrandCoin size={38} />
+          </View>
+        </TouchableOpacity>
+
         <TouchableOpacity
-          style={styles.iconBtn}
+          style={styles.bellBtn}
           onPress={openNotifications}
-          hitSlop={8}
-          activeOpacity={0.85}
+          activeOpacity={0.88}
           accessibilityLabel="Notifications"
         >
-          <AppIcon name="bell" size={22} light />
+          <BrandBell size={26} />
           {notificationBadgeCount > 0 ? (
             <View style={[styles.badge, notificationBadgeCount > 9 && styles.badgeWide]}>
               <Text style={styles.badgeText} numberOfLines={1}>
@@ -70,104 +80,91 @@ export default function AppHeader({ navigation, style }) {
             </View>
           ) : null}
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.iconBtn}
-          onPress={() => navigation.navigate('SupportTickets')}
-          hitSlop={8}
-          activeOpacity={0.85}
-        >
-          <AppIcon name="headset" size={22} light />
-          {supportBadgeCount > 0 ? (
-            <View style={[styles.badge, supportBadgeCount > 9 && styles.badgeWide]}>
-              <Text style={styles.badgeText} numberOfLines={1}>
-                {supportBadgeCount > 99 ? '99+' : String(supportBadgeCount)}
-              </Text>
-            </View>
-          ) : null}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.walletPill}
-          onPress={() => navigation.navigate('WalletTab')}
-          activeOpacity={0.88}
-        >
-          <MaterialCommunityIcons name="wallet-outline" size={18} color={COLORS.white} />
-          <Text
-            style={styles.walletText}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-          >
-            {formatBalance(walletBalance)}
-          </Text>
-          <MaterialCommunityIcons name="plus" size={16} color="#FBBF24" />
-        </TouchableOpacity>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  bar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 2,
-    marginBottom: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
   },
-  profileSection: {
+  left: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     flex: 1,
-    marginRight: 10,
     minWidth: 0,
+    marginRight: 10,
   },
-  avatar: {
+  avatarRing: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  brand: {
+    flex: 1,
+    fontSize: 22,
+    fontFamily: FONTS.bold,
+    color: COLORS.white,
+    letterSpacing: 0.4,
+  },
+  right: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  coinWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 36,
+    paddingLeft: 18,
+  },
+  coinImageWrap: {
+    position: 'absolute',
+    left: 0,
+    zIndex: 2,
+  },
+  coinBox: {
+    minWidth: 52,
+    height: 30,
+    backgroundColor: '#1C2438',
+    borderRadius: 8,
+    paddingLeft: 24,
+    paddingRight: 12,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  coinValue: {
+    fontSize: 14,
+    fontFamily: FONTS.bold,
+    color: COLORS.white,
+    maxWidth: 72,
+  },
+  bellBtn: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#151D36',
-  },
-  avatarImage: {
-    width: 42,
-    height: 42,
-  },
-  nameBlock: {
-    flex: 1,
-    minWidth: 0,
-  },
-  greeting: {
-    fontSize: 12,
-    fontFamily: FONTS.medium,
-    color: COLORS.gray,
-  },
-  username: {
-    fontSize: 17,
-    fontFamily: FONTS.bold,
-    color: COLORS.white,
-    marginTop: 1,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  iconBtn: {
-    position: 'relative',
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'visible',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.28,
+        shadowRadius: 5,
+      },
+      android: { elevation: 6 },
+    }),
   },
   badge: {
     position: 'absolute',
-    top: -1,
+    top: -2,
     right: -2,
     minWidth: 16,
     height: 16,
@@ -177,7 +174,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 4,
     borderWidth: 1.5,
-    borderColor: '#0B0E1E',
+    borderColor: '#FFFFFF',
   },
   badgeWide: {
     minWidth: 22,
@@ -190,21 +187,5 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     includeFontPadding: false,
     textAlign: 'center',
-  },
-  walletPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#5B39A8',
-    borderRadius: 22,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    gap: 7,
-    minHeight: 40,
-  },
-  walletText: {
-    fontSize: 14,
-    fontFamily: FONTS.bold,
-    color: COLORS.white,
-    maxWidth: 72,
   },
 });

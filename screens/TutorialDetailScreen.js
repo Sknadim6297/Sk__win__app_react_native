@@ -42,7 +42,7 @@ export default function TutorialDetailScreen({ navigation, route }) {
   };
 
   const goToWallet = () => {
-    navigation.navigate('MainApp', { screen: 'WalletTab' });
+    navigation.navigate('Wallet');
   };
 
   return (

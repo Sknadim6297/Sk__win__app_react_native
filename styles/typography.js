@@ -16,17 +16,20 @@ export const LINE_HEIGHT = {
   relaxed: 1.6,
 };
 
-/** DM Sans — use weight-specific families (avoid fontWeight with custom fonts on Android) */
-export const FONT_FAMILY = 'DMSans_400Regular';
+/**
+ * DM Sans — bold UI font on every screen.
+ * Use named families instead of fontWeight on Android custom fonts.
+ */
+export const FONT_FAMILY = 'DMSans_700Bold';
 
 export const FONTS = {
-  regular: 'DMSans_400Regular',
-  medium: 'DMSans_500Medium',
-  semiBold: 'DMSans_600SemiBold',
-  bold: 'DMSans_700Bold',
-  display: 'DMSans_700Bold',
-  displayMedium: 'DMSans_500Medium',
-  displaySemiBold: 'DMSans_600SemiBold',
+  regular: 'DMSans_700Bold',
+  medium: 'DMSans_700Bold',
+  semiBold: 'DMSans_800ExtraBold',
+  bold: 'DMSans_800ExtraBold',
+  display: 'DMSans_800ExtraBold',
+  displayMedium: 'DMSans_700Bold',
+  displaySemiBold: 'DMSans_800ExtraBold',
 };
 
 /** Icons8 display sizes — 24px default, 28px for important actions */
@@ -46,39 +49,39 @@ function lh(fontSize, multiplier = LINE_HEIGHT.normal) {
 export const TYPO = {
   display: {
     fontFamily: FONTS.display,
-    fontSize: scaleFont(32),
-    lineHeight: lh(scaleFont(32), LINE_HEIGHT.tight),
-    letterSpacing: 0.6,
+    fontSize: scaleFont(26),
+    lineHeight: lh(scaleFont(26), LINE_HEIGHT.tight),
+    letterSpacing: 0.2,
   },
   h1: {
     fontFamily: FONTS.bold,
-    fontSize: scaleFont(28),
-    lineHeight: lh(scaleFont(28), LINE_HEIGHT.tight),
+    fontSize: scaleFont(24),
+    lineHeight: lh(scaleFont(24), LINE_HEIGHT.tight),
   },
   h2: {
     fontFamily: FONTS.bold,
-    fontSize: scaleFont(22),
-    lineHeight: lh(scaleFont(22), LINE_HEIGHT.tight),
+    fontSize: scaleFont(20),
+    lineHeight: lh(scaleFont(20), LINE_HEIGHT.tight),
   },
   h3: {
     fontFamily: FONTS.semiBold,
-    fontSize: scaleFont(19),
-    lineHeight: lh(scaleFont(19)),
+    fontSize: scaleFont(17),
+    lineHeight: lh(scaleFont(17)),
   },
   bodyLg: {
     fontFamily: FONTS.regular,
-    fontSize: scaleFont(17),
-    lineHeight: lh(scaleFont(17), LINE_HEIGHT.relaxed),
+    fontSize: scaleFont(15),
+    lineHeight: lh(scaleFont(15), LINE_HEIGHT.relaxed),
   },
   body: {
     fontFamily: FONTS.regular,
-    fontSize: scaleFont(16),
-    lineHeight: lh(scaleFont(16), LINE_HEIGHT.relaxed),
+    fontSize: scaleFont(14),
+    lineHeight: lh(scaleFont(14), LINE_HEIGHT.relaxed),
   },
   bodyMedium: {
     fontFamily: FONTS.medium,
-    fontSize: scaleFont(16),
-    lineHeight: lh(scaleFont(16), LINE_HEIGHT.relaxed),
+    fontSize: scaleFont(14),
+    lineHeight: lh(scaleFont(14), LINE_HEIGHT.relaxed),
   },
   label: {
     fontFamily: FONTS.medium,
@@ -104,9 +107,9 @@ export const TYPO = {
   },
   button: {
     fontFamily: FONTS.bold,
-    fontSize: scaleFont(16),
-    lineHeight: lh(scaleFont(16), LINE_HEIGHT.tight),
-    letterSpacing: 0.6,
+    fontSize: scaleFont(15),
+    lineHeight: lh(scaleFont(15), LINE_HEIGHT.tight),
+    letterSpacing: 0.2,
   },
   buttonSm: {
     fontFamily: FONTS.semiBold,
@@ -115,8 +118,8 @@ export const TYPO = {
   },
   stat: {
     fontFamily: FONTS.bold,
-    fontSize: scaleFont(30),
-    lineHeight: lh(scaleFont(30), LINE_HEIGHT.tight),
+    fontSize: scaleFont(26),
+    lineHeight: lh(scaleFont(26), LINE_HEIGHT.tight),
   },
   tabLabel: {
     fontFamily: FONTS.semiBold,

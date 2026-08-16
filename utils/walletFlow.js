@@ -41,13 +41,10 @@ export function navigateToAddCoins(navigation, tournamentIdOrOpts) {
       ? tournamentIdOrOpts
       : { tournamentId: tournamentIdOrOpts };
 
-  root.navigate('MainApp', {
-    screen: 'WalletTab',
-    params: {
-      returnToTournamentId: opts.tournamentId || null,
-      returnScreen: opts.returnScreen || 'TournamentDetails',
-      openAddCoins: opts.openAddCoins !== false,
-    },
+  root.navigate('Wallet', {
+    returnToTournamentId: opts.tournamentId || null,
+    returnScreen: opts.returnScreen || 'TournamentDetails',
+    openAddCoins: opts.openAddCoins !== false,
   });
 }
 

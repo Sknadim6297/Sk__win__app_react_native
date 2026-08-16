@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppIcon from '../components/ui/AppIcon';
+import BrandCoin from '../components/ui/BrandCoin';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { AuthContext } from '../context/AuthContext';
 import { tournamentService, walletService } from '../services/api';
@@ -22,7 +23,7 @@ const PURPLE = '#7B61FF';
 function CoinRow({ value, size = 22 }) {
   return (
     <View style={styles.coinRow}>
-      <AppIcon name="coins" size={size} color="#FBBF24" />
+      <BrandCoin size={size} />
       <Text style={styles.coinValue}>{value}</Text>
     </View>
   );

@@ -8,7 +8,6 @@ import {
   StatusBar,
   ActivityIndicator,
   RefreshControl,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,7 +16,7 @@ import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
 import ScreenHeader from '../components/navigation/ScreenHeader';
 import { userService } from '../services/api';
-import SKWinLogo from '../components/SKWinLogo';
+import DefaultAvatar from '../components/ui/DefaultAvatar';
 import AppIcon from '../components/ui/AppIcon';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 
@@ -97,11 +96,7 @@ const AccountProfileScreen = ({ navigation }) => {
       >
         <View style={styles.heroCard}>
           <View style={styles.avatarWrap}>
-            {photo ? (
-              <Image source={{ uri: photo }} style={styles.avatar} />
-            ) : (
-              <SKWinLogo size={96} rounded backgroundColor="transparent" />
-            )}
+              <DefaultAvatar uri={photo} size={96} />
           </View>
           <Text style={styles.name}>{stats.name || stats.username || 'User'}</Text>
           {stats.gameUsername ? (

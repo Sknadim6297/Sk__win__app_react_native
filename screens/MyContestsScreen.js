@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AppIcon from '../components/ui/AppIcon';
+import BrandCoin from '../components/ui/BrandCoin';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { tournamentService } from '../services/api';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
@@ -51,7 +52,7 @@ function formatDate(dateString) {
 function CoinAmount({ value, color = ORANGE, size = 18 }) {
   return (
     <View style={styles.coinRow}>
-      <AppIcon name="coins" size={size} color="#FBBF24" />
+      <BrandCoin size={size} />
       <Text style={[styles.coinValue, { color }]}>{value}</Text>
     </View>
   );

@@ -23,17 +23,9 @@ import CustomTabBar from './components/navigation/CustomTabBar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import {
-  DMSans_400Regular,
-} from '@expo-google-fonts/dm-sans/400Regular';
-import {
-  DMSans_500Medium,
-} from '@expo-google-fonts/dm-sans/500Medium';
-import {
-  DMSans_600SemiBold,
-} from '@expo-google-fonts/dm-sans/600SemiBold';
-import {
   DMSans_700Bold,
-} from '@expo-google-fonts/dm-sans/700Bold';
+  DMSans_800ExtraBold,
+} from '@expo-google-fonts/dm-sans';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { logApiConfig } from './utils/apiConfig';
 import { navigationRef } from './utils/navigationRef';
@@ -48,6 +40,8 @@ import AuthScreen from './screens/AuthScreen';
 import HomeScreen from './screens/HomeScreen';
 import WalletScreen from './screens/WalletScreen';
 import AccountScreen from './screens/AccountScreen';
+import ShareAppScreen from './screens/ShareAppScreen';
+import LeaderboardScreen from './screens/LeaderboardScreen';
 import AppLoadingScreen, { WELCOME_BG } from './components/AppLoadingScreen';
 import { applyGlobalTypography } from './styles/typography';
 
@@ -69,9 +63,10 @@ function MainTabNavigator() {
         freezeOnBlur: !IS_WEB,
       }}
     >
+      <Tab.Screen name="EarnTab" component={ShareAppScreen} />
+      <Tab.Screen name="LeaderboardTab" component={LeaderboardScreen} />
       <Tab.Screen name="HomeTab" component={HomeScreen} />
-      <Tab.Screen name="WalletTab" component={WalletScreen} />
-      <Tab.Screen name="AccountTab" component={AccountScreen} />
+      <Tab.Screen name="MenuTab" component={AccountScreen} />
     </Tab.Navigator>
   );
 }
@@ -81,10 +76,8 @@ export default function App() {
     if (__DEV__) logApiConfig();
   }, []);
   const [fontsLoaded] = useFonts({
-    DMSans_400Regular,
-    DMSans_500Medium,
-    DMSans_600SemiBold,
     DMSans_700Bold,
+    DMSans_800ExtraBold,
   });
 
   useEffect(() => {
@@ -198,6 +191,7 @@ function AppNavigator() {
             ) : (
               <>
                 <Stack.Screen name="MainApp" component={MainTabNavigator} />
+                <Stack.Screen name="Wallet" component={WalletScreen} />
                 <Stack.Screen name="AccountProfile" {...screen(() => require('./screens/AccountProfileScreen').default)} />
                 <Stack.Screen name="EditProfile" {...screen(() => require('./screens/EditProfileScreen').default)} />
                 <Stack.Screen name="MyWallet" {...screen(() => require('./screens/MyWalletScreen').default)} />

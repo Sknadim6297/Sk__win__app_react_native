@@ -56,7 +56,13 @@
         }
       ],
       [
-        "expo-font"
+        "expo-font",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf",
+            "./node_modules/@expo-google-fonts/dm-sans/800ExtraBold/DMSans_800ExtraBold.ttf"
+          ]
+        }
       ],
       [
         "expo-notifications",

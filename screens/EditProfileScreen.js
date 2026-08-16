@@ -17,7 +17,7 @@ import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
 import ScreenHeader from '../components/navigation/ScreenHeader';
 import { userService } from '../services/api';
-import SKWinLogo from '../components/SKWinLogo';
+import DefaultAvatar from '../components/ui/DefaultAvatar';
 
 const EditProfileScreen = ({ navigation }) => {
   const { updateUser } = useContext(AuthContext);
@@ -159,7 +159,7 @@ const EditProfileScreen = ({ navigation }) => {
       >
         <View style={styles.heroCard}>
           <View style={styles.avatarWrap}>
-            <SKWinLogo size={96} rounded backgroundColor="transparent" />
+            <DefaultAvatar size={96} />
           </View>
           <Text style={styles.heroName}>{name || 'Player'}</Text>
           <Text style={styles.heroId}>{userId || '—'}</Text>

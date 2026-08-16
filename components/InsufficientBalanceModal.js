@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CenterDialog from './CenterDialog';
+import BrandCoin from './ui/BrandCoin';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 
 /**
@@ -19,7 +20,7 @@ export default function InsufficientBalanceModal({
   return (
     <CenterDialog visible={visible} onClose={onClose} dismissOnOverlay>
       <View style={styles.iconWrap}>
-        <MaterialCommunityIcons name="wallet-outline" size={36} color="#FBBF24" />
+        <BrandCoin size={36} />
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>

@@ -6,7 +6,6 @@ import {
   StyleSheet,
   StatusBar,
   FlatList,
-  ImageBackground,
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
@@ -15,14 +14,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { gameService } from '../services/api';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import GameModePoster from '../components/home/GameModePoster';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_PADDING = 12;
-const GRID_GAP = 10;
-const NUM_COLUMNS = 3;
+const GRID_GAP = 12;
+const NUM_COLUMNS = 2;
 const CARD_WIDTH =
   (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
-const CARD_HEIGHT = CARD_WIDTH * 1.22;
+const CARD_HEIGHT = CARD_WIDTH * 0.72;
 
 const mapMode = (mode, index) => {
   const id = mode._id || mode.id || String(index);
@@ -37,42 +37,6 @@ const mapMode = (mode, index) => {
     image: imageUri ? { uri: imageUri } : null,
   };
 };
-
-function GameModeCard({ item, onPress }) {
-  return (
-    <TouchableOpacity
-      style={[styles.card, !item.image && styles.cardPlaceholder]}
-      activeOpacity={0.88}
-      onPress={() => onPress(item)}
-    >
-      {item.image ? (
-        <ImageBackground source={item.image} style={styles.cardImage} resizeMode="cover">
-          <View style={styles.countBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveCount}>{item.tournamentCount}</Text>
-          </View>
-          <View style={styles.titleBar}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
-              {item.name}
-            </Text>
-          </View>
-        </ImageBackground>
-      ) : (
-        <View style={styles.cardImage}>
-          <View style={styles.countBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveCount}>{item.tournamentCount}</Text>
-          </View>
-          <View style={styles.titleBar}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
-              {item.name}
-            </Text>
-          </View>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-}
 
 export default function GameModesScreen({ navigation, route }) {
   const gameId = route?.params?.gameId;
@@ -164,7 +128,14 @@ export default function GameModesScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.gridContent}
           columnWrapperStyle={columnWrapperStyle}
-          renderItem={({ item }) => <GameModeCard item={item} onPress={handleModePress} />}
+          renderItem={({ item }) => (
+            <GameModePoster
+              item={item}
+              width={CARD_WIDTH}
+              height={CARD_HEIGHT}
+              onPress={() => handleModePress(item)}
+            />
+          )}
         />
       )}
     </SafeAreaView>

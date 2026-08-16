@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dm-sans">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -13,7 +13,7 @@
   <link rel="icon" href="/brand/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,700;0,9..40,800&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg: #0B0E1E;
@@ -25,17 +25,24 @@
       --purple-deep: #5B39A8;
       --green: #00B368;
       --gold: #FBBF24;
-      --font: "DM Sans", system-ui, sans-serif;
+      --font: "DM Sans", sans-serif;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
     body {
       font-family: var(--font);
+      font-weight: 700;
+      font-style: normal;
       background: var(--bg);
       color: var(--white);
       min-height: 100vh;
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
+    }
+    .dm-sans {
+      font-family: "DM Sans", sans-serif;
+      font-weight: 700;
+      font-style: normal;
     }
     .atmosphere {
       min-height: 100vh;
