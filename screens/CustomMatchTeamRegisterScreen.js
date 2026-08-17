@@ -39,6 +39,10 @@ function isPlayerComplete(player) {
   return String(player?.name || '').trim().length >= 3 && String(player?.gamingUID || '').trim().length >= 3;
 }
 
+function isAlreadyJoinedError(err) {
+  return /already joined|already registered in this tournament/i.test(String(err?.message || err || ''));
+}
+
 export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
   const { tournamentId, walletRecharged, pendingJoin } = route.params || {};
   const { user, isAdmin } = useContext(AuthContext);
@@ -147,15 +151,22 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       return;
     }
 
-    await tournamentManagementService.registerTeam(tournamentId, {
-      teamName: join.teamName,
-      teamSide: isCustomMatch(tournament) ? join.teamSide : undefined,
-      slotNumber: isCustomMatch(tournament) ? undefined : join.slotNumber,
-      players: join.players,
-    });
+    try {
+      await tournamentManagementService.registerTeam(tournamentId, {
+        teamName: join.teamName,
+        teamSide: isCustomMatch(tournament) ? join.teamSide : undefined,
+        slotNumber: isCustomMatch(tournament) ? undefined : join.slotNumber,
+        players: join.players,
+      });
+    } catch (e) {
+      if (isAlreadyJoinedError(e)) {
+        navigation.replace('TournamentDetails', { tournamentId, joinedSuccess: true });
+        return;
+      }
+      throw e;
+    }
 
-    showToast('Team registered successfully!', 'success');
-    setTimeout(() => navigation.replace('TournamentDetails', { tournamentId }), 700);
+    navigation.replace('TournamentDetails', { tournamentId, joinedSuccess: true });
   };
 
   useEffect(() => {

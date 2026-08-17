@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const cron = require('node-cron');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -70,7 +71,14 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/download', express.static(path.join(PUBLIC_ROOT, 'download')));
+
+const WEBSITE_DIST = path.join(__dirname, '..', 'website', 'dist');
+const WEBSITE_INDEX = path.join(WEBSITE_DIST, 'index.html');
+const isWebsiteReady = () => fs.existsSync(WEBSITE_INDEX);
+
+if (!isWebsiteReady()) {
+  app.use('/download', express.static(path.join(PUBLIC_ROOT, 'download')));
+}
 
 // Single brand logo (no copies) — used by download page favicon/OG/hero
 const BRAND_LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo', 'ROUND_GAME_LOGO.png');
@@ -85,13 +93,15 @@ app.get(['/brand/logo.png', '/download/logo.png'], (req, res) => {
 
 const isDbReady = () => mongoose.connection.readyState === 1;
 
-/** Homepage → download landing (share this URL with users) */
-app.get('/', (req, res) => {
+/** Homepage → marketing website when built; otherwise APK landing */
+app.get('/', (req, res, next) => {
+  if (isWebsiteReady()) return next();
   res.redirect(302, '/download');
 });
 
-/** Modern APK landing page */
-app.get(['/download', '/download/'], (req, res) => {
+/** Legacy APK landing — used only if the marketing website is not built yet */
+app.get(['/download', '/download/'], (req, res, next) => {
+  if (isWebsiteReady()) return next();
   res.sendFile(PAGE_PATH, (err) => {
     if (err) {
       console.error('[download] page missing:', PAGE_PATH, err.message);
@@ -262,6 +272,34 @@ app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API endpoint not found' });
 });
 
+app.use(
+  express.static(WEBSITE_DIST, {
+    index: false,
+    fallthrough: true,
+    maxAge: '1h',
+    setHeaders(res, filePath) {
+      if (String(filePath).endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-store');
+      }
+    },
+  })
+);
+app.get('*', (req, res, next) => {
+  if (!isWebsiteReady()) return next();
+  if (req.method !== 'GET') return next();
+  const p = req.path || '';
+  if (
+    p.startsWith('/api') ||
+    p.startsWith('/admin') ||
+    p.startsWith('/uploads') ||
+    p.startsWith('/downloads') ||
+    p.startsWith('/brand')
+  ) {
+    return next();
+  }
+  res.sendFile(WEBSITE_INDEX);
+});
+
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     console.error('JSON Parse Error:', err.message);
@@ -309,6 +347,11 @@ async function startServer() {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);
       console.log(`Admin panel: http://localhost:${PORT}/admin`);
+      console.log(
+        isWebsiteReady()
+          ? `WAREZONE website: http://localhost:${PORT}/`
+          : 'WAREZONE website: not built yet (run npm run website:build)'
+      );
       console.log(`APK download page: http://localhost:${PORT}/download`);
       if (process.env.PUBLIC_BASE_URL) {
         console.log(`Public base URL (for uploads/images): ${process.env.PUBLIC_BASE_URL}`);

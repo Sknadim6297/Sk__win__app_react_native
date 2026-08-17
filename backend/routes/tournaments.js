@@ -2426,7 +2426,9 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
 // Get tournament by ID (generic - must be after all specific routes)
 router.get('/:id', async (req, res) => {
   try {
-    const tournament = await Tournament.findById(req.params.id);
+    const tournament = await Tournament.findById(req.params.id)
+      .populate('game', 'name image')
+      .populate('gameMode', 'name image');
 
     if (!tournament) {
       return res.status(404).json({ error: 'Tournament not found' });
@@ -2434,7 +2436,7 @@ router.get('/:id', async (req, res) => {
 
     // Get participants
     const participants = await TournamentParticipant.find({ tournamentId: req.params.id })
-      .populate('userId', 'username email');
+      .populate('userId', 'username');
 
     const doc = tournament.toObject();
     res.json({

@@ -8,7 +8,6 @@ import {
   FlatList,
   TextInput,
   ActivityIndicator,
-  Alert,
   ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +25,10 @@ import Toast from '../components/Toast';
 import ScreenHeader from '../components/navigation/ScreenHeader';
 import { CoinValue } from '../components/contest/ContestShared';
 import { LIST_PERF } from '../utils/listPerf';
+
+function isAlreadyJoinedError(err) {
+  return /already joined|already booked a slot/i.test(String(err?.message || err || ''));
+}
 
 export default function TournamentSlotBookingScreen({ navigation, route }) {
   const { tournamentId, gamingUsername: initialUsername = '', walletRecharged, pendingJoin } = route.params || {};
@@ -46,6 +49,11 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
   const showToast = (message, type = 'error') => setToast({ visible: true, message, type });
   const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
   const autoJoinRef = useRef(false);
+  const bookingLockRef = useRef(false);
+
+  const goToJoinedDetails = useCallback(() => {
+    navigation.replace('TournamentDetails', { tournamentId, joinedSuccess: true });
+  }, [navigation, tournamentId]);
 
   useEffect(() => {
     (async () => {
@@ -121,6 +129,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
   };
 
   const handleBook = async () => {
+    if (bookingLockRef.current) return;
     if (!gamingUsername || gamingUsername.trim().length < 3) {
       setStep('details');
       showToast('Enter your in-game name', 'warning');
@@ -132,6 +141,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
       return;
     }
     try {
+      bookingLockRef.current = true;
       setBooking(true);
       if (isPaymentEnabled() && Number(entryFee) > 0) {
         startTournamentZapUpiPayment(navigation, {
@@ -172,10 +182,12 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           return;
         }
       }
-      Alert.alert('Success', `Slot ${selected[0]} booked`, [
-        { text: 'OK', onPress: () => navigation.replace('TournamentDetails', { tournamentId }) },
-      ]);
+      goToJoinedDetails();
     } catch (e) {
+      if (isAlreadyJoinedError(e)) {
+        goToJoinedDetails();
+        return;
+      }
       const msg = e.message || 'Failed to book';
       if (/balance|insufficient/i.test(msg)) {
         showInsufficientBalance({
@@ -189,6 +201,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
         showToast(msg, 'error');
       }
     } finally {
+      bookingLockRef.current = false;
       setBooking(false);
     }
   };
@@ -230,10 +243,12 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           return;
         }
         if (!res.success) throw new Error(res.message || 'Booking failed');
-        Alert.alert('Success', `Slot ${slotNum} booked`, [
-          { text: 'OK', onPress: () => navigation.replace('TournamentDetails', { tournamentId }) },
-        ]);
+        goToJoinedDetails();
       } catch (e) {
+        if (isAlreadyJoinedError(e)) {
+          goToJoinedDetails();
+          return;
+        }
         autoJoinRef.current = false;
         showToast(e.message || 'Failed to book', 'error');
       } finally {
@@ -253,11 +268,14 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
         gamingUID.trim()
       );
       if (res.success) {
-        Alert.alert('Success', 'Booking confirmed!', [
-          { text: 'OK', onPress: () => navigation.replace('TournamentDetails', { tournamentId }) },
-        ]);
+        goToJoinedDetails();
+        return;
       }
     } catch (e) {
+      if (isAlreadyJoinedError(e)) {
+        goToJoinedDetails();
+        return;
+      }
       showToast(e.message || 'Failed to confirm', 'error');
     } finally {
       setBooking(false);
