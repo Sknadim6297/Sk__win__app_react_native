@@ -13,24 +13,23 @@ function withNormalizedImage(doc, req) {
   return obj;
 }
 
-/** Green badge on mode cards: live matches only (never draft / upcoming / completed). */
-const LIVE_MATCH_STATUSES = ['ongoing', 'live'];
+/** Green badge on mode cards: upcoming matches only (not draft / live / completed). */
+const UPCOMING_MATCH_STATUSES = ['upcoming', 'incoming'];
 
-function liveMatchFilter(idField, ids) {
+function upcomingMatchFilter(idField, ids) {
   return {
     [idField]: { $in: ids },
-    $and: [
+    $or: [
+      { lifecycleStatus: { $in: UPCOMING_MATCH_STATUSES } },
       {
-        $or: [
-          { status: { $in: LIVE_MATCH_STATUSES } },
-          { lifecycleStatus: { $in: LIVE_MATCH_STATUSES } },
-        ],
-      },
-      { status: { $nin: ['draft', 'upcoming', 'incoming', 'completed', 'result_published', 'cancelled'] } },
-      {
-        $or: [
-          { lifecycleStatus: { $exists: false } },
-          { lifecycleStatus: { $in: LIVE_MATCH_STATUSES } },
+        $and: [
+          {
+            $or: [
+              { lifecycleStatus: { $exists: false } },
+              { lifecycleStatus: null },
+            ],
+          },
+          { status: { $in: UPCOMING_MATCH_STATUSES } },
         ],
       },
     ],
@@ -40,7 +39,7 @@ function liveMatchFilter(idField, ids) {
 async function countTournamentsByGame(gameIds) {
   if (!gameIds.length) return new Map();
   const rows = await Tournament.aggregate([
-    { $match: liveMatchFilter('game', gameIds) },
+    { $match: upcomingMatchFilter('game', gameIds) },
     { $group: { _id: '$game', count: { $sum: 1 } } },
   ]);
   return new Map(rows.map((r) => [String(r._id), r.count]));
@@ -49,7 +48,7 @@ async function countTournamentsByGame(gameIds) {
 async function countTournamentsByMode(modeIds) {
   if (!modeIds.length) return new Map();
   const rows = await Tournament.aggregate([
-    { $match: liveMatchFilter('gameMode', modeIds) },
+    { $match: upcomingMatchFilter('gameMode', modeIds) },
     { $group: { _id: '$gameMode', count: { $sum: 1 } } },
   ]);
   return new Map(rows.map((r) => [String(r._id), r.count]));

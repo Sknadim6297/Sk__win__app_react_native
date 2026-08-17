@@ -1,7 +1,6 @@
 /**
- * Seeds 10 dummy tournaments for admin lifecycle + result entry testing:
- * - 5 Custom (team vs team) — CustomMatchResult + PrizeDistribution
- * - 5 Battle Royale (solo slots) — BattleRoyaleResult + rank tiers
+ * Wipes all existing tournaments and seeds dummy matches with banner images
+ * for list / join testing.
  *
  * Run from backend/: npm run seed:tournaments
  */
@@ -17,30 +16,31 @@ const Team = require('./models/Team');
 const TeamMember = require('./models/TeamMember');
 const PrizeDistribution = require('./models/PrizeDistribution');
 const BattleRoyaleResult = require('./models/BattleRoyaleResult');
+const BattleRoyaleTeamResult = require('./models/BattleRoyaleTeamResult');
 const CustomMatchResult = require('./models/CustomMatchResult');
+const TournamentResult = require('./models/TournamentResult');
+const WinnerPayout = require('./models/WinnerPayout');
+const TournamentRefund = require('./models/TournamentRefund');
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/sk-win';
-const SEED_TAG = 'dummy-tournament-v2';
+const SEED_TAG = 'dummy-tournament-v3';
 
-const BANNER_IMAGES = [
-  'img_1775898188319.jpg',
-  'img_1779015715280.jpg',
-  'img_1779100796118.png',
-  'img_1778934537217.png',
-  'img_1779116982623.png',
-];
-
-const SEED_TITLES = [
-  'Lone Wolf Clash',
-  '1v1 Arena',
-  'Sniper Challenge',
-  'Desert Duel',
-  'Fast Combat Room',
-  'Bermuda Battle',
-  'Purgatory Survival',
-  'Kalahari Rush',
-  'Alpine Warzone',
-  'Nextterra Championship',
+const DUMMY_BANNERS = [
+  'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1200&q=70',
+  'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=70',
+  'https://images.unsplash.com/photo-1538481199705-c740cbf90b6c?auto=format&fit=crop&w=1200&q=70',
+  'https://images.unsplash.com/photo-1493711662062-fa541adb3fc8?auto=format&fit=crop&w=1200&q=70',
+  'https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=1200&q=70',
+  'https://images.unsplash.com/photo-1593305841991-05c297ba4575?auto=format&fit=crop&w=1200&q=70',
+  'https://images.unsplash.com/photo-1511882150382-421056c89033?auto=format&fit=crop&w=1200&q=70',
+  'https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=1200&q=70',
+  'https://images.unsplash.com/photo-1542751110-97427bbecf20?auto=format&fit=crop&w=1200&q=70',
+  'https://images.unsplash.com/photo-1519669556871-a5de8d2d2b0d?auto=format&fit=crop&w=1200&q=70',
+  'https://picsum.photos/seed/skwin-arena/1200/640',
+  'https://picsum.photos/seed/skwin-kalahari/1200/640',
+  'https://picsum.photos/seed/skwin-bermuda/1200/640',
+  'https://picsum.photos/seed/skwin-purgatory/1200/640',
+  'https://picsum.photos/seed/skwin-alpine/1200/640',
 ];
 
 const DEFAULT_RULES = [
@@ -51,12 +51,20 @@ const DEFAULT_RULES = [
   'Review prize pool distribution before joining.',
 ];
 
+function banner(i) {
+  return DUMMY_BANNERS[i % DUMMY_BANNERS.length];
+}
+
 function minutesFromNow(m) {
   return new Date(Date.now() + m * 60 * 1000);
 }
 
 function hoursFromNow(h) {
   return minutesFromNow(h * 60);
+}
+
+function daysFromNow(d) {
+  return hoursFromNow(d * 24);
 }
 
 function hoursAgo(h) {
@@ -85,6 +93,12 @@ function customPrizeSplit(prizePool) {
     winnerPrize: Number(prizePool) || 0,
     runnerUpPrize: 0,
   };
+}
+
+function brSlotsForMode(mode) {
+  if (mode === 'duo') return 25;
+  if (mode === 'squad') return 12;
+  return 50;
 }
 
 async function ensureAdmin() {
@@ -131,7 +145,7 @@ async function ensureGameAndModes() {
   if (!game) {
     game = await Game.create({
       name: 'Free Fire MAX',
-      image: BANNER_IMAGES[0],
+      image: banner(0),
       rating: 4.8,
       players: '3M+',
       description: 'Battle royale mobile esports',
@@ -139,6 +153,9 @@ async function ensureGameAndModes() {
       status: 'active',
     });
     console.log('Created game: Free Fire MAX');
+  } else {
+    game.image = banner(0);
+    await game.save();
   }
 
   let loneWolfMode = await GameMode.findOne({ game: game._id, name: 'Lone Wolf' });
@@ -147,9 +164,12 @@ async function ensureGameAndModes() {
       game: game._id,
       name: 'Lone Wolf',
       description: 'Custom matches — squad vs squad',
-      image: BANNER_IMAGES[1],
+      image: banner(1),
       status: 'active',
     });
+  } else {
+    loneWolfMode.image = banner(1);
+    await loneWolfMode.save();
   }
 
   let fullMapMode = await GameMode.findOne({
@@ -161,9 +181,12 @@ async function ensureGameAndModes() {
       game: game._id,
       name: 'BR FULL MAP',
       description: 'Classic BR — prize pool + per kill',
-      image: BANNER_IMAGES[2],
+      image: banner(2),
       status: 'active',
     });
+  } else {
+    fullMapMode.image = banner(2);
+    await fullMapMode.save();
   }
 
   const duplicateFullMap = await GameMode.find({
@@ -172,27 +195,34 @@ async function ensureGameAndModes() {
     _id: { $ne: fullMapMode._id },
   });
   for (const extra of duplicateFullMap) {
-    await Tournament.updateMany({ gameMode: extra._id }, { $set: { gameMode: fullMapMode._id, game: game._id } });
     await extra.deleteOne();
-    console.log(`Merged duplicate mode "${extra.name}" into "${fullMapMode.name}"`);
+    console.log(`Removed duplicate mode "${extra.name}"`);
   }
 
   return { game, loneWolfMode, fullMapMode };
 }
 
-async function clearPreviousSeed() {
-  const old = await Tournament.find({ name: { $in: SEED_TITLES } }).select('_id');
-  const ids = old.map((t) => t._id);
-  if (!ids.length) return;
+async function clearAllTournaments() {
+  const ids = (await Tournament.find({}).select('_id')).map((t) => t._id);
+  if (!ids.length) {
+    console.log('No existing tournaments to remove');
+    return;
+  }
 
-  await TournamentParticipant.deleteMany({ tournamentId: { $in: ids } });
-  await TeamMember.deleteMany({ tournamentId: { $in: ids } });
-  await Team.deleteMany({ tournamentId: { $in: ids } });
-  await BattleRoyaleResult.deleteMany({ tournamentId: { $in: ids } });
-  await CustomMatchResult.deleteMany({ tournamentId: { $in: ids } });
-  await PrizeDistribution.deleteMany({ tournamentId: { $in: ids } });
-  await Tournament.deleteMany({ _id: { $in: ids } });
-  console.log(`Removed ${ids.length} previous seed tournaments (+ related results/teams)`);
+  await Promise.all([
+    TournamentParticipant.deleteMany({ tournamentId: { $in: ids } }),
+    TeamMember.deleteMany({ tournamentId: { $in: ids } }),
+    Team.deleteMany({ tournamentId: { $in: ids } }),
+    BattleRoyaleResult.deleteMany({ tournamentId: { $in: ids } }),
+    BattleRoyaleTeamResult.deleteMany({ tournamentId: { $in: ids } }),
+    CustomMatchResult.deleteMany({ tournamentId: { $in: ids } }),
+    PrizeDistribution.deleteMany({ tournamentId: { $in: ids } }),
+    WinnerPayout.deleteMany({ tournamentId: { $in: ids } }),
+    TournamentRefund.deleteMany({ tournamentId: { $in: ids } }),
+    TournamentResult.deleteMany({ tournamentId: { $in: ids } }),
+    Tournament.deleteMany({ _id: { $in: ids } }),
+  ]);
+  console.log(`Removed ALL ${ids.length} tournaments (+ related records)`);
 }
 
 function buildSlots(maxSlots, bookings) {
@@ -253,12 +283,14 @@ async function attachCustomTeams(tournament, players, teamSize = 4) {
   const teamA = await Team.create({
     tournamentId: tournament._id,
     name: 'Alpha Squad',
+    side: 'A',
     captainUserId: sliceA[0]._id,
     status: 'registered',
   });
   const teamB = await Team.create({
     tournamentId: tournament._id,
     name: 'Bravo Squad',
+    side: 'B',
     captainUserId: sliceB[0]._id,
     status: 'registered',
   });
@@ -284,7 +316,7 @@ async function attachCustomTeams(tournament, players, teamSize = 4) {
   tournament.registeredPlayers = [...sliceA, ...sliceB].map((p) => p._id);
   await tournament.save();
 
-  return { teamA, teamB, mvpUser: sliceA[1] };
+  return { teamA, teamB, mvpUser: sliceA[sliceA.length > 1 ? 1 : 0] };
 }
 
 async function seedPrizeDistribution(tournament, type) {
@@ -360,7 +392,8 @@ async function seedCustomMatchResult(tournament, teams, mvpUser, prizeDistributi
 async function createTournament(def, ctx) {
   const { game, admin, matchNumber } = ctx;
   const lifecycleStatus = def.lifecycleStatus;
-  const maxSlots = def.maxParticipants || 48;
+  const isCustom = def.category === 'custom';
+  const maxSlots = def.maxParticipants || (isCustom ? 2 : brSlotsForMode(def.mode || 'solo'));
   const prizePool = def.prizePool;
   const prizes = splitPrizes(prizePool);
   const locked = ['ongoing', 'completed', 'result_published'].includes(lifecycleStatus);
@@ -368,7 +401,7 @@ async function createTournament(def, ctx) {
   const tournament = await Tournament.create({
     name: def.name,
     description: `${def.description} [${SEED_TAG}]`,
-    bannerImage: def.bannerImage || BANNER_IMAGES[matchNumber % BANNER_IMAGES.length],
+    bannerImage: def.bannerImage || banner(matchNumber),
     bannerTitle: def.bannerTitle || def.name.toUpperCase(),
     matchNumber: 50000 + matchNumber,
     game: game._id,
@@ -377,14 +410,14 @@ async function createTournament(def, ctx) {
     category: def.category,
     lifecycleStatus,
     status: lifecycleStatus,
-    rewardType: def.category === 'custom' ? 'survival' : 'per_kill',
+    rewardType: isCustom ? 'survival' : 'per_kill',
     map: def.map,
     rules: def.rules || DEFAULT_RULES,
     entryFee: def.entryFee,
     prizePool,
-    perKill: def.category === 'custom' ? 0 : def.perKill,
+    perKill: isCustom ? 0 : def.perKill,
     maxParticipants: maxSlots,
-    maxTeams: def.maxTeams || 2,
+    maxTeams: def.maxTeams || (isCustom ? 2 : maxSlots),
     currentParticipants: 0,
     registeredPlayers: [],
     locked,
@@ -402,7 +435,7 @@ async function createTournament(def, ctx) {
 
   let prizeDistribution = null;
 
-  if (def.category === 'custom' && def.teamPlayers?.length) {
+  if (isCustom && def.teamPlayers?.length) {
     const teams = await attachCustomTeams(tournament, def.teamPlayers, def.teamSize || 4);
     prizeDistribution = await seedPrizeDistribution(tournament, 'custom_match');
     if (def.seedResults) {
@@ -423,6 +456,8 @@ async function createTournament(def, ctx) {
     if (def.seedResults && def.bookings?.length) {
       await seedBattleRoyaleResults(tournament, def.bookings, prizeDistribution);
     }
+  } else if (isCustom) {
+    prizeDistribution = await seedPrizeDistribution(tournament, 'custom_match');
   }
 
   return { tournament, prizeDistribution };
@@ -432,7 +467,7 @@ async function seedTournaments() {
   await mongoose.connect(MONGODB_URI);
   console.log('Connected:', mongoose.connection.name);
 
-  await clearPreviousSeed();
+  await clearAllTournaments();
   const admin = await ensureAdmin();
   const players = await ensureTestPlayers(50);
   const { game, loneWolfMode, fullMapMode } = await ensureGameAndModes();
@@ -445,65 +480,146 @@ async function seedTournaments() {
 
   const customDefs = [
     {
-      name: 'Lone Wolf Clash',
-      category: 'custom',
-      mode: 'squad',
-      gameModeId: loneWolfMode._id,
-      map: 'Training Ground',
-      entryFee: 5,
-      prizePool: 200,
-      lifecycleStatus: 'upcoming',
-      startDate: minutesFromNow(30),
-      endDate: hoursFromNow(3),
-      teamPlayers: players.slice(0, 8),
-      description: 'Upcoming squad custom — register teams, no results yet.',
-    },
-    {
       name: '1v1 Arena',
       category: 'custom',
-      mode: 'squad',
+      mode: 'solo',
+      teamSize: 1,
       gameModeId: loneWolfMode._id,
       map: 'Arena Alpha',
       entryFee: 10,
       prizePool: 400,
       lifecycleStatus: 'upcoming',
-      startDate: hoursFromNow(2),
-      endDate: hoursFromNow(5),
-      teamPlayers: players.slice(8, 16),
-      description: 'Both teams registered — ready to publish & start.',
+      startDate: minutesFromNow(25),
+      endDate: hoursFromNow(3),
+      bannerImage: banner(0),
+      description: 'Upcoming 1v1 — empty, ready to join.',
     },
     {
-      name: 'Sniper Challenge',
+      name: '1v1 Clash',
       category: 'custom',
-      mode: 'squad',
+      mode: 'solo',
+      teamSize: 1,
+      gameModeId: loneWolfMode._id,
+      map: 'Training Ground',
+      entryFee: 8,
+      prizePool: 250,
+      lifecycleStatus: 'upcoming',
+      startDate: hoursFromNow(1),
+      endDate: hoursFromNow(4),
+      bannerImage: banner(1),
+      description: 'Upcoming 1v1 clash.',
+    },
+    {
+      name: 'Sniper Duel',
+      category: 'custom',
+      mode: 'solo',
+      teamSize: 1,
       gameModeId: loneWolfMode._id,
       map: 'Sniper Ridge',
-      entryFee: 15,
-      prizePool: 600,
-      lifecycleStatus: 'ongoing',
-      startDate: hoursAgo(0.15),
-      endDate: hoursFromNow(2),
-      teamPlayers: players.slice(16, 24),
-      description: 'Live custom match — join blocked.',
+      entryFee: 12,
+      prizePool: 480,
+      lifecycleStatus: 'upcoming',
+      startDate: hoursFromNow(3),
+      endDate: hoursFromNow(6),
+      bannerImage: banner(2),
+      description: 'Upcoming 1v1 sniper room.',
     },
     {
-      name: 'Desert Duel',
+      name: 'Duo Clash',
+      category: 'custom',
+      mode: 'duo',
+      teamSize: 2,
+      gameModeId: loneWolfMode._id,
+      map: 'Combat Lab',
+      entryFee: 15,
+      prizePool: 600,
+      lifecycleStatus: 'upcoming',
+      startDate: hoursFromNow(2),
+      endDate: hoursFromNow(5),
+      bannerImage: banner(3),
+      description: 'Upcoming 2v2 — empty, ready to join.',
+    },
+    {
+      name: 'Night Duo',
+      category: 'custom',
+      mode: 'duo',
+      teamSize: 2,
+      gameModeId: loneWolfMode._id,
+      map: 'Bermuda',
+      entryFee: 18,
+      prizePool: 720,
+      lifecycleStatus: 'upcoming',
+      startDate: hoursFromNow(6),
+      endDate: hoursFromNow(9),
+      bannerImage: banner(4),
+      description: 'Upcoming 2v2 night match.',
+    },
+    {
+      name: 'Squad Wars',
       category: 'custom',
       mode: 'squad',
+      teamSize: 4,
       gameModeId: loneWolfMode._id,
       map: 'Desert Ruins',
-      entryFee: 12,
-      prizePool: 500,
-      lifecycleStatus: 'completed',
-      startDate: hoursAgo(4),
-      endDate: hoursAgo(1),
-      teamPlayers: players.slice(24, 32),
-      description: 'Completed — enter results in admin, then publish (no results saved yet).',
+      entryFee: 20,
+      prizePool: 800,
+      lifecycleStatus: 'upcoming',
+      startDate: hoursFromNow(4),
+      endDate: hoursFromNow(8),
+      bannerImage: banner(5),
+      description: 'Upcoming 4v4 — empty, ready to join.',
+    },
+    {
+      name: 'Alpha Rush',
+      category: 'custom',
+      mode: 'squad',
+      teamSize: 4,
+      gameModeId: loneWolfMode._id,
+      map: 'Kalahari',
+      entryFee: 25,
+      prizePool: 1000,
+      lifecycleStatus: 'upcoming',
+      startDate: daysFromNow(1),
+      endDate: daysFromNow(1.2),
+      bannerImage: banner(6),
+      description: 'Upcoming 4v4 tomorrow.',
+    },
+    {
+      name: 'Weekend Cup',
+      category: 'custom',
+      mode: 'squad',
+      teamSize: 4,
+      gameModeId: loneWolfMode._id,
+      map: 'Purgatory',
+      entryFee: 30,
+      prizePool: 1200,
+      lifecycleStatus: 'upcoming',
+      startDate: daysFromNow(2),
+      endDate: daysFromNow(2.2),
+      bannerImage: banner(7),
+      description: 'Upcoming 4v4 weekend cup.',
+    },
+    {
+      name: 'Live Custom Duel',
+      category: 'custom',
+      mode: 'solo',
+      teamSize: 1,
+      gameModeId: loneWolfMode._id,
+      map: 'Arena Alpha',
+      entryFee: 10,
+      prizePool: 400,
+      lifecycleStatus: 'ongoing',
+      startDate: hoursAgo(0.2),
+      endDate: hoursFromNow(2),
+      teamPlayers: players.slice(0, 2),
+      bannerImage: banner(8),
+      description: 'Live 1v1 — join blocked.',
     },
     {
       name: 'Fast Combat Room',
       category: 'custom',
       mode: 'squad',
+      teamSize: 4,
       gameModeId: loneWolfMode._id,
       map: 'Combat Lab',
       entryFee: 8,
@@ -511,119 +627,198 @@ async function seedTournaments() {
       lifecycleStatus: 'result_published',
       startDate: hoursAgo(6),
       endDate: hoursAgo(3),
-      teamPlayers: players.slice(32, 40),
+      teamPlayers: players.slice(2, 10),
       seedResults: true,
-      description: 'Published custom — winner/runner-up/MVP visible to players.',
+      bannerImage: banner(9),
+      description: 'Published custom — winner visible.',
     },
   ];
 
   const brDefs = [
     {
-      name: 'Bermuda Battle',
+      name: 'Bermuda Open',
       category: 'battle_royale',
+      mode: 'solo',
       gameModeId: fullMapMode._id,
       map: 'Bermuda',
       entryFee: 7,
       prizePool: 800,
       perKill: 5,
-      maxParticipants: 48,
-      lifecycleStatus: 'ongoing',
-      startDate: hoursAgo(0.2),
-      endDate: hoursFromNow(2),
-      bookings: makeBookings(players.slice(0, 12), 12),
-      roomId: 'FFBERM01',
-      roomPassword: 'live01',
-      showRoomCredentials: true,
-      description: 'Live Full Map BR — Bermuda.',
+      lifecycleStatus: 'upcoming',
+      startDate: minutesFromNow(40),
+      endDate: hoursFromNow(4),
+      bookings: makeBookings(players.slice(10, 22), 12),
+      bannerImage: banner(10),
+      description: 'Upcoming BR Solo — Bermuda.',
     },
     {
-      name: 'Purgatory Survival',
+      name: 'Bermuda Night',
       category: 'battle_royale',
+      mode: 'solo',
+      gameModeId: fullMapMode._id,
+      map: 'Bermuda',
+      entryFee: 8,
+      prizePool: 900,
+      perKill: 6,
+      lifecycleStatus: 'upcoming',
+      startDate: hoursFromNow(2),
+      endDate: hoursFromNow(6),
+      bookings: makeBookings(players.slice(12, 18), 6),
+      bannerImage: banner(11),
+      description: 'Upcoming BR Solo night.',
+    },
+    {
+      name: 'Purgatory Duo',
+      category: 'battle_royale',
+      mode: 'duo',
       gameModeId: fullMapMode._id,
       map: 'Purgatory',
-      entryFee: 10,
-      prizePool: 1200,
+      entryFee: 12,
+      prizePool: 1400,
       perKill: 8,
-      lifecycleStatus: 'ongoing',
-      startDate: hoursAgo(0.15),
-      endDate: hoursFromNow(2),
-      bookings: makeBookings(players.slice(4), 24),
-      roomId: 'FFPURG02',
-      roomPassword: 'live02',
-      showRoomCredentials: true,
-      description: 'Live Full Map BR — Purgatory.',
+      lifecycleStatus: 'upcoming',
+      startDate: hoursFromNow(5),
+      endDate: hoursFromNow(9),
+      bookings: makeBookings(players.slice(18, 26), 8),
+      bannerImage: banner(12),
+      description: 'Upcoming BR Duo.',
     },
     {
       name: 'Kalahari Rush',
       category: 'battle_royale',
+      mode: 'squad',
+      gameModeId: fullMapMode._id,
+      map: 'Kalahari',
+      entryFee: 15,
+      prizePool: 1800,
+      perKill: 10,
+      lifecycleStatus: 'upcoming',
+      startDate: hoursFromNow(8),
+      endDate: hoursFromNow(12),
+      bookings: makeBookings(players.slice(20, 26), 6),
+      bannerImage: banner(13),
+      description: 'Upcoming BR Squad.',
+    },
+    {
+      name: 'Alpine Warzone',
+      category: 'battle_royale',
+      mode: 'solo',
+      gameModeId: fullMapMode._id,
+      map: 'Alpine',
+      entryFee: 10,
+      prizePool: 1100,
+      perKill: 7,
+      lifecycleStatus: 'upcoming',
+      startDate: daysFromNow(1),
+      endDate: daysFromNow(1.2),
+      bookings: makeBookings(players.slice(24, 32), 8),
+      bannerImage: banner(14),
+      description: 'Upcoming BR Solo — Alpine.',
+    },
+    {
+      name: 'Nextterra Cup',
+      category: 'battle_royale',
+      mode: 'duo',
+      gameModeId: fullMapMode._id,
+      map: 'Nextterra',
+      entryFee: 14,
+      prizePool: 1600,
+      perKill: 9,
+      lifecycleStatus: 'upcoming',
+      startDate: daysFromNow(1.5),
+      endDate: daysFromNow(1.7),
+      bookings: makeBookings(players.slice(28, 34), 6),
+      bannerImage: banner(0),
+      description: 'Upcoming BR Duo — Nextterra.',
+    },
+    {
+      name: 'Bermuda Classic',
+      category: 'battle_royale',
+      mode: 'solo',
+      gameModeId: fullMapMode._id,
+      map: 'Bermuda',
+      entryFee: 6,
+      prizePool: 700,
+      perKill: 4,
+      lifecycleStatus: 'upcoming',
+      startDate: daysFromNow(2),
+      endDate: daysFromNow(2.2),
+      bannerImage: banner(1),
+      description: 'Upcoming BR Solo — empty lobby.',
+    },
+    {
+      name: 'Purgatory Night',
+      category: 'battle_royale',
+      mode: 'squad',
+      gameModeId: fullMapMode._id,
+      map: 'Purgatory',
+      entryFee: 18,
+      prizePool: 2200,
+      perKill: 12,
+      lifecycleStatus: 'upcoming',
+      startDate: daysFromNow(3),
+      endDate: daysFromNow(3.2),
+      bookings: makeBookings(players.slice(30, 34), 4),
+      bannerImage: banner(2),
+      description: 'Upcoming BR Squad night.',
+    },
+    {
+      name: 'Live Bermuda',
+      category: 'battle_royale',
+      mode: 'solo',
+      gameModeId: fullMapMode._id,
+      map: 'Bermuda',
+      entryFee: 7,
+      prizePool: 800,
+      perKill: 5,
+      lifecycleStatus: 'ongoing',
+      startDate: hoursAgo(0.2),
+      endDate: hoursFromNow(2),
+      bookings: makeBookings(players.slice(34, 46), 12),
+      roomId: 'FFBERM01',
+      roomPassword: 'live01',
+      showRoomCredentials: true,
+      bannerImage: banner(3),
+      description: 'Live Full Map BR — Bermuda.',
+    },
+    {
+      name: 'Kalahari Finals',
+      category: 'battle_royale',
+      mode: 'solo',
       gameModeId: fullMapMode._id,
       map: 'Kalahari',
       entryFee: 12,
       prizePool: 1500,
       perKill: 10,
-      lifecycleStatus: 'ongoing',
-      startDate: hoursAgo(0.1),
-      endDate: hoursFromNow(2),
-      bookings: makeBookings(players, 40),
-      roomId: 'FFKALA03',
-      roomPassword: 'live03',
-      showRoomCredentials: true,
-      description: 'Live Full Map BR — Kalahari.',
-    },
-    {
-      name: 'Alpine Warzone',
-      category: 'battle_royale',
-      gameModeId: fullMapMode._id,
-      map: 'Alpine',
-      entryFee: 15,
-      prizePool: 2000,
-      perKill: 12,
-      lifecycleStatus: 'ongoing',
-      startDate: hoursAgo(0.05),
-      endDate: hoursFromNow(3),
-      bookings: makeBookings(players.slice(8), 18),
-      roomId: 'FFALPI04',
-      roomPassword: 'live04',
-      showRoomCredentials: true,
-      description: 'Live Full Map BR — Alpine.',
-    },
-    {
-      name: 'Nextterra Championship',
-      category: 'battle_royale',
-      gameModeId: fullMapMode._id,
-      map: 'Nextterra',
-      entryFee: 20,
-      prizePool: 3000,
-      perKill: 15,
-      lifecycleStatus: 'ongoing',
-      startDate: hoursAgo(0.08),
-      endDate: hoursFromNow(3),
-      bookings: makeBookings(players, 32),
-      roomId: 'FFNEXT05',
-      roomPassword: 'live05',
-      showRoomCredentials: true,
-      description: 'Live Full Map BR — Nextterra.',
+      lifecycleStatus: 'result_published',
+      startDate: hoursAgo(8),
+      endDate: hoursAgo(6),
+      bookings: makeBookings(players.slice(40, 50), 10),
+      seedResults: true,
+      bannerImage: banner(4),
+      description: 'Published BR — results visible.',
     },
   ];
 
-  console.log('\n--- Lone Wolf (Custom, 2 squads) ---');
+  console.log('\n--- Lone Wolf (Custom) ---');
   for (const def of customDefs) {
     const { tournament } = await createTournament(def, { ...ctx, matchNumber: nextNum() });
-    const extra = def.seedResults ? ' + CustomMatchResult' : def.lifecycleStatus === 'completed' ? ' (awaiting result entry)' : '';
-    console.log(`  ✓ ${tournament.name} [${tournament.lifecycleStatus}] teams 2/2${extra}`);
+    console.log(
+      `  ✓ ${tournament.name} [${tournament.lifecycleStatus}] ${tournament.currentParticipants}/${tournament.maxParticipants} ${def.mode}`
+    );
   }
 
   console.log('\n--- Full Map (Battle Royale) ---');
   for (const def of brDefs) {
     const { tournament } = await createTournament(def, { ...ctx, matchNumber: nextNum() });
-    const slots = `${tournament.currentParticipants}/${tournament.maxParticipants}`;
-    const extra = def.seedResults ? ' + BattleRoyaleResult' : '';
-    console.log(`  ✓ ${tournament.name} [${tournament.lifecycleStatus}] ${slots} perKill ₹${tournament.perKill}${extra}`);
+    console.log(
+      `  ✓ ${tournament.name} [${tournament.lifecycleStatus}] ${tournament.currentParticipants}/${tournament.maxParticipants} ${def.mode}`
+    );
   }
 
-  console.log('\n✅ Seed complete — 10 tournaments (v2 lifecycle models)');
-  console.log('   Custom: mixed upcoming / live / completed (Lone Wolf)');
-  console.log('   Full Map: 5 live dummy BR matches (home badge counts live only)');
+  console.log('\n✅ Seed complete — dummy matches with banner images');
+  console.log(`   Custom: ${customDefs.length}  |  BR: ${brDefs.length}`);
+  console.log('   Most upcoming matches are empty so you can join for testing');
   console.log('   Test login: seed_player_1 … seed_player_50 / test1234');
   console.log('   Admin: admin@skwin.com / admin123\n');
 

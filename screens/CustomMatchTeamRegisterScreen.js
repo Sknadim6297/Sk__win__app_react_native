@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,23 +8,38 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ScreenHeader from '../components/navigation/ScreenHeader';
+import CenterDialog from '../components/CenterDialog';
 import { COLORS, FONTS } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
 import { tournamentService, tournamentManagementService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import Toast from '../components/Toast';
-import { getTeamSize, isCustomMatch, isTeamEntryMode } from '../utils/tournamentHelpers';
+import { getTeamSize, isCustomMatch, getMatchStructure } from '../utils/tournamentHelpers';
 import { fetchWalletForEntry } from '../utils/walletFlow';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
-import { isPaymentEnabled } from '../utils/paymentConfig';
 
 const emptyPlayer = () => ({ name: '', gamingUID: '' });
 
+function clonePlayers(list) {
+  return (list || []).map((p) => ({
+    name: String(p?.name || ''),
+    gamingUID: String(p?.gamingUID || ''),
+  }));
+}
+
+function isPlayerComplete(player) {
+  return String(player?.name || '').trim().length >= 3 && String(player?.gamingUID || '').trim().length >= 3;
+}
+
 export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
-  const { tournamentId, walletRecharged, payWithCashfree } = route.params || {};
+  const { tournamentId, walletRecharged, pendingJoin } = route.params || {};
   const { user, isAdmin } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
 
@@ -33,8 +48,18 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
   const [submitting, setSubmitting] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [teamSide, setTeamSide] = useState('A');
+  const [teamSlot, setTeamSlot] = useState(1);
   const [players, setPlayers] = useState([emptyPlayer()]);
+  const [teamSubmitted, setTeamSubmitted] = useState(false);
+  const [entryVisible, setEntryVisible] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [draftTeamName, setDraftTeamName] = useState('');
+  const [draftTeamSide, setDraftTeamSide] = useState('A');
+  const [draftTeamSlot, setDraftTeamSlot] = useState(1);
+  const [draftPlayers, setDraftPlayers] = useState([emptyPlayer()]);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
+
+  const autoJoinRef = useRef(false);
 
   const showToast = (message, type = 'error') => setToast({ visible: true, message, type });
   const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
@@ -52,7 +77,9 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
         const data = await tournamentService.getDetails(tournamentId);
         setTournament(data);
         const count = getTeamSize(data.mode);
-        setPlayers(Array.from({ length: count }, () => emptyPlayer()));
+        const blank = Array.from({ length: count }, () => emptyPlayer());
+        setPlayers(blank);
+        setDraftPlayers(clonePlayers(blank));
       } catch (e) {
         showToast(e.message || 'Failed to load match');
       } finally {
@@ -62,11 +89,81 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
   }, [tournamentId]);
 
   useEffect(() => {
-    if (walletRecharged) {
-      showToast('Coins added successfully! You can register your team now.', 'success');
+    if (!walletRecharged) return;
+    showToast('Coins added successfully!', 'success');
+    if (!pendingJoin) {
       navigation.setParams({ walletRecharged: undefined });
     }
-  }, [walletRecharged, navigation]);
+  }, [walletRecharged, pendingJoin, navigation]);
+
+  const buildPendingJoin = (override) => {
+    const roster = (override?.players || players).map((p) => ({
+      name: String(p.name || '').trim(),
+      gamingUID: String(p.gamingUID || '').trim(),
+    }));
+    return {
+      kind: 'team',
+      teamName: String(override?.teamName || teamName).trim(),
+      teamSide: override?.teamSide || teamSide,
+      slotNumber: override?.slotNumber || teamSlot,
+      players: roster,
+    };
+  };
+
+  const completeTeamJoin = async (payload) => {
+    const join = payload || buildPendingJoin();
+    if (!join.teamName) {
+      showToast('Enter team name');
+      return;
+    }
+
+    const walletCheck = await fetchWalletForEntry(tournament.entryFee);
+    if (!walletCheck.sufficient) {
+      showInsufficientBalance({
+        tournamentId,
+        returnScreen: 'CustomMatchTeamRegister',
+        forTeam: true,
+        requiredAmount: tournament.entryFee,
+        currentBalance: walletCheck.balance,
+        remainingAmount: walletCheck.remaining,
+        qrAmount: walletCheck.qrAmount,
+        pendingJoin: join,
+      });
+      return;
+    }
+
+    await tournamentManagementService.registerTeam(tournamentId, {
+      teamName: join.teamName,
+      teamSide: isCustomMatch(tournament) ? join.teamSide : undefined,
+      slotNumber: isCustomMatch(tournament) ? undefined : join.slotNumber,
+      players: join.players,
+    });
+
+    showToast('Team registered successfully!', 'success');
+    setTimeout(() => navigation.replace('TournamentDetails', { tournamentId }), 700);
+  };
+
+  useEffect(() => {
+    if (!walletRecharged || !tournament || !pendingJoin || autoJoinRef.current) return;
+    autoJoinRef.current = true;
+    setTeamName(pendingJoin.teamName || '');
+    setTeamSide(pendingJoin.teamSide || 'A');
+    setTeamSlot(pendingJoin.slotNumber || 1);
+    setPlayers(clonePlayers(pendingJoin.players || []));
+    setTeamSubmitted(true);
+    navigation.setParams({ walletRecharged: undefined, pendingJoin: undefined });
+    (async () => {
+      try {
+        setSubmitting(true);
+        await completeTeamJoin(pendingJoin);
+      } catch (e) {
+        autoJoinRef.current = false;
+        showToast(e.message || 'Failed to register team');
+      } finally {
+        setSubmitting(false);
+      }
+    })();
+  }, [walletRecharged, tournament, pendingJoin, navigation]);
 
   const takenSides = useMemo(() => {
     const sides = new Set();
@@ -76,8 +173,84 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
     return sides;
   }, [tournament?.teams]);
 
-  const updatePlayer = (index, field, value) => {
-    setPlayers((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+  const takenSlots = useMemo(() => {
+    const slots = new Set();
+    (tournament?.teams || []).forEach((t) => {
+      if (t.slotNumber) slots.add(Number(t.slotNumber));
+    });
+    return slots;
+  }, [tournament?.teams]);
+
+  const matchStructure = useMemo(() => getMatchStructure(tournament || {}), [tournament]);
+
+  const openEntryModal = () => {
+    const nextSide = takenSides.has(teamSide)
+      ? ['A', 'B'].find((side) => !takenSides.has(side)) || teamSide
+      : teamSide;
+    let nextSlot = teamSlot;
+    if (takenSlots.has(nextSlot)) {
+      for (let i = 1; i <= matchStructure.totalSlots; i += 1) {
+        if (!takenSlots.has(i)) {
+          nextSlot = i;
+          break;
+        }
+      }
+    }
+    setDraftTeamName(teamName);
+    setDraftTeamSide(nextSide);
+    setDraftTeamSlot(nextSlot);
+    setDraftPlayers(clonePlayers(players));
+    setEntryVisible(true);
+  };
+
+  const updateDraftPlayer = (index, field, value) => {
+    setDraftPlayers((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+  };
+
+  const handleModalSubmit = () => {
+    if (!draftTeamName.trim()) {
+      showToast('Enter team name');
+      return;
+    }
+    if (isCustomMatch(tournament) && takenSides.has(draftTeamSide)) {
+      showToast(`Team ${draftTeamSide} is already taken`);
+      return;
+    }
+    if (!isCustomMatch(tournament) && takenSlots.has(draftTeamSlot)) {
+      showToast(`Slot ${draftTeamSlot} is already booked`);
+      return;
+    }
+
+    for (let i = 0; i < draftPlayers.length; i += 1) {
+      const name = String(draftPlayers[i].name || '').trim();
+      const uid = String(draftPlayers[i].gamingUID || '').trim();
+      if (name.length < 3) {
+        showToast(`Player ${i + 1}: enter Game ID (min 3 characters)`, 'warning');
+        return;
+      }
+      if (uid.length < 3) {
+        showToast(`Player ${i + 1}: enter Game UID (min 3 characters)`, 'warning');
+        return;
+      }
+    }
+
+    setTeamName(draftTeamName.trim());
+    setTeamSide(draftTeamSide);
+    setTeamSlot(draftTeamSlot);
+    setPlayers(clonePlayers(draftPlayers).map((p) => ({
+      name: p.name.trim(),
+      gamingUID: p.gamingUID.trim(),
+    })));
+    setTeamSubmitted(true);
+    setEntryVisible(false);
+  };
+
+  const handleJoinPress = () => {
+    if (!teamSubmitted || !players.every(isPlayerComplete) || !teamName.trim()) {
+      openEntryModal();
+      return;
+    }
+    setConfirmVisible(true);
   };
 
   const handleRegister = async () => {
@@ -89,7 +262,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       showToast('Admins cannot register as participants');
       return;
     }
-    if (!isCustomMatch(tournament) && !isTeamEntryMode(tournament?.mode)) {
+    if (!getMatchStructure(tournament).usesTeamRegistration) {
       showToast('This tournament does not use team registration');
       return;
     }
@@ -97,8 +270,12 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       showToast('Enter team name');
       return;
     }
-    if (takenSides.has(teamSide)) {
+    if (isCustomMatch(tournament) && takenSides.has(teamSide)) {
       showToast(`Team ${teamSide} is already taken`);
+      return;
+    }
+    if (!isCustomMatch(tournament) && takenSlots.has(teamSlot)) {
+      showToast(`Slot ${teamSlot} is already booked`);
       return;
     }
 
@@ -117,47 +294,8 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
 
     try {
       setSubmitting(true);
-
-      const roster = players.map((p) => ({
-        name: p.name.trim(),
-        gamingUID: p.gamingUID.trim(),
-      }));
-
-      // Cashfree Sandbox Pay & Join for team entry
-      if (isPaymentEnabled() || payWithCashfree) {
-        navigation.navigate('TournamentPayJoin', {
-          tournamentId,
-          tournamentName: tournament?.name,
-          amount: tournament?.entryFee,
-          joinKind: 'team',
-          teamName: teamName.trim(),
-          teamSide,
-          players: roster,
-          skipForm: true,
-        });
-        return;
-      }
-
-      const walletCheck = await fetchWalletForEntry(tournament.entryFee);
-      if (!walletCheck.sufficient) {
-        showInsufficientBalance({
-          tournamentId,
-          returnScreen: 'CustomMatchTeamRegister',
-          forTeam: true,
-          requiredAmount: walletCheck.realRequired,
-          currentBalance: walletCheck.balance,
-        });
-        return;
-      }
-
-      await tournamentManagementService.registerTeam(tournamentId, {
-        teamName: teamName.trim(),
-        teamSide,
-        players: roster,
-      });
-
-      showToast('Team registered successfully!', 'success');
-      setTimeout(() => navigation.replace('TournamentDetails', { tournamentId }), 700);
+      setConfirmVisible(false);
+      await completeTeamJoin(buildPendingJoin());
     } catch (e) {
       showToast(e.message || 'Failed to register team');
     } finally {
@@ -167,7 +305,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={pageStyles.container} edges={['top']}>
         <ActivityIndicator size="large" color={PAGE.cyan} style={{ marginTop: 80 }} />
       </SafeAreaView>
     );
@@ -175,21 +313,25 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
 
   const isCustom = isCustomMatch(tournament);
   const showSidePicker = isCustom;
+  const filledCount = players.filter(isPlayerComplete).length;
 
   return (
     <SafeAreaView style={pageStyles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
       <ScreenHeader title="Joining Match" onBack={() => navigation.goBack()} />
       <View style={styles.selectBanner}>
-        <Text style={styles.selectBannerText}>Select Match Position</Text>
+        <Text style={styles.selectBannerText}>
+          {teamSubmitted ? 'Confirm Team' : 'Select Match Position'}
+        </Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.matchName}>{tournament?.name}</Text>
         <Text style={styles.meta}>
-          {isCustom ? 'Custom Match' : 'Battle Royale'} · {(tournament?.mode || 'solo').toUpperCase()} ·{' '}
-          {playersPerTeam} player{playersPerTeam > 1 ? 's' : ''}/team
-          {isCustom ? ' · Max 2 teams' : ''}
+          {matchStructure.matchType} · {matchStructure.formatLabel}
+          {matchStructure.kind === 'battle_royale' ? ` · ${matchStructure.modeLabel}` : ''} ·{' '}
+          {playersPerTeam} player{playersPerTeam > 1 ? 's' : ''}/{matchStructure.entryUnit}
+          {isCustom ? ' · Max 2 teams' : ` · ${matchStructure.totalSlots} slots`}
           {'\n'}Entry fee ₹{tournament?.entryFee || 0} — paid once by team captain
         </Text>
 
@@ -201,98 +343,272 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
           </Text>
         </View>
 
-        <Text style={styles.label}>Team Name *</Text>
-        <TextInput
-          style={styles.input}
-          value={teamName}
-          onChangeText={setTeamName}
-          placeholder="Enter team name"
-          placeholderTextColor={PAGE.muted}
-        />
-
-        {showSidePicker ? (
+        {teamSubmitted ? (
           <>
-            <Text style={styles.label}>Team Side *</Text>
-            <View style={styles.sideRow}>
-              {['A', 'B'].map((side) => {
-                const taken = takenSides.has(side);
-                const selected = teamSide === side;
-                return (
-                  <TouchableOpacity
-                    key={side}
-                    disabled={taken}
-                    style={[
-                      styles.sideBtn,
-                      selected && styles.sideBtnActive,
-                      taken && styles.sideBtnTaken,
-                    ]}
-                    onPress={() => setTeamSide(side)}
-                  >
-                    <Text
-                      style={[
-                        styles.sideBtnText,
-                        selected && styles.sideBtnTextActive,
-                        taken && styles.sideBtnTextTaken,
-                      ]}
-                    >
-                      Team {side}
-                      {taken ? ' (Taken)' : ''}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </>
-        ) : null}
-
-        <Text style={styles.label}>
-          Team Players * ({playersPerTeam}/{playersPerTeam}) — Game ID + UID required
-        </Text>
-        {players.map((player, index) => (
-          <View key={`player-${index}`} style={styles.playerCard}>
-            <View style={styles.detailsHead}>
-              <Text style={styles.detailsHeadText}>
-                Player {index + 1}
-                {index === 0 ? ' (Captain)' : ''}
+            <View style={styles.teamSummary}>
+              <View style={styles.teamSummaryTop}>
+                <View style={styles.flex}>
+                  <Text style={styles.summaryLabel}>Team Name</Text>
+                  <Text style={styles.summaryValue}>{teamName}</Text>
+                </View>
+                {showSidePicker ? (
+                  <View style={styles.sideBadge}>
+                    <Text style={styles.sideBadgeText}>Team {teamSide}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.sideBadge}>
+                    <Text style={styles.sideBadgeText}>Slot {teamSlot}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.rosterCount}>
+                Team Players ({filledCount}/{playersPerTeam})
               </Text>
             </View>
-            <View style={styles.playerBody}>
-              <Text style={styles.fieldLabel}>inGameName</Text>
-              <TextInput
-                style={styles.underlineInput}
-                value={player.name}
-                onChangeText={(text) => updatePlayer(index, 'name', text)}
-                placeholder="Game ID (in-game name)"
-                placeholderTextColor={PAGE.muted}
-                autoCapitalize="none"
-              />
-              <Text style={styles.fieldLabel}>inGameId</Text>
-              <TextInput
-                style={styles.underlineInput}
-                value={player.gamingUID}
-                onChangeText={(text) => updatePlayer(index, 'gamingUID', text)}
-                placeholder="Game UID"
-                placeholderTextColor={PAGE.muted}
-                autoCapitalize="none"
-              />
-            </View>
+
+            {players.map((player, index) => (
+              <View key={`member-${index}`} style={styles.memberCard}>
+                <View style={styles.memberHead}>
+                  <Text style={styles.memberHeadText}>
+                    Player {index + 1}
+                    {index === 0 ? ' (Captain)' : ''}
+                  </Text>
+                </View>
+                <View style={styles.memberBody}>
+                  <View style={styles.memberRow}>
+                    <Text style={styles.memberKey}>Game ID</Text>
+                    <Text style={styles.memberVal} numberOfLines={1}>
+                      {player.name}
+                    </Text>
+                  </View>
+                  <View style={styles.memberRow}>
+                    <Text style={styles.memberKey}>UID</Text>
+                    <Text style={styles.memberVal} numberOfLines={1}>
+                      {player.gamingUID}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+
+            <TouchableOpacity style={styles.editLink} onPress={openEntryModal}>
+              <MaterialCommunityIcons name="pencil-outline" size={16} color={PAGE.cyan} />
+              <Text style={styles.editLinkText}>Edit team details</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Team details required</Text>
+            <Text style={styles.emptyText}>
+              Add team name, {isCustom ? 'side' : 'slot'}, and Game ID + UID for all {playersPerTeam} players before joining.
+            </Text>
+            <TouchableOpacity style={styles.enterBtn} onPress={openEntryModal}>
+              <Text style={styles.enterBtnText}>Enter Team Details</Text>
+            </TouchableOpacity>
           </View>
-        ))}
+        )}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <TouchableOpacity
           style={[styles.submitBtn, submitting && styles.submitDisabled]}
+          onPress={handleJoinPress}
+          disabled={submitting}
+        >
+          {submitting ? (
+            <ActivityIndicator color={COLORS.white} />
+          ) : (
+            <Text style={styles.submitText}>{teamSubmitted ? 'Join Now' : 'Enter Team & Join'}</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <Modal
+        visible={entryVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEntryVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalRoot}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Team Entry</Text>
+                <TouchableOpacity onPress={() => setEntryVisible(false)} hitSlop={12}>
+                  <MaterialCommunityIcons name="close" size={22} color={PAGE.muted} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                contentContainerStyle={styles.modalScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={styles.label}>Team Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={draftTeamName}
+                  onChangeText={setDraftTeamName}
+                  placeholder="Enter team name"
+                  placeholderTextColor={PAGE.muted}
+                />
+
+                {showSidePicker ? (
+                  <>
+                    <Text style={styles.label}>Team Side *</Text>
+                    <View style={styles.sideRow}>
+                      {['A', 'B'].map((side) => {
+                        const taken = takenSides.has(side);
+                        const selected = draftTeamSide === side;
+                        return (
+                          <TouchableOpacity
+                            key={side}
+                            disabled={taken}
+                            style={[
+                              styles.sideBtn,
+                              selected && styles.sideBtnActive,
+                              taken && styles.sideBtnTaken,
+                            ]}
+                            onPress={() => setDraftTeamSide(side)}
+                          >
+                            <Text
+                              style={[
+                                styles.sideBtnText,
+                                selected && styles.sideBtnTextActive,
+                                taken && styles.sideBtnTextTaken,
+                              ]}
+                            >
+                              Team {side}
+                              {taken ? ' (Taken)' : ''}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
+
+                {!isCustom ? (
+                  <>
+                    <Text style={styles.label}>Slot *</Text>
+                    <View style={styles.slotWrap}>
+                      {Array.from({ length: matchStructure.totalSlots }, (_, i) => i + 1).map((num) => {
+                        const taken = takenSlots.has(num);
+                        const selected = draftTeamSlot === num;
+                        return (
+                          <TouchableOpacity
+                            key={num}
+                            disabled={taken}
+                            style={[
+                              styles.slotChip,
+                              selected && styles.sideBtnActive,
+                              taken && styles.sideBtnTaken,
+                            ]}
+                            onPress={() => setDraftTeamSlot(num)}
+                          >
+                            <Text
+                              style={[
+                                styles.sideBtnText,
+                                selected && styles.sideBtnTextActive,
+                                taken && styles.sideBtnTextTaken,
+                              ]}
+                            >
+                              {num}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
+
+                <Text style={styles.label}>
+                  Team Players * ({playersPerTeam}/{playersPerTeam}) — Game ID + UID required
+                </Text>
+                {draftPlayers.map((player, index) => (
+                  <View key={`draft-player-${index}`} style={styles.playerCard}>
+                    <View style={styles.detailsHead}>
+                      <Text style={styles.detailsHeadText}>
+                        Player {index + 1}
+                        {index === 0 ? ' (Captain)' : ''}
+                      </Text>
+                    </View>
+                    <View style={styles.playerBody}>
+                      <Text style={styles.fieldLabel}>inGameName</Text>
+                      <TextInput
+                        style={styles.underlineInput}
+                        value={player.name}
+                        onChangeText={(text) => updateDraftPlayer(index, 'name', text)}
+                        placeholder="Game ID (in-game name)"
+                        placeholderTextColor={PAGE.muted}
+                        autoCapitalize="none"
+                      />
+                      <Text style={styles.fieldLabel}>inGameId</Text>
+                      <TextInput
+                        style={styles.underlineInput}
+                        value={player.gamingUID}
+                        onChangeText={(text) => updateDraftPlayer(index, 'gamingUID', text)}
+                        placeholder="Game UID"
+                        placeholderTextColor={PAGE.muted}
+                        autoCapitalize="none"
+                      />
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleModalSubmit}>
+                <Text style={styles.modalSaveText}>Save Team</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <CenterDialog
+        visible={confirmVisible}
+        onClose={submitting ? undefined : () => setConfirmVisible(false)}
+        dismissOnOverlay={!submitting}
+      >
+        <Text style={styles.confirmTitle}>Are you sure?</Text>
+        <Text style={styles.confirmText}>
+          Confirm join for {teamName || 'your team'}
+          {showSidePicker ? ` (Team ${teamSide})` : ` (Slot ${teamSlot})`}. Entry fee ₹{tournament?.entryFee || 0} will be
+          paid once by the team captain.
+        </Text>
+        {players.slice(0, 4).map((player, index) => (
+          <View key={`confirm-${index}`} style={styles.confirmRow}>
+            <Text style={styles.confirmPlayer}>P{index + 1}</Text>
+            <Text style={styles.confirmName} numberOfLines={1}>
+              {player.name}
+            </Text>
+            <Text style={styles.confirmUid} numberOfLines={1}>
+              {player.gamingUID}
+            </Text>
+          </View>
+        ))}
+        <TouchableOpacity
+          style={[styles.confirmJoinBtn, submitting && styles.submitDisabled]}
           onPress={handleRegister}
           disabled={submitting}
         >
           {submitting ? (
             <ActivityIndicator color={COLORS.white} />
           ) : (
-            <Text style={styles.submitText}>Join Now</Text>
+            <Text style={styles.submitText}>Yes, Join</Text>
           )}
         </TouchableOpacity>
-      </View>
+        <TouchableOpacity
+          style={styles.confirmCancelBtn}
+          onPress={() => setConfirmVisible(false)}
+          disabled={submitting}
+        >
+          <Text style={styles.confirmCancelText}>Cancel</Text>
+        </TouchableOpacity>
+      </CenterDialog>
 
       <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hideToast} />
       {InsufficientBalanceDialog}
@@ -301,6 +617,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   selectBanner: {
     backgroundColor: PAGE.cyan,
     paddingVertical: 12,
@@ -324,6 +641,77 @@ const styles = StyleSheet.create({
   },
   warnTitle: { color: PAGE.gold, fontFamily: FONTS.bold, fontSize: 13, marginBottom: 6 },
   warnText: { color: PAGE.muted, fontSize: 12, lineHeight: 18 },
+  emptyCard: {
+    backgroundColor: PAGE.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+    padding: 18,
+    alignItems: 'center',
+  },
+  emptyTitle: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 16, marginBottom: 8 },
+  emptyText: {
+    color: PAGE.muted,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  enterBtn: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  enterBtnText: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 14 },
+  teamSummary: {
+    backgroundColor: PAGE.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+    padding: 14,
+    marginBottom: 12,
+  },
+  teamSummaryTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  summaryLabel: { color: PAGE.muted, fontSize: 12, marginBottom: 4 },
+  summaryValue: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 16 },
+  sideBadge: {
+    backgroundColor: 'rgba(79,209,197,0.14)',
+    borderWidth: 1,
+    borderColor: PAGE.cyan,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  sideBadgeText: { color: PAGE.cyan, fontFamily: FONTS.bold, fontSize: 12 },
+  rosterCount: { color: PAGE.muted, fontSize: 12, fontFamily: FONTS.bold },
+  memberCard: {
+    backgroundColor: PAGE.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  memberHead: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  memberHeadText: { fontFamily: FONTS.bold, fontSize: 13, color: COLORS.white },
+  memberBody: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  memberRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  memberKey: { color: PAGE.muted, fontSize: 12, fontFamily: FONTS.bold },
+  memberVal: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 13, flex: 1, textAlign: 'right' },
+  editLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  editLinkText: { color: PAGE.cyan, fontFamily: FONTS.bold, fontSize: 13 },
   label: { color: COLORS.white, marginBottom: 8, fontFamily: FONTS.bold },
   input: {
     backgroundColor: PAGE.cardAlt,
@@ -362,6 +750,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sideRow: { flexDirection: 'row', gap: 10, marginBottom: 18 },
+  slotWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
+  slotChip: {
+    width: 44,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+    backgroundColor: PAGE.cardAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sideBtn: {
     flex: 1,
     borderRadius: 10,
@@ -391,4 +790,70 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { opacity: 0.6 },
   submitText: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 16 },
+  modalRoot: { flex: 1 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(5, 5, 16, 0.78)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: PAGE.bg,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderWidth: 1,
+    borderColor: PAGE.borderAccent,
+    maxHeight: '92%',
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  modalTitle: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 18 },
+  modalScroll: { paddingBottom: 16 },
+  modalSaveBtn: {
+    backgroundColor: '#2DD4BF',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  modalSaveText: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 15 },
+  confirmTitle: {
+    color: COLORS.white,
+    fontFamily: FONTS.bold,
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  confirmText: {
+    color: PAGE.muted,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  confirmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: PAGE.border,
+  },
+  confirmPlayer: { color: PAGE.cyan, fontFamily: FONTS.bold, width: 24, fontSize: 12 },
+  confirmName: { flex: 1, color: COLORS.white, fontFamily: FONTS.bold, fontSize: 13 },
+  confirmUid: { color: PAGE.muted, fontSize: 12, maxWidth: 110, textAlign: 'right' },
+  confirmJoinBtn: {
+    backgroundColor: '#E11D48',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  confirmCancelBtn: { alignItems: 'center', paddingVertical: 12 },
+  confirmCancelText: { color: PAGE.muted, fontFamily: FONTS.bold, fontSize: 14 },
 });

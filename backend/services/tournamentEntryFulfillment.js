@@ -182,8 +182,9 @@ async function joinSoloFromPayment(claim, tournament, user) {
   }
 
   if (!tournament.slots || tournament.slots.length === 0) {
+    const structure = lifecycle.getMatchStructure(tournament);
     const newSlots = [];
-    for (let i = 1; i <= 50; i += 1) {
+    for (let i = 1; i <= structure.totalSlots; i += 1) {
       newSlots.push({
         slotNumber: i,
         userId: null,
@@ -196,8 +197,20 @@ async function joinSoloFromPayment(claim, tournament, user) {
     tournament.slots = newSlots;
   }
 
-  const freeSlot = tournament.slots.find((s) => !s.isBooked);
-  if (!freeSlot) {
+  const requested = Number(meta.slotNumber);
+  let targetSlot = null;
+  if (requested >= 1) {
+    targetSlot = tournament.slots.find((s) => Number(s.slotNumber) === requested);
+    if (!targetSlot) {
+      return { ok: false, reason: 'INVALID_SLOT', message: 'Selected slot does not exist' };
+    }
+    if (targetSlot.isBooked) {
+      return { ok: false, reason: 'SLOT_TAKEN', message: `Slot ${requested} is already booked` };
+    }
+  } else {
+    targetSlot = tournament.slots.find((s) => !s.isBooked);
+  }
+  if (!targetSlot) {
     return { ok: false, reason: 'TOURNAMENT_FULL', message: 'No free slots left' };
   }
 
@@ -207,16 +220,16 @@ async function joinSoloFromPayment(claim, tournament, user) {
     return { ok: false, reason: 'TOURNAMENT_FULL', message: 'Tournament is full' };
   }
 
-  freeSlot.userId = user._id;
-  freeSlot.gamingUsername = gamingUsername;
-  freeSlot.gamingUID = gamingUID;
-  freeSlot.bookedAt = new Date();
-  freeSlot.isBooked = true;
+  targetSlot.userId = user._id;
+  targetSlot.gamingUsername = gamingUsername;
+  targetSlot.gamingUID = gamingUID;
+  targetSlot.bookedAt = new Date();
+  targetSlot.isBooked = true;
 
   await TournamentParticipant.create({
     tournamentId: tournament._id,
     userId: user._id,
-    slotNumber: freeSlot.slotNumber,
+    slotNumber: targetSlot.slotNumber,
     gamingUsername,
     gamingUID,
     status: 'joined',
@@ -233,7 +246,7 @@ async function joinSoloFromPayment(claim, tournament, user) {
   user.tournament.participatedCount = (user.tournament.participatedCount || 0) + 1;
   await user.save();
 
-  return { ok: true, slotNumber: freeSlot.slotNumber };
+  return { ok: true, slotNumber: targetSlot.slotNumber };
 }
 
 async function joinTeamFromPayment(claim, tournament, user) {
@@ -313,6 +326,34 @@ async function joinTeamFromPayment(claim, tournament, user) {
   };
   if (side) teamPayload.side = side;
 
+  if (!isCustom) {
+    const structure = lifecycle.getMatchStructure(tournament);
+    let slotNumber = Number(meta.slotNumber);
+    if (!slotNumber || slotNumber < 1 || slotNumber > structure.totalSlots) {
+      const taken = await Team.find({ tournamentId: tournament._id, status: 'registered' }).select('slotNumber');
+      const used = new Set(taken.map((t) => Number(t.slotNumber)).filter(Boolean));
+      slotNumber = null;
+      for (let i = 1; i <= structure.totalSlots; i += 1) {
+        if (!used.has(i)) {
+          slotNumber = i;
+          break;
+        }
+      }
+    }
+    if (!slotNumber) {
+      return { ok: false, reason: 'TOURNAMENT_FULL', message: 'All slots are full' };
+    }
+    const slotTaken = await Team.findOne({
+      tournamentId: tournament._id,
+      slotNumber,
+      status: 'registered',
+    });
+    if (slotTaken) {
+      return { ok: false, reason: 'SLOT_TAKEN', message: `Slot ${slotNumber} is already booked` };
+    }
+    teamPayload.slotNumber = slotNumber;
+  }
+
   const team = await Team.create(teamPayload);
   await TeamMember.create({
     tournamentId: tournament._id,
@@ -333,7 +374,7 @@ async function joinTeamFromPayment(claim, tournament, user) {
   user.tournament.participatedCount = (user.tournament.participatedCount || 0) + 1;
   await user.save();
 
-  return { ok: true, teamId: team._id };
+  return { ok: true, teamId: team._id, slotNumber: team.slotNumber || null };
 }
 
 module.exports = {

@@ -1,5 +1,8 @@
 import { walletService } from '../services/api';
 import { getPaymentSplit } from './tournamentHelpers';
+import { isPaymentEnabled } from './paymentConfig';
+
+export const CASHFREE_MIN_TOPUP = 10;
 
 /** Walk up to the root stack navigator. */
 export function getRootNavigation(navigation) {
@@ -17,14 +20,50 @@ export async function fetchWalletForEntry(entryFee) {
   const bonusBalance = w?.bonusBalance ?? 0;
   const balance = w?.balance ?? 0;
   const split = getPaymentSplit(entryFee, bonusBalance);
+  const remaining = Math.max(0, split.realRequired - balance);
   return {
     balance,
     bonusBalance,
     realRequired: split.realRequired,
     totalPayable: split.totalPayable,
+    remaining,
+    qrAmount: remaining > 0 ? Math.max(CASHFREE_MIN_TOPUP, remaining) : 0,
     sufficient: balance >= split.realRequired,
     totalBalance: w?.totalBalance ?? balance + bonusBalance,
   };
+}
+
+/**
+ * If wallet is short, open QR for the remaining coins (or Add Coins when gateway is off).
+ * After payment, return to the join screen and auto-complete join.
+ */
+export function openRemainingJoinPayment(navigation, opts = {}) {
+  const root = getRootNavigation(navigation);
+  if (!root) return;
+
+  const remaining = Math.max(0, Number(opts.remainingAmount ?? opts.qrAmount) || 0);
+  const amount = Math.max(CASHFREE_MIN_TOPUP, remaining);
+  const tournamentId = opts.tournamentId || null;
+  const returnScreen = opts.returnScreen || 'TournamentDetails';
+  const pendingJoin = opts.pendingJoin || null;
+
+  if (isPaymentEnabled()) {
+    root.navigate('CashfreeQrPayment', {
+      amount,
+      returnToTournamentId: tournamentId,
+      returnScreen,
+      pendingJoin,
+    });
+    return;
+  }
+
+  navigateToAddCoins(navigation, {
+    tournamentId,
+    returnScreen,
+    openAddCoins: true,
+    suggestedAmount: amount,
+    pendingJoin,
+  });
 }
 
 /**
@@ -45,6 +84,8 @@ export function navigateToAddCoins(navigation, tournamentIdOrOpts) {
     returnToTournamentId: opts.tournamentId || null,
     returnScreen: opts.returnScreen || 'TournamentDetails',
     openAddCoins: opts.openAddCoins !== false,
+    suggestedAmount: opts.suggestedAmount,
+    pendingJoin: opts.pendingJoin || null,
   });
 }
 
@@ -57,7 +98,12 @@ export function promptInsufficientBalance(navigation, tournamentId, returnScreen
 }
 
 /** After successful top-up, return user to the originating tournament screen. */
-export function navigateAfterWalletTopup(navigation, returnToTournamentId, returnScreen = 'TournamentDetails') {
+export function navigateAfterWalletTopup(
+  navigation,
+  returnToTournamentId,
+  returnScreen = 'TournamentDetails',
+  pendingJoin = null
+) {
   if (!returnToTournamentId) return false;
 
   const root = getRootNavigation(navigation);
@@ -67,6 +113,7 @@ export function navigateAfterWalletTopup(navigation, returnToTournamentId, retur
   const params = {
     tournamentId: returnToTournamentId,
     walletRecharged: true,
+    pendingJoin: pendingJoin || undefined,
   };
 
   if (screen === 'CustomMatchTeamRegister') {
@@ -85,6 +132,8 @@ export function clearWalletReturnParams(navigation) {
       openAddCoins: false,
       returnToTournamentId: undefined,
       returnScreen: undefined,
+      suggestedAmount: undefined,
+      pendingJoin: undefined,
     });
   } catch {
     /* tab navigator may not support setParams in some cases */

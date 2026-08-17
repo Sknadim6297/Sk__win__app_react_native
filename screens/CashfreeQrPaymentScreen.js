@@ -37,6 +37,7 @@ export default function CashfreeQrPaymentScreen({ navigation, route }) {
   const amount = Number(route.params?.amount || 0);
   const returnToTournamentId = route.params?.returnToTournamentId || null;
   const returnScreen = route.params?.returnScreen || 'TournamentDetails';
+  const pendingJoin = route.params?.pendingJoin || null;
   const initialBalance = route.params?.walletBalance;
 
   const [phase, setPhase] = useState('CREATING');
@@ -96,13 +97,18 @@ export default function CashfreeQrPaymentScreen({ navigation, route }) {
       playSuccessAnimation();
 
       setTimeout(() => {
-        const returned = navigateAfterWalletTopup(navigation, returnToTournamentId, returnScreen);
+        const returned = navigateAfterWalletTopup(
+          navigation,
+          returnToTournamentId,
+          returnScreen,
+          pendingJoin
+        );
         if (!returned) {
           navigation.navigate('Wallet');
         }
       }, 1800);
     },
-    [clearTimers, navigation, playSuccessAnimation, returnScreen, returnToTournamentId]
+    [clearTimers, navigation, pendingJoin, playSuccessAnimation, returnScreen, returnToTournamentId]
   );
 
   const pollStatus = useCallback(

@@ -14,7 +14,7 @@ import BrandCoin from '../components/ui/BrandCoin';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { AuthContext } from '../context/AuthContext';
 import { tournamentService, walletService } from '../services/api';
-import { getPaymentSplit, getTeamSize, formatModeLabel, isTeamEntryMode } from '../utils/tournamentHelpers';
+import { getPaymentSplit, getTeamSize, formatModeLabel, getMatchStructure } from '../utils/tournamentHelpers';
 import { navigateToAddCoins } from '../utils/walletFlow';
 
 const CYAN = '#00E5FF';
@@ -67,7 +67,7 @@ export default function TournamentEntryScreen({ navigation, route }) {
   const split = getPaymentSplit(tournament.entryFee, bonusBalance);
   const hasFunds = balance >= split.realRequired;
   const teamSize = getTeamSize(tournament.mode);
-  const perTeam = isTeamEntryMode(tournament.mode);
+  const perTeam = getMatchStructure(tournament).usesTeamRegistration;
   const totalPayable = perTeam ? split.totalPayable : split.totalPayable;
 
   return (

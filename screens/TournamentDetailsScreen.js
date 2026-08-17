@@ -22,16 +22,12 @@ import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import {
   parseRules,
   formatScheduleLine,
-  formatModeLabel,
   isCustomMatch,
-  isTeamEntryMode,
-  getTeamSize,
+  getMatchStructure,
   resolveDisplayPrizePool,
   resolvePrizePlaces,
 } from '../utils/tournamentHelpers';
-import { fetchWalletForEntry } from '../utils/walletFlow';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
-import { isPaymentEnabled } from '../utils/paymentConfig';
 import { CoinValue, TimeLeftBar, InfoCell } from '../components/contest/ContestShared';
 
 const DEFAULT_BANNER = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
@@ -116,88 +112,46 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     try {
       setJoining(true);
       const eligibility = await tournamentService.canJoin(tournamentId);
-      const isTeamFlow =
-        isCustomMatch(tournament) ||
-        eligibility?.isCustomMatch ||
-        eligibility?.usesTeamRegistration ||
-        isTeamEntryMode(tournament.mode);
+      const structure = getMatchStructure(tournament);
+      const isTeamFlow = structure.usesTeamRegistration;
 
-      if (isPaymentEnabled() && !isTeamFlow) {
-        if (!eligibility?.canJoin && eligibility?.code !== 'INSUFFICIENT_BALANCE') {
-          const isInsufficient =
-            eligibility?.code === 'INSUFFICIENT_BALANCE' ||
-            /insufficient|balance/i.test(String(eligibility?.reason || ''));
-          if (!isInsufficient) {
-            showToast(eligibility?.reason || 'This tournament is not open for joining', 'warning');
-            return;
-          }
+      if (!eligibility?.canJoin && eligibility?.code !== 'INSUFFICIENT_BALANCE') {
+        const isInsufficient =
+          eligibility?.code === 'INSUFFICIENT_BALANCE' ||
+          /insufficient|balance/i.test(String(eligibility?.reason || ''));
+        if (!isInsufficient) {
+          showToast(eligibility?.reason || 'This tournament is not open for joining', 'warning');
+          return;
         }
-        navigation.navigate('TournamentPayJoin', {
-          tournamentId,
-          tournamentName: tournament?.name,
-          amount: tournament?.entryFee,
-          joinKind: 'solo',
-        });
-        return;
-      }
-
-      if (isPaymentEnabled() && isTeamFlow) {
-        navigation.navigate('CustomMatchTeamRegister', { tournamentId, payWithCashfree: true });
-        return;
       }
 
       const isInsufficient =
         eligibility?.code === 'INSUFFICIENT_BALANCE' ||
         /insufficient|balance/i.test(String(eligibility?.reason || ''));
 
-      if (!eligibility?.canJoin) {
-        if (isInsufficient) {
-          showInsufficientBalance({
-            tournamentId,
-            returnScreen: isTeamFlow ? 'CustomMatchTeamRegister' : 'TournamentSlotBooking',
-            forTeam: isTeamFlow,
-            requiredAmount: eligibility?.realMoneyRequired ?? tournament.entryFee,
-            currentBalance: eligibility?.balance,
-          });
-          return;
-        }
-        showToast(eligibility?.reason || 'This tournament is not open for joining', 'warning');
-        return;
-      }
-
-      if (isTeamFlow) {
-        const walletCheck = await fetchWalletForEntry(tournament.entryFee);
-        if (!walletCheck.sufficient) {
-          showInsufficientBalance({
-            tournamentId,
-            returnScreen: 'CustomMatchTeamRegister',
-            forTeam: true,
-            requiredAmount: walletCheck.realRequired,
-            currentBalance: walletCheck.balance,
-          });
-          return;
-        }
-        navigation.navigate('CustomMatchTeamRegister', { tournamentId });
-        return;
-      }
-
-      const walletCheck = await fetchWalletForEntry(tournament.entryFee);
-      if (!walletCheck.sufficient) {
+      if (!eligibility?.canJoin && isInsufficient) {
         showInsufficientBalance({
           tournamentId,
-          returnScreen: 'TournamentSlotBooking',
-          forTeam: false,
-          requiredAmount: walletCheck.realRequired,
-          currentBalance: walletCheck.balance,
+          returnScreen: isTeamFlow ? 'CustomMatchTeamRegister' : 'TournamentSlotBooking',
+          forTeam: isTeamFlow,
+          requiredAmount: eligibility?.realMoneyRequired ?? tournament.entryFee,
+          currentBalance: eligibility?.balance,
         });
         return;
       }
 
-      navigation.navigate('TournamentSlotBooking', { tournamentId });
+      if (!eligibility?.canJoin) {
+        showToast(eligibility?.reason || 'This tournament is not open for joining', 'warning');
+        return;
+      }
+
+      navigation.navigate(isTeamFlow ? 'CustomMatchTeamRegister' : 'TournamentSlotBooking', {
+        tournamentId,
+      });
     } catch (e) {
       const msg = e.message || 'Could not verify wallet';
       if (/insufficient|balance/i.test(msg)) {
-        const isTeamFlow = isCustomMatch(tournament) || isTeamEntryMode(tournament?.mode);
+        const isTeamFlow = getMatchStructure(tournament).usesTeamRegistration;
         showInsufficientBalance({
           tournamentId,
           returnScreen: isTeamFlow ? 'CustomMatchTeamRegister' : 'TournamentSlotBooking',
@@ -237,14 +191,11 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
   const rules = parseRules(tournament.rules);
   const custom = isCustomMatch(tournament);
-  const teamEntry = custom || isTeamEntryMode(tournament.mode);
-  const maxP = teamEntry
-    ? tournament.maxTeams ||
-      (custom ? 2 : Math.floor((tournament.maxParticipants || 50) / getTeamSize(tournament.mode)))
-    : tournament.maxParticipants || tournament.slots?.length || 48;
+  const structure = getMatchStructure(tournament);
+  const teamEntry = structure.usesTeamRegistration;
+  const maxP = tournament.totalSlots || structure.totalSlots;
   const joined = tournament.participantCount || 0;
   const matchNo = tournament.matchNumber || 10000;
-  const modeName = (tournament.gameMode?.name || formatModeLabel(tournament.mode) || 'MATCH').toUpperCase();
   const totalPrize = resolveDisplayPrizePool(tournament);
   const places = resolvePrizePlaces(tournament);
   const lifecycleStatus = tournament.lifecycleStatus || tournament.status;
@@ -295,13 +246,17 @@ export default function TournamentDetailsScreen({ navigation, route }) {
         </Text>
 
         <View style={styles.grid3}>
-          <InfoCell label="Team" value={formatModeLabel(tournament.mode)} flex={1} />
-          <InfoCell label="Mode" value={modeName} flex={1} />
+          <InfoCell label="Format" value={structure.formatLabel} flex={1} />
+          <InfoCell label="Mode" value={custom ? structure.matchType : structure.modeLabel} flex={1} />
           <InfoCell label="Map" value={(tournament.map || 'BERMUDA').toUpperCase()} flex={1} />
         </View>
         <View style={styles.grid2}>
-          <InfoCell label="Match Type" value={Number(tournament.entryFee) > 0 ? 'Paid' : 'Free'} flex={1} />
-          <InfoCell label="Entry Fee" value={tournament.entryFee || 0} coin flex={1} />
+          <InfoCell
+            label="Entry"
+            value={`₹${tournament.entryFee || 0} / ${structure.entryUnit}`}
+            flex={1}
+          />
+          <InfoCell label="Slots" value={`${joined}/${maxP} ${structure.slotUnit}`} flex={1} />
         </View>
         <InfoCell label="Match Schedule" value={formatScheduleLine(tournament.startDate)} />
 
@@ -311,7 +266,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
             <Text style={styles.prizeLabel}>Prize Pool</Text>
             <CoinValue value={totalPrize} color={PAGE.gold} />
           </View>
-          {!custom && Number(tournament.perKill) > 0 ? (
+          {!custom && structure.hasKillRewards && Number(tournament.perKill) > 0 ? (
             <View style={styles.prizeLine}>
               <Text style={styles.prizeLabel}>Per Kill</Text>
               <CoinValue value={tournament.perKill} color={PAGE.gold} />
@@ -378,30 +333,35 @@ export default function TournamentDetailsScreen({ navigation, route }) {
         {showJoinings ? (
           <View style={styles.joiningsBox}>
             <Text style={styles.sectionHead}>
-              {teamEntry ? 'Teams' : 'Players'} ({teamEntry ? teams.length : players.length}/{maxP})
+              {custom ? 'Teams' : 'Slots'} ({joined}/{maxP})
             </Text>
             {teamEntry ? (
               teams.length ? (
                 teams.map((team) => (
-                  <View key={team._id || team.side} style={styles.joiningRow}>
+                  <View key={team._id || team.side || team.slotNumber} style={styles.joiningRow}>
                     <Text style={styles.joiningName}>
-                      Team {team.side || ''} · {team.name}
+                      {custom
+                        ? `Team ${team.side || ''} · ${team.name}`
+                        : `Slot ${team.slotNumber || '—'} · ${team.name}`}
                     </Text>
-                    <Text style={styles.joiningMeta}>{(team.players || []).length} players</Text>
+                    <Text style={styles.joiningMeta}>
+                      {(team.players || []).map((p) => p.name || p.gamingUsername).filter(Boolean).join(', ') ||
+                        `${(team.players || []).length} players`}
+                    </Text>
                   </View>
                 ))
               ) : (
-                <Text style={styles.emptyJoinings}>No teams registered yet.</Text>
+                <Text style={styles.emptyJoinings}>{custom ? 'No teams registered yet.' : 'No slots booked yet.'}</Text>
               )
             ) : players.length ? (
               players.map((p, i) => (
                 <View key={`${p.slotNumber}-${i}`} style={styles.joiningRow}>
-                  <Text style={styles.joiningSlot}>#{p.slotNumber || i + 1}</Text>
+                  <Text style={styles.joiningSlot}>Slot {p.slotNumber || i + 1}</Text>
                   <Text style={styles.joiningName}>{p.gamingUsername || p.username || 'Player'}</Text>
                 </View>
               ))
             ) : (
-              <Text style={styles.emptyJoinings}>No players joined yet.</Text>
+              <Text style={styles.emptyJoinings}>No slots booked yet.</Text>
             )}
           </View>
         ) : null}

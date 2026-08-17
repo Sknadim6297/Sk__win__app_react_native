@@ -5,6 +5,7 @@ const TeamMember = require('../models/TeamMember');
 const PrizeDistribution = require('../models/PrizeDistribution');
 const BattleRoyaleResult = require('../models/BattleRoyaleResult');
 const CustomMatchResult = require('../models/CustomMatchResult');
+const matchStructure = require('./matchStructure');
 
 const LIFECYCLE = ['draft', 'upcoming', 'ongoing', 'completed', 'cancelled'];
 
@@ -17,16 +18,15 @@ const TRANSITIONS = {
 };
 
 function isBattleRoyale(tournament) {
-  const c = tournament.category || tournament.tournamentType;
-  if (c === 'battle_royale') return true;
-  if (c === 'custom' || c === 'custom_match') return false;
-  const modeName = tournament?.gameMode?.name || '';
-  return String(modeName).toLowerCase().includes('battle royale');
+  return matchStructure.isBattleRoyale(tournament);
 }
 
 function isCustomMatch(tournament) {
-  const c = tournament.category || tournament.tournamentType;
-  return c === 'custom' || c === 'custom_match';
+  return matchStructure.isCustomMatch(tournament);
+}
+
+function getMatchStructure(tournament) {
+  return matchStructure.getMatchStructure(tournament);
 }
 
 function getTournamentType(tournament) {
@@ -276,32 +276,29 @@ function calculateBrReward({ placementPrize, kills, perKill }) {
 
 /** Join display + full check */
 async function getJoinStats(tournamentId, tournament) {
-  if (usesTeamRegistration(tournament)) {
+  const structure = getMatchStructure(tournament);
+  if (structure.usesTeamRegistration) {
     const teamCount = await getTeamCount(tournamentId);
-    const perTeam = getPlayersPerTeam(tournament.mode);
-    const maxTeams =
-      tournament.maxTeams ||
-      (isCustomMatch(tournament)
-        ? 2
-        : Math.floor((tournament.maxParticipants || BR_MAX_PLAYERS) / perTeam) ||
-          (perTeam === 1 ? tournament.maxParticipants || BR_MAX_PLAYERS : 1));
     return {
       joinedCount: teamCount,
-      capacity: maxTeams,
-      unit: 'teams',
-      isFull: teamCount >= maxTeams,
+      capacity: structure.totalSlots,
+      unit: structure.slotUnit,
+      isFull: teamCount >= structure.totalSlots,
       usesTeams: true,
+      matchKind: structure.kind,
+      formatLabel: structure.formatLabel,
     };
   }
 
   const joinedCount = await getParticipantCount(tournamentId);
-  const capacity = tournament.maxParticipants || 50;
   return {
     joinedCount,
-    capacity,
-    unit: 'players',
-    isFull: joinedCount >= capacity,
+    capacity: structure.totalSlots,
+    unit: structure.slotUnit,
+    isFull: joinedCount >= structure.totalSlots,
     usesTeams: false,
+    matchKind: structure.kind,
+    formatLabel: structure.formatLabel,
   };
 }
 
@@ -501,6 +498,7 @@ module.exports = {
   BR_MAX_PLAYERS,
   isBattleRoyale,
   isCustomMatch,
+  getMatchStructure,
   getTournamentType,
   usesTeamRegistration,
   getPlayersPerTeam,

@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -13,14 +13,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AuthContext } from '../context/AuthContext';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import AppIcon from '../components/ui/AppIcon';
 import AppHeader from '../components/navigation/AppHeader';
 import GameModePoster from '../components/home/GameModePoster';
 import { BRAND } from '../constants/branding';
 import {
-  tournamentService,
   gameService,
   configService,
   sliderService,
@@ -34,12 +32,8 @@ const MODE_CARD_WIDTH = (width - 32 - 12) / 2;
 const MODE_CARD_HEIGHT = MODE_CARD_WIDTH * 0.72;
 
 export default function HomeScreen({ navigation }) {
-  const { user } = useContext(AuthContext);
   const [esportsModes, setEsportsModes] = useState([]);
   const [esportsGameId, setEsportsGameId] = useState(null);
-  const [upcomingCount, setUpcomingCount] = useState(0);
-  const [ongoingCount, setOngoingCount] = useState(0);
-  const [completedCount, setCompletedCount] = useState(0);
   const [latestNews, setLatestNews] = useState({ text: '🏆 Tournaments Are Back! 🎮', isActive: true });
   const [supportLinks, setSupportLinks] = useState({});
   const [homeSliders, setHomeSliders] = useState([]);
@@ -85,27 +79,11 @@ export default function HomeScreen({ navigation }) {
         });
       }
       setSupportLinks(homeConfig.supportLinks || {});
-      if (!user) return;
-
-      const myTournamentsData = await tournamentService.getMyTournaments().catch(() => []);
-      const tournamentList = Array.isArray(myTournamentsData) ? myTournamentsData : [];
-      setUpcomingCount(tournamentList.filter((t) => {
-        const s = t.lifecycleStatus || t.status;
-        return s === 'incoming' || s === 'upcoming';
-      }).length);
-      setOngoingCount(tournamentList.filter((t) => {
-        const s = t.lifecycleStatus || t.status;
-        return s === 'ongoing' || s === 'live';
-      }).length);
-      setCompletedCount(tournamentList.filter((t) => {
-        const s = t.lifecycleStatus || t.status;
-        return s === 'completed' || s === 'result_published';
-      }).length);
     } catch (e) {
       console.error('Home load error:', e);
       setSlidersLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -176,9 +154,9 @@ export default function HomeScreen({ navigation }) {
 
         <View style={styles.contestsRow}>
           {[
-            { key: 'upcoming', label: 'Upcoming', icon: 'clock-outline', count: upcomingCount },
-            { key: 'live', label: 'Live', icon: 'broadcast', count: ongoingCount },
-            { key: 'completed', label: 'Completed', icon: 'check-circle-outline', count: completedCount },
+            { key: 'upcoming', label: 'Upcoming', icon: 'clock-outline' },
+            { key: 'live', label: 'Live', icon: 'broadcast' },
+            { key: 'completed', label: 'Completed', icon: 'check-circle-outline' },
           ].map((item) => (
             <TouchableOpacity
               key={item.key}
@@ -190,11 +168,6 @@ export default function HomeScreen({ navigation }) {
                 <AppIcon name={item.icon} size={44} accent="00F2FF" />
               </View>
               <Text style={styles.contestLabel}>{item.label}</Text>
-              {item.count > 0 ? (
-                <View style={styles.contestCountBadge}>
-                  <Text style={styles.contestCount}>{item.count}</Text>
-                </View>
-              ) : null}
             </TouchableOpacity>
           ))}
         </View>
@@ -435,21 +408,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     letterSpacing: 0.2,
-  },
-  contestCountBadge: {
-    marginTop: 6,
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(0, 229, 255, 0.2)',
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  contestCount: {
-    fontSize: 12,
-    fontFamily: FONTS.bold,
-    color: '#00E5FF',
   },
   bottomActionsBlock: {
     marginTop: 4,

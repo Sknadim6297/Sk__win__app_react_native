@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,8 @@ import AppIcon from '../components/ui/AppIcon';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
 import { tournamentService, walletService } from '../services/api';
-import { getPaymentSplit, isTeamEntryMode } from '../utils/tournamentHelpers';
+import { getPaymentSplit, getMatchStructure } from '../utils/tournamentHelpers';
+import { fetchWalletForEntry } from '../utils/walletFlow';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
 import Toast from '../components/Toast';
 import ScreenHeader from '../components/navigation/ScreenHeader';
@@ -26,7 +27,7 @@ import { CoinValue } from '../components/contest/ContestShared';
 import { LIST_PERF } from '../utils/listPerf';
 
 export default function TournamentSlotBookingScreen({ navigation, route }) {
-  const { tournamentId, gamingUsername: initialUsername = '' } = route.params || {};
+  const { tournamentId, gamingUsername: initialUsername = '', walletRecharged, pendingJoin } = route.params || {};
   const insets = useSafeAreaInsets();
   const { showInsufficientBalance, InsufficientBalanceDialog } = useInsufficientBalance(navigation);
   const [tournament, setTournament] = useState(null);
@@ -43,6 +44,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
   const showToast = (message, type = 'error') => setToast({ visible: true, message, type });
   const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
+  const autoJoinRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -53,8 +55,8 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           tournamentService.getSlots(tournamentId),
         ]);
         setTournament(tData);
-        if (isTeamEntryMode(tData?.mode)) {
-          showToast('Duo/Squad uses team registration. Captain pays once for the team.', 'warning');
+        if (getMatchStructure(tData).usesTeamRegistration) {
+          showToast('This match uses team registration. Captain pays once for the team.', 'warning');
           navigation.replace('CustomMatchTeamRegister', { tournamentId });
           return;
         }
@@ -100,16 +102,6 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
       showToast('Please select one match position.', 'warning');
       return;
     }
-    if (balance < split.realRequired) {
-      showInsufficientBalance({
-        tournamentId,
-        returnScreen: 'TournamentSlotBooking',
-        forTeam: false,
-        requiredAmount: split.realRequired,
-        currentBalance: balance,
-      });
-      return;
-    }
     setStep('confirm');
   };
 
@@ -140,6 +132,25 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     }
     try {
       setBooking(true);
+      const walletCheck = await fetchWalletForEntry(entryFee);
+      if (!walletCheck.sufficient) {
+        showInsufficientBalance({
+          tournamentId,
+          returnScreen: 'TournamentSlotBooking',
+          forTeam: false,
+          requiredAmount: entryFee,
+          currentBalance: walletCheck.balance,
+          remainingAmount: walletCheck.remaining,
+          qrAmount: walletCheck.qrAmount,
+          pendingJoin: {
+            kind: 'solo',
+            slotNumber: selected[0],
+            gamingUsername: gamingUsername.trim(),
+            gamingUID: gamingUID.trim(),
+          },
+        });
+        return;
+      }
       for (const slotNum of selected) {
         const result = await bookOne(slotNum);
         if (result.mismatch) {
@@ -148,7 +159,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           return;
         }
       }
-      Alert.alert('Success', `Position booked: Team ${selected[0]}`, [
+      Alert.alert('Success', `Slot ${selected[0]} booked`, [
         { text: 'OK', onPress: () => navigation.replace('TournamentDetails', { tournamentId }) },
       ]);
     } catch (e) {
@@ -168,6 +179,55 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
       setBooking(false);
     }
   };
+
+  useEffect(() => {
+    if (!walletRecharged || !tournament || !pendingJoin || autoJoinRef.current) return;
+    if (pendingJoin.kind && pendingJoin.kind !== 'solo') return;
+    autoJoinRef.current = true;
+    const slotNum = pendingJoin.slotNumber;
+    const name = pendingJoin.gamingUsername || '';
+    const uid = pendingJoin.gamingUID || '';
+    setSelected(slotNum ? [slotNum] : []);
+    setGamingUsername(name);
+    setGamingUID(uid);
+    setStep('confirm');
+    navigation.setParams({ walletRecharged: undefined, pendingJoin: undefined });
+    (async () => {
+      try {
+        setBooking(true);
+        const walletCheck = await fetchWalletForEntry(Number(tournament.entryFee) || 0);
+        if (!walletCheck.sufficient) {
+          autoJoinRef.current = false;
+          showInsufficientBalance({
+            tournamentId,
+            returnScreen: 'TournamentSlotBooking',
+            forTeam: false,
+            requiredAmount: tournament.entryFee,
+            currentBalance: walletCheck.balance,
+            remainingAmount: walletCheck.remaining,
+            qrAmount: walletCheck.qrAmount,
+            pendingJoin,
+          });
+          return;
+        }
+        const res = await tournamentService.bookSlot(tournamentId, slotNum, name, uid);
+        if (res.step === 'confirm_username_mismatch') {
+          setMismatchData({ ...res, slotNumber: slotNum, pendingSlots: [slotNum] });
+          setStep('mismatch');
+          return;
+        }
+        if (!res.success) throw new Error(res.message || 'Booking failed');
+        Alert.alert('Success', `Slot ${slotNum} booked`, [
+          { text: 'OK', onPress: () => navigation.replace('TournamentDetails', { tournamentId }) },
+        ]);
+      } catch (e) {
+        autoJoinRef.current = false;
+        showToast(e.message || 'Failed to book', 'error');
+      } finally {
+        setBooking(false);
+      }
+    })();
+  }, [walletRecharged, tournament, pendingJoin, navigation, tournamentId, showInsufficientBalance]);
 
   const handleConfirmMismatch = async () => {
     try {
@@ -225,9 +285,10 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
         disabled={taken}
         activeOpacity={0.75}
       >
-        <Text style={[styles.slotTeam, taken && styles.slotTakenText]}>Team {num}</Text>
+        <Text style={[styles.slotTeam, taken && styles.slotTakenText]}>
+          Slot {num}{taken && item.gamingUsername ? ` · ${item.gamingUsername}` : ''}
+        </Text>
         <View style={styles.slotRight}>
-          <Text style={[styles.slotPos, taken && styles.slotTakenText]}>1</Text>
           <View style={[styles.checkbox, taken && styles.checkboxTaken, isPicked && styles.checkboxPicked]}>
             {(taken || isPicked) && (
               <AppIcon name="check" size={14} color={taken ? PAGE.muted : PAGE.cyan} />
@@ -247,7 +308,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           <CoinValue value={balance} size={16} color={PAGE.gold} />
         </View>
         <View style={styles.balanceLine}>
-          <Text style={styles.balanceLabel}>Entry Fee Per Person : </Text>
+          <Text style={styles.balanceLabel}>Entry Fee : </Text>
           <CoinValue value={entryFee} size={16} color={PAGE.gold} />
         </View>
         <View style={styles.balanceLine}>
@@ -276,8 +337,8 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
             <Text style={styles.selectBannerText}>Select Match Position</Text>
           </View>
           <View style={styles.colHead}>
-            <Text style={styles.colHeadText}>Team</Text>
-            <Text style={styles.colHeadText}>A</Text>
+            <Text style={styles.colHeadText}>Slot</Text>
+            <Text style={styles.colHeadText}>Player</Text>
           </View>
           <FlatList
             {...LIST_PERF}
@@ -302,13 +363,13 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
             <View style={styles.positionCard}>
               <Text style={styles.positionTitle}>Selected Position</Text>
               <View style={styles.posHeadRow}>
-                <Text style={[styles.posCol, styles.posHead]}>Team</Text>
-                <Text style={[styles.posCol, styles.posHead]}>Position</Text>
+                <Text style={[styles.posCol, styles.posHead]}>Slot</Text>
+                <Text style={[styles.posCol, styles.posHead]}>Status</Text>
                 <Text style={[styles.posColWide, styles.posHead]}>InGameName</Text>
               </View>
               <View style={styles.posDataRow}>
-                <Text style={styles.posCol}>Team {picked}</Text>
-                <Text style={styles.posCol}>1</Text>
+                <Text style={styles.posCol}>Slot {picked}</Text>
+                <Text style={styles.posCol}>Selected</Text>
                 <View style={styles.posColWide}>
                   {hasInfo ? (
                     <Text style={styles.inGameName} numberOfLines={1}>

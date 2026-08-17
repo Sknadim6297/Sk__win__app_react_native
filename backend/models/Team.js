@@ -12,6 +12,12 @@ const teamSchema = new mongoose.Schema({
     type: String,
     enum: ['A', 'B'],
   },
+  /** Battle Royale Duo/Squad slot (1–N). Custom Match uses side A/B instead. */
+  slotNumber: {
+    type: Number,
+    min: 1,
+    max: 50,
+  },
   players: [
     {
       name: { type: String, required: true, trim: true },
@@ -41,6 +47,16 @@ teamSchema.index(
     partialFilterExpression: {
       status: 'registered',
       side: { $type: 'string' },
+    },
+  }
+);
+teamSchema.index(
+  { tournamentId: 1, slotNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: 'registered',
+      slotNumber: { $type: 'number' },
     },
   }
 );

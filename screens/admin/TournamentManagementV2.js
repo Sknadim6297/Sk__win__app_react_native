@@ -41,8 +41,9 @@ const SECTION_ORDER = [
 ];
 
 function getJoinedLabel(item) {
-  const unit = item.joinUnit || (item.tournamentType === 'custom_match' || item.category === 'custom' ? 'teams' : 'players');
-  return `${item.joinedCount ?? 0}/${item.capacity ?? '—'} ${unit}`;
+  const format = item.formatLabel ? `${item.formatLabel} · ` : '';
+  const unit = item.joinUnit || (item.tournamentType === 'custom_match' || item.category === 'custom' ? 'teams' : 'slots');
+  return `${format}${item.joinedCount ?? 0}/${item.capacity ?? '—'} ${unit}`;
 }
 
 function groupBySection(items) {
@@ -146,7 +147,7 @@ export default function TournamentManagementV2({ navigation }) {
       return (
         <>
           <ActionBtn label="Edit" onPress={() => navigation.navigate('TournamentManagement', { editId: id })} />
-          <ActionBtn label="Participants" onPress={() => navigation.navigate('TournamentManagement', { viewParticipantsId: id })} />
+          <ActionBtn label="View slots" onPress={() => navigation.navigate('TournamentHistory')} />
           <ActionBtn label="Start" primary onPress={() => runAction('Start', () => tournamentManagementService.startMatch(id))} />
           <ActionBtn
             label="Cancel + Refund"
@@ -176,7 +177,7 @@ export default function TournamentManagementV2({ navigation }) {
     if (status === 'ongoing') {
       return (
         <>
-          <ActionBtn label="Participants" onPress={() => navigation.navigate('TournamentManagement', { viewParticipantsId: id })} />
+          <ActionBtn label="View slots" onPress={() => navigation.navigate('TournamentHistory')} />
           <ActionBtn
             label="Complete"
             primary
@@ -320,7 +321,10 @@ export default function TournamentManagementV2({ navigation }) {
                         </View>
                       )}
                     </View>
-                    <Text style={styles.meta}>{type} · ₹{item.entryFee ?? 0} entry</Text>
+                    <Text style={styles.meta}>
+                      {item.formatLabel ? `${item.formatLabel} · ` : ''}
+                      {type} · ₹{item.entryFee ?? 0}/{item.joinUnit === 'teams' ? 'team' : 'slot'}
+                    </Text>
                     <Text style={styles.meta}>{joinedLabel}</Text>
                     <View style={styles.row}>
                       <View style={[styles.statusPill, statusPillStyle(status)]}>

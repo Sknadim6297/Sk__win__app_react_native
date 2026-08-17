@@ -493,6 +493,7 @@ router.post('/cashfree/create-order', authMiddleware, requirePaymentsEnabled, as
         ...metadata,
         teamName,
         teamSide: req.body?.teamSide || req.body?.side || null,
+        slotNumber: req.body?.slotNumber || null,
         players: normalizedPlayers,
       };
     } else {
@@ -507,7 +508,7 @@ router.post('/cashfree/create-order', authMiddleware, requirePaymentsEnabled, as
           message: 'Game ID and UID are required (min 3 characters)',
         });
       }
-      metadata = { ...metadata, gamingUsername, gamingUID };
+      metadata = { ...metadata, gamingUsername, gamingUID, slotNumber: req.body?.slotNumber || null };
     }
 
     const { paymentOrder, expiry } = await createCashfreeQrOrder({

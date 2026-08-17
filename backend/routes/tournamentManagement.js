@@ -50,13 +50,21 @@ async function requireAdmin(req, res) {
 function formatListItem(tournament, joinStats) {
   const status = lifecycle.getEffectiveStatus(tournament);
   const type = lifecycle.getTournamentType(tournament);
+  const structure = lifecycle.getMatchStructure(tournament);
   const { joinedCount, capacity, unit, isFull, usesTeams } = joinStats;
   return {
     _id: tournament._id,
     name: tournament.name,
     tournamentType: type,
     category: tournament.category,
+    matchKind: structure.kind,
+    matchType: structure.matchType,
+    formatLabel: structure.formatLabel,
+    mode: structure.mode,
+    modeLabel: structure.modeLabel,
+    hasKillRewards: structure.hasKillRewards,
     entryFee: tournament.entryFee,
+    perKill: structure.hasKillRewards ? tournament.perKill || 0 : 0,
     joinedCount,
     capacity,
     joinUnit: unit,
@@ -149,8 +157,9 @@ router.get('/admin/:id', authMiddleware, async (req, res) => {
 
     let participants = [];
     let teams = [];
+    const structure = lifecycle.getMatchStructure(tournament);
 
-    if (lifecycle.isCustomMatch(tournament)) {
+    if (structure.usesTeamRegistration) {
       teams = await Team.find({ tournamentId: tournament._id, status: 'registered' })
         .populate('captainUserId', 'username email')
         .lean();
@@ -175,6 +184,11 @@ router.get('/admin/:id', authMiddleware, async (req, res) => {
       tournament: tournament.toObject(),
       status,
       resultsPublished: lifecycle.areResultsPublished(tournament),
+      matchKind: structure.kind,
+      matchType: structure.matchType,
+      formatLabel: structure.formatLabel,
+      modeLabel: structure.modeLabel,
+      hasKillRewards: structure.hasKillRewards,
       joinedCount: joinStats.joinedCount,
       capacity: joinStats.capacity,
       joinUnit: joinStats.unit,
@@ -1090,7 +1104,8 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
     }
 
     const isCustom = lifecycle.isCustomMatch(tournament);
-    const { teamName, teamSide, players } = req.body;
+    const structure = lifecycle.getMatchStructure(tournament);
+    const { teamName, teamSide, players, slotNumber: slotNumberRaw } = req.body;
     const sideRaw = String(teamSide || req.body.side || '')
       .trim()
       .toUpperCase()
@@ -1162,6 +1177,32 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
       }
     }
 
+    let slotNumber = null;
+    if (!isCustom && structure.usesTeamRegistration) {
+      slotNumber = Number(slotNumberRaw);
+      if (!slotNumber || slotNumber < 1 || slotNumber > structure.totalSlots) {
+        const taken = await Team.find({ tournamentId: tournament._id, status: 'registered' }).select('slotNumber');
+        const used = new Set(taken.map((t) => Number(t.slotNumber)).filter(Boolean));
+        for (let i = 1; i <= structure.totalSlots; i += 1) {
+          if (!used.has(i)) {
+            slotNumber = i;
+            break;
+          }
+        }
+      }
+      if (!slotNumber) {
+        return res.status(400).json({ error: 'All slots are full' });
+      }
+      const slotTaken = await Team.findOne({
+        tournamentId: tournament._id,
+        slotNumber,
+        status: 'registered',
+      });
+      if (slotTaken) {
+        return res.status(400).json({ error: `Slot ${slotNumber} is already booked` });
+      }
+    }
+
     const nameTaken = await Team.findOne({
       tournamentId: tournament._id,
       status: 'registered',
@@ -1198,6 +1239,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
       captainUserId: req.userId,
     };
     if (isCustom && side) teamPayload.side = side;
+    if (slotNumber) teamPayload.slotNumber = slotNumber;
 
     const team = await Team.create(teamPayload);
 

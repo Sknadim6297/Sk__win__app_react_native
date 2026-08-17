@@ -12,6 +12,7 @@ const TeamMember = require('../models/TeamMember');
 const PrizeDistribution = require('../models/PrizeDistribution');
 const lifecycle = require('../services/tournamentLifecycle');
 const winnerPayoutService = require('../services/winnerPayoutService');
+const adminTournamentHistory = require('../services/adminTournamentHistory');
 const WalletTransaction = require('../models/WalletTransaction');
 const {
   notifyTournamentJoined,
@@ -130,16 +131,9 @@ const calculateResultRewards = (tournament, resultsInput) => {
 
 async function getJoinEligibility(tournament, participantCount) {
   const status = lifecycle.getEffectiveStatus(tournament);
-  const isCustom = lifecycle.isCustomMatch(tournament);
-  const usesTeams = lifecycle.usesTeamRegistration(tournament);
+  const structure = lifecycle.getMatchStructure(tournament);
   const joined = participantCount ?? tournament.currentParticipants ?? 0;
-  const perTeam = lifecycle.getPlayersPerTeam(tournament.mode);
-  const max = usesTeams
-    ? (tournament.maxTeams ||
-        (isCustom ? 2 : Math.floor((tournament.maxParticipants || 50) / perTeam)))
-    : isCustom
-      ? (tournament.maxTeams || 2)
-      : (tournament.maxParticipants || 50);
+  const max = structure.totalSlots;
 
   if (status === 'draft') {
     return { canJoin: false, reason: 'Tournament is not published yet' };
@@ -156,7 +150,7 @@ async function getJoinEligibility(tournament, participantCount) {
   if (joined >= max) {
     return {
       canJoin: false,
-      reason: usesTeams || isCustom
+      reason: structure.usesTeamRegistration || structure.kind === 'team_vs_team'
         ? 'All team slots are full'
         : 'Tournament is full — all slots taken',
       isFull: true,
@@ -1105,57 +1099,7 @@ router.get('/admin/history', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Only admins can view tournament history' });
     }
 
-    const tournaments = await Tournament.find()
-      .populate('game', 'name')
-      .populate('gameMode', 'name')
-      .sort({ startDate: -1 });
-
-    // Fetch participants for each tournament
-    const tournamentHistory = await Promise.all(
-      tournaments.map(async (tournament) => {
-        const participants = await TournamentParticipant.find({ 
-          tournamentId: tournament._id 
-        })
-          .populate('userId', 'username email phoneNumber')
-          .sort({ joinedAt: -1 });
-
-        // Calculate status based on time
-        const calculatedStatus = calculateTournamentStatus(tournament);
-
-        return {
-          _id: tournament._id,
-          name: tournament.name,
-          game: tournament.game,
-          gameMode: tournament.gameMode,
-          mode: tournament.mode,
-          map: tournament.map,
-          entryFee: tournament.entryFee,
-          prizePool: tournament.prizePool,
-          perKill: tournament.perKill,
-          maxParticipants: tournament.maxParticipants,
-          startDate: tournament.startDate,
-          endDate: tournament.endDate,
-          status: calculatedStatus,
-          roomId: tournament.roomId,
-          roomPassword: tournament.roomPassword,
-          showRoomCredentials: tournament.showRoomCredentials,
-          totalJoined: participants.length,
-          participants: participants.map(p => ({
-            userId: p.userId?._id,
-            username: p.userId?.username,
-            email: p.userId?.email,
-            phoneNumber: p.userId?.phoneNumber,
-            slotNumber: p.slotNumber,
-            gamingUsername: p.gamingUsername,
-            status: p.status,
-            joinedAt: p.joinedAt,
-            rank: p.rank,
-            prizeAmount: p.prizeAmount,
-          })),
-        };
-      })
-    );
-
+    const tournamentHistory = await adminTournamentHistory.getAdminHistory();
     res.json(tournamentHistory);
   } catch (error) {
     console.error('Error fetching tournament history:', error);
@@ -1163,7 +1107,7 @@ router.get('/admin/history', authMiddleware, async (req, res) => {
   }
 });
 
-// Get participants for a specific tournament (Admin)
+// Get participants / slot map for a specific tournament (Admin)
 router.get('/admin/:id/participants', authMiddleware, async (req, res) => {
   try {
     const admin = await User.findById(req.userId);
@@ -1174,48 +1118,11 @@ router.get('/admin/:id/participants', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Only admins can view participants' });
     }
 
-    const tournament = await Tournament.findById(req.params.id)
-      .populate('game', 'name')
-      .populate('gameMode', 'name');
-
-    if (!tournament) {
+    const data = await adminTournamentHistory.getAdminEntries(req.params.id);
+    if (!data) {
       return res.status(404).json({ error: 'Tournament not found' });
     }
-
-    const participants = await TournamentParticipant.find({ 
-      tournamentId: req.params.id 
-    })
-      .populate('userId', 'username email phoneNumber wallet')
-      .sort({ joinedAt: -1 });
-
-    res.json({
-      tournament: {
-        _id: tournament._id,
-        name: tournament.name,
-        game: tournament.game,
-        gameMode: tournament.gameMode,
-        maxParticipants: tournament.maxParticipants,
-        roomId: tournament.roomId,
-        roomPassword: tournament.roomPassword,
-        showRoomCredentials: tournament.showRoomCredentials,
-      },
-      participants: participants.map(p => ({
-        _id: p._id,
-        userId: p.userId?._id,
-        username: p.userId?.username,
-        email: p.userId?.email,
-        phoneNumber: p.userId?.phoneNumber,
-        walletBalance: p.userId?.wallet?.balance,
-        slotNumber: p.slotNumber,
-        gamingUsername: p.gamingUsername,
-        teamName: p.teamName,
-        status: p.status,
-        joinedAt: p.joinedAt,
-        rank: p.rank,
-        prizeAmount: p.prizeAmount,
-      })),
-      totalJoined: participants.length,
-    });
+    res.json(data);
   } catch (error) {
     console.error('Error fetching participants:', error);
     res.status(500).json({ error: 'Failed to fetch participants' });
@@ -1284,10 +1191,11 @@ router.get('/list', async (req, res) => {
         }
 
         const joinStats = await lifecycle.getJoinStats(tournament._id, tournament);
+        const structure = lifecycle.getMatchStructure(tournament);
 
         let userJoined = false;
         if (userId) {
-          if (lifecycle.isCustomMatch(tournament)) {
+          if (structure.usesTeamRegistration) {
             const membership = await TeamMember.findOne({
               tournamentId: tournament._id,
               userId,
@@ -1310,7 +1218,13 @@ router.get('/list', async (req, res) => {
           currentParticipants: joinStats.joinedCount,
           participantCount: joinStats.joinedCount,
           joinUnit: joinStats.unit,
-          maxTeams: tournament.maxTeams || 2,
+          maxTeams: structure.totalSlots,
+          totalSlots: structure.totalSlots,
+          matchKind: structure.kind,
+          matchType: structure.matchType,
+          formatLabel: structure.formatLabel,
+          modeLabel: structure.modeLabel,
+          hasKillRewards: structure.hasKillRewards,
           isCustomMatch: lifecycle.isCustomMatch(tournament),
           userJoined,
           status: publicStatus,
@@ -1395,18 +1309,21 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
     if (usesTeams) {
       const teamDocs = await Team.find({ tournamentId: tournament._id, status: 'registered' }).sort({
         side: 1,
+        slotNumber: 1,
         createdAt: 1,
       });
       teams = teamDocs.map((t) => ({
         _id: t._id,
         name: t.name,
         side: t.side,
+        slotNumber: t.slotNumber || null,
         players: t.players || [],
         captainUserId: t.captainUserId,
       }));
     }
 
     const doc = tournament.toObject();
+    const structure = lifecycle.getMatchStructure(tournament);
     const joinCheck = await getJoinEligibility(tournament, joinStats.joinedCount);
     const startMs = new Date(tournament.startDate).getTime() - Date.now();
 
@@ -1417,16 +1334,24 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
       lifecycleStatus: lifecycle.getEffectiveStatus(tournament),
       displayStatus: calculatedStatus === 'incoming' ? 'upcoming' : calculatedStatus,
       isCustomMatch: isCustom,
+      matchKind: structure.kind,
+      matchType: structure.matchType,
+      formatLabel: structure.formatLabel,
+      modeLabel: structure.modeLabel,
+      hasKillRewards: structure.hasKillRewards,
+      usesSlotGrid: structure.usesSlotGrid,
+      usesTeamSides: structure.usesTeamSides,
       userJoined,
       participantCount: joinStats.joinedCount,
       joinUnit: joinStats.unit,
+      totalSlots: structure.totalSlots,
       maxTeams: usesTeams ? joinStats.capacity : tournament.maxTeams || 2,
       canJoin: joinCheck.canJoin && !userJoined,
       joinBlockReason: joinCheck.reason,
       countdownMs: Math.max(startMs, 0),
       resultsPublished: !!tournament.resultsPublished,
       teams,
-      participants: isCustom
+      participants: structure.usesTeamRegistration
         ? []
         : participants.map((p) => ({
             userId: p.userId?._id || p.userId,
@@ -1691,6 +1616,8 @@ router.get('/:id/canJoin', authMiddleware, async (req, res) => {
       isFull: eligibility.isFull,
       isCustomMatch: isCustom,
       usesTeamRegistration: usesTeams,
+      matchKind: joinStats.matchKind,
+      formatLabel: joinStats.formatLabel,
       joinUnit: joinStats.unit,
       joinedCount: joinStats.joinedCount,
       capacity: joinStats.capacity,
@@ -1978,44 +1905,115 @@ router.get('/:id/results', async (req, res) => {
 
 // ===== SLOT BOOKING ENDPOINTS =====
 
-// Get all slots for a tournament (initialized if not exists)
+// Get all slots for a tournament (Battle Royale grid, or Team A/B for custom)
 router.get('/:id/slots', async (req, res) => {
   try {
-    let tournament = await Tournament.findById(req.params.id);
-
+    const tournament = await Tournament.findById(req.params.id);
     if (!tournament) {
       return res.status(404).json({ error: 'Tournament not found' });
     }
 
-    // Initialize slots if not already created
+    const structure = lifecycle.getMatchStructure(tournament);
+
+    if (structure.kind === 'team_vs_team') {
+      const teams = await Team.find({ tournamentId: tournament._id, status: 'registered' }).lean();
+      const bySide = new Map(teams.map((t) => [String(t.side || '').toUpperCase(), t]));
+      const slots = ['A', 'B'].map((side, idx) => {
+        const team = bySide.get(side);
+        return {
+          slotNumber: idx + 1,
+          side,
+          isBooked: Boolean(team),
+          teamName: team?.name || null,
+          gamingUsername: team?.name || null,
+          players: team?.players || [],
+        };
+      });
+      const bookedSlots = slots.filter((s) => s.isBooked).length;
+      return res.json({
+        tournamentId: tournament._id,
+        matchKind: structure.kind,
+        formatLabel: structure.formatLabel,
+        totalSlots: 2,
+        bookedSlots,
+        availableSlots: 2 - bookedSlots,
+        slots,
+      });
+    }
+
+    if (structure.usesTeamRegistration) {
+      const teams = await Team.find({ tournamentId: tournament._id, status: 'registered' }).lean();
+      const bySlot = new Map(
+        teams.filter((t) => t.slotNumber).map((t) => [Number(t.slotNumber), t])
+      );
+      let auto = 1;
+      const used = new Set(bySlot.keys());
+      teams
+        .filter((t) => !t.slotNumber)
+        .forEach((t) => {
+          while (used.has(auto) && auto <= structure.totalSlots) auto += 1;
+          if (auto <= structure.totalSlots) {
+            bySlot.set(auto, t);
+            used.add(auto);
+            auto += 1;
+          }
+        });
+      const slots = [];
+      for (let i = 1; i <= structure.totalSlots; i += 1) {
+        const team = bySlot.get(i);
+        slots.push({
+          slotNumber: i,
+          isBooked: Boolean(team),
+          teamName: team?.name || null,
+          gamingUsername: team?.name || null,
+          players: team?.players || [],
+        });
+      }
+      const bookedSlots = slots.filter((s) => s.isBooked).length;
+      return res.json({
+        tournamentId: tournament._id,
+        matchKind: structure.kind,
+        formatLabel: structure.formatLabel,
+        totalSlots: structure.totalSlots,
+        bookedSlots,
+        availableSlots: structure.totalSlots - bookedSlots,
+        slots,
+      });
+    }
+
     if (!tournament.slots || tournament.slots.length === 0) {
       const newSlots = [];
-      for (let i = 1; i <= 50; i++) {
+      for (let i = 1; i <= structure.totalSlots; i += 1) {
         newSlots.push({
           slotNumber: i,
           userId: null,
           gamingUsername: null,
+          gamingUID: null,
           bookedAt: null,
           isBooked: false,
         });
       }
       tournament.slots = newSlots;
-      tournament = await tournament.save();
+      await tournament.save();
     }
 
-    // Format response with slot details
-    const slotsWithUsernames = tournament.slots.map(slot => ({
-      slotNumber: slot.slotNumber,
-      isBooked: slot.isBooked,
-      gamingUsername: slot.isBooked ? slot.gamingUsername : null,
-      userId: slot.isBooked ? slot.userId : null,
-    }));
+    const slotsWithUsernames = tournament.slots
+      .filter((slot) => slot.slotNumber >= 1 && slot.slotNumber <= structure.totalSlots)
+      .map((slot) => ({
+        slotNumber: slot.slotNumber,
+        isBooked: slot.isBooked,
+        gamingUsername: slot.isBooked ? slot.gamingUsername : null,
+        userId: slot.isBooked ? slot.userId : null,
+      }));
 
+    const bookedSlots = slotsWithUsernames.filter((s) => s.isBooked).length;
     res.json({
       tournamentId: tournament._id,
-      totalSlots: 50,
-      bookedSlots: tournament.slots.filter(s => s.isBooked).length,
-      availableSlots: 50 - tournament.slots.filter(s => s.isBooked).length,
+      matchKind: structure.kind,
+      formatLabel: structure.formatLabel,
+      totalSlots: structure.totalSlots,
+      bookedSlots,
+      availableSlots: structure.totalSlots - bookedSlots,
       slots: slotsWithUsernames,
     });
   } catch (error) {
@@ -2057,17 +2055,24 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Tournament not found' });
     }
 
-    if (lifecycle.usesTeamRegistration(tournament)) {
+    const structure = lifecycle.getMatchStructure(tournament);
+    if (structure.kind === 'team_vs_team' || structure.usesTeamRegistration) {
       return res.status(400).json({
-        error: 'This tournament uses team registration. Captain pays once — use Register Team.',
+        error: structure.kind === 'team_vs_team'
+          ? 'This is a team-vs-team match. Use team registration (Team A / Team B).'
+          : 'This tournament uses team slot booking. Captain pays once — use Register Team.',
         code: 'TEAM_REGISTRATION_REQUIRED',
       });
+    }
+
+    if (slotNumber < 1 || slotNumber > structure.totalSlots) {
+      return res.status(400).json({ error: `Invalid slot number. Must be between 1 and ${structure.totalSlots}` });
     }
 
     // Initialize slots if not already created
     if (!tournament.slots || tournament.slots.length === 0) {
       const newSlots = [];
-      for (let i = 1; i <= 50; i++) {
+      for (let i = 1; i <= structure.totalSlots; i++) {
         newSlots.push({
           slotNumber: i,
           userId: null,

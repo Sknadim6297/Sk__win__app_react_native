@@ -16,7 +16,16 @@ export default function InsufficientBalanceModal({
   message = "You don't have enough coins to register your team for this tournament. Please add coins to continue.",
   requiredAmount,
   currentBalance,
+  remainingAmount,
+  payLabel,
 }) {
+  const remaining =
+    remainingAmount != null
+      ? Number(remainingAmount)
+      : requiredAmount != null && currentBalance != null
+        ? Math.max(0, Number(requiredAmount) - Number(currentBalance))
+        : null;
+
   return (
     <CenterDialog visible={visible} onClose={onClose} dismissOnOverlay>
       <View style={styles.iconWrap}>
@@ -25,19 +34,27 @@ export default function InsufficientBalanceModal({
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
 
-      {(requiredAmount != null || currentBalance != null) && (
+      {(requiredAmount != null || currentBalance != null || remaining != null) && (
         <View style={styles.metaBox}>
           {requiredAmount != null ? (
             <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Required</Text>
+              <Text style={styles.metaLabel}>Entry fee</Text>
               <Text style={styles.metaValue}>₹{Number(requiredAmount).toLocaleString('en-IN')}</Text>
             </View>
           ) : null}
           {currentBalance != null ? (
             <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Your balance</Text>
+              <Text style={styles.metaLabel}>Your coins</Text>
               <Text style={[styles.metaValue, styles.metaWarn]}>
                 ₹{Number(currentBalance).toLocaleString('en-IN')}
+              </Text>
+            </View>
+          ) : null}
+          {remaining != null ? (
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>Remaining</Text>
+              <Text style={[styles.metaValue, styles.metaRemain]}>
+                ₹{Number(remaining).toLocaleString('en-IN')}
               </Text>
             </View>
           ) : null}
@@ -45,8 +62,10 @@ export default function InsufficientBalanceModal({
       )}
 
       <TouchableOpacity style={styles.primaryBtn} onPress={onAddCoins} activeOpacity={0.88}>
-        <MaterialCommunityIcons name="plus-circle" size={18} color={COLORS.white} />
-        <Text style={styles.primaryText}>Add Coins</Text>
+        <MaterialCommunityIcons name="qrcode" size={18} color={COLORS.white} />
+        <Text style={styles.primaryText}>
+          {payLabel || (remaining > 0 ? `Pay remaining ₹${Number(remaining).toLocaleString('en-IN')}` : 'Add Coins')}
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.8}>
         <Text style={styles.cancelText}>Cancel</Text>
@@ -106,6 +125,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   metaWarn: { color: '#F87171' },
+  metaRemain: { color: '#FBBF24' },
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -17,106 +17,86 @@ import { COLORS } from '../../styles/theme';
 import { tournamentService } from '../../services/api';
 import Toast from '../../components/Toast';
 
-const TournamentHistory = ({ navigation }) => {
-  const [filter, setFilter] = useState('all'); // all, completed, ongoing, incoming
+const rupee = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+
+function statusColor(status) {
+  if (status === 'completed') return COLORS.gray;
+  if (status === 'ongoing' || status === 'live') return '#FF3B30';
+  if (status === 'incoming' || status === 'upcoming') return '#FF9500';
+  if (status === 'cancelled') return COLORS.gray;
+  return COLORS.gray;
+}
+
+function payColor(status) {
+  const s = String(status || '').toUpperCase();
+  if (s === 'PAID' || s === 'COVERED') return '#34C759';
+  if (s === 'PENDING') return '#FF9500';
+  if (s === 'AVAILABLE') return COLORS.gray;
+  return '#FF3B30';
+}
+
+export default function TournamentHistory({ navigation }) {
+  const [filter, setFilter] = useState('all');
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedTournament, setSelectedTournament] = useState(null);
-  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
-  const [participants, setParticipants] = useState([]);
-  const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [slots, setSlots] = useState([]);
+  const [showSlots, setShowSlots] = useState(false);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
 
-  useEffect(() => {
-    fetchTournamentHistory();
-  }, []);
+  const showToast = (message, type = 'error') => setToast({ visible: true, message, type });
+  const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
 
-  const showToast = (message, type = 'error') => {
-    setToast({ visible: true, message, type });
-  };
-
-  const hideToast = () => {
-    setToast({ visible: false, message: '', type: 'error' });
-  };
-
-  const fetchTournamentHistory = async () => {
+  const fetchHistory = async () => {
     try {
       setLoading(true);
       const data = await tournamentService.getTournamentHistory();
-      setTournaments(data);
+      setTournaments(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error fetching tournament history:', error);
-      showToast(error.message || 'Failed to fetch tournament history', 'error');
+      showToast(error.message || 'Failed to fetch tournament history');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchHistory();
+  }, []);
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchTournamentHistory();
+    await fetchHistory();
     setRefreshing(false);
   };
 
-  const fetchParticipants = async (tournamentId) => {
+  const openSlots = async (tournament) => {
+    setSelected(tournament);
+    setShowSlots(true);
     try {
-      setLoadingParticipants(true);
-      const data = await tournamentService.getTournamentParticipants(tournamentId);
-      setParticipants(data.participants);
-      setSelectedTournament(data.tournament);
+      setLoadingSlots(true);
+      const data = await tournamentService.getTournamentParticipants(tournament._id);
+      setSelected(data.tournament || tournament);
+      setSlots(data.slots || []);
     } catch (error) {
-      console.error('Error fetching participants:', error);
-      showToast(error.message || 'Failed to fetch participants', 'error');
+      showToast(error.message || 'Failed to load slots');
     } finally {
-      setLoadingParticipants(false);
+      setLoadingSlots(false);
     }
   };
 
-  const handleViewParticipants = async (tournament) => {
-    setShowParticipantsModal(true);
-    await fetchParticipants(tournament._id);
-  };
-
-  const getFilteredTournaments = () => {
-    if (filter === 'all') return tournaments;
-    if (filter === 'incoming') {
-      return tournaments.filter(t => t.status === 'incoming' || t.status === 'upcoming');
-    }
-    if (filter === 'ongoing') {
-      return tournaments.filter(t => t.status === 'ongoing' || t.status === 'live');
-    }
-    return tournaments.filter(t => t.status === filter);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return COLORS.gray;
-      case 'ongoing': return '#FF3B30';
-      case 'live': return '#FF3B30';
-      case 'incoming': return '#FF9500';
-      case 'upcoming': return '#FF9500';
-      case 'cancelled': return COLORS.gray;
-      default: return COLORS.gray;
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'completed': return 'checkmark-circle';
-      case 'ongoing': return 'radio-button-on';
-      case 'live': return 'radio-button-on';
-      case 'incoming': return 'time';
-      case 'upcoming': return 'time';
-      case 'cancelled': return 'close-circle';
-      default: return 'ellipse';
-    }
-  };
+  const filtered = tournaments.filter((t) => {
+    const status = t.status || t.lifecycleStatus;
+    if (filter === 'all') return true;
+    if (filter === 'incoming') return status === 'incoming' || status === 'upcoming';
+    if (filter === 'ongoing') return status === 'ongoing' || status === 'live';
+    return status === filter;
+  });
 
   const formatDate = (dateString) => {
     if (!dateString) return 'TBA';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
+    return new Date(dateString).toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -124,24 +104,20 @@ const TournamentHistory = ({ navigation }) => {
   };
 
   const formatDateTime = (dateString) => {
-    if (!dateString) return 'TBA';
-    const date = new Date(dateString);
-    return date.toLocaleString('en-IN', {
+    if (!dateString) return '—';
+    return new Date(dateString).toLocaleString('en-IN', {
       day: '2-digit',
       month: 'short',
-      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
     });
   };
 
-  const filteredTournaments = getFilteredTournaments();
-
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.white} />
@@ -151,7 +127,6 @@ const TournamentHistory = ({ navigation }) => {
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.accent} />
-          <Text style={styles.loadingText}>Loading tournaments...</Text>
         </View>
       </SafeAreaView>
     );
@@ -159,9 +134,7 @@ const TournamentHistory = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
-      
-      {/* Header */}
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
@@ -170,7 +143,6 @@ const TournamentHistory = ({ navigation }) => {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Statistics */}
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{tournaments.length}</Text>
@@ -178,261 +150,197 @@ const TournamentHistory = ({ navigation }) => {
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
-            {tournaments.filter(t => t.status === 'ongoing' || t.status === 'live').length}
+            {tournaments.filter((t) => t.status === 'ongoing' || t.status === 'live').length}
           </Text>
-          <Text style={styles.statLabel}>Ongoing</Text>
+          <Text style={styles.statLabel}>Live</Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
-            {tournaments.filter(t => t.status === 'incoming' || t.status === 'upcoming').length}
+            {tournaments.filter((t) => t.status === 'incoming' || t.status === 'upcoming').length}
           </Text>
-          <Text style={styles.statLabel}>Incoming</Text>
+          <Text style={styles.statLabel}>Upcoming</Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
-            {tournaments.filter(t => t.status === 'completed').length}
+            {tournaments.filter((t) => t.status === 'completed').length}
           </Text>
-          <Text style={styles.statLabel}>Completed</Text>
+          <Text style={styles.statLabel}>Done</Text>
         </View>
       </View>
 
-      {/* Filter Tabs */}
       <View style={styles.filterContainer}>
-        <TouchableOpacity
-          style={[styles.filterTab, filter === 'all' && styles.activeFilter]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={[styles.filterText, filter === 'all' && styles.activeFilterText]}>
-            ALL ({tournaments.length})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.filterTab, filter === 'completed' && styles.activeFilter]}
-          onPress={() => setFilter('completed')}
-        >
-          <Text style={[styles.filterText, filter === 'completed' && styles.activeFilterText]}>
-            COMPLETED
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.filterTab, filter === 'ongoing' && styles.activeFilter]}
-          onPress={() => setFilter('ongoing')}
-        >
-          <Text style={[styles.filterText, filter === 'ongoing' && styles.activeFilterText]}>
-            ONGOING
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.filterTab, filter === 'incoming' && styles.activeFilter]}
-          onPress={() => setFilter('incoming')}
-        >
-          <Text style={[styles.filterText, filter === 'incoming' && styles.activeFilterText]}>
-            INCOMING
-          </Text>
-        </TouchableOpacity>
+        {[
+          { key: 'all', label: 'ALL' },
+          { key: 'completed', label: 'DONE' },
+          { key: 'ongoing', label: 'LIVE' },
+          { key: 'incoming', label: 'UPCOMING' },
+        ].map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.filterTab, filter === tab.key && styles.activeFilter]}
+            onPress={() => setFilter(tab.key)}
+          >
+            <Text style={[styles.filterText, filter === tab.key && styles.activeFilterText]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh} 
-            tintColor={COLORS.accent}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />}
       >
-        {filteredTournaments.length === 0 ? (
+        {filtered.length === 0 ? (
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="trophy-outline" size={64} color={COLORS.gray} />
             <Text style={styles.emptyText}>No tournaments found</Text>
-            <Text style={styles.emptySubtext}>
-              {filter === 'all' 
-                ? 'Create your first tournament to get started' 
-                : `No ${filter} tournaments`}
-            </Text>
           </View>
         ) : (
-          filteredTournaments.map((tournament) => (
-            <View key={tournament._id} style={styles.tournamentCard}>
-              <View style={styles.cardHeader}>
-                <View style={styles.tournamentIcon}>
-                  <MaterialCommunityIcons name="trophy-award" size={28} color={COLORS.accent} />
-                </View>
-                <View style={styles.tournamentInfo}>
-                  <Text style={styles.tournamentName}>{tournament.name}</Text>
-                  <Text style={styles.tournamentGame}>
-                    {tournament.game?.name} - {tournament.gameMode?.name}
-                  </Text>
-                  <View style={styles.statusContainer}>
-                    <Ionicons 
-                      name={getStatusIcon(tournament.status)} 
-                      size={14} 
-                      color={getStatusColor(tournament.status)} 
-                    />
-                    <Text style={[styles.statusText, { color: getStatusColor(tournament.status) }]}>
-                      {tournament.status.toUpperCase()}
+          filtered.map((t) => {
+            const isCustom = t.matchKind === 'team_vs_team' || t.formatLabel === '1v1' || t.formatLabel === '2v2' || t.formatLabel === '4v4';
+            return (
+              <View key={t._id} style={styles.card}>
+                <View style={styles.cardTop}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.name}>{t.name}</Text>
+                    <Text style={styles.sub}>
+                      {t.matchType || (isCustom ? 'Custom Match' : 'Battle Royale')} · {t.formatLabel || t.modeLabel || t.mode}
+                      {t.matchKind === 'battle_royale' ? ` · ${t.modeLabel || ''}` : ''}
+                    </Text>
+                  </View>
+                  <View style={[styles.statusPill, { borderColor: statusColor(t.status) }]}>
+                    <Text style={[styles.statusText, { color: statusColor(t.status) }]}>
+                      {String(t.status || '').toUpperCase()}
                     </Text>
                   </View>
                 </View>
-              </View>
 
-              <View style={styles.detailsGrid}>
-                <View style={styles.detailItem}>
-                  <Ionicons name="calendar" size={16} color={COLORS.accent} />
-                  <Text style={styles.detailText}>{formatDate(tournament.startDate)}</Text>
+                <View style={styles.grid}>
+                  <Stat label="Slots" value={`${t.bookedSlots ?? t.totalJoined ?? 0}/${t.totalSlots || t.maxParticipants || 0}`} />
+                  <Stat label="Available" value={String(t.availableSlots ?? '—')} />
+                  <Stat label="Entry" value={rupee(t.entryFee)} />
+                  <Stat label="Collected" value={rupee(t.collectedAmount)} />
+                  <Stat label="Prize pool" value={rupee(t.prizePool)} />
+                  <Stat label="Match date" value={formatDate(t.startDate)} />
                 </View>
 
-                <View style={styles.detailItem}>
-                  <Ionicons name="people" size={16} color={COLORS.accent} />
-                  <Text style={styles.detailText}>
-                    {tournament.totalJoined || 0} / {tournament.maxParticipants}
-                  </Text>
-                </View>
-
-                <View style={styles.detailItem}>
-                  <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                  <Text style={styles.detailText}>₹{tournament.prizePool}</Text>
-                </View>
-
-                <View style={styles.detailItem}>
-                  <MaterialCommunityIcons name="ticket" size={16} color={COLORS.accent} />
-                  <Text style={styles.detailText}>₹{tournament.entryFee}</Text>
-                </View>
-              </View>
-
-              {tournament.prizes && (
-                <View style={styles.prizesRow}>
-                  <View style={styles.prizeBadge}>
-                    <Text style={styles.prizeRank}>🥇</Text>
-                    <Text style={styles.prizeValue}>₹{tournament.prizes.first || 0}</Text>
+                {t.hasKillRewards ? (
+                  <View style={styles.killRow}>
+                    <Text style={styles.killText}>Per kill {rupee(t.perKill)}</Text>
+                    <Text style={styles.killText}>Kills {t.totalKills || 0}</Text>
+                    <Text style={styles.killText}>Kill rewards {rupee(t.killRewardsDistributed)}</Text>
                   </View>
-                  <View style={styles.prizeBadge}>
-                    <Text style={styles.prizeRank}>🥈</Text>
-                    <Text style={styles.prizeValue}>₹{tournament.prizes.second || 0}</Text>
-                  </View>
-                  <View style={styles.prizeBadge}>
-                    <Text style={styles.prizeRank}>🥉</Text>
-                    <Text style={styles.prizeValue}>₹{tournament.prizes.third || 0}</Text>
-                  </View>
-                </View>
-              )}
+                ) : (
+                  <Text style={styles.note}>Team vs team — no per-kill rewards</Text>
+                )}
 
-              {/* Room Credentials */}
-              {tournament.roomId && (
-                <View style={styles.roomCredentials}>
-                  <MaterialCommunityIcons name="key" size={16} color={COLORS.accent} />
-                  <Text style={styles.roomText}>
-                    Room ID: {tournament.roomId} | Pass: {tournament.roomPassword || 'Not set'}
-                  </Text>
-                  <View style={[
-                    styles.credentialsBadge,
-                    { backgroundColor: tournament.showRoomCredentials ? '#34C759' : COLORS.gray }
-                  ]}>
-                    <Text style={styles.credentialsBadgeText}>
-                      {tournament.showRoomCredentials ? 'Visible' : 'Hidden'}
-                    </Text>
-                  </View>
-                </View>
-              )}
+                <Text style={styles.payLine}>Payments: {t.paymentStatus || '—'}</Text>
 
-              <View style={styles.cardActions}>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.viewButton]}
-                  onPress={() => handleViewParticipants(tournament)}
-                >
-                  <Ionicons name="people" size={18} color={COLORS.white} />
-                  <Text style={styles.actionButtonText}>
-                    View Players ({tournament.totalJoined || 0})
+                <TouchableOpacity style={styles.viewBtn} onPress={() => openSlots(t)}>
+                  <Ionicons name="grid-outline" size={18} color={COLORS.white} />
+                  <Text style={styles.viewBtnText}>
+                    View {isCustom ? 'teams' : 'slots'} ({t.bookedSlots ?? 0})
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
-      {/* Participants Modal */}
-      <Modal
-        visible={showParticipantsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowParticipantsModal(false)}
-      >
+      <Modal visible={showSlots} animationType="slide" transparent onRequestClose={() => setShowSlots(false)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {selectedTournament?.name || 'Tournament'} - Players
-              </Text>
-              <TouchableOpacity onPress={() => setShowParticipantsModal(false)}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>{selected?.name || 'Slots'}</Text>
+                <Text style={styles.modalSub}>
+                  {selected?.matchType} · {selected?.formatLabel}
+                  {selected?.hasKillRewards ? ` · per kill ${rupee(selected?.perKill)}` : ''}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowSlots(false)}>
                 <Ionicons name="close" size={24} color={COLORS.white} />
               </TouchableOpacity>
             </View>
 
-            {loadingParticipants ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={COLORS.accent} />
-              </View>
+            {loadingSlots ? (
+              <ActivityIndicator size="large" color={COLORS.accent} style={{ marginTop: 40 }} />
             ) : (
               <FlatList
-                data={participants}
-                keyExtractor={(item, index) => item._id || index.toString()}
-                renderItem={({ item, index }) => (
-                  <View style={styles.participantItem}>
-                    <View style={styles.participantRank}>
-                      <Text style={styles.rankText}>{index + 1}</Text>
-                    </View>
-                    <View style={styles.participantInfo}>
-                      <Text style={styles.participantName}>{item.username}</Text>
-                      <Text style={styles.participantEmail}>{item.email}</Text>
-                      <Text style={styles.participantMeta}>
-                        Slot: {item.slotNumber ? `#${item.slotNumber}` : '-'} | Gaming ID: {item.gamingUsername || '-'}
-                      </Text>
-                      <Text style={styles.joinedDate}>
-                        Joined: {formatDateTime(item.joinedAt)}
-                      </Text>
-                    </View>
-                    <View style={[
-                      styles.participantStatus,
-                      { backgroundColor: item.status === 'winner' ? '#FFD700' : COLORS.accent }
-                    ]}>
-                      <Text style={styles.participantStatusText}>
-                        {item.status === 'winner' ? '👑' : '✓'}
-                      </Text>
-                    </View>
-                  </View>
-                )}
+                data={slots}
+                keyExtractor={(item, index) => String(item.slotNumber || item.side || index)}
+                contentContainerStyle={{ paddingBottom: 24 }}
                 ListEmptyComponent={
                   <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>No participants yet</Text>
+                    <Text style={styles.emptyText}>No slot records</Text>
                   </View>
                 }
+                renderItem={({ item }) => (
+                  <View style={styles.slotCard}>
+                    <View style={styles.slotHead}>
+                      <Text style={styles.slotLabel}>{item.label || `Slot ${item.slotNumber}`}</Text>
+                      <Text style={[styles.payBadge, { color: payColor(item.paymentStatus) }]}>
+                        {item.available ? 'AVAILABLE' : item.paymentStatus || item.teamName || 'JOINED'}
+                      </Text>
+                    </View>
+                    {item.teamName ? <Text style={styles.teamName}>{item.teamName}</Text> : null}
+                    {(item.players || []).map((p, idx) => (
+                      <View key={`${item.slotNumber}-${idx}`} style={styles.playerRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.playerName}>
+                            {p.role === 'captain' ? 'Captain · ' : ''}
+                            {p.displayName || p.gamingUsername}
+                          </Text>
+                          <Text style={styles.playerMeta}>
+                            UID {p.gamingUID || '—'}
+                            {p.userId ? ` · User ${String(p.userId).slice(-6)}` : ''}
+                          </Text>
+                          <Text style={styles.playerMeta}>
+                            {p.orderId ? `Order ${p.orderId}` : p.transactionId ? `Txn ${p.transactionId}` : 'No payment id'}
+                            {' · '}
+                            {p.joinedAt ? formatDateTime(p.joinedAt) : '—'}
+                          </Text>
+                          {p.kills != null ? (
+                            <Text style={styles.playerMeta}>
+                              Kills {p.kills} · Kill reward {rupee(p.killReward)} · Winnings {rupee(p.finalWinnings)}
+                            </Text>
+                          ) : p.finalWinnings ? (
+                            <Text style={styles.playerMeta}>Winnings {rupee(p.finalWinnings)}</Text>
+                          ) : null}
+                        </View>
+                        <Text style={[styles.payBadge, { color: payColor(p.paymentStatus) }]}>
+                          {p.paymentStatus}
+                        </Text>
+                      </View>
+                    ))}
+                    {item.available ? <Text style={styles.availableHint}>Open — not joined, not collected</Text> : null}
+                  </View>
+                )}
               />
             )}
           </View>
         </View>
       </Modal>
 
-      <Toast 
-        visible={toast.visible}
-        message={toast.message}
-        type={toast.type}
-        onHide={hideToast}
-      />
+      <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hideToast} />
     </SafeAreaView>
   );
-};
+}
+
+function Stat({ label, value }) {
+  return (
+    <View style={styles.statCell}>
+      <Text style={styles.statCellLabel}>{label}</Text>
+      <Text style={styles.statCellValue}>{value}</Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -442,22 +350,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: COLORS.accent,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  loadingText: {
-    color: COLORS.gray,
-    marginTop: 12,
-    fontSize: 16,
-  },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.white },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -467,275 +361,85 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderRadius: 12,
   },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.accent,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginTop: 4,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-  },
+  statItem: { alignItems: 'center' },
+  statValue: { fontSize: 22, fontWeight: 'bold', color: COLORS.accent },
+  statLabel: { fontSize: 12, color: COLORS.gray, marginTop: 4 },
+  filterContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   filterTab: {
     flex: 1,
     paddingVertical: 8,
-    paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: COLORS.lightGray,
     alignItems: 'center',
   },
-  activeFilter: {
-    backgroundColor: COLORS.accent,
-  },
-  filterText: {
-    fontSize: 11,
-    color: COLORS.gray,
-    fontWeight: '600',
-  },
-  activeFilterText: {
-    color: COLORS.white,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 18,
-    color: COLORS.white,
-    fontWeight: 'bold',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  tournamentCard: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  tournamentIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: COLORS.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  tournamentInfo: {
-    flex: 1,
-  },
-  tournamentName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 4,
-  },
-  tournamentGame: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 6,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    marginLeft: 4,
-  },
-  detailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '50%',
-    marginBottom: 8,
-  },
-  detailText: {
-    fontSize: 13,
-    color: COLORS.white,
-    marginLeft: 6,
-  },
-  prizesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    backgroundColor: COLORS.background,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  prizeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: COLORS.darkGray,
-  },
-  prizeRank: {
-    fontSize: 12,
-  },
-  prizeValue: {
-    fontSize: 12,
-    color: COLORS.white,
-    fontWeight: '600',
-  },
-  roomCredentials: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  roomText: {
-    fontSize: 12,
-    color: COLORS.white,
-    marginLeft: 8,
-    flex: 1,
-  },
-  credentialsBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  credentialsBadgeText: {
-    fontSize: 10,
-    color: COLORS.white,
-    fontWeight: 'bold',
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    flex: 1,
+  activeFilter: { backgroundColor: COLORS.accent },
+  filterText: { fontSize: 11, color: COLORS.gray, fontWeight: '600' },
+  activeFilterText: { color: COLORS.white },
+  content: { flex: 1, paddingHorizontal: 16 },
+  emptyContainer: { padding: 40, alignItems: 'center' },
+  emptyText: { fontSize: 16, color: COLORS.white, fontWeight: 'bold', marginTop: 12 },
+  card: { backgroundColor: COLORS.lightGray, borderRadius: 12, padding: 16, marginBottom: 12 },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12, gap: 8 },
+  name: { fontSize: 16, fontWeight: 'bold', color: COLORS.white, marginBottom: 4 },
+  sub: { fontSize: 12, color: COLORS.gray },
+  statusPill: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  statusText: { fontSize: 10, fontWeight: 'bold' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  statCell: { width: '50%', marginBottom: 10 },
+  statCellLabel: { fontSize: 11, color: COLORS.gray, marginBottom: 2 },
+  statCellValue: { fontSize: 14, color: COLORS.white, fontWeight: '700' },
+  killRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 },
+  killText: { fontSize: 12, color: '#FBBF24', fontWeight: '600' },
+  note: { fontSize: 12, color: COLORS.gray, marginBottom: 8 },
+  payLine: { fontSize: 12, color: COLORS.white, marginBottom: 12 },
+  viewBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 10,
-    borderRadius: 8,
     gap: 6,
-  },
-  viewButton: {
     backgroundColor: COLORS.accent,
+    borderRadius: 8,
+    paddingVertical: 10,
   },
-  actionButtonText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: COLORS.white,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
+  viewBtnText: { color: COLORS.white, fontWeight: 'bold', fontSize: 13 },
+  modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: COLORS.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
-    paddingBottom: 20,
+    maxHeight: '88%',
+    paddingBottom: 16,
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.darkGray,
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    flex: 1,
-  },
-  participantItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.darkGray,
-  },
-  participantRank: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  modalTitle: { fontSize: 17, fontWeight: 'bold', color: COLORS.white },
+  modalSub: { fontSize: 12, color: COLORS.gray, marginTop: 4 },
+  slotCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
     backgroundColor: COLORS.lightGray,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+    borderRadius: 12,
+    padding: 12,
   },
-  rankText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.accent,
+  slotHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  slotLabel: { fontSize: 15, fontWeight: 'bold', color: COLORS.white },
+  teamName: { fontSize: 13, color: COLORS.accent, marginTop: 4, marginBottom: 6 },
+  playerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.darkGray,
+    marginTop: 8,
+    gap: 8,
   },
-  participantInfo: {
-    flex: 1,
-  },
-  participantName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 2,
-  },
-  participantEmail: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 2,
-  },
-  participantMeta: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 2,
-  },
-  joinedDate: {
-    fontSize: 11,
-    color: COLORS.gray,
-  },
-  participantStatus: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  participantStatusText: {
-    fontSize: 14,
-    color: COLORS.white,
-  },
+  playerName: { fontSize: 14, fontWeight: 'bold', color: COLORS.white },
+  playerMeta: { fontSize: 11, color: COLORS.gray, marginTop: 2 },
+  payBadge: { fontSize: 11, fontWeight: 'bold' },
+  availableHint: { fontSize: 12, color: COLORS.gray, marginTop: 6 },
 });
-
-export default TournamentHistory;

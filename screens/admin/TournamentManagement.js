@@ -33,9 +33,9 @@ const GAME_MODES = [
 ];
 
 const CUSTOM_GAME_MODES = [
-  { label: 'Solo', value: 'solo', teamSize: 1 },
-  { label: 'Duo', value: 'duo', teamSize: 2 },
-  { label: 'Squad', value: 'squad', teamSize: 4 },
+  { label: '1v1', value: 'solo', teamSize: 1 },
+  { label: '2v2', value: 'duo', teamSize: 2 },
+  { label: '4v4', value: 'squad', teamSize: 4 },
 ];
 
 const MODE_MAX_PLAYERS = {
@@ -45,8 +45,8 @@ const MODE_MAX_PLAYERS = {
 };
 
 const TOURNAMENT_CATEGORIES = [
-  { label: 'Battle Royale', value: 'battle_royale', description: 'Prize pool + per kill rewards' },
-  { label: 'Custom Match', value: 'custom', description: 'Prize pool only — winner / lose' },
+  { label: 'Battle Royale', value: 'battle_royale', description: 'Full map · Solo / Duo / Squad · up to 50 slots · per-kill rewards' },
+  { label: 'Custom Match', value: 'custom', description: 'Team vs team · 1v1 / 2v2 / 4v4 · Team A vs Team B · entry fee per team · no kill rewards' },
 ];
 
 const MATCH_STATUSES = [
@@ -311,6 +311,10 @@ const TournamentManagement = ({ navigation }) => {
   };
 
   const getPayingUnits = () => {
+    const isCustom =
+      (form.category || form.tournamentType) === 'custom' ||
+      (form.category || form.tournamentType) === 'custom_match';
+    if (isCustom) return 2;
     const maxParticipants = parseInt(form.maxParticipants, 10) || 50;
     if (form.mode === 'solo') return maxParticipants;
     return Math.floor(maxParticipants / (form.teamSize || getTeamSizeFromMode(form.mode)));
@@ -1516,8 +1520,8 @@ const TournamentManagement = ({ navigation }) => {
                   <MaterialCommunityIcons name="account-group" size={20} color={COLORS.accent} />
                   <Text style={styles.teamConfigTitle}>
                     {(form.category || form.tournamentType) === 'custom'
-                      ? 'Custom Match Teams'
-                      : 'Team Configuration'}
+                      ? '1v1 / 2v2 / 4v4 — Team A vs Team B'
+                      : 'Battle Royale Slots'}
                   </Text>
                 </View>
                 <View style={styles.teamConfigDetails}>

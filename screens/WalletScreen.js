@@ -59,6 +59,7 @@ const WalletScreen = ({ navigation, route }) => {
   const paymentInFlight = useRef(false);
   const returnTournamentRef = useRef(null);
   const returnScreenRef = useRef('TournamentDetails');
+  const pendingJoinRef = useRef(null);
 
   const loadData = useCallback(async (silent = false) => {
     try {
@@ -95,6 +96,12 @@ const WalletScreen = ({ navigation, route }) => {
       }
       if (route.params?.returnScreen) {
         returnScreenRef.current = route.params.returnScreen;
+      }
+      if (route.params?.pendingJoin) {
+        pendingJoinRef.current = route.params.pendingJoin;
+      }
+      if (route.params?.suggestedAmount) {
+        setAddAmount(String(route.params.suggestedAmount));
       }
       if (route.params?.openAddCoins) {
         setShowAddCoins(true);
@@ -154,6 +161,7 @@ const WalletScreen = ({ navigation, route }) => {
           walletBalance: balance.totalBalance ?? balance.balance,
           returnToTournamentId: returnTournamentRef.current,
           returnScreen: returnScreenRef.current,
+          pendingJoin: pendingJoinRef.current,
         });
         return;
       }

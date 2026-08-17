@@ -45,6 +45,7 @@ export default function TournamentPayJoinScreen({ navigation, route }) {
     gamingUID: initialUid = '',
     teamName,
     teamSide,
+    slotNumber,
     players,
     skipForm = false,
   } = route.params || {};
@@ -191,6 +192,7 @@ export default function TournamentPayJoinScreen({ navigation, route }) {
       body.teamName = teamName;
       body.teamSide = teamSide;
       body.players = players;
+      if (slotNumber) body.slotNumber = slotNumber;
     } else {
       const name = String(gamingUsername || '').trim();
       const uid = String(gamingUID || '').trim();
@@ -201,6 +203,7 @@ export default function TournamentPayJoinScreen({ navigation, route }) {
       }
       body.gamingUsername = name;
       body.gamingUID = uid;
+      if (slotNumber) body.slotNumber = slotNumber;
     }
 
     doneRef.current = false;

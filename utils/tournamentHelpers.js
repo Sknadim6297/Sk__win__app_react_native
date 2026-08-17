@@ -13,12 +13,82 @@ export function getTeamSize(mode) {
   return 1;
 }
 
-/** Duo/Squad — captain pays once per team (Custom Match + Battle Royale). */
-export function isTeamEntryMode(mode) {
-  return getTeamSize(mode) > 1;
+export function formatModeLabel(mode) {
+  const m = (mode || 'solo').toLowerCase();
+  return m.charAt(0).toUpperCase() + m.slice(1);
 }
 
-export function getPayingUnitCount(mode, maxParticipants = 50) {
+export function isCustomMatch(tournament) {
+  const c = tournament?.category || tournament?.tournamentType;
+  return c === 'custom' || c === 'custom_match' || !!tournament?.isCustomMatch;
+}
+
+export function isBattleRoyaleMatch(tournamentOrMode) {
+  if (!tournamentOrMode) return false;
+  if (isCustomMatch(tournamentOrMode)) return false;
+  if (tournamentOrMode.category === 'battle_royale') return true;
+  const name =
+    tournamentOrMode.gameMode?.name ||
+    tournamentOrMode.name ||
+    tournamentOrMode.gameType ||
+    '';
+  return String(name).toLowerCase().includes('battle royale');
+}
+
+/** Captain pays once: Custom Match (any size) or Battle Royale Duo/Squad. */
+export function isTeamEntryMode(modeOrTournament, tournament) {
+  if (tournament || (modeOrTournament && typeof modeOrTournament === 'object' && modeOrTournament.mode)) {
+    const t = tournament || modeOrTournament;
+    return getMatchStructure(t).usesTeamRegistration;
+  }
+  return getTeamSize(modeOrTournament) > 1;
+}
+
+export function getMatchStructure(tournament) {
+  const mode = String(tournament?.mode || 'solo').toLowerCase();
+  const playersPerTeam = getTeamSize(mode);
+  const custom = isCustomMatch(tournament);
+
+  if (custom) {
+    return {
+      kind: 'team_vs_team',
+      matchType: 'Custom Match',
+      formatLabel: playersPerTeam === 4 ? '4v4' : playersPerTeam === 2 ? '2v2' : '1v1',
+      mode,
+      modeLabel: formatModeLabel(mode),
+      playersPerTeam,
+      totalSlots: 2,
+      slotUnit: 'teams',
+      entryUnit: 'team',
+      hasKillRewards: false,
+      usesTeamRegistration: true,
+      usesSlotGrid: false,
+      usesTeamSides: true,
+    };
+  }
+
+  const totalSlots = mode === 'solo' ? 50 : Math.floor(50 / playersPerTeam);
+  return {
+    kind: 'battle_royale',
+    matchType: 'Battle Royale',
+    formatLabel: 'Battle Royale',
+    mode,
+    modeLabel: formatModeLabel(mode),
+    playersPerTeam,
+    totalSlots,
+    slotUnit: 'slots',
+    entryUnit: mode === 'solo' ? 'player' : 'team',
+    hasKillRewards: true,
+    usesTeamRegistration: mode !== 'solo',
+    usesSlotGrid: true,
+    usesTeamSides: false,
+  };
+}
+
+export function getPayingUnitCount(mode, maxParticipants = 50, tournament) {
+  if (tournament) {
+    return getMatchStructure(tournament).totalSlots;
+  }
   const max = Number(maxParticipants) || 50;
   const teamSize = getTeamSize(mode);
   if (teamSize === 1) return max;
@@ -69,11 +139,8 @@ export function resolveDisplayPrizePool(tournament) {
  */
 export function resolvePrizePlaces(tournament) {
   const pool = resolveDisplayPrizePool(tournament);
-  const isCustom =
-    tournament?.category === 'custom' ||
-    tournament?.category === 'custom_match' ||
-    tournament?.tournamentType === 'custom_match' ||
-    tournament?.isCustomMatch;
+  const structure = getMatchStructure(tournament);
+  const isCustom = structure.kind === 'team_vs_team';
 
   if (isCustom) {
     const winnerPrize =
@@ -133,34 +200,6 @@ export function formatScheduleLine(dateString) {
   return `${d} at ${t}`;
 }
 
-export function formatModeLabel(mode) {
-  const m = (mode || 'solo').toLowerCase();
-  return m.charAt(0).toUpperCase() + m.slice(1);
-}
-
-export function isBattleRoyaleMatch(tournamentOrMode) {
-  if (!tournamentOrMode) return false;
-  if (tournamentOrMode.category === 'battle_royale') return true;
-  if (
-    tournamentOrMode.category === 'custom' ||
-    tournamentOrMode.category === 'custom_match' ||
-    tournamentOrMode.tournamentType === 'custom_match'
-  ) {
-    return false;
-  }
-  const name =
-    tournamentOrMode.gameMode?.name ||
-    tournamentOrMode.name ||
-    tournamentOrMode.gameType ||
-    '';
-  return String(name).toLowerCase().includes('battle royale');
-}
-
-export function isCustomMatch(tournament) {
-  const c = tournament?.category || tournament?.tournamentType;
-  return c === 'custom' || c === 'custom_match' || !!tournament?.isCustomMatch;
-}
-
 const STATUS_LABELS = {
   draft: 'Draft',
   incoming: 'Upcoming',
@@ -189,9 +228,9 @@ export function getCountdownParts(targetDate) {
 }
 
 export function formatTimeLeft(targetDate) {
-  const { days, hours, minutes, seconds, expired } = getCountdownParts(targetDate);
-  if (expired) return '0d 0h 0m 0s';
-  return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+  const { days, hours, minutes, expired } = getCountdownParts(targetDate);
+  if (expired) return '0d 0h 0m';
+  return `${days}d ${hours}h ${minutes}m`;
 }
 
 export function formatCountdown(targetDate) {

@@ -17,10 +17,12 @@ export default function GameModePoster({ item, width, height, onPress }) {
         style={styles.image}
         resizeMode="cover"
       >
-        <View style={styles.countBadge}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveCount}>{item.tournamentCount ?? 0}</Text>
-        </View>
+        {item.tournamentCount > 0 ? (
+          <View style={styles.countBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveCount}>{item.tournamentCount}</Text>
+          </View>
+        ) : null}
         <View style={styles.titleBar}>
           <Text style={styles.title} numberOfLines={2}>
             {item.name}
