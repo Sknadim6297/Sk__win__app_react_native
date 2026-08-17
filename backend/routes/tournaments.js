@@ -25,6 +25,20 @@ const router = express.Router();
 
 const MAX_BONUS_ENTRY_PERCENT = 0.2;
 
+const DEFAULT_MATCH_RULES = [
+  'Minimum level 40+ required to join.',
+  'Room ID and password shared 8–10 minutes before match.',
+  'No hacks, emulators, or teaming — instant disqualification.',
+  'Wrong gaming ID / UID = no refund.',
+  'Review prize pool distribution before joining.',
+];
+
+function parseRulesInput(rules) {
+  if (!rules) return [];
+  const lines = Array.isArray(rules) ? rules : String(rules).split(/\r?\n/);
+  return lines.flatMap((line) => String(line).split(/\r?\n/)).map((line) => line.trim()).filter(Boolean);
+}
+
 const getEntryPaymentSplit = (user, entryFee) => {
   const fee = Number(entryFee) || 0;
   const bonusBalance = Number(user?.wallet?.bonusBalance) || 0;
@@ -337,7 +351,10 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       mode: resolvedMode,
       category: matchCategory,
       map: map || 'Bermuda',
-      rules: rules || [],
+      rules: (() => {
+        const parsed = parseRulesInput(rules);
+        return parsed.length ? parsed : DEFAULT_MATCH_RULES;
+      })(),
       entryFee: entryFee || 0,
       prizePool: prizePool || 0,
       perKill: matchCategory === 'custom' ? 0 : (perKill || 0),
@@ -364,7 +381,7 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
             },
       roomId: roomId || '',
       roomPassword: roomPassword || '',
-      showRoomCredentials: false,
+      showRoomCredentials: Boolean(showRoomCredentials),
       lifecycleStatus: 'draft',
       status: 'draft',
       maxTeams: resolvedMaxTeams,
@@ -449,6 +466,12 @@ router.put('/admin/:id', authMiddleware, async (req, res) => {
     delete updateData.teamSize;
     delete updateData.killRewardEnabled;
     delete updateData.tournamentType;
+    if (updateData.rules !== undefined) {
+      updateData.rules = parseRulesInput(updateData.rules);
+    }
+    if (typeof updateData.bannerTitle === 'string') {
+      updateData.bannerTitle = updateData.bannerTitle.trim();
+    }
 
     // Apply non-status fields
     const statusInput = updateData.status;
@@ -1099,7 +1122,7 @@ router.get('/admin/history', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Only admins can view tournament history' });
     }
 
-    const tournamentHistory = await adminTournamentHistory.getAdminHistory();
+    const tournamentHistory = await adminTournamentHistory.getAdminHistory(req.query);
     res.json(tournamentHistory);
   } catch (error) {
     console.error('Error fetching tournament history:', error);
@@ -1212,8 +1235,10 @@ router.get('/list', async (req, res) => {
 
         const doc = tournament.toObject();
         const publicStatus = toPublicStatus(tournament);
+        const publicRules = parseRulesInput(doc.rules);
         return {
           ...doc,
+          rules: publicRules.length ? publicRules : DEFAULT_MATCH_RULES,
           matchNumber: resolveMatchNumber(doc),
           currentParticipants: joinStats.joinedCount,
           participantCount: joinStats.joinedCount,
@@ -1323,12 +1348,19 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
     }
 
     const doc = tournament.toObject();
+    const publicRules = parseRulesInput(doc.rules);
+    if (!publicRules.length) {
+      tournament.rules = DEFAULT_MATCH_RULES;
+      tournament.markModified('rules');
+      await tournament.save().catch(() => {});
+    }
     const structure = lifecycle.getMatchStructure(tournament);
     const joinCheck = await getJoinEligibility(tournament, joinStats.joinedCount);
     const startMs = new Date(tournament.startDate).getTime() - Date.now();
 
     res.json({
       ...doc,
+      rules: publicRules.length ? publicRules : DEFAULT_MATCH_RULES,
       matchNumber: resolveMatchNumber(doc),
       status: calculatedStatus,
       lifecycleStatus: lifecycle.getEffectiveStatus(tournament),

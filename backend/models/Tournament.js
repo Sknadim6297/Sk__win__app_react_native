@@ -179,4 +179,11 @@ const tournamentSchema = new mongoose.Schema({
   },
 });
 
+tournamentSchema.index({ lifecycleStatus: 1, startDate: -1 });
+tournamentSchema.index({ status: 1, startDate: -1 });
+tournamentSchema.index({ gameMode: 1, lifecycleStatus: 1 });
+tournamentSchema.index({ category: 1, mode: 1 });
+tournamentSchema.index({ name: 1 });
+tournamentSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('Tournament', tournamentSchema);

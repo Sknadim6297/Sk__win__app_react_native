@@ -21,7 +21,7 @@ import AddCoinsModal from '../components/AddCoinsModal';
 import CenterDialog from '../components/CenterDialog';
 import { walletService, configService, paymentService } from '../services/api';
 import { clearWalletReturnParams } from '../utils/walletFlow';
-import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE } from '../utils/paymentConfig';
+import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE, TESTING_ADD_HINT } from '../utils/paymentConfig';
 
 /** Testing: credit wallet directly. Live: Cashfree QR when gateway is on. */
 async function creditOrOpenGateway({ amount, balance, navigation, returnTournamentId, returnScreen }) {
@@ -400,6 +400,8 @@ const WalletScreen = ({ navigation, route }) => {
         onChangeAmount={(v) => setAddAmount(sanitizeAmountInput(v))}
         onSubmit={handleAddCoins}
         processing={addingCoins}
+        hint={isPaymentEnabled() ? undefined : TESTING_ADD_HINT}
+        submitLabel={isPaymentEnabled() ? 'Pay & Add Coins' : 'Add Coins'}
       />
 
       <CenterDialog

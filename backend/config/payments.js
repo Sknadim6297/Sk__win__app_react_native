@@ -1,7 +1,8 @@
 /**
  * Master payment switch for testing phase.
  * When PAYMENT_ENABLED=false, no real-money payment / top-up / gateway calls run.
- * Set PAYMENT_ENABLED=true in backend/.env to re-enable (still requires Cashfree credentials).
+ * Set PAYMENT_ENABLED=true in backend/.env to re-enable Cashfree (still requires credentials).
+ * Currently off so Add Coins credits the wallet directly for testing.
  */
 
 const truthy = (v) => {

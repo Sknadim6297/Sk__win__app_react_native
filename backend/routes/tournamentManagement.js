@@ -37,7 +37,7 @@ const getEntryPaymentSplit = (user, entryFee) => {
 async function requireAdmin(req, res) {
   const admin = await User.findById(req.userId);
   if (!admin) {
-    res.status(404).json({ error: 'User not found' });
+    res.status(401).json({ error: 'Session expired. Please sign in again.' });
     return null;
   }
   if (admin.role !== 'admin') {
@@ -80,8 +80,24 @@ function formatListItem(tournament, joinStats) {
     maxParticipants: tournament.maxParticipants,
     maxTeams: tournament.maxTeams,
     prizePool: tournament.prizePool,
+    map: tournament.map || '',
+    bannerImage: tournament.bannerImage || '',
+    locked: Boolean(tournament.locked),
     resultsPublished: lifecycle.areResultsPublished(tournament),
   };
+}
+
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function listStatusMatch(status) {
+  const s = String(status || '').trim();
+  if (!s) return null;
+  if (s === 'upcoming') return { $in: ['upcoming', 'incoming'] };
+  if (s === 'live' || s === 'ongoing') return { $in: ['ongoing', 'live'] };
+  if (s === 'completed') return { $in: ['completed', 'result_published'] };
+  return s;
 }
 
 // ——— Admin list ———
@@ -89,14 +105,50 @@ router.get('/admin/list', authMiddleware, async (req, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
 
-    const tournaments = await Tournament.find()
-      .populate('gameMode', 'name')
-      .sort({ createdAt: -1 })
-      .lean();
+    const page = req.query.page != null && req.query.page !== ''
+      ? Math.max(1, Number(req.query.page) || 1)
+      : null;
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const search = String(req.query.search || '').trim();
+    const status = listStatusMatch(req.query.status);
+    const category = String(req.query.category || '').trim();
+    const mode = String(req.query.mode || '').trim();
+    const filter = {};
 
+    if (search) filter.name = new RegExp(escapeRegex(search), 'i');
+    if (status) filter.$or = [{ lifecycleStatus: status }, { status }];
+    if (category === 'custom' || category === 'custom_match') {
+      filter.category = { $in: ['custom', 'custom_match'] };
+    } else if (category) {
+      filter.category = category;
+    }
+    if (['solo', 'duo', 'squad'].includes(mode)) filter.mode = mode;
+    if (req.query.from || req.query.to) {
+      filter.startDate = {};
+      if (req.query.from) filter.startDate.$gte = new Date(req.query.from);
+      if (req.query.to) {
+        const end = new Date(req.query.to);
+        end.setHours(23, 59, 59, 999);
+        filter.startDate.$lte = end;
+      }
+    }
+    if (req.query.entryMin !== undefined && req.query.entryMin !== '') {
+      filter.entryFee = { ...(filter.entryFee || {}), $gte: Number(req.query.entryMin) || 0 };
+    }
+    if (req.query.entryMax !== undefined && req.query.entryMax !== '') {
+      filter.entryFee = { ...(filter.entryFee || {}), $lte: Number(req.query.entryMax) || 0 };
+    }
+
+    let find = Tournament.find(filter).populate('gameMode', 'name').sort({ createdAt: -1 });
+    let total = 0;
+    if (page) {
+      total = await Tournament.countDocuments(filter);
+      find = find.skip((page - 1) * limit).limit(limit);
+    }
+
+    const tournaments = await find.lean();
     const list = await Promise.all(
       tournaments.map(async (t) => {
-        // Heal stuck Draft/Upcoming mismatch in DB
         const doc = await Tournament.findById(t._id);
         if (doc && lifecycle.ensureLifecycleSynced(doc)) {
           await doc.save();
@@ -112,15 +164,18 @@ router.get('/admin/list', authMiddleware, async (req, res) => {
       })
     );
 
-    const STATUS_ORDER = ['draft', 'upcoming', 'incoming', 'ongoing', 'completed', 'cancelled'];
-    list.sort((a, b) => {
-      const ai = STATUS_ORDER.indexOf(a.status);
-      const bi = STATUS_ORDER.indexOf(b.status);
-      if (ai !== bi) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-      return new Date(b.matchDate) - new Date(a.matchDate);
-    });
+    if (!page) {
+      const STATUS_ORDER = ['draft', 'upcoming', 'incoming', 'ongoing', 'completed', 'cancelled'];
+      list.sort((a, b) => {
+        const ai = STATUS_ORDER.indexOf(a.status);
+        const bi = STATUS_ORDER.indexOf(b.status);
+        if (ai !== bi) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        return new Date(b.matchDate) - new Date(a.matchDate);
+      });
+      return res.json(list);
+    }
 
-    res.json(list);
+    res.json({ items: list, total, page, limit, pages: Math.ceil(total / limit) || 1 });
   } catch (error) {
     console.error('admin list:', error);
     res.status(500).json({ error: 'Failed to fetch tournaments' });
@@ -148,7 +203,9 @@ router.get('/admin/:id', authMiddleware, async (req, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
 
-    const tournament = await Tournament.findById(req.params.id).populate('gameMode', 'name');
+    const tournament = await Tournament.findById(req.params.id)
+      .populate('game', 'name image')
+      .populate('gameMode', 'name image');
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
 
     const joinStats = await lifecycle.getJoinStats(tournament._id, tournament);
@@ -188,6 +245,14 @@ router.get('/admin/:id', authMiddleware, async (req, res) => {
       matchType: structure.matchType,
       formatLabel: structure.formatLabel,
       modeLabel: structure.modeLabel,
+      playersPerTeam: structure.playersPerTeam,
+      slotUnit: structure.slotUnit,
+      entryUnit: structure.entryUnit,
+      teamSetup: structure.usesTeamSides
+        ? 'Team A vs Team B'
+        : structure.usesTeamRegistration
+          ? `${structure.modeLabel} teams`
+          : 'Solo — individual slots',
       hasKillRewards: structure.hasKillRewards,
       joinedCount: joinStats.joinedCount,
       capacity: joinStats.capacity,

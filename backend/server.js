@@ -204,6 +204,18 @@ app.use('/api/support', supportRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/download', downloadApiRouter);
 
+const ADMIN_WEB_ROOT = path.join(__dirname, 'admin-web');
+app.use('/admin', express.static(ADMIN_WEB_ROOT, {
+  index: 'index.html',
+  extensions: ['html'],
+  setHeaders(res) {
+    res.setHeader('Cache-Control', 'no-store');
+  },
+}));
+app.get(['/admin', '/admin/'], (req, res) => {
+  res.sendFile(path.join(ADMIN_WEB_ROOT, 'index.html'));
+});
+
 /** Google OAuth browser callback — opens the app via custom URI scheme (APK / dev build). */
 function googleReversedScheme(clientId) {
   const id = String(clientId || '').trim();
@@ -294,6 +306,7 @@ async function startServer() {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);
+      console.log(`Admin panel: http://localhost:${PORT}/admin`);
       console.log(`APK download page: http://localhost:${PORT}/download`);
       if (process.env.PUBLIC_BASE_URL) {
         console.log(`Public base URL (for uploads/images): ${process.env.PUBLIC_BASE_URL}`);

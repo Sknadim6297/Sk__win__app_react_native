@@ -11,7 +11,7 @@ const router = express.Router();
 const requireAdmin = async (req, res, next) => {
   try {
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(401).json({ error: 'Session expired. Please sign in again.' });
     if (user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
     next();
   } catch (error) {
@@ -19,7 +19,11 @@ const requireAdmin = async (req, res, next) => {
   }
 };
 
-// Get all users (admin only)
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Get all users (admin only). Optional page/limit/search keeps mobile array response.
 router.get('/all', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId);
@@ -30,8 +34,44 @@ router.get('/all', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const users = await User.find().select('-password');
-    res.json(users);
+    const page = req.query.page != null && req.query.page !== ''
+      ? Math.max(1, parseInt(req.query.page, 10) || 1)
+      : null;
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const search = String(req.query.search || '').trim();
+    const status = String(req.query.status || '').trim();
+    const role = String(req.query.role || '').trim();
+    const query = {};
+
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), 'i');
+      query.$or = [{ username: rx }, { email: rx }, { name: rx }, { phone: rx }, { phoneNumber: rx }];
+    }
+    if (status) query.status = status;
+    if (role) query.role = role;
+
+    if (!page) {
+      const users = await User.find(query).select('-password').sort({ createdAt: -1 });
+      return res.json(users);
+    }
+
+    const [items, total] = await Promise.all([
+      User.find(query)
+        .select('-password')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      User.countDocuments(query),
+    ]);
+
+    res.json({
+      items,
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit) || 1,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch users' });
   }
@@ -87,25 +127,56 @@ router.get('/transactions', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const { type, status, limit = 100 } = req.query;
+    const { type, status, search } = req.query;
+    const page = req.query.page != null && req.query.page !== ''
+      ? Math.max(1, Number(req.query.page) || 1)
+      : null;
+    const parsedLimit = Math.min(Math.max(parseInt(req.query.limit, 10) || (page ? 20 : 100), 1), 500);
     const query = {};
 
-    if (type) {
-      query.type = type;
-    }
-
+    if (type) query.type = type;
     if (status) {
-      query.status = status;
+      if (status === 'success') query.status = { $in: ['completed', 'success'] };
+      else if (status === 'refunded') query.status = { $in: ['reversed', 'refunded'] };
+      else query.status = status;
     }
 
-    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+    const q = String(search || '').trim();
+    if (q) {
+      const User = require('../models/User');
+      const users = await User.find({
+        $or: [
+          { username: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+          { email: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+        ],
+      }).select('_id').limit(50).lean();
+      query.$or = [
+        { transactionId: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+        { cashfreePaymentId: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+        { userId: { $in: users.map((u) => u._id) } },
+      ];
+    }
 
-    const transactions = await WalletTransaction.find(query)
+    let find = WalletTransaction.find(query)
       .populate('userId', 'username email name')
-      .sort({ createdAt: -1 })
-      .limit(parsedLimit)
-      .lean();
+      .populate({ path: 'tournamentId', model: 'Tournament', select: 'name' })
+      .sort({ createdAt: -1 });
 
+    if (page) {
+      const total = await WalletTransaction.countDocuments(query);
+      const items = await find.skip((page - 1) * parsedLimit).limit(parsedLimit).lean();
+      return res.json({
+        transactions: items,
+        items,
+        count: items.length,
+        total,
+        page,
+        limit: parsedLimit,
+        pages: Math.ceil(total / parsedLimit) || 1,
+      });
+    }
+
+    const transactions = await find.limit(parsedLimit).lean();
     res.json({
       transactions,
       count: transactions.length,

@@ -20,12 +20,12 @@ import Toast from '../components/Toast';
 import ScreenHeader from '../components/navigation/ScreenHeader';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import {
-  parseRules,
   formatScheduleLine,
   isCustomMatch,
   getMatchStructure,
   resolveDisplayPrizePool,
   resolvePrizePlaces,
+  resolveMatchRules,
 } from '../utils/tournamentHelpers';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
 import { CoinValue, TimeLeftBar, InfoCell } from '../components/contest/ContestShared';
@@ -189,7 +189,8 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     (tournament.game?.image && resolveMediaUrl(tournament.game.image)) ||
     null;
 
-  const rules = parseRules(tournament.rules);
+  const rules = resolveMatchRules(tournament);
+  const aboutText = String(tournament.description || '').trim();
   const custom = isCustomMatch(tournament);
   const structure = getMatchStructure(tournament);
   const teamEntry = structure.usesTeamRegistration;
@@ -292,17 +293,26 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           ) : null}
         </View>
 
-        <Text style={styles.sectionHead}>About this Match</Text>
+        {aboutText ? (
+          <>
+            <Text style={styles.sectionHead}>About this Match</Text>
+            <View style={styles.aboutCard}>
+              {aboutText.split(/\n/).map((line, idx) => (
+                <Text key={`about-${idx}`} style={styles.ruleLine}>
+                  {line}
+                </Text>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        <Text style={styles.sectionHead}>Rules & Regulations</Text>
         <View style={styles.aboutCard}>
-          {rules.length === 0 ? (
-            <Text style={styles.ruleLine}>• Follow fair play. No hacks or teaming.</Text>
-          ) : (
-            rules.map((rule, idx) => (
-              <Text key={idx} style={styles.ruleLine}>
-                • {rule}
-              </Text>
-            ))
-          )}
+          {rules.map((rule, idx) => (
+            <Text key={`rule-${idx}`} style={styles.ruleLine}>
+              • {rule}
+            </Text>
+          ))}
         </View>
 
         {hasJoined && tournament.roomCredentialsVisible && (tournament.roomId || tournament.roomPassword) ? (

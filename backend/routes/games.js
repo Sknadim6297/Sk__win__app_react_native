@@ -139,6 +139,16 @@ router.delete('/admin/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// All modes for a game (Admin, includes inactive)
+router.get('/admin/:gameId/modes', authMiddleware, async (req, res) => {
+  try {
+    const modes = await GameMode.find({ game: req.params.gameId }).sort({ createdAt: -1 });
+    res.json(modes.map((m) => withNormalizedImage(m, req)));
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch game modes', message: error.message });
+  }
+});
+
 // Create game mode (Admin)
 router.post('/modes/admin/create', authMiddleware, async (req, res) => {
   try {

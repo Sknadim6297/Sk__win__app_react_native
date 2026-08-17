@@ -12,6 +12,9 @@ export const PAYMENT_DISABLED_MESSAGE =
 export const WITHDRAW_DISABLED_MESSAGE =
   'Withdrawals are currently disabled for testing.';
 
+export const TESTING_ADD_HINT =
+  'Testing mode: coins are added instantly. Payment gateway is off.';
+
 function readFlag() {
   const fromEnv = process.env.EXPO_PUBLIC_PAYMENT_ENABLED;
   const fromExtra = Constants.expoConfig?.extra?.paymentEnabled;

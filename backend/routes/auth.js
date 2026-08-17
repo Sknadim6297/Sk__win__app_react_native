@@ -219,6 +219,54 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Admin panel login — same credentials, admin role required
+router.post('/admin-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Please provide email and password' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const user = await User.findOne({
+      email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+    });
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid email or password' });
+    }
+    if (user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    if (user.authProvider === 'google' || !user.password) {
+      return res.status(400).json({ error: 'This account uses Google sign-in.' });
+    }
+
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
+    if (!isPasswordMatch) {
+      return res.status(400).json({ error: 'Invalid email or password' });
+    }
+    if (user.status === 'banned' || user.status === 'suspended') {
+      return res.status(403).json({ error: 'Account is not active' });
+    }
+
+    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        name: user.name || user.username,
+      },
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
 async function buildUniqueUsername(baseRaw) {
   const base =
     String(baseRaw || 'player')

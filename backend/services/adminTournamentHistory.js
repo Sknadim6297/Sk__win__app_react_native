@@ -510,16 +510,59 @@ function buildBrTeamSlots({
   return slots;
 }
 
-async function getAdminHistory() {
-  const tournaments = await Tournament.find()
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function statusFilter(status) {
+  const s = String(status || '').trim();
+  if (!s) return null;
+  if (s === 'upcoming') return { $in: ['upcoming', 'incoming'] };
+  if (s === 'live' || s === 'ongoing') return { $in: ['ongoing', 'live'] };
+  if (s === 'completed') return { $in: ['completed', 'result_published'] };
+  return s;
+}
+
+async function getAdminHistory(query = {}) {
+  const page = query.page != null && query.page !== ''
+    ? Math.max(1, Number(query.page) || 1)
+    : null;
+  const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+  const filter = {};
+  const search = String(query.search || '').trim();
+  const status = statusFilter(query.status);
+  const category = String(query.category || '').trim();
+
+  if (search) filter.name = new RegExp(escapeRegex(search), 'i');
+  if (status) {
+    filter.$or = [{ lifecycleStatus: status }, { status }];
+  }
+  if (category === 'custom' || category === 'custom_match') {
+    filter.category = { $in: ['custom', 'custom_match'] };
+  } else if (category) {
+    filter.category = category;
+  }
+
+  let find = Tournament.find(filter)
     .populate('game', 'name')
     .populate('gameMode', 'name')
-    .sort({ startDate: -1 })
-    .lean();
+    .sort({ startDate: -1 });
 
-  if (!tournaments.length) return [];
+  let total = 0;
+  if (page) {
+    total = await Tournament.countDocuments(filter);
+    find = find.skip((page - 1) * limit).limit(limit);
+  }
+
+  const tournaments = await find.lean();
+  if (!tournaments.length) {
+    return page ? { items: [], total, page, limit, pages: Math.ceil(total / limit) || 1 } : [];
+  }
+
   const ledger = await loadLedger(tournaments.map((t) => t._id));
-  return tournaments.map((t) => buildHistoryRow(t, ledger));
+  const items = tournaments.map((t) => buildHistoryRow(t, ledger));
+  if (!page) return items;
+  return { items, total, page, limit, pages: Math.ceil(total / limit) || 1 };
 }
 
 async function getAdminEntries(tournamentId) {

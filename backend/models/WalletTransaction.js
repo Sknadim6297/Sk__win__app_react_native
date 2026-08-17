@@ -36,7 +36,12 @@ const walletTransactionSchema = new mongoose.Schema({
     index: true,
     sparse: true,
   },
-  tournamentId: mongoose.Schema.Types.ObjectId,
+  tournamentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tournament',
+    index: true,
+    sparse: true,
+  },
   /** Links wallet txn to WinnerPayout (credit or reversal) */
   payoutId: {
     type: mongoose.Schema.Types.ObjectId,

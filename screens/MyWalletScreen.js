@@ -22,7 +22,7 @@ import AddCoinsModal from '../components/AddCoinsModal';
 import CenterDialog from '../components/CenterDialog';
 import { walletService, userService, paymentService } from '../services/api';
 import { clearWalletReturnParams } from '../utils/walletFlow';
-import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE } from '../utils/paymentConfig';
+import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE, TESTING_ADD_HINT } from '../utils/paymentConfig';
 
 const formatAmount = (value) => {
   const n = Number(value) || 0;
@@ -370,8 +370,8 @@ const MyWalletScreen = ({ navigation, route }) => {
         onSubmit={handleAddMoney}
         processing={processing}
         title="Add Money"
-        hint="Enter amount to add (₹10 – ₹10,000)"
-        submitLabel="Add Money"
+        hint={isPaymentEnabled() ? 'Enter amount to add (₹10 – ₹10,000)' : TESTING_ADD_HINT}
+        submitLabel={isPaymentEnabled() ? 'Pay & Add Money' : 'Add Money'}
       />
 
       <CenterDialog

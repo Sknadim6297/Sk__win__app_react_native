@@ -21,7 +21,7 @@ import RNPickerSelect from 'react-native-picker-select';
 import { COLORS } from '../../styles/theme';
 import { tournamentService, tournamentManagementService, gameService, uploadImageFile, mapService } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
-import { getPrizeBreakdown, buildPrizesForCategory, getCustomWinnerPrize } from '../../utils/tournamentHelpers';
+import { getPrizeBreakdown, buildPrizesForCategory, getCustomWinnerPrize, getMatchStructure } from '../../utils/tournamentHelpers';
 import { ensureMediaLibraryPermission, launchImageLibrary } from '../../utils/imagePicker';
 import WebSafeDateTimePicker from '../../components/WebSafeDateTimePicker';
 import Toast from '../../components/Toast';
@@ -78,6 +78,7 @@ const TournamentManagement = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [actionTarget, setActionTarget] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingTournament, setEditingTournament] = useState(null);
   const [showRoomModal, setShowRoomModal] = useState(false);
@@ -1066,14 +1067,28 @@ const TournamentManagement = ({ navigation }) => {
                     <View style={styles.detailRow}>
                       <MaterialCommunityIcons name="account-group" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>
-                        {tournament.currentParticipants || 0}/{tournament.maxParticipants} Players
+                        {(() => {
+                          const s = getMatchStructure(tournament);
+                          const booked = tournament.currentParticipants || 0;
+                          const cap = tournament.maxTeams || s.totalSlots;
+                          return `${booked}/${cap} ${s.slotUnit === 'teams' ? 'Teams' : 'Slots'}`;
+                        })()}
                       </Text>
                       <MaterialCommunityIcons name="clock-outline" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>
                         {new Date(tournament.startDate).toLocaleDateString()}
                       </Text>
                     </View>
-                    {tournament.mode !== 'solo' && (
+                    {getMatchStructure(tournament).kind === 'team_vs_team' ? (
+                      <View style={styles.detailRow}>
+                        <MaterialCommunityIcons name="account-multiple" size={16} color={COLORS.accent} />
+                        <Text style={styles.detailText}>
+                          {getMatchStructure(tournament).formatLabel} · {getMatchStructure(tournament).playersPerTeam} per team
+                        </Text>
+                        <MaterialCommunityIcons name="flag" size={16} color={COLORS.accent} />
+                        <Text style={styles.detailText}>Max 2 teams</Text>
+                      </View>
+                    ) : tournament.mode !== 'solo' ? (
                       <View style={styles.detailRow}>
                         <MaterialCommunityIcons name="account-multiple" size={16} color={COLORS.accent} />
                         <Text style={styles.detailText}>
@@ -1081,67 +1096,25 @@ const TournamentManagement = ({ navigation }) => {
                         </Text>
                         <MaterialCommunityIcons name="flag" size={16} color={COLORS.accent} />
                         <Text style={styles.detailText}>
-                          Max {tournament.maxTeams || Math.floor(tournament.maxParticipants / (tournament.mode === 'duo' ? 2 : 4))} teams
+                          Max {tournament.maxTeams || getMatchStructure(tournament).totalSlots} slots
                         </Text>
                       </View>
-                    )}
+                    ) : null}
                   </View>
 
                   <View style={styles.tournamentActions}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.actionButton}
                       onPress={() => navigation.navigate('TournamentDetails', { tournamentId: tournament._id })}
                     >
                       <MaterialCommunityIcons name="eye" size={16} color={COLORS.accent} />
                       <Text style={styles.actionText}>View</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.actionButton}
-                      onPress={() => openEditModal(tournament)}
+                    <TouchableOpacity
+                      style={styles.moreButton}
+                      onPress={() => setActionTarget(tournament)}
                     >
-                      <MaterialCommunityIcons name="pencil" size={16} color={COLORS.accent} />
-                      <Text style={styles.actionText}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[styles.actionButton, tournament.locked && styles.lockedButton]}
-                      onPress={() => handleLockToggle(tournament)}
-                    >
-                      <MaterialCommunityIcons 
-                        name={tournament.locked ? "lock" : "lock-open"} 
-                        size={16} 
-                        color={tournament.locked ? "#FF8500" : COLORS.accent} 
-                      />
-                      <Text style={[styles.actionText, tournament.locked && styles.lockedText]}>
-                        {tournament.locked ? "Locked" : "Lock"}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.actionButton}
-                      onPress={() => handleManageRoom(tournament)}
-                    >
-                      <MaterialCommunityIcons name="key" size={16} color={COLORS.accent} />
-                      <Text style={styles.actionText}>Room</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.actionButton}
-                      onPress={() => handleDeclarWinners(tournament)}
-                    >
-                      <MaterialCommunityIcons name="trophy" size={16} color={COLORS.accent} />
-                      <Text style={styles.actionText}>Winners</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.actionButton}
-                      onPress={() => handleManageResults(tournament)}
-                    >
-                      <MaterialCommunityIcons name="clipboard-list" size={16} color={COLORS.accent} />
-                      <Text style={styles.actionText}>Results</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={[styles.actionButton, styles.deleteButton]}
-                      onPress={() => handleDeleteTournament(tournament)}
-                    >
-                      <MaterialCommunityIcons name="delete" size={16} color="#FF6B6B" />
-                      <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
+                      <Text style={styles.moreText}>Actions ⋮</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1150,6 +1123,59 @@ const TournamentManagement = ({ navigation }) => {
           </View>
         )}
       </ScrollView>
+
+      <Modal visible={!!actionTarget} animationType="fade" transparent onRequestClose={() => setActionTarget(null)}>
+        <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setActionTarget(null)}>
+          <View style={styles.sheet}>
+            <Text style={styles.sheetTitle}>{actionTarget?.name || 'Actions'}</Text>
+            <TouchableOpacity style={styles.sheetItem} onPress={() => {
+              const t = actionTarget; setActionTarget(null);
+              navigation.navigate('TournamentDetails', { tournamentId: t._id });
+            }}>
+              <Text style={styles.sheetItemText}>View Details</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetItem} onPress={() => {
+              const t = actionTarget; setActionTarget(null);
+              setTimeout(() => openEditModal(t), 50);
+            }}>
+              <Text style={styles.sheetItemText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetItem} onPress={() => {
+              const t = actionTarget; setActionTarget(null);
+              setTimeout(() => handleLockToggle(t), 50);
+            }}>
+              <Text style={styles.sheetItemText}>{actionTarget?.locked ? 'Unlock' : 'Lock'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetItem} onPress={() => {
+              const t = actionTarget; setActionTarget(null);
+              setTimeout(() => handleManageRoom(t), 50);
+            }}>
+              <Text style={styles.sheetItemText}>Manage Room</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetItem} onPress={() => {
+              const t = actionTarget; setActionTarget(null);
+              setTimeout(() => handleDeclarWinners(t), 50);
+            }}>
+              <Text style={styles.sheetItemText}>Winners</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetItem} onPress={() => {
+              const t = actionTarget; setActionTarget(null);
+              setTimeout(() => handleManageResults(t), 50);
+            }}>
+              <Text style={styles.sheetItemText}>Results</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.sheetItem, styles.sheetDanger]} onPress={() => {
+              const t = actionTarget; setActionTarget(null);
+              setTimeout(() => handleDeleteTournament(t), 50);
+            }}>
+              <Text style={styles.sheetDangerText}>Delete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sheetItem} onPress={() => setActionTarget(null)}>
+              <Text style={styles.sheetCancel}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Create Tournament Modal */}
       <Modal visible={showCreateModal} animationType="slide" transparent>
@@ -2284,11 +2310,51 @@ const styles = StyleSheet.create({
   },
   tournamentActions: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: COLORS.darkGray,
+    gap: 10,
   },
+  moreButton: {
+    backgroundColor: COLORS.accent,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  moreText: {
+    color: '#111',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  sheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#12182B',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    paddingBottom: 28,
+  },
+  sheetTitle: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  sheetItem: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  sheetItemText: { color: COLORS.accent, fontWeight: '700', fontSize: 15 },
+  sheetDanger: { borderBottomWidth: 0 },
+  sheetDangerText: { color: '#FF6B6B', fontWeight: '700', fontSize: 15 },
+  sheetCancel: { color: '#9AA4B8', fontWeight: '600', textAlign: 'center' },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',

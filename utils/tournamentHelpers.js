@@ -6,6 +6,20 @@ export function parseRules(rules) {
   return String(rules).split('\n').map((r) => r.trim()).filter(Boolean);
 }
 
+export const DEFAULT_MATCH_RULES = [
+  'Minimum level 40+ required to join.',
+  'Room ID and password shared 8–10 minutes before match.',
+  'No hacks, emulators, or teaming — instant disqualification.',
+  'Wrong gaming ID / UID = no refund.',
+  'Review prize pool distribution before joining.',
+];
+
+export function resolveMatchRules(tournament) {
+  const fromRules = parseRules(tournament?.rules);
+  if (fromRules.length) return fromRules;
+  return DEFAULT_MATCH_RULES;
+}
+
 export function getTeamSize(mode) {
   const m = (mode || 'solo').toLowerCase();
   if (m === 'duo') return 2;

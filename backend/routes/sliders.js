@@ -9,7 +9,7 @@ const router = express.Router();
 const requireAdmin = async (req, res, next) => {
   try {
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(401).json({ error: 'Session expired. Please sign in again.' });
     if (user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
     next();
   } catch {

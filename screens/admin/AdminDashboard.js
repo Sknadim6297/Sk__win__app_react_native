@@ -14,591 +14,294 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
 import { adminService } from '../../services/api';
+import { getApiUrl } from '../../utils/apiConfig';
 import { COLORS } from '../../styles/theme';
 
-const AdminDashboard = ({ navigation }) => {
+const ORANGE = COLORS.primary;
+const CARD = '#12182B';
+const BG = '#0B0E1B';
+
+function Metric({ icon, iconColor, borderColor, value, label }) {
+  return (
+    <View style={[styles.metricCard, { borderLeftColor: borderColor }]}>
+      <View style={[styles.metricIcon, { backgroundColor: `${iconColor}22` }]}>
+        <Ionicons name={icon} size={22} color={iconColor} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.metricValue}>{value}</Text>
+        <Text style={styles.metricLabel}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+function NavTile({ icon, title, subtitle, onPress }) {
+  return (
+    <TouchableOpacity style={styles.tile} onPress={onPress} activeOpacity={0.85}>
+      <View style={styles.tileIcon}>
+        <MaterialCommunityIcons name={icon} size={22} color={ORANGE} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.tileTitle}>{title}</Text>
+        <Text style={styles.tileSub}>{subtitle}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={ORANGE} />
+    </TouchableOpacity>
+  );
+}
+
+export default function AdminDashboard({ navigation }) {
   const { user, logout } = useContext(AuthContext);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState(null);
+  const [webRedirecting, setWebRedirecting] = useState(Platform.OS === 'web');
 
   useEffect(() => {
-    fetchStats();
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+    try {
+      const api = getApiUrl();
+      const origin = String(api || '').replace(/\/api\/?$/, '');
+      if (origin) {
+        window.location.replace(`${origin}/admin`);
+        return undefined;
+      }
+    } catch (e) {
+      console.warn('Admin web redirect failed', e);
+    }
+    setWebRedirecting(false);
+    return undefined;
   }, []);
 
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const data = await adminService.getStats();
-      setStats(data);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
+      setStats(await adminService.getStats());
+    } catch (e) {
+      console.error('Error fetching stats:', e);
     } finally {
       setLoading(false);
     }
   };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchStats();
-    setRefreshing(false);
-  };
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    fetchStats();
+  }, []);
 
-  const handleLogout = async () => {
-    // Just call logout - conditional rendering in AppNavigator will handle the navigation
-    await logout();
-  };
-
-  const navigateTo = (screen) => {
-    navigation.navigate(screen);
-  };
-
-  if (loading) {
+  if (webRedirecting || loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading Admin Dashboard...</Text>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={ORANGE} />
+          {webRedirecting ? (
+            <Text style={{ color: '#9AA4B8', marginTop: 12 }}>Opening Arena Control…</Text>
+          ) : null}
         </View>
       </SafeAreaView>
     );
   }
 
+  const blocked = (stats?.suspendedUsers || 0) + (stats?.bannedUsers || 0);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} translucent={false} />
-      
-      <ScrollView 
+      <StatusBar barStyle="light-content" backgroundColor={ORANGE} />
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={styles.badge}>
+            <MaterialCommunityIcons name="shield-crown" size={22} color={ORANGE} />
+          </View>
+          <View>
+            <Text style={styles.headerTitle}>WARZONE ADMIN</Text>
+            <Text style={styles.headerSub}>@{user?.username || 'admin'}</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.logout} onPress={logout}>
+          <Ionicons name="log-out-outline" size={22} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={async () => {
+            setRefreshing(true);
+            await fetchStats();
+            setRefreshing(false);
+          }} tintColor={ORANGE} />
+        }
+        contentContainerStyle={styles.content}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.adminBadge}>
-              <MaterialCommunityIcons name="shield-crown" size={28} color={COLORS.accent} />
-            </View>
-            <View>
-              <Text style={styles.headerTitle}>WARZONE ADMIN</Text>
-              <Text style={styles.headerSubtitle}>@{user?.username || 'Admin'}</Text>
-            </View>
-          </View>
-          <TouchableOpacity 
-            onPress={handleLogout} 
-            style={[styles.logoutButton, { backgroundColor: `${COLORS.error}30` }]}
-          >
-            <Ionicons name="log-out" size={22} color={COLORS.error} />
-          </TouchableOpacity>
+        <Text style={styles.section}>KEY METRICS</Text>
+        <View style={styles.metrics}>
+          <Metric icon="people" iconColor={ORANGE} borderColor={ORANGE} value={stats?.totalUsers || 0} label="Total Users" />
+          <Metric icon="checkmark-circle" iconColor="#22C55E" borderColor="#22C55E" value={stats?.verifiedUsers || 0} label="Verified" />
+          <Metric icon="ban" iconColor="#EF4444" borderColor="#EF4444" value={blocked} label="Blocked" />
         </View>
 
-        <View style={styles.content}>
-          {/* Key Metrics */}
-          <Text style={styles.sectionTitle}>KEY METRICS</Text>
-          <View style={styles.metricsGrid}>
-            <View style={[styles.metricCard, { borderLeftColor: COLORS.primary }]}>
-              <View style={[styles.metricIcon, { backgroundColor: `${COLORS.primary}20` }]}>
-                <Ionicons name="people" size={28} color={COLORS.primary} />
-              </View>
-              <View style={styles.metricContent}>
-                <Text style={styles.metricValue}>{stats?.totalUsers || 0}</Text>
-                <Text style={styles.metricLabel}>Total Users</Text>
-              </View>
-            </View>
-
-            <View style={[styles.metricCard, { borderLeftColor: COLORS.success }]}>
-              <View style={[styles.metricIcon, { backgroundColor: `${COLORS.success}20` }]}>
-                <Ionicons name="checkmark-circle" size={28} color={COLORS.success} />
-              </View>
-              <View style={styles.metricContent}>
-                <Text style={styles.metricValue}>{stats?.verifiedUsers || 0}</Text>
-                <Text style={styles.metricLabel}>Verified</Text>
-              </View>
-            </View>
-
-            <View style={[styles.metricCard, { borderLeftColor: COLORS.error }]}>
-              <View style={[styles.metricIcon, { backgroundColor: `${COLORS.error}20` }]}>
-                <Ionicons name="ban" size={28} color={COLORS.error} />
-              </View>
-              <View style={styles.metricContent}>
-                <Text style={styles.metricValue}>{(stats?.suspendedUsers || 0) + (stats?.bannedUsers || 0)}</Text>
-                <Text style={styles.metricLabel}>Blocked</Text>
-              </View>
-            </View>
+        <View style={styles.wallet}>
+          <View style={styles.walletIcon}>
+            <MaterialCommunityIcons name="wallet" size={26} color={ORANGE} />
           </View>
-
-          {/* Wallet Summary */}
-          <View style={styles.walletCard}>
-            <View style={styles.walletIcon}>
-              <MaterialCommunityIcons name="wallet" size={32} color={COLORS.accent} />
-            </View>
-            <View style={styles.walletContent}>
-              <Text style={styles.walletLabel}>Total Wallet Balance</Text>
-              <Text style={styles.walletAmount}>₹{stats?.totalWalletBalance?.toLocaleString() || 0}</Text>
-            </View>
-          </View>
-
-          {/* Main Actions */}
-          <Text style={styles.sectionTitle}>MANAGEMENT</Text>
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity 
-              style={styles.actionCardWide}
-              onPress={() => navigateTo('UserManagement')}
-            >
-              <View style={[styles.actionGradient, { backgroundColor: `${COLORS.primary}15` }]}>
-                <View style={styles.actionCardContent}>
-                  <View style={[styles.actionCardIcon, { backgroundColor: `${COLORS.primary}30` }]}>
-                    <Ionicons name="people" size={32} color={COLORS.primary} />
-                  </View>
-                  <View style={styles.actionCardText}>
-                    <Text style={styles.actionCardTitle}>User Management</Text>
-                    <Text style={styles.actionCardSubtitle}>Manage {stats?.totalUsers || 0} users</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color={COLORS.primary} />
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.actionCardWide}
-              onPress={() => navigateTo('TournamentManagementV2')}
-            >
-              <View style={[styles.actionGradient, { backgroundColor: `${COLORS.accent}15` }]}>
-                <View style={styles.actionCardContent}>
-                  <View style={[styles.actionCardIcon, { backgroundColor: `${COLORS.accent}30` }]}>
-                    <MaterialCommunityIcons name="tournament" size={32} color={COLORS.accent} />
-                  </View>
-                  <View style={styles.actionCardText}>
-                    <Text style={styles.actionCardTitle}>Tournament Management</Text>
-                    <Text style={styles.actionCardSubtitle}>Create & manage tournaments</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color={COLORS.accent} />
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.actionCardWide}
-              onPress={() => navigateTo('TutorialManagement')}
-            >
-              <View style={[styles.actionGradient, { backgroundColor: `#00BCD415` }]}>
-                <View style={styles.actionCardContent}>
-                  <View style={[styles.actionCardIcon, { backgroundColor: `#00BCD430` }]}>
-                    <MaterialCommunityIcons name="play-box-multiple" size={32} color="#00BCD4" />
-                  </View>
-                  <View style={styles.actionCardText}>
-                    <Text style={styles.actionCardTitle}>How To Play</Text>
-                    <Text style={styles.actionCardSubtitle}>Home carousel thumbnails & videos</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color="#00BCD4" />
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.actionCardWide}
-              onPress={() => navigateTo('TournamentHistory')}
-            >
-              <View style={[styles.actionGradient, { backgroundColor: `#FF980015` }]}>
-                <View style={styles.actionCardContent}>
-                  <View style={[styles.actionCardIcon, { backgroundColor: `#FF980030` }]}>
-                    <MaterialCommunityIcons name="history" size={32} color="#FF9800" />
-                  </View>
-                  <View style={styles.actionCardText}>
-                    <Text style={styles.actionCardTitle}>Tournament History</Text>
-                    <Text style={styles.actionCardSubtitle}>View all tournaments</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color="#FF9800" />
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.actionCardWide}
-              onPress={() => navigateTo('TournamentLeaderboard')}
-            >
-              <View style={[styles.actionGradient, { backgroundColor: `#4CAF5015` }]}>
-                <View style={styles.actionCardContent}>
-                  <View style={[styles.actionCardIcon, { backgroundColor: `#4CAF5030` }]}>
-                    <MaterialCommunityIcons name="podium" size={32} color="#4CAF50" />
-                  </View>
-                  <View style={styles.actionCardText}>
-                    <Text style={styles.actionCardTitle}>Tournament Leaderboard</Text>
-                    <Text style={styles.actionCardSubtitle}>Rank, kills, earnings</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color="#4CAF50" />
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.actionCardWide}
-              onPress={() => navigateTo('GameManagement')}
-            >
-              <View style={[styles.actionGradient, { backgroundColor: `#9C27B015` }]}>
-                <View style={styles.actionCardContent}>
-                  <View style={[styles.actionCardIcon, { backgroundColor: `#9C27B030` }]}>
-                    <MaterialCommunityIcons name="gamepad-variant" size={32} color="#9C27B0" />
-                  </View>
-                  <View style={styles.actionCardText}>
-                    <Text style={styles.actionCardTitle}>Game Management</Text>
-                    <Text style={styles.actionCardSubtitle}>Manage games & modes</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color="#9C27B0" />
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.actionCardWide}
-              onPress={() => navigateTo('MapManagement')}
-            >
-              <View style={[styles.actionGradient, { backgroundColor: `#26A69A15` }]}>
-                <View style={styles.actionCardContent}>
-                  <View style={[styles.actionCardIcon, { backgroundColor: `#26A69A30` }]}>
-                    <MaterialCommunityIcons name="map" size={32} color="#26A69A" />
-                  </View>
-                  <View style={styles.actionCardText}>
-                    <Text style={styles.actionCardTitle}>Map Management</Text>
-                    <Text style={styles.actionCardSubtitle}>Add / edit tournament maps</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={24} color="#26A69A" />
-                </View>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* Secondary Actions */}
-          <Text style={styles.sectionTitle}>OTHER</Text>
-          <View style={styles.secondaryActions}>
-            <TouchableOpacity 
-              style={[styles.secondaryBtn, { borderLeftColor: COLORS.primary }]}
-              onPress={() => navigateTo('PaymentManagement')}
-            >
-              <MaterialCommunityIcons name="cash-multiple" size={24} color={COLORS.primary} style={styles.secondaryIcon} />
-              <View style={styles.secondaryContent}>
-                <Text style={styles.secondaryTitle}>Payment Management</Text>
-                <Text style={styles.secondarySubtitle}>Manage transactions</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.secondaryBtn, { borderLeftColor: COLORS.error }]}
-              onPress={() => navigateTo('SupportManagement')}
-            >
-              <Ionicons name="headset" size={24} color={COLORS.error} style={styles.secondaryIcon} />
-              <View style={styles.secondaryContent}>
-                <Text style={styles.secondaryTitle}>Support Tickets</Text>
-                <Text style={styles.secondarySubtitle}>Categories & user tickets</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.secondaryBtn, { borderLeftColor: COLORS.accent }]}
-              onPress={() => navigateTo('Analytics')}
-            >
-              <MaterialCommunityIcons name="chart-line" size={24} color={COLORS.accent} style={styles.secondaryIcon} />
-              <View style={styles.secondaryContent}>
-                <Text style={styles.secondaryTitle}>Analytics</Text>
-                <Text style={styles.secondarySubtitle}>View statistics</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.secondaryBtn, { borderLeftColor: '#38BDF8' }]}
-              onPress={() => navigateTo('SliderManagement')}
-            >
-              <MaterialCommunityIcons name="view-carousel" size={24} color="#38BDF8" style={styles.secondaryIcon} />
-              <View style={styles.secondaryContent}>
-                <Text style={styles.secondaryTitle}>Home Banners</Text>
-                <Text style={styles.secondarySubtitle}>Image-only slides + redirect link</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.secondaryBtn, { borderLeftColor: '#2DD4BF' }]}
-              onPress={() => navigateTo('AnnouncementManagement')}
-            >
-              <MaterialCommunityIcons name="bullhorn" size={24} color="#2DD4BF" style={styles.secondaryIcon} />
-              <View style={styles.secondaryContent}>
-                <Text style={styles.secondaryTitle}>Important Updates</Text>
-                <Text style={styles.secondarySubtitle}>News list, links & descriptions</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.secondaryBtn, { borderLeftColor: '#A78BFA' }]}
-              onPress={() => navigateTo('AdminPushNotifications')}
-            >
-              <MaterialCommunityIcons name="bell-ring" size={24} color="#A78BFA" style={styles.secondaryIcon} />
-              <View style={styles.secondaryContent}>
-                <Text style={styles.secondaryTitle}>Push Notifications</Text>
-                <Text style={styles.secondarySubtitle}>Send to all, users, or tournament</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.secondaryBtn, { borderLeftColor: '#00B368' }]}
-              onPress={() => navigateTo('AppContentManagement')}
-            >
-              <MaterialCommunityIcons name="cellphone-cog" size={24} color="#00B368" style={styles.secondaryIcon} />
-              <View style={styles.secondaryContent}>
-                <Text style={styles.secondaryTitle}>App Content</Text>
-                <Text style={styles.secondarySubtitle}>Home, wallet & coin packs</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-            </TouchableOpacity>
+          <View>
+            <Text style={styles.walletLabel}>Total Wallet Balance</Text>
+            <Text style={styles.walletValue}>₹{(stats?.totalWalletBalance || 0).toLocaleString('en-IN')}</Text>
           </View>
         </View>
 
-        <View style={{ height: 30 }} />
+        <Text style={styles.section}>MANAGEMENT</Text>
+        <NavTile
+          icon="account-group"
+          title="User Management"
+          subtitle={`Manage ${stats?.totalUsers || 0} users`}
+          onPress={() => navigation.navigate('UserManagement')}
+        />
+        <NavTile
+          icon="tournament"
+          title="Tournament Management"
+          subtitle="Create & manage matches"
+          onPress={() => navigation.navigate('TournamentManagement')}
+        />
+        <NavTile
+          icon="history"
+          title="Tournament History"
+          subtitle="Slots, payments & results"
+          onPress={() => navigation.navigate('TournamentHistory')}
+        />
+        <NavTile
+          icon="gamepad-variant"
+          title="Games & Modes"
+          subtitle="Titles players can join"
+          onPress={() => navigation.navigate('GameManagement')}
+        />
+        <NavTile
+          icon="cash-multiple"
+          title="Payments"
+          subtitle="Wallet transactions"
+          onPress={() => navigation.navigate('PaymentManagement')}
+        />
+
+        <Text style={styles.section}>OTHER</Text>
+        <NavTile icon="map" title="Maps" subtitle="Match maps" onPress={() => navigation.navigate('MapManagement')} />
+        <NavTile icon="play-box-multiple" title="How To Play" subtitle="Tutorial videos" onPress={() => navigation.navigate('TutorialManagement')} />
+        <NavTile icon="view-carousel" title="Home Banners" subtitle="Image slides" onPress={() => navigation.navigate('SliderManagement')} />
+        <NavTile icon="bullhorn" title="Announcements" subtitle="Home updates" onPress={() => navigation.navigate('AnnouncementManagement')} />
+        <NavTile icon="headset" title="Support" subtitle="Player tickets" onPress={() => navigation.navigate('SupportManagement')} />
+        <NavTile icon="bell-ring" title="Push Notifications" subtitle="Send alerts" onPress={() => navigation.navigate('AdminPushNotifications')} />
+        <NavTile icon="cellphone-cog" title="App Content" subtitle="Home & coin packs" onPress={() => navigation.navigate('AppContentManagement')} />
+        <NavTile icon="chart-line" title="Analytics" subtitle="App statistics" onPress={() => navigation.navigate('Analytics')} />
       </ScrollView>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
-    ...(Platform.OS === 'web'
-      ? {
-          height: '100%',
-          minHeight: '100vh',
-          width: '100%',
-        }
-      : null),
+    backgroundColor: BG,
+    ...(Platform.OS === 'web' ? { minHeight: '100vh', width: '100%' } : null),
   },
-  scrollView: {
-    flex: 1,
-  },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
+    backgroundColor: ORANGE,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    paddingTop: 15,
-    backgroundColor: COLORS.primary,
-    ...(Platform.OS === 'web'
-      ? {
-          maxWidth: 1100,
-          width: '100%',
-          alignSelf: 'center',
-        }
-      : null),
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  headerContent: {
-    flexDirection: 'row',
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  badge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#1A1208',
     alignItems: 'center',
-    flex: 1,
-  },
-  adminBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: `${COLORS.darkGray}60`,
     justifyContent: 'center',
+  },
+  headerTitle: { color: '#fff', fontWeight: '800', fontSize: 16, letterSpacing: 1 },
+  headerSub: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 1 },
+  logout: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.2)',
     alignItems: 'center',
-    marginRight: 14,
-    borderWidth: 2,
-    borderColor: COLORS.accent,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.white,
-    letterSpacing: 2,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: `${COLORS.white}80`,
-    marginTop: 2,
-  },
-  logoutButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     justifyContent: 'center',
-    alignItems: 'center',
   },
   content: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    ...(Platform.OS === 'web'
-      ? {
-          maxWidth: 1100,
-          width: '100%',
-          alignSelf: 'center',
-        }
-      : null),
+    padding: 16,
+    paddingBottom: 40,
+    ...(Platform.OS === 'web' ? { maxWidth: 920, width: '100%', alignSelf: 'center' } : null),
   },
-  sectionTitle: {
-    fontSize: 16,
+  section: {
+    color: '#fff',
     fontWeight: '800',
-    color: COLORS.white,
-    marginTop: 24,
-    marginBottom: 14,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
+    fontSize: 13,
+    marginBottom: 10,
+    marginTop: 8,
   },
-  metricsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 20,
-  },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
   metricCard: {
-    width: Platform.OS === 'web' ? '32%' : '48%',
-    minWidth: Platform.OS === 'web' ? 220 : undefined,
     flexGrow: 1,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 14,
+    minWidth: Platform.OS === 'web' ? 200 : '47%',
+    backgroundColor: CARD,
+    borderRadius: 12,
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderLeftWidth: 4,
   },
   metricIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  metricValue: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  metricLabel: { color: '#9AA4B8', fontSize: 11, marginTop: 2 },
+  wallet: {
+    backgroundColor: CARD,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 22,
+    borderLeftWidth: 4,
+    borderLeftColor: ORANGE,
+  },
+  walletIcon: {
     width: 48,
     height: 48,
     borderRadius: 12,
+    backgroundColor: 'rgba(255,107,0,0.18)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
   },
-  metricContent: {
-    flex: 1,
-  },
-  metricValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  metricLabel: {
-    fontSize: 11,
-    color: COLORS.gray,
-    marginTop: 2,
-  },
-  walletCard: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 24,
-    alignItems: 'center',
-    borderLeftWidth: 5,
-    borderLeftColor: COLORS.accent,
-  },
-  walletIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: `${COLORS.accent}30`,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  walletContent: {
-    flex: 1,
-  },
-  walletLabel: {
-    color: COLORS.gray,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  walletAmount: {
-    color: COLORS.accent,
-    fontSize: 26,
-    fontWeight: '800',
-    marginTop: 4,
-  },
-  actionsGrid: {
-    marginBottom: 24,
-  },
-  actionCardWide: {
-    marginBottom: 12,
-    borderRadius: 14,
-    overflow: 'hidden',
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : null),
-  },
-  actionGradient: {
-    padding: 0,
-  },
-  actionCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-  },
-  actionCardIcon: {
-    width: 52,
-    height: 52,
+  walletLabel: { color: '#9AA4B8', fontSize: 12, fontWeight: '600' },
+  walletValue: { color: ORANGE, fontSize: 26, fontWeight: '800', marginTop: 2 },
+  tile: {
+    backgroundColor: CARD,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  actionCardText: {
-    flex: 1,
-  },
-  actionCardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  actionCardSubtitle: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginTop: 2,
-  },
-  secondaryActions: {
-    marginBottom: 20,
-  },
-  secondaryBtn: {
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.lightGray,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+    gap: 12,
     marginBottom: 10,
-    borderLeftWidth: 4,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : null),
   },
-  secondaryIcon: {
-    marginRight: 12,
-  },
-  secondaryContent: {
-    flex: 1,
-  },
-  secondaryTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  secondarySubtitle: {
-    fontSize: 11,
-    color: COLORS.gray,
-    marginTop: 2,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  tileIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,107,0,0.16)',
     alignItems: 'center',
-    minHeight: Platform.OS === 'web' ? 320 : undefined,
+    justifyContent: 'center',
   },
-  loadingText: {
-    color: COLORS.white,
-    marginTop: 10,
-    fontSize: 14,
-  },
+  tileTitle: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  tileSub: { color: '#9AA4B8', fontSize: 12, marginTop: 2 },
 });
-
-export default AdminDashboard;
