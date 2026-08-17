@@ -976,7 +976,7 @@ router.post('/admin/:id/publish-results', authMiddleware, async (req, res) => {
     } else {
       const custom = await CustomMatchResult.findOne({ tournamentId: req.params.id });
       if (!custom) {
-        return res.status(400).json({ error: 'Save custom match results before publishing' });
+        return res.status(400).json({ error: 'Save Clash Squad results before publishing' });
       }
     }
 

@@ -312,46 +312,22 @@ export const walletService = {
   },
 };
 
-/** Cashfree QR wallet top-up (backend-only credentials) */
+/** ZapUPI wallet top-up / tournament Pay & Join (backend-only zap_key) */
 export const paymentService = {
-  getConfig: async () => {
-    if (!isPaymentEnabled()) {
-      return {
-        success: true,
-        enabled: false,
-        paymentEnabled: false,
-        // Soft message — app uses direct top-up in testing; do not treat as a user-facing block.
-        message: 'Testing mode: wallet top-up credits coins without Cashfree.',
-      };
-    }
-    return apiCall('/payments/config');
-  },
-  createCashfreeQr: (data) => {
-    if (!isPaymentEnabled()) {
-      return Promise.reject(getPaymentDisabledError('deposit'));
-    }
-    return apiCall('/payments/cashfree/create-qr', {
+  getConfig: () => apiCall('/payments/config'),
+  createZapUpiQr: (data) =>
+    apiCall('/payments/zapupi/create-qr', {
       method: 'POST',
       body: data,
-    });
-  },
-  createCashfreeOrder: (data) => {
-    if (!isPaymentEnabled()) {
-      return Promise.reject(getPaymentDisabledError('deposit'));
-    }
-    return apiCall('/payments/cashfree/create-order', {
+    }),
+  createZapUpiOrder: (data) =>
+    apiCall('/payments/zapupi/create-order', {
       method: 'POST',
       body: data,
-    });
-  },
-  getCashfreeStatus: (orderId) => {
-    if (!isPaymentEnabled()) {
-      return Promise.reject(getPaymentDisabledError('deposit'));
-    }
-    return apiCall(`/payments/cashfree/status/${orderId}`);
-  },
-  cancelCashfreeOrder: (orderId) =>
-    apiCall(`/payments/cashfree/cancel/${orderId}`, {
+    }),
+  getZapUpiStatus: (orderId) => apiCall(`/payments/zapupi/status/${orderId}`),
+  cancelZapUpiOrder: (orderId) =>
+    apiCall(`/payments/zapupi/cancel/${orderId}`, {
       method: 'POST',
       body: {},
     }),

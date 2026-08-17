@@ -21,7 +21,7 @@ import RNPickerSelect from 'react-native-picker-select';
 import { COLORS } from '../../styles/theme';
 import { tournamentService, tournamentManagementService, gameService, uploadImageFile, mapService } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
-import { getPrizeBreakdown, buildPrizesForCategory, getCustomWinnerPrize, getMatchStructure } from '../../utils/tournamentHelpers';
+import { getPrizeBreakdown, buildPrizesForCategory, getCustomWinnerPrize, getMatchStructure, toPlayerMatchLabel } from '../../utils/tournamentHelpers';
 import { ensureMediaLibraryPermission, launchImageLibrary } from '../../utils/imagePicker';
 import WebSafeDateTimePicker from '../../components/WebSafeDateTimePicker';
 import Toast from '../../components/Toast';
@@ -46,7 +46,7 @@ const MODE_MAX_PLAYERS = {
 
 const TOURNAMENT_CATEGORIES = [
   { label: 'Battle Royale', value: 'battle_royale', description: 'Full map · Solo / Duo / Squad · up to 50 slots · per-kill rewards' },
-  { label: 'Custom Match', value: 'custom', description: 'Team vs team · 1v1 / 2v2 / 4v4 · Team A vs Team B · entry fee per team · no kill rewards' },
+  { label: 'Clash Squad', value: 'custom', description: 'Team vs team · 1v1 / 2v2 / 4v4 · Team A vs Team B · entry fee per team · no kill rewards' },
 ];
 
 const MATCH_STATUSES = [
@@ -987,7 +987,7 @@ const TournamentManagement = ({ navigation }) => {
                     styles.gameModeCardText,
                     selectedGameMode === mode._id && styles.gameModeCardTextSelected
                   ]}>
-                    {mode.name}
+                    {toPlayerMatchLabel(mode.name)}
                   </Text>
                   {mode.description && (
                     <Text style={styles.modeDescription}>
@@ -1041,7 +1041,7 @@ const TournamentManagement = ({ navigation }) => {
                         </Text>
                       ) : null}
                       <Text style={styles.tournamentGame}>
-                        {tournament.game?.name} - {tournament.gameMode?.name}
+                        {tournament.game?.name} - {toPlayerMatchLabel(tournament.gameMode?.name)}
                       </Text>
                     </View>
                     <View style={[styles.statusBadge, styles[`status${getTournamentStatus(tournament)}`] || styles.statusupcoming]}>
@@ -1071,7 +1071,7 @@ const TournamentManagement = ({ navigation }) => {
                       )}
                       <MaterialCommunityIcons name="star" size={16} color={COLORS.accent} />
                       <Text style={styles.detailText}>
-                        {(tournament.category || 'battle_royale') === 'custom' ? 'Custom Match' : 'Battle Royale'}
+                        {(tournament.category || 'battle_royale') === 'custom' ? 'Clash Squad' : 'Battle Royale'}
                       </Text>
                     </View>
                     <View style={styles.detailRow}>
@@ -1441,7 +1441,7 @@ const TournamentManagement = ({ navigation }) => {
                       </Text>
                     </View>
                     <Text style={styles.prizePoolHint}>
-                      Custom Match is 2 teams only. Winning team receives 100% of the prize. Losing team receives ₹0.
+                      Clash Squad is 2 teams only. Winning team receives 100% of the prize. Losing team receives ₹0.
                     </Text>
                   </View>
                 </View>

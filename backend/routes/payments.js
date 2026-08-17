@@ -7,13 +7,13 @@ const TeamMember = require('../models/TeamMember');
 const PaymentOrder = require('../models/PaymentOrder');
 const PaymentLog = require('../models/PaymentLog');
 const { authMiddleware } = require('../middleware/auth');
-const { getCashfreeConfig, assertCashfreeReady } = require('../config/cashfree');
+const { getZapUpiConfig, assertZapUpiReady } = require('../config/zapupi');
 const {
   isPaymentEnabled,
   requirePaymentsEnabled,
   PAYMENT_DISABLED_MESSAGE,
 } = require('../config/payments');
-const cashfree = require('../services/cashfreeService');
+const zapupi = require('../services/zapupiService');
 const { creditWalletForPaymentOrder } = require('../services/walletCreditService');
 const { fulfillTournamentEntryPayment } = require('../services/tournamentEntryFulfillment');
 const lifecycle = require('../services/tournamentLifecycle');
@@ -31,6 +31,10 @@ function publicBaseUrl(req) {
   return `${proto}://${req.get('host')}`;
 }
 
+function webhookUrl(req) {
+  return `${publicBaseUrl(req)}/api/payments/zapupi/webhook`;
+}
+
 async function writeLog(entry) {
   try {
     await PaymentLog.create(entry);
@@ -39,24 +43,25 @@ async function writeLog(entry) {
   }
 }
 
+function uniqueOrderId() {
+  return `SKW${Date.now()}${crypto.randomBytes(3).toString('hex')}`.toUpperCase();
+}
+
 function userFacingError(code, fallback) {
   const map = {
     PAYMENT_DISABLED: PAYMENT_DISABLED_MESSAGE,
-    CASHFREE_DISABLED: 'QR payments are temporarily unavailable. Please try again later.',
-    CASHFREE_NOT_CONFIGURED: 'Payment gateway is not configured yet. Please contact support.',
-    CASHFREE_API_ERROR: 'Unable to reach the payment gateway. Please try again.',
-    CASHFREE_AUTH_FAILED:
-      'Cashfree authentication failed. Use Payment Gateway Test API keys (Payments → Developers), not Payouts keys.',
-    INVALID_AMOUNT: 'Please enter a valid amount between ₹10 and ₹10,000.',
+    ZAPUPI_DISABLED: 'UPI payments are temporarily unavailable. Please try again later.',
+    ZAPUPI_NOT_CONFIGURED: 'Payment gateway is not configured yet. Please contact support.',
+    ZAPUPI_API_ERROR: 'Unable to reach the payment gateway. Please try again.',
+    INVALID_AMOUNT: 'Please enter a valid amount.',
     ORDER_NOT_FOUND: 'Payment order not found.',
-    ORDER_EXPIRED: 'This QR code has expired. Please generate a new one.',
+    ORDER_EXPIRED: 'This payment session expired. Please try again.',
     PAYMENT_FAILED: 'Payment failed. Please try again.',
     PAYMENT_CANCELLED: 'Payment was cancelled.',
-    PAYMENT_PENDING: 'Payment is still pending. Complete the UPI payment and wait a moment.',
-    INVALID_SIGNATURE: 'Invalid payment webhook signature.',
+    PAYMENT_PENDING: 'Payment is still pending. Complete UPI and wait a moment.',
     INVALID_ORDER: 'Invalid payment order.',
     NETWORK_ERROR: 'Network error. Please check your connection and try again.',
-    TIMEOUT: 'Payment verification timed out. If money was deducted, contact support with your Order ID.',
+    TIMEOUT: 'Payment timed out. If money was deducted, wait or contact support with your Order ID.',
     DUPLICATE_CALLBACK: 'This payment was already processed.',
     ALREADY_JOINED: 'You have already joined this tournament.',
     TOURNAMENT_CLOSED: 'Registration is not open for this tournament.',
@@ -65,116 +70,23 @@ function userFacingError(code, fallback) {
   return map[code] || fallback || 'Something went wrong with the payment.';
 }
 
-function slimPayResponse(pay) {
-  try {
-    const clone = JSON.parse(JSON.stringify(pay));
-    if (clone?.data?.payload && typeof clone.data.payload === 'string' && clone.data.payload.length > 180) {
-      clone.data.payload = `[omitted ${clone.data.payload.length} chars]`;
-    }
-    return clone;
-  } catch {
-    return { cf_payment_id: pay?.cf_payment_id, channel: pay?.channel };
-  }
+function customerMobile(user) {
+  const raw = user?.phone || user?.mobile || user?.phoneNumber || user?.whatsapp || '';
+  const digits = String(raw).replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : '';
 }
 
-async function createCashfreeQrOrder({
-  req,
-  user,
-  amountNum,
-  purpose = 'wallet_topup',
-  tournamentId = null,
-  metadata = {},
-}) {
-  const cfg = assertCashfreeReady();
-  const orderId = `SKW_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`.slice(0, 45);
-  const notifyUrl = `${publicBaseUrl(req)}/api/payments/cashfree/webhook`;
-
-  await writeLog({
-    orderId,
-    userId: user._id,
-    event: purpose === 'tournament_entry' ? 'CREATE_ORDER_REQUESTED' : 'CREATE_QR_REQUESTED',
-    source: 'api',
-    requestPayload: { amount: amountNum, purpose, tournamentId },
-  });
-
-  const { order, expiry } = await cashfree.createOrder({
-    orderId,
-    amount: amountNum,
-    currency: cfg.currency,
-    customer: {
-      id: user._id,
-      phone: user.phone || user.mobile || user.phoneNumber,
-      email: user.email,
-      name: user.name || user.username || 'SK Win Player',
-    },
-    notifyUrl,
-  });
-
-  const paymentSessionId = order.payment_session_id;
-  if (!paymentSessionId) {
-    const err = new Error(userFacingError('CASHFREE_API_ERROR'));
-    err.status = 502;
-    err.code = 'CASHFREE_API_ERROR';
-    throw err;
-  }
-
-  const { pay, qr } = await cashfree.createUpiQrPayment(paymentSessionId, cfg.qrExpiryMinutes);
-  if (!qr.qrPayload && !qr.qrImageUrl) {
-    const err = new Error(
-      'QR could not be generated. Ensure Cashfree S2S / UPI QR is enabled on your merchant account.'
-    );
-    err.status = 502;
-    err.code = 'CASHFREE_API_ERROR';
-    throw err;
-  }
-
-  const paymentOrder = await PaymentOrder.create({
-    orderId,
-    userId: user._id,
-    purpose,
-    tournamentId: tournamentId || undefined,
-    amount: amountNum,
-    currency: cfg.currency,
-    status: 'PENDING',
-    paymentMethod: 'cashfree_qr',
-    cashfreeOrderId: order.cf_order_id != null ? String(order.cf_order_id) : orderId,
-    cashfreePaymentId: qr.cfPaymentId || undefined,
-    paymentSessionId,
-    qrPayload: qr.qrPayload || undefined,
-    qrImageUrl: qr.qrImageUrl || undefined,
-    qrExpiresAt: expiry,
-    cfOrderStatus: order.order_status,
-    rawCreateResponse: order,
-    rawPayResponse: slimPayResponse(pay),
-    metadata: { channel: qr.channel, action: qr.action, purpose, ...metadata },
-  });
-
-  await writeLog({
-    orderId,
-    paymentOrderId: paymentOrder._id,
-    userId: user._id,
-    event: 'QR_CREATED',
-    source: 'api',
-    success: true,
-    responsePayload: {
-      purpose,
-      cfPaymentId: qr.cfPaymentId,
-      hasPayload: Boolean(qr.qrPayload),
-      hasImage: Boolean(qr.qrImageUrl),
-    },
-  });
-
-  return { paymentOrder, expiry };
-}
-
-async function settleSuccessfulPayment(paymentOrder, { source, cfPaymentId } = {}) {
+async function settleSuccessfulPayment(paymentOrder, { source, txnId, utr } = {}) {
   const purpose = paymentOrder.purpose || paymentOrder.metadata?.purpose || 'wallet_topup';
+
+  if (txnId) paymentOrder.zapupiTxnId = paymentOrder.zapupiTxnId || String(txnId);
+  if (utr) paymentOrder.zapupiUtr = paymentOrder.zapupiUtr || String(utr);
 
   if (purpose === 'tournament_entry') {
     if (!['SUCCESS', 'PAID'].includes(paymentOrder.status)) {
       paymentOrder.status = 'SUCCESS';
-      await paymentOrder.save();
     }
+    await paymentOrder.save();
     const fulfill = await fulfillTournamentEntryPayment(paymentOrder, { source });
     const joined =
       paymentOrder.tournamentJoined || fulfill.joined || fulfill.reason === 'ALREADY_JOINED';
@@ -189,7 +101,11 @@ async function settleSuccessfulPayment(paymentOrder, { source, cfPaymentId } = {
 
   paymentOrder.status = 'SUCCESS';
   await paymentOrder.save();
-  const credit = await creditWalletForPaymentOrder(paymentOrder, { source, cfPaymentId });
+  const credit = await creditWalletForPaymentOrder(paymentOrder, {
+    source,
+    txnId: paymentOrder.zapupiTxnId,
+    utr: paymentOrder.zapupiUtr,
+  });
   return {
     purpose: 'wallet_topup',
     status: 'SUCCESS',
@@ -202,12 +118,7 @@ async function settleSuccessfulPayment(paymentOrder, { source, cfPaymentId } = {
 function buildStatusPayload(paymentOrder, extra = {}) {
   const purpose = paymentOrder.purpose || paymentOrder.metadata?.purpose || 'wallet_topup';
   let status = paymentOrder.status;
-  if (
-    purpose === 'tournament_entry' &&
-    (paymentOrder.tournamentJoined || status === 'SUCCESS' || status === 'PAID')
-  ) {
-    if (paymentOrder.tournamentJoined) status = 'PAID';
-  }
+  if (purpose === 'tournament_entry' && paymentOrder.tournamentJoined) status = 'PAID';
   return {
     success: true,
     orderId: paymentOrder.orderId,
@@ -218,48 +129,194 @@ function buildStatusPayload(paymentOrder, extra = {}) {
     tournamentId: paymentOrder.tournamentId || null,
     walletCredited: Boolean(paymentOrder.walletCredited),
     tournamentJoined: Boolean(paymentOrder.tournamentJoined),
+    utr: paymentOrder.zapupiUtr || null,
+    ...extra,
+  };
+}
+
+async function verifyAndSettle(paymentOrder, { source } = {}) {
+  const remote = await zapupi.getOrderStatus(paymentOrder.orderId);
+  paymentOrder.lastStatusPayload = remote.raw;
+  paymentOrder.lastVerifiedAt = new Date();
+  if (remote.txnId) paymentOrder.zapupiTxnId = String(remote.txnId);
+  if (remote.utr) paymentOrder.zapupiUtr = String(remote.utr);
+  if (remote.environment) paymentOrder.zapupiEnvironment = String(remote.environment);
+
+  const cfg = getZapUpiConfig();
+  if (
+    !cfg.acceptTestWebhooks &&
+    zapupi.isTestEnvironment(remote.environment || paymentOrder.zapupiEnvironment, remote.txnId || paymentOrder.zapupiTxnId)
+  ) {
+    paymentOrder.failureReason = 'TEST_WEBHOOK_IGNORED_IN_PRODUCTION';
+    await paymentOrder.save();
+    return { ignored: true, localStatus: 'PENDING', remote };
+  }
+
+  const localStatus = zapupi.mapZapStatusToLocal(remote.status);
+  const paidAmount = Number(remote.payAmount ?? remote.amount ?? paymentOrder.amount);
+
+  if (localStatus === 'SUCCESS' && Math.abs(paidAmount - Number(paymentOrder.amount)) > 0.05) {
+    paymentOrder.status = 'FAILED';
+    paymentOrder.failureReason = 'AMOUNT_MISMATCH';
+    await paymentOrder.save();
+    await writeLog({
+      orderId: paymentOrder.orderId,
+      paymentOrderId: paymentOrder._id,
+      userId: paymentOrder.userId,
+      event: 'AMOUNT_MISMATCH',
+      source,
+      success: false,
+      responsePayload: { expected: paymentOrder.amount, paid: paidAmount },
+      errorCode: 'AMOUNT_MISMATCH',
+    });
+    return { localStatus: 'FAILED', mismatch: true, remote };
+  }
+
+  if (localStatus === 'SUCCESS') {
+    paymentOrder.status = 'SUCCESS';
+    await paymentOrder.save();
+    const settle = await settleSuccessfulPayment(paymentOrder, {
+      source,
+      txnId: remote.txnId,
+      utr: remote.utr,
+    });
+    return { localStatus: 'SUCCESS', settle, remote };
+  }
+
+  if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(localStatus)) {
+    if (!['SUCCESS', 'PAID'].includes(paymentOrder.status)) {
+      paymentOrder.status = localStatus;
+      paymentOrder.failureReason = remote.status || localStatus;
+      await paymentOrder.save();
+    }
+  } else {
+    paymentOrder.status = paymentOrder.status === 'CREATED' ? 'PENDING' : paymentOrder.status;
+    await paymentOrder.save();
+  }
+
+  return { localStatus, remote };
+}
+
+async function createZapUpiOrder({
+  req,
+  user,
+  amountNum,
+  purpose = 'wallet_topup',
+  tournamentId = null,
+  metadata = {},
+}) {
+  const cfg = assertZapUpiReady();
+  const orderId = uniqueOrderId();
+  const notifyUrl = webhookUrl(req);
+  const expiry = new Date(Date.now() + cfg.orderExpiryMinutes * 60 * 1000);
+
+  await writeLog({
+    orderId,
+    userId: user._id,
+    event: purpose === 'tournament_entry' ? 'CREATE_ORDER_REQUESTED' : 'CREATE_QR_REQUESTED',
+    source: 'api',
+    requestPayload: { amount: amountNum, purpose, tournamentId },
+  });
+
+  const remarkParts = [
+    purpose === 'tournament_entry' ? 'Tournament entry' : 'Wallet top-up',
+    String(user._id),
+    tournamentId ? String(tournamentId) : '',
+  ].filter(Boolean);
+
+  const created = await zapupi.createOrder({
+    orderId,
+    amount: amountNum,
+    customerMobile: customerMobile(user),
+    remark: remarkParts.join(' | '),
+    webhookUrl: notifyUrl,
+  });
+
+  const paymentOrder = await PaymentOrder.create({
+    orderId: created.orderId || orderId,
+    userId: user._id,
+    purpose,
+    tournamentId: tournamentId || undefined,
+    amount: amountNum,
+    currency: cfg.currency,
+    status: 'PENDING',
+    paymentMethod: 'zapupi',
+    paymentUrl: created.paymentUrl,
+    qrExpiresAt: expiry,
+    zapupiEnvironment: cfg.env,
+    rawCreateResponse: created.raw,
+    metadata: { purpose, ...metadata },
+  });
+
+  await writeLog({
+    orderId: paymentOrder.orderId,
+    paymentOrderId: paymentOrder._id,
+    userId: user._id,
+    event: 'ORDER_CREATED',
+    source: 'api',
+    success: true,
+    responsePayload: { purpose, hasPaymentUrl: Boolean(created.paymentUrl) },
+  });
+
+  return { paymentOrder, expiry };
+}
+
+function orderPublicFields(paymentOrder, extra = {}) {
+  return {
+    success: true,
+    orderId: paymentOrder.orderId,
+    amount: paymentOrder.amount,
+    currency: paymentOrder.currency,
+    status: paymentOrder.status,
+    purpose: paymentOrder.purpose,
+    tournamentId: paymentOrder.tournamentId || null,
+    paymentMethod: 'ZapUPI',
+    paymentUrl: paymentOrder.paymentUrl,
+    expiresAt: paymentOrder.qrExpiresAt,
+    expiresInSeconds: paymentOrder.qrExpiresAt
+      ? Math.max(0, Math.floor((new Date(paymentOrder.qrExpiresAt).getTime() - Date.now()) / 1000))
+      : 0,
     ...extra,
   };
 }
 
 /** Public status for app — no secrets */
 router.get('/config', authMiddleware, async (req, res) => {
-  const cfg = getCashfreeConfig();
+  const cfg = getZapUpiConfig();
   const paymentsOn = isPaymentEnabled();
   res.json({
     success: true,
     enabled: paymentsOn && cfg.ready,
     paymentEnabled: paymentsOn,
-    cashfreeReady: cfg.ready,
+    zapupiReady: cfg.ready,
     environment: cfg.env,
     minAmount: cfg.minAmount,
     maxAmount: cfg.maxAmount,
     currency: cfg.currency,
-    qrExpiryMinutes: cfg.qrExpiryMinutes,
-    paymentMethod: 'cashfree_qr',
+    paymentMethod: 'zapupi',
     supportsTournamentPayJoin: true,
     message: paymentsOn
       ? cfg.ready
         ? 'Payments enabled'
         : 'Payment gateway is not configured yet'
-      : 'Testing mode: use wallet top-up (dummy coins). Cashfree is off.',
+      : 'Testing mode: use wallet top-up (dummy coins). ZapUPI is off.',
   });
 });
 
 /**
- * Create Cashfree order + UPI QR for wallet top-up.
- * POST /api/payments/cashfree/create-qr
+ * Create ZapUPI order for wallet top-up.
+ * POST /api/payments/zapupi/create-qr
  */
-router.post('/cashfree/create-qr', authMiddleware, requirePaymentsEnabled, async (req, res) => {
+async function handleCreateWalletOrder(req, res) {
   try {
-    const cfg = assertCashfreeReady();
+    const cfg = assertZapUpiReady();
     const amountNum = parseFloat(req.body?.amount);
 
     if (!amountNum || Number.isNaN(amountNum) || amountNum < cfg.minAmount || amountNum > cfg.maxAmount) {
       return res.status(400).json({
         success: false,
         code: 'INVALID_AMOUNT',
-        message: userFacingError('INVALID_AMOUNT'),
+        message: `Enter an amount between ₹${cfg.minAmount} and ₹${cfg.maxAmount}.`,
       });
     }
 
@@ -272,54 +329,45 @@ router.post('/cashfree/create-qr', authMiddleware, requirePaymentsEnabled, async
       });
     }
 
-    const { paymentOrder, expiry } = await createCashfreeQrOrder({
+    const { paymentOrder } = await createZapUpiOrder({
       req,
       user,
       amountNum,
       purpose: 'wallet_topup',
     });
 
-    res.json({
-      success: true,
-      orderId: paymentOrder.orderId,
-      amount: paymentOrder.amount,
-      currency: paymentOrder.currency,
-      status: paymentOrder.status,
-      purpose: 'wallet_topup',
-      paymentMethod: 'Cashfree QR',
-      qrPayload: paymentOrder.qrPayload,
-      qrImageUrl: paymentOrder.qrImageUrl,
-      expiresAt: paymentOrder.qrExpiresAt,
-      expiresInSeconds: Math.max(0, Math.floor((expiry.getTime() - Date.now()) / 1000)),
-      walletBalance: (user.wallet?.balance || 0) + (user.wallet?.bonusBalance || 0),
-      message: 'Scan the QR with any UPI app to pay',
-    });
+    res.json(
+      orderPublicFields(paymentOrder, {
+        purpose: 'wallet_topup',
+        walletBalance: (user.wallet?.balance || 0) + (user.wallet?.bonusBalance || 0),
+        message: 'Open the payment page and scan the UPI QR',
+      })
+    );
   } catch (error) {
-    console.error('[payments] create-qr error:', error.message, error.payload || '');
+    console.error('[payments] create wallet order error:', error.message, error.payload || '');
     await writeLog({
       userId: req.userId,
       event: 'CREATE_QR_FAILED',
       source: 'api',
       success: false,
       message: error.message,
-      errorCode: error.code || 'CASHFREE_API_ERROR',
+      errorCode: error.code || 'ZAPUPI_API_ERROR',
       responsePayload: error.payload,
     });
     res.status(error.status || 500).json({
       success: false,
-      code: error.code || 'CASHFREE_API_ERROR',
+      code: error.code || 'ZAPUPI_API_ERROR',
       message: userFacingError(error.code, error.message),
     });
   }
-});
+}
 
 /**
- * Pay & Join — Cashfree Sandbox order for tournament entry fee.
- * POST /api/payments/cashfree/create-order
+ * Pay & Join — ZapUPI order for tournament entry fee.
  */
-router.post('/cashfree/create-order', authMiddleware, requirePaymentsEnabled, async (req, res) => {
+async function handleCreateTournamentOrder(req, res) {
   try {
-    const cfg = assertCashfreeReady();
+    const cfg = assertZapUpiReady();
     const tournamentId = req.body?.tournamentId;
     if (!tournamentId) {
       return res.status(400).json({
@@ -395,7 +443,7 @@ router.post('/cashfree/create-order', authMiddleware, requirePaymentsEnabled, as
       tournamentJoined: false,
     }).sort({ createdAt: -1 });
     if (paidPendingJoin) {
-      const settle = await settleSuccessfulPayment(paidPendingJoin, { source: 'api_resume' });
+      const settle = await settleSuccessfulPayment(paidPendingJoin, { source: 'api' });
       return res.json({
         success: true,
         orderId: paidPendingJoin.orderId,
@@ -416,28 +464,18 @@ router.post('/cashfree/create-order', authMiddleware, requirePaymentsEnabled, as
       tournamentId: tournament._id,
       purpose: 'tournament_entry',
       status: { $in: ['PENDING', 'CREATED', 'ACTIVE'] },
+      paymentUrl: { $exists: true, $ne: '' },
       qrExpiresAt: { $gt: new Date() },
     }).sort({ createdAt: -1 });
-    if (existingPending?.qrPayload || existingPending?.qrImageUrl) {
-      return res.json({
-        success: true,
-        orderId: existingPending.orderId,
-        amount: existingPending.amount,
-        currency: existingPending.currency,
-        status: 'PENDING',
-        purpose: 'tournament_entry',
-        tournamentId: tournament._id,
-        paymentMethod: 'Cashfree QR',
-        qrPayload: existingPending.qrPayload,
-        qrImageUrl: existingPending.qrImageUrl,
-        expiresAt: existingPending.qrExpiresAt,
-        expiresInSeconds: Math.max(
-          0,
-          Math.floor((new Date(existingPending.qrExpiresAt).getTime() - Date.now()) / 1000)
-        ),
-        resumed: true,
-        message: 'Complete payment with the existing QR',
-      });
+    if (existingPending?.paymentUrl) {
+      return res.json(
+        orderPublicFields(existingPending, {
+          purpose: 'tournament_entry',
+          tournamentName: tournament.name,
+          resumed: true,
+          message: 'Complete payment with the existing ZapUPI order',
+        })
+      );
     }
 
     const isTeam =
@@ -449,7 +487,7 @@ router.post('/cashfree/create-order', authMiddleware, requirePaymentsEnabled, as
         code: 'INVALID_AMOUNT',
         message:
           amountNum < cfg.minAmount
-            ? `Entry fee must be at least ₹${cfg.minAmount} for Cashfree Sandbox QR`
+            ? `Entry fee must be at least ₹${cfg.minAmount}`
             : userFacingError('INVALID_AMOUNT'),
       });
     }
@@ -511,7 +549,7 @@ router.post('/cashfree/create-order', authMiddleware, requirePaymentsEnabled, as
       metadata = { ...metadata, gamingUsername, gamingUID, slotNumber: req.body?.slotNumber || null };
     }
 
-    const { paymentOrder, expiry } = await createCashfreeQrOrder({
+    const { paymentOrder } = await createZapUpiOrder({
       req,
       user,
       amountNum,
@@ -520,50 +558,36 @@ router.post('/cashfree/create-order', authMiddleware, requirePaymentsEnabled, as
       metadata,
     });
 
-    res.json({
-      success: true,
-      orderId: paymentOrder.orderId,
-      amount: paymentOrder.amount,
-      currency: paymentOrder.currency,
-      status: paymentOrder.status,
-      purpose: 'tournament_entry',
-      tournamentId: tournament._id,
-      tournamentName: tournament.name,
-      paymentMethod: 'Cashfree QR',
-      qrPayload: paymentOrder.qrPayload,
-      qrImageUrl: paymentOrder.qrImageUrl,
-      expiresAt: paymentOrder.qrExpiresAt,
-      expiresInSeconds: Math.max(0, Math.floor((expiry.getTime() - Date.now()) / 1000)),
-      message: 'Scan the QR and pay the entry fee to join',
-    });
+    res.json(
+      orderPublicFields(paymentOrder, {
+        purpose: 'tournament_entry',
+        tournamentName: tournament.name,
+        message: 'Scan the QR on the ZapUPI page to pay the entry fee',
+      })
+    );
   } catch (error) {
-    console.error('[payments] create-order error:', error.message, error.payload || '');
+    console.error('[payments] create tournament order error:', error.message, error.payload || '');
     await writeLog({
       userId: req.userId,
       event: 'CREATE_ORDER_FAILED',
       source: 'api',
       success: false,
       message: error.message,
-      errorCode: error.code || 'CASHFREE_API_ERROR',
+      errorCode: error.code || 'ZAPUPI_API_ERROR',
       responsePayload: error.payload,
     });
     res.status(error.status || 500).json({
       success: false,
-      code: error.code || 'CASHFREE_API_ERROR',
+      code: error.code || 'ZAPUPI_API_ERROR',
       message: userFacingError(error.code, error.message),
     });
   }
-});
+}
 
-/**
- * Poll / verify payment status. Credits wallet OR joins tournament (idempotent).
- * GET /api/payments/cashfree/status/:orderId
- */
-router.get('/cashfree/status/:orderId', authMiddleware, requirePaymentsEnabled, async (req, res) => {
+async function handleStatus(req, res) {
   try {
-    assertCashfreeReady();
+    assertZapUpiReady();
     const { orderId } = req.params;
-
     const paymentOrder = await PaymentOrder.findOne({ orderId, userId: req.userId });
     if (!paymentOrder) {
       return res.status(404).json({
@@ -615,6 +639,29 @@ router.get('/cashfree/status/:orderId', authMiddleware, requirePaymentsEnabled, 
     }
 
     if (paymentOrder.qrExpiresAt && paymentOrder.qrExpiresAt.getTime() < Date.now()) {
+      try {
+        const verified = await verifyAndSettle(paymentOrder, { source: 'poll' });
+        if (verified.localStatus === 'SUCCESS') {
+          const fresh = await PaymentOrder.findById(paymentOrder._id);
+          const user = await User.findById(req.userId);
+          return res.json(
+            buildStatusPayload(fresh, {
+              status: purpose === 'tournament_entry' && fresh.tournamentJoined ? 'PAID' : 'SUCCESS',
+              tournamentJoined: Boolean(fresh.tournamentJoined),
+              walletCredited: Boolean(fresh.walletCredited),
+              balance: user?.wallet?.balance,
+              message:
+                purpose === 'tournament_entry'
+                  ? fresh.tournamentJoined
+                    ? 'Payment successful. You have joined the tournament.'
+                    : 'Payment received. Completing join…'
+                  : 'Payment successful. Wallet updated.',
+            })
+          );
+        }
+      } catch (_) {
+        /* fall through to expired */
+      }
       if (!['SUCCESS', 'PAID', 'FAILED'].includes(paymentOrder.status)) {
         paymentOrder.status = 'EXPIRED';
         await paymentOrder.save();
@@ -630,12 +677,9 @@ router.get('/cashfree/status/:orderId', authMiddleware, requirePaymentsEnabled, 
       }
     }
 
-    let cfOrder;
-    let payments = [];
+    let verified;
     try {
-      cfOrder = await cashfree.getOrder(orderId);
-      const paymentsRes = await cashfree.getOrderPayments(orderId);
-      payments = Array.isArray(paymentsRes) ? paymentsRes : paymentsRes?.payments || [];
+      verified = await verifyAndSettle(paymentOrder, { source: 'poll' });
     } catch (apiErr) {
       await writeLog({
         orderId,
@@ -655,112 +699,52 @@ router.get('/cashfree/status/:orderId', authMiddleware, requirePaymentsEnabled, 
       });
     }
 
-    const latestPayment = [...payments].sort(
-      (a, b) => new Date(b.payment_time || 0) - new Date(a.payment_time || 0)
-    )[0];
+    const fresh = await PaymentOrder.findById(paymentOrder._id);
+    const user = await User.findById(req.userId);
 
-    const localStatus = cashfree.mapCfStatusToLocal(
-      cfOrder?.order_status,
-      latestPayment?.payment_status
-    );
-
-    paymentOrder.cfOrderStatus = cfOrder?.order_status;
-    paymentOrder.cfPaymentStatus = latestPayment?.payment_status;
-    paymentOrder.lastVerifiedAt = new Date();
-    if (latestPayment?.cf_payment_id) {
-      paymentOrder.cashfreePaymentId = String(latestPayment.cf_payment_id);
-    }
-
-    const paidAmount = Number(
-      latestPayment?.payment_amount ?? cfOrder?.order_amount ?? paymentOrder.amount
-    );
-    if (localStatus === 'SUCCESS' && Math.abs(paidAmount - Number(paymentOrder.amount)) > 0.009) {
-      paymentOrder.status = 'FAILED';
-      paymentOrder.failureReason = 'AMOUNT_MISMATCH';
-      await paymentOrder.save();
-      await writeLog({
-        orderId,
-        paymentOrderId: paymentOrder._id,
-        userId: req.userId,
-        event: 'AMOUNT_MISMATCH',
-        source: 'poll',
-        success: false,
-        responsePayload: { expected: paymentOrder.amount, paid: paidAmount },
-        errorCode: 'AMOUNT_MISMATCH',
-      });
-      return res.status(400).json({
-        success: false,
-        code: 'INVALID_ORDER',
-        message: userFacingError('INVALID_ORDER'),
-        status: 'FAILED',
-      });
-    }
-
-    if (localStatus === 'SUCCESS') {
-      paymentOrder.status = 'SUCCESS';
-      await paymentOrder.save();
-      const settle = await settleSuccessfulPayment(paymentOrder, {
-        source: 'poll',
-        cfPaymentId: paymentOrder.cashfreePaymentId,
-      });
-      const fresh = await PaymentOrder.findById(paymentOrder._id);
-      const user = await User.findById(req.userId);
-
+    if (verified.localStatus === 'SUCCESS') {
       if (purpose === 'tournament_entry') {
         return res.json(
           buildStatusPayload(fresh, {
-            status: settle.tournamentJoined ? 'PAID' : 'SUCCESS',
-            tournamentJoined: settle.tournamentJoined,
-            message: settle.tournamentJoined
+            status: fresh.tournamentJoined ? 'PAID' : 'SUCCESS',
+            tournamentJoined: Boolean(fresh.tournamentJoined),
+            message: fresh.tournamentJoined
               ? 'Payment successful. You have joined the tournament.'
-              : settle.fulfill?.message || 'Payment received. Completing join…',
+              : verified.settle?.fulfill?.message || 'Payment received. Completing join…',
           })
         );
       }
-
       return res.json(
         buildStatusPayload(fresh, {
           status: 'SUCCESS',
           walletCredited: true,
-          newlyCredited: settle.credit?.credited,
+          newlyCredited: verified.settle?.credit?.credited,
           balance: user?.wallet?.balance,
-          message:
-            settle.credit?.reason === 'ALREADY_CREDITED' || settle.credit?.reason === 'DUPLICATE'
-              ? 'Payment already processed. Wallet is up to date.'
-              : 'Payment successful. Wallet updated.',
+          message: 'Payment successful. Wallet updated.',
         })
       );
     }
 
-    if (['FAILED', 'CANCELLED', 'EXPIRED', 'USER_DROPPED'].includes(localStatus)) {
-      paymentOrder.status = localStatus === 'USER_DROPPED' ? 'CANCELLED' : localStatus;
-      paymentOrder.failureReason = latestPayment?.payment_message || localStatus;
-      await paymentOrder.save();
-
+    if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(verified.localStatus)) {
       const code =
-        localStatus === 'EXPIRED'
+        verified.localStatus === 'EXPIRED'
           ? 'ORDER_EXPIRED'
-          : localStatus === 'CANCELLED' || localStatus === 'USER_DROPPED'
+          : verified.localStatus === 'CANCELLED'
             ? 'PAYMENT_CANCELLED'
             : 'PAYMENT_FAILED';
-
       return res.json(
-        buildStatusPayload(paymentOrder, {
+        buildStatusPayload(fresh, {
+          status: verified.localStatus,
           code,
           message: userFacingError(code),
         })
       );
     }
 
-    paymentOrder.status = 'PENDING';
-    await paymentOrder.save();
-
     return res.json(
-      buildStatusPayload(paymentOrder, {
+      buildStatusPayload(fresh, {
         status: 'PENDING',
-        code: 'PAYMENT_PENDING',
         message: userFacingError('PAYMENT_PENDING'),
-        expiresAt: paymentOrder.qrExpiresAt,
       })
     );
   } catch (error) {
@@ -771,13 +755,9 @@ router.get('/cashfree/status/:orderId', authMiddleware, requirePaymentsEnabled, 
       message: userFacingError(error.code, error.message),
     });
   }
-});
+}
 
-/**
- * User cancels waiting on QR (does not void Cashfree order remotely).
- * POST /api/payments/cashfree/cancel/:orderId
- */
-router.post('/cashfree/cancel/:orderId', authMiddleware, async (req, res) => {
+async function handleCancel(req, res) {
   try {
     const paymentOrder = await PaymentOrder.findOne({
       orderId: req.params.orderId,
@@ -805,7 +785,23 @@ router.post('/cashfree/cancel/:orderId', authMiddleware, async (req, res) => {
       });
     }
 
-    if (!['FAILED', 'EXPIRED', 'CANCELLED'].includes(paymentOrder.status)) {
+    try {
+      const verified = await verifyAndSettle(paymentOrder, { source: 'api' });
+      if (verified.localStatus === 'SUCCESS') {
+        const fresh = await PaymentOrder.findById(paymentOrder._id);
+        return res.json({
+          success: true,
+          status: fresh.tournamentJoined ? 'PAID' : 'SUCCESS',
+          message: 'Payment already completed.',
+          tournamentJoined: Boolean(fresh.tournamentJoined),
+          walletCredited: Boolean(fresh.walletCredited),
+        });
+      }
+    } catch (_) {
+      /* still allow local cancel */
+    }
+
+    if (!['FAILED', 'EXPIRED', 'CANCELLED', 'SUCCESS', 'PAID'].includes(paymentOrder.status)) {
       paymentOrder.status = 'CANCELLED';
       paymentOrder.failureReason = 'USER_CANCELLED';
       await paymentOrder.save();
@@ -821,7 +817,7 @@ router.post('/cashfree/cancel/:orderId', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      status: 'CANCELLED',
+      status: paymentOrder.status,
       message: userFacingError('PAYMENT_CANCELLED'),
     });
   } catch (error) {
@@ -830,86 +826,30 @@ router.post('/cashfree/cancel/:orderId', authMiddleware, async (req, res) => {
       message: userFacingError('NETWORK_ERROR'),
     });
   }
-});
+}
 
 /**
- * Cashfree webhook — signature verified; credits wallet or joins tournament idempotently.
- * POST /api/payments/cashfree/webhook
+ * ZapUPI webhook. Always 200 + {status:'ok'}. Never trust this payload alone —
+ * confirm with Order Status API before joining / crediting.
  */
-router.post('/cashfree/webhook', async (req, res) => {
+router.post('/zapupi/webhook', async (req, res) => {
+  const ack = () => res.status(200).json({ status: 'ok' });
   try {
-    if (!isPaymentEnabled()) {
-      await writeLog({
-        event: 'WEBHOOK_REJECTED_PAYMENT_DISABLED',
-        source: 'webhook',
-        success: false,
-        errorCode: 'PAYMENT_DISABLED',
-      });
-      return res.status(503).json({
-        success: false,
-        code: 'PAYMENT_DISABLED',
-        message: PAYMENT_DISABLED_MESSAGE,
-      });
-    }
-
-    const rawBody =
-      typeof req.rawBody === 'string'
-        ? req.rawBody
-        : Buffer.isBuffer(req.body)
-          ? req.body.toString('utf8')
-          : JSON.stringify(req.body || {});
-
-    const signature = req.get('x-webhook-signature') || req.get('x-cashfree-signature');
-    const timestamp = req.get('x-webhook-timestamp') || req.get('x-cashfree-timestamp');
-
-    const cfg = getCashfreeConfig();
-    if (cfg.configured) {
-      const valid = cashfree.verifyWebhookSignature({ rawBody, timestamp, signature });
-      if (!valid) {
-        await writeLog({
-          event: 'WEBHOOK_INVALID_SIGNATURE',
-          source: 'webhook',
-          success: false,
-          errorCode: 'INVALID_SIGNATURE',
-          headers: { signature: Boolean(signature), timestamp: Boolean(timestamp) },
-        });
-        return res.status(401).json({
-          success: false,
-          code: 'INVALID_SIGNATURE',
-          message: userFacingError('INVALID_SIGNATURE'),
-        });
-      }
-    }
-
-    const payload = typeof req.body === 'object' && !Buffer.isBuffer(req.body)
-      ? req.body
-      : JSON.parse(rawBody || '{}');
-
-    const data = payload?.data || payload;
-    const orderId = data?.order?.order_id || data?.order_id || payload?.orderId;
-    const paymentStatus =
-      data?.payment?.payment_status ||
-      data?.payment_status ||
-      payload?.payment_status;
-    const cfPaymentId =
-      data?.payment?.cf_payment_id ||
-      data?.cf_payment_id ||
-      payload?.cf_payment_id;
-    const orderAmount = Number(
-      data?.order?.order_amount || data?.payment?.payment_amount || data?.order_amount
-    );
+    const payload = req.body && typeof req.body === 'object' ? req.body : {};
+    const orderId = payload.order_id || payload.orderId;
+    const txnId = payload.txn_id || payload.txnId;
+    const utr = payload.utr;
+    const environment = payload.environment;
 
     await writeLog({
       orderId,
-      event: payload?.type || payload?.event || 'WEBHOOK_RECEIVED',
+      event: 'WEBHOOK_RECEIVED',
       source: 'webhook',
       requestPayload: payload,
       success: true,
     });
 
-    if (!orderId) {
-      return res.status(200).json({ success: true, ignored: true });
-    }
+    if (!orderId) return ack();
 
     const paymentOrder = await PaymentOrder.findOne({ orderId });
     if (!paymentOrder) {
@@ -920,15 +860,10 @@ router.post('/cashfree/webhook', async (req, res) => {
         success: false,
         errorCode: 'INVALID_ORDER',
       });
-      return res.status(200).json({ success: true, ignored: true });
+      return ack();
     }
 
-    const purpose = paymentOrder.purpose || paymentOrder.metadata?.purpose || 'wallet_topup';
-
-    if (
-      (purpose === 'wallet_topup' && paymentOrder.walletCredited) ||
-      (purpose === 'tournament_entry' && paymentOrder.tournamentJoined)
-    ) {
+    if (paymentOrder.walletCredited || paymentOrder.tournamentJoined) {
       await writeLog({
         orderId,
         paymentOrderId: paymentOrder._id,
@@ -938,49 +873,54 @@ router.post('/cashfree/webhook', async (req, res) => {
         message: 'Already processed',
         errorCode: 'DUPLICATE_CALLBACK',
       });
-      return res.status(200).json({ success: true, duplicate: true });
+      return ack();
     }
 
-    const localStatus = cashfree.mapCfStatusToLocal(
-      data?.order?.order_status,
-      paymentStatus
-    );
-
-    if (cfPaymentId) paymentOrder.cashfreePaymentId = String(cfPaymentId);
-    paymentOrder.cfPaymentStatus = paymentStatus;
+    if (txnId) paymentOrder.zapupiTxnId = String(txnId);
+    if (utr) paymentOrder.zapupiUtr = String(utr);
+    if (environment) paymentOrder.zapupiEnvironment = String(environment);
     paymentOrder.lastVerifiedAt = new Date();
+    await paymentOrder.save();
 
-    if (
-      localStatus === 'SUCCESS' &&
-      !Number.isNaN(orderAmount) &&
-      Math.abs(orderAmount - Number(paymentOrder.amount)) > 0.009
-    ) {
-      paymentOrder.status = 'FAILED';
-      paymentOrder.failureReason = 'AMOUNT_MISMATCH';
-      await paymentOrder.save();
-      return res.status(200).json({ success: false, code: 'AMOUNT_MISMATCH' });
-    }
-
-    if (localStatus === 'SUCCESS') {
-      paymentOrder.status = 'SUCCESS';
-      await paymentOrder.save();
-      await settleSuccessfulPayment(paymentOrder, {
+    if (!isPaymentEnabled()) {
+      await writeLog({
+        orderId,
+        event: 'WEBHOOK_REJECTED_PAYMENT_DISABLED',
         source: 'webhook',
-        cfPaymentId: paymentOrder.cashfreePaymentId,
+        success: false,
+        errorCode: 'PAYMENT_DISABLED',
       });
-      return res.status(200).json({ success: true });
+      return ack();
     }
 
-    if (['FAILED', 'CANCELLED', 'EXPIRED', 'USER_DROPPED'].includes(localStatus)) {
-      paymentOrder.status = localStatus === 'USER_DROPPED' ? 'CANCELLED' : localStatus;
-      await paymentOrder.save();
+    const cfg = getZapUpiConfig();
+    if (!cfg.acceptTestWebhooks && zapupi.isTestEnvironment(environment, txnId)) {
+      await writeLog({
+        orderId,
+        event: 'WEBHOOK_TEST_IGNORED',
+        source: 'webhook',
+        success: false,
+        errorCode: 'TEST_IGNORED',
+      });
+      return ack();
     }
 
-    return res.status(200).json({ success: true, status: paymentOrder.status });
+    try {
+      await verifyAndSettle(paymentOrder, { source: 'webhook' });
+    } catch (verifyErr) {
+      console.error('[payments] webhook verify error:', verifyErr.message);
+    }
+
+    return ack();
   } catch (error) {
     console.error('[payments] webhook error:', error.message);
-    res.status(500).json({ success: false });
+    return ack();
   }
 });
+
+router.post('/zapupi/create-qr', authMiddleware, requirePaymentsEnabled, handleCreateWalletOrder);
+router.post('/zapupi/create-order', authMiddleware, requirePaymentsEnabled, handleCreateTournamentOrder);
+router.get('/zapupi/status/:orderId', authMiddleware, requirePaymentsEnabled, handleStatus);
+router.post('/zapupi/cancel/:orderId', authMiddleware, handleCancel);
 
 module.exports = router;

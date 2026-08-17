@@ -20,9 +20,10 @@ import ScreenHeader from '../components/navigation/ScreenHeader';
 import BrandCoin from '../components/ui/BrandCoin';
 import AddCoinsModal from '../components/AddCoinsModal';
 import CenterDialog from '../components/CenterDialog';
-import { walletService, userService, paymentService } from '../services/api';
-import { clearWalletReturnParams } from '../utils/walletFlow';
-import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE, TESTING_ADD_HINT } from '../utils/paymentConfig';
+import { walletService, userService } from '../services/api';
+import { clearWalletReturnParams, isWalletCredit } from '../utils/walletFlow';
+import { toPlayerMatchLabel } from '../utils/tournamentHelpers';
+import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE } from '../utils/paymentConfig';
 
 const formatAmount = (value) => {
   const n = Number(value) || 0;
@@ -120,9 +121,6 @@ const MyWalletScreen = ({ navigation, route }) => {
     loadWalletData(true);
   };
 
-  const isCreditTransaction = (type) =>
-    ['deposit', 'tournament_reward', 'refund', 'referral_bonus'].includes(type);
-
   const formatDateTime = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -153,40 +151,16 @@ const MyWalletScreen = ({ navigation, route }) => {
       paymentInFlight.current = true;
       setProcessing(true);
 
-      // Testing (PAYMENT_ENABLED=false): credit dummy coins immediately — no Cashfree / no block alert.
-      if (!isPaymentEnabled()) {
-        const res = await walletService.topup({
-          amount: amountNum,
-          paymentMethod: 'testing',
-        });
-        setShowAddMoneyModal(false);
-        setAddAmount('');
-        await loadWalletData(true);
-        Alert.alert('Success', res?.message || `₹${amountNum} added to your wallet`);
-        return;
-      }
-
-      const cfg = await paymentService.getConfig();
-      if (cfg?.enabled) {
-        setShowAddMoneyModal(false);
-        setAddAmount('');
-        navigation.navigate('CashfreeQrPayment', {
-          amount: amountNum,
-          walletBalance: walletData.balance + walletData.bonusBalance,
-          returnToTournamentId: returnTournamentRef.current,
-          returnScreen: returnScreenRef.current,
-        });
-        return;
-      }
-
-      const res = await walletService.topup({
-        amount: amountNum,
-        paymentMethod: 'testing',
-      });
+      // Always open ZapUPI payment page (QR). Never dummy-credit.
       setShowAddMoneyModal(false);
       setAddAmount('');
-      await loadWalletData(true);
-      Alert.alert('Success', res?.message || `₹${amountNum} added to your wallet`);
+      navigation.navigate('ZapUpiPayment', {
+        purpose: 'wallet_topup',
+        amount: amountNum,
+        walletBalance: walletData.balance + walletData.bonusBalance,
+        returnToTournamentId: returnTournamentRef.current,
+        returnScreen: returnScreenRef.current,
+      });
     } catch (err) {
       Alert.alert('Could not add coins', err.message || 'Check your connection and try again.');
     } finally {
@@ -338,13 +312,13 @@ const MyWalletScreen = ({ navigation, route }) => {
             </View>
           ) : (
             transactions.slice(0, 20).map((tx, index, arr) => {
-              const credit = isCreditTransaction(tx.type);
+              const credit = isWalletCredit(tx.type);
               const last = index === Math.min(arr.length, 20) - 1;
               return (
                 <View key={tx._id || index} style={[pageStyles.row, last && pageStyles.rowLast]}>
                   <View style={styles.txLeft}>
                     <Text style={styles.txDesc} numberOfLines={2}>
-                      {tx.description || tx.type}
+                      {toPlayerMatchLabel(tx.description || tx.type)}
                     </Text>
                     <Text style={pageStyles.caption}>{formatDateTime(tx.createdAt)}</Text>
                   </View>
@@ -370,8 +344,8 @@ const MyWalletScreen = ({ navigation, route }) => {
         onSubmit={handleAddMoney}
         processing={processing}
         title="Add Money"
-        hint={isPaymentEnabled() ? 'Enter amount to add (₹10 – ₹10,000)' : TESTING_ADD_HINT}
-        submitLabel={isPaymentEnabled() ? 'Pay & Add Money' : 'Add Money'}
+        hint="Pay with UPI QR (ZapUPI). Coins add after payment is confirmed."
+        submitLabel="Pay & Add Money"
       />
 
       <CenterDialog

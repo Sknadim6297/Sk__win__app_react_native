@@ -19,21 +19,14 @@ import AppHeader from '../components/navigation/AppHeader';
 import BrandCoin from '../components/ui/BrandCoin';
 import AddCoinsModal from '../components/AddCoinsModal';
 import CenterDialog from '../components/CenterDialog';
-import { walletService, configService, paymentService } from '../services/api';
-import { clearWalletReturnParams } from '../utils/walletFlow';
-import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE, TESTING_ADD_HINT } from '../utils/paymentConfig';
+import { walletService, configService } from '../services/api';
+import { clearWalletReturnParams, isWalletCredit } from '../utils/walletFlow';
+import { toPlayerMatchLabel } from '../utils/tournamentHelpers';
+import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE } from '../utils/paymentConfig';
 
-/** Testing: credit wallet directly. Live: Cashfree QR when gateway is on. */
+/** Always open ZapUPI for Add Coins — never silent dummy credit. */
 async function creditOrOpenGateway({ amount, balance, navigation, returnTournamentId, returnScreen }) {
-  if (!isPaymentEnabled()) {
-    return walletService.topup({ amount, paymentMethod: 'testing' });
-  }
-  const cfg = await paymentService.getConfig();
-  if (cfg?.enabled) {
-    return { openCashfree: true, amount, balance, returnTournamentId, returnScreen };
-  }
-  // Gateway flag on but Cashfree not ready — still allow test credit
-  return walletService.topup({ amount, paymentMethod: 'testing' });
+  return { openZapUpi: true, amount, balance, returnTournamentId, returnScreen };
 }
 
 const WalletScreen = ({ navigation, route }) => {
@@ -155,8 +148,9 @@ const WalletScreen = ({ navigation, route }) => {
       setShowAddCoins(false);
       setAddAmount('');
 
-      if (result?.openCashfree) {
-        navigation.navigate('CashfreeQrPayment', {
+      if (result?.openZapUpi) {
+        navigation.navigate('ZapUpiPayment', {
+          purpose: 'wallet_topup',
           amount: amountNum,
           walletBalance: balance.totalBalance ?? balance.balance,
           returnToTournamentId: returnTournamentRef.current,
@@ -369,7 +363,7 @@ const WalletScreen = ({ navigation, route }) => {
               <View key={tx._id || tx.id} style={styles.txRow}>
                 <View style={styles.txLeft}>
                   <Text style={styles.txDesc} numberOfLines={2}>
-                    {tx.description || tx.type}
+                    {toPlayerMatchLabel(tx.description || tx.type)}
                   </Text>
                   <Text style={styles.txDate}>
                     {tx.createdAt ? new Date(tx.createdAt).toLocaleString('en-IN') : ''}
@@ -378,13 +372,13 @@ const WalletScreen = ({ navigation, route }) => {
                 <Text
                   style={[
                     styles.txAmount,
-                    tx.type === 'withdraw' || tx.type === 'tournament_entry'
-                      ? styles.txNeg
-                      : styles.txPos,
+                    isWalletCredit(tx.type)
+                      ? styles.txPos
+                      : styles.txNeg,
                   ]}
                   numberOfLines={1}
                 >
-                  {tx.type === 'withdraw' || tx.type === 'tournament_entry' ? '-' : '+'}₹
+                  {isWalletCredit(tx.type) ? '+' : '-'}₹
                   {formatAmount(tx.amount)}
                 </Text>
               </View>
@@ -400,8 +394,8 @@ const WalletScreen = ({ navigation, route }) => {
         onChangeAmount={(v) => setAddAmount(sanitizeAmountInput(v))}
         onSubmit={handleAddCoins}
         processing={addingCoins}
-        hint={isPaymentEnabled() ? undefined : TESTING_ADD_HINT}
-        submitLabel={isPaymentEnabled() ? 'Pay & Add Coins' : 'Add Coins'}
+        hint="Pay with UPI QR (ZapUPI). Coins add after payment is confirmed."
+        submitLabel="Pay & Add Coins"
       />
 
       <CenterDialog

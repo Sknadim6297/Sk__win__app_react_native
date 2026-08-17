@@ -10,8 +10,8 @@ const lifecycle = require('./tournamentLifecycle');
 const { notifyTournamentJoined } = require('./tournamentPushEvents');
 
 /**
- * Idempotent tournament join after verified Cashfree SUCCESS/PAID.
- * Does NOT credit wallet — the Cashfree payment IS the entry fee.
+ * Idempotent tournament join after verified ZapUPI SUCCESS/PAID.
+ * Does NOT credit wallet — the ZapUPI payment IS the entry fee.
  */
 async function fulfillTournamentEntryPayment(paymentOrder, { source = 'api' } = {}) {
   if (!paymentOrder) {
@@ -101,7 +101,7 @@ async function fulfillTournamentEntryPayment(paymentOrder, { source = 'api' } = 
       return { joined: false, reason: result.reason || 'JOIN_FAILED', message: result.message };
     }
 
-    const txnId = `CF_ENTRY_${claim.orderId}`;
+    const txnId = `ZAP_ENTRY_${claim.orderId}`;
     let transaction = await WalletTransaction.findOne({ transactionId: txnId });
     if (!transaction) {
       transaction = await WalletTransaction.create({
@@ -109,12 +109,13 @@ async function fulfillTournamentEntryPayment(paymentOrder, { source = 'api' } = 
         type: 'tournament_entry',
         amount: claim.amount,
         tournamentId: claim.tournamentId,
-        description: `Cashfree entry for ${tournament.name} (order ${claim.orderId})`,
+        description: `ZapUPI entry for ${tournament.name} (order ${claim.orderId})`,
         status: 'completed',
-        paymentMethod: 'Cashfree QR',
+        paymentMethod: 'ZapUPI',
         transactionId: txnId,
         paymentOrderId: claim._id,
-        cashfreePaymentId: claim.cashfreePaymentId,
+        zapupiTxnId: claim.zapupiTxnId,
+        zapupiUtr: claim.zapupiUtr,
       });
     }
 

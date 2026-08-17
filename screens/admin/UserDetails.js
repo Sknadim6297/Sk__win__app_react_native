@@ -13,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../../styles/theme';
 import { adminService } from '../../services/api';
+import { isWalletCredit } from '../../utils/walletFlow';
+import { toPlayerMatchLabel } from '../../utils/tournamentHelpers';
 import Toast from '../../components/Toast';
 
 const UserDetails = ({ navigation, route }) => {
@@ -301,23 +303,23 @@ const UserDetails = ({ navigation, route }) => {
                   <View style={styles.transactionHeader}>
                     <View style={styles.transactionIcon}>
                       <MaterialCommunityIcons 
-                        name={txn.type === 'deposit' || txn.type === 'tournament_reward' ? 'arrow-down' : 'arrow-up'} 
+                        name={isWalletCredit(txn.type) ? 'arrow-down' : 'arrow-up'} 
                         size={20} 
-                        color={txn.type === 'deposit' || txn.type === 'tournament_reward' ? COLORS.success : COLORS.error} 
+                        color={isWalletCredit(txn.type) ? COLORS.success : COLORS.error} 
                       />
                     </View>
                     <View style={styles.transactionInfo}>
                       <Text style={styles.transactionType}>{txn.type?.replace('_', ' ').toUpperCase()}</Text>
-                      <Text style={styles.transactionDesc}>{txn.description}</Text>
+                      <Text style={styles.transactionDesc}>{toPlayerMatchLabel(txn.description)}</Text>
                       <Text style={styles.transactionDate}>
                         {new Date(txn.createdAt).toLocaleString()}
                       </Text>
                     </View>
                     <Text style={[
                       styles.transactionAmount,
-                      { color: txn.type === 'deposit' || txn.type === 'tournament_reward' ? COLORS.success : COLORS.error }
+                      { color: isWalletCredit(txn.type) ? COLORS.success : COLORS.error }
                     ]}>
-                      {txn.type === 'deposit' || txn.type === 'tournament_reward' ? '+' : '-'}₹{txn.amount}
+                      {isWalletCredit(txn.type) ? '+' : '-'}₹{txn.amount}
                     </Text>
                   </View>
                 </View>

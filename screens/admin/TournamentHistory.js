@@ -206,7 +206,7 @@ export default function TournamentHistory({ navigation }) {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.name}>{t.name}</Text>
                     <Text style={styles.sub}>
-                      {t.matchType || (isCustom ? 'Custom Match' : 'Battle Royale')} · {t.formatLabel || t.modeLabel || t.mode}
+                      {(t.matchType || '').replace(/Custom Match/gi, 'Clash Squad') || (isCustom ? 'Clash Squad' : 'Battle Royale')} · {t.formatLabel || t.modeLabel || t.mode}
                       {t.matchKind === 'battle_royale' ? ` · ${t.modeLabel || ''}` : ''}
                     </Text>
                   </View>
@@ -257,7 +257,7 @@ export default function TournamentHistory({ navigation }) {
               <View style={{ flex: 1 }}>
                 <Text style={styles.modalTitle}>{selected?.name || 'Slots'}</Text>
                 <Text style={styles.modalSub}>
-                  {selected?.matchType} · {selected?.formatLabel}
+                  {(selected?.matchType || '').replace(/Custom Match/gi, 'Clash Squad')} · {selected?.formatLabel}
                   {selected?.hasKillRewards ? ` · per kill ${rupee(selected?.perKill)}` : ''}
                 </Text>
               </View>

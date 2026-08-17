@@ -32,6 +32,14 @@ export function formatModeLabel(mode) {
   return m.charAt(0).toUpperCase() + m.slice(1);
 }
 
+export const CLASH_SQUAD_LABEL = 'Clash Squad';
+
+/** Show Clash Squad instead of the old "Custom Match" wording. */
+export function toPlayerMatchLabel(text) {
+  if (text == null || text === '') return text;
+  return String(text).replace(/Custom Match/gi, CLASH_SQUAD_LABEL);
+}
+
 export function isCustomMatch(tournament) {
   const c = tournament?.category || tournament?.tournamentType;
   return c === 'custom' || c === 'custom_match' || !!tournament?.isCustomMatch;
@@ -66,7 +74,7 @@ export function getMatchStructure(tournament) {
   if (custom) {
     return {
       kind: 'team_vs_team',
-      matchType: 'Custom Match',
+      matchType: 'Clash Squad',
       formatLabel: playersPerTeam === 4 ? '4v4' : playersPerTeam === 2 ? '2v2' : '1v1',
       mode,
       modeLabel: formatModeLabel(mode),

@@ -1,6 +1,6 @@
 /**
  * Canonical split between the two live match products:
- *   team_vs_team  — Custom Match 1v1 / 2v2 / 4v4 (Team A vs Team B)
+ *   team_vs_team  — Clash Squad 1v1 / 2v2 / 4v4 (Team A vs Team B)
  *   battle_royale — Full-map Solo / Duo / Squad (slot grid, optional kill rewards)
  */
 
@@ -45,7 +45,7 @@ function getMatchStructure(tournament) {
   if (custom) {
     return {
       kind: 'team_vs_team',
-      matchType: 'Custom Match',
+      matchType: 'Clash Squad',
       formatLabel: customFormatLabel(playersPerTeam),
       mode,
       modeLabel: formatModeLabel(mode),

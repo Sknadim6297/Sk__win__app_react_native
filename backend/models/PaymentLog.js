@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 /**
- * Append-only audit log for Cashfree payment lifecycle events.
+ * Append-only audit log for ZapUPI payment lifecycle events.
  */
 const paymentLogSchema = new mongoose.Schema(
   {

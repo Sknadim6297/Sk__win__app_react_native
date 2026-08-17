@@ -6,10 +6,10 @@ const { notifyWalletCredited } = require('./tournamentPushEvents');
 const { buildEventKey } = require('./notificationService');
 
 /**
- * Idempotent wallet credit after verified Cashfree SUCCESS.
+ * Idempotent wallet credit after verified ZapUPI SUCCESS.
  * Uses atomic findOneAndUpdate (no replica-set transactions required).
  */
-async function creditWalletForPaymentOrder(paymentOrder, { source = 'api', cfPaymentId } = {}) {
+async function creditWalletForPaymentOrder(paymentOrder, { source = 'api', txnId, utr } = {}) {
   if (!paymentOrder) {
     return { credited: false, reason: 'ORDER_NOT_FOUND' };
   }
@@ -35,7 +35,8 @@ async function creditWalletForPaymentOrder(paymentOrder, { source = 'api', cfPay
     {
       $set: {
         walletCredited: true,
-        ...(cfPaymentId ? { cashfreePaymentId: String(cfPaymentId) } : {}),
+        ...(txnId ? { zapupiTxnId: String(txnId) } : {}),
+        ...(utr ? { zapupiUtr: String(utr) } : {}),
         lastVerifiedAt: new Date(),
         status: 'SUCCESS',
       },
@@ -53,10 +54,10 @@ async function creditWalletForPaymentOrder(paymentOrder, { source = 'api', cfPay
   }
 
   const amount = Number(claim.amount);
-  const txnId = `CF_${claim.orderId}`;
+  const txnKey = `ZAP_${claim.orderId}`;
 
   try {
-    const existingTxn = await WalletTransaction.findOne({ transactionId: txnId });
+    const existingTxn = await WalletTransaction.findOne({ transactionId: txnKey });
     if (existingTxn) {
       claim.walletTransactionId = existingTxn._id;
       await claim.save();
@@ -76,12 +77,13 @@ async function creditWalletForPaymentOrder(paymentOrder, { source = 'api', cfPay
       userId: claim.userId,
       type: 'deposit',
       amount,
-      paymentMethod: 'Cashfree QR',
-      transactionId: txnId,
-      description: `₹${amount} Added via Cashfree QR`,
+      paymentMethod: 'ZapUPI',
+      transactionId: txnKey,
+      description: `₹${amount} Added via ZapUPI`,
       status: 'completed',
       paymentOrderId: claim._id,
-      cashfreePaymentId: claim.cashfreePaymentId || (cfPaymentId ? String(cfPaymentId) : undefined),
+      zapupiTxnId: claim.zapupiTxnId || (txnId ? String(txnId) : undefined),
+      zapupiUtr: claim.zapupiUtr || (utr ? String(utr) : undefined),
     });
 
     user.wallet.balance = (user.wallet.balance || 0) + amount;
@@ -107,7 +109,7 @@ async function creditWalletForPaymentOrder(paymentOrder, { source = 'api', cfPay
 
     try {
       await notifyWalletCredited(claim.userId, amount, {
-        eventKey: buildEventKey(['wallet_cashfree', transaction._id]),
+        eventKey: buildEventKey(['wallet_zapupi', transaction._id]),
         description: `₹${amount} has been credited to your wallet.`,
       });
     } catch (_) {
@@ -130,7 +132,6 @@ async function creditWalletForPaymentOrder(paymentOrder, { source = 'api', cfPay
       };
     }
 
-    // Roll back claim so a later poll/webhook can retry
     await PaymentOrder.findByIdAndUpdate(paymentOrder._id, {
       walletCredited: false,
       failureReason: error.message,

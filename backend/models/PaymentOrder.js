@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 
 /**
- * Tracks Cashfree orders (wallet top-up OR tournament entry Pay & Join).
- * Wallet top-up: credit after SUCCESS via walletCredited flag.
- * Tournament entry: join after SUCCESS/PAID via tournamentJoined flag (no wallet credit).
+ * Tracks ZapUPI orders (wallet top-up OR tournament entry Pay & Join).
+ * Wallet top-up: credit after verified SUCCESS via walletCredited flag.
+ * Tournament entry: join after verified SUCCESS/PAID via tournamentJoined flag (no wallet credit).
  */
 const paymentOrderSchema = new mongoose.Schema(
   {
@@ -58,16 +58,13 @@ const paymentOrderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      default: 'cashfree_qr',
+      default: 'zapupi',
     },
-    cashfreeOrderId: String,
-    cashfreePaymentId: { type: String, index: true, sparse: true },
-    paymentSessionId: String,
-    qrPayload: String,
-    qrImageUrl: String,
+    paymentUrl: String,
+    zapupiTxnId: { type: String, index: true, sparse: true },
+    zapupiUtr: String,
+    zapupiEnvironment: String,
     qrExpiresAt: Date,
-    cfOrderStatus: String,
-    cfPaymentStatus: String,
     walletCredited: {
       type: Boolean,
       default: false,
@@ -78,21 +75,34 @@ const paymentOrderSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    webhookProcessed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     walletTransactionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'WalletTransaction',
     },
     failureReason: String,
     rawCreateResponse: mongoose.Schema.Types.Mixed,
-    rawPayResponse: mongoose.Schema.Types.Mixed,
+    lastStatusPayload: mongoose.Schema.Types.Mixed,
     lastVerifiedAt: Date,
     metadata: mongoose.Schema.Types.Mixed,
+    /** Legacy Cashfree fields kept so old rows still load. */
+    cashfreeOrderId: String,
+    cashfreePaymentId: { type: String, index: true, sparse: true },
+    paymentSessionId: String,
+    qrPayload: String,
+    qrImageUrl: String,
+    cfOrderStatus: String,
+    cfPaymentStatus: String,
   },
   { timestamps: true }
 );
 
 paymentOrderSchema.index({ userId: 1, createdAt: -1 });
 paymentOrderSchema.index({ userId: 1, tournamentId: 1, purpose: 1, status: 1 });
-paymentOrderSchema.index({ cashfreePaymentId: 1 }, { unique: true, sparse: true });
+paymentOrderSchema.index({ zapupiTxnId: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('PaymentOrder', paymentOrderSchema);

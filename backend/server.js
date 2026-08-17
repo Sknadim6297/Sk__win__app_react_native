@@ -68,16 +68,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Capture raw body for Cashfree webhook signature verification
-app.use(
-  express.json({
-    verify: (req, res, buf) => {
-      if (req.originalUrl && req.originalUrl.includes('/api/payments/cashfree/webhook')) {
-        req.rawBody = buf.toString('utf8');
-      }
-    },
-  })
-);
+app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/download', express.static(path.join(PUBLIC_ROOT, 'download')));
 

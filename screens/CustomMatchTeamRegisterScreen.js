@@ -22,7 +22,8 @@ import { tournamentService, tournamentManagementService } from '../services/api'
 import { AuthContext } from '../context/AuthContext';
 import Toast from '../components/Toast';
 import { getTeamSize, isCustomMatch, getMatchStructure } from '../utils/tournamentHelpers';
-import { fetchWalletForEntry } from '../utils/walletFlow';
+import { fetchWalletForEntry, startTournamentZapUpiPayment } from '../utils/walletFlow';
+import { isPaymentEnabled } from '../utils/paymentConfig';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
 
 const emptyPlayer = () => ({ name: '', gamingUID: '' });
@@ -114,6 +115,20 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
     const join = payload || buildPendingJoin();
     if (!join.teamName) {
       showToast('Enter team name');
+      return;
+    }
+
+    if (Number(tournament.entryFee) > 0) {
+      startTournamentZapUpiPayment(navigation, {
+        tournamentId,
+        tournamentName: tournament?.name,
+        amount: tournament.entryFee,
+        joinKind: 'team',
+        teamName: join.teamName,
+        teamSide: join.teamSide,
+        slotNumber: join.slotNumber,
+        players: join.players,
+      });
       return;
     }
 

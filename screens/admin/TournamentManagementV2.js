@@ -28,8 +28,8 @@ const STATUS_LABELS = {
 
 const TYPE_LABELS = {
   battle_royale: 'Battle Royale',
-  custom_match: 'Custom Match',
-  custom: 'Custom Match',
+  custom_match: 'Clash Squad',
+  custom: 'Clash Squad',
 };
 
 const SECTION_ORDER = [
@@ -279,7 +279,7 @@ export default function TournamentManagementV2({ navigation }) {
             {[
               { key: 'all', label: 'All' },
               { key: 'battle_royale', label: 'Battle Royale' },
-              { key: 'custom_match', label: 'Custom Match' },
+              { key: 'custom_match', label: 'Clash Squad' },
             ].map((f) => (
               <TouchableOpacity
                 key={f.key}

@@ -437,7 +437,7 @@ router.post('/admin/:id/publish-results', authMiddleware, async (req, res) => {
     } else {
       const custom = await CustomMatchResult.findOne({ tournamentId: tournament._id });
       if (!custom) {
-        return res.status(400).json({ error: 'Save custom match results first' });
+        return res.status(400).json({ error: 'Save Clash Squad results first' });
       }
     }
 
@@ -474,7 +474,7 @@ router.post('/admin/:id/publish-results', authMiddleware, async (req, res) => {
                 resultModel: 'CustomMatchResult',
                 amount: Number(custom.winnerPrize) || 0,
                 usernameSnapshot: '',
-                description: `Custom Match winner prize — ${tournament.name}`,
+                description: `Clash Squad winner prize — ${tournament.name}`,
               },
             ]);
           }
@@ -793,7 +793,7 @@ router.get('/admin/:id/results/custom-match', authMiddleware, async (req, res) =
       status: lifecycle.getEffectiveStatus(tournament),
     });
   } catch (e) {
-    res.status(500).json({ error: 'Failed to load custom match data' });
+    res.status(500).json({ error: 'Failed to load Clash Squad data' });
   }
 });
 
@@ -892,7 +892,7 @@ router.post('/admin/:id/results/custom-match', authMiddleware, async (req, res) 
       if (!marked.ok) return res.status(400).json({ error: marked.error });
       await tournament.save();
 
-      // Winner payout via controlled lifecycle (TEST wallet; no Cashfree)
+      // Winner payout via controlled lifecycle (wallet credit; gateway is ZapUPI for deposits/join)
       let winnerPrizeCredited = 0;
       if (resolvedWinnerPrize > 0) {
         const winnerTeam = teams.find((t) => String(t._id) === String(winnerTeamId));
@@ -907,7 +907,7 @@ router.post('/admin/:id/results/custom-match', authMiddleware, async (req, res) 
               resultModel: 'CustomMatchResult',
               amount: resolvedWinnerPrize,
               usernameSnapshot: captain?.username || '',
-              description: `Custom Match winner prize — ${tournament.name}`,
+              description: `Clash Squad winner prize — ${tournament.name}`,
             },
           ]);
           const credit = await winnerPayoutService.autoCreditPendingForTournament(tournament._id, {
@@ -946,10 +946,10 @@ router.post('/admin/:id/results/custom-match', authMiddleware, async (req, res) 
       });
     }
 
-    res.json({ message: 'Custom match results saved', result: doc, status, resultsPublished: false });
+    res.json({ message: 'Clash Squad results saved', result: doc, status, resultsPublished: false });
   } catch (e) {
     console.error('save custom:', e);
-    res.status(500).json({ error: e.message || 'Failed to save custom match results' });
+    res.status(500).json({ error: e.message || 'Failed to save Clash Squad results' });
   }
 });
 
@@ -1170,7 +1170,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
 
     if (!lifecycle.isCustomMatch(tournament) && !lifecycle.usesTeamRegistration(tournament)) {
       return res.status(400).json({
-        error: 'Team registration is for Custom Match or Duo/Squad Battle Royale only. Solo uses slot booking.',
+        error: 'Team registration is for Clash Squad or Duo/Squad Battle Royale only. Solo uses slot booking.',
       });
     }
 
@@ -1334,7 +1334,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
     user.tournament.participatedCount = (user.tournament.participatedCount || 0) + 1;
     await user.save();
 
-    const entryLabel = isCustom ? 'Custom Match' : 'Battle Royale';
+    const entryLabel = isCustom ? 'Clash Squad' : 'Battle Royale';
     const sideLabel = side ? ` / Team ${side}` : '';
 
     await WalletTransaction.create({

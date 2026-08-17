@@ -222,7 +222,7 @@ function resolveTournamentCapacity({ category, mode, maxParticipants, maxTeams }
 
   if (isCustom) {
     if (!['solo', 'duo', 'squad'].includes(modeNorm)) {
-      return { ok: false, error: 'Custom Match supports Solo, Duo, or Squad only' };
+      return { ok: false, error: 'Clash Squad supports Solo, Duo, or Squad only' };
     }
     return {
       ok: true,

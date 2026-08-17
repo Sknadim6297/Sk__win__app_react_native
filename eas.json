@@ -9,7 +9,7 @@
         "NODE_ENV": "production",
         "EXPO_PUBLIC_API_URL": "https://sk-win-api.onrender.com/api",
         "EXPO_PUBLIC_APP_NAME": "WAREZONE Tournament",
-        "EXPO_PUBLIC_PAYMENT_ENABLED": "false",
+        "EXPO_PUBLIC_PAYMENT_ENABLED": "true",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "188535028372-q5ure3if58qkkrhgeimgrhoo5td7e9gs.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "188535028372-vgg0o270r97e3qtg21ilpt0m6dj1t37j.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "188535028372-c7lhtl9ku9qufa0v4b163icqepmrrl8a.apps.googleusercontent.com"
@@ -24,7 +24,7 @@
         "NODE_ENV": "production",
         "EXPO_PUBLIC_API_URL": "https://sk-win-api.onrender.com/api",
         "EXPO_PUBLIC_APP_NAME": "WAREZONE Tournament",
-        "EXPO_PUBLIC_PAYMENT_ENABLED": "false",
+        "EXPO_PUBLIC_PAYMENT_ENABLED": "true",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "188535028372-q5ure3if58qkkrhgeimgrhoo5td7e9gs.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "188535028372-vgg0o270r97e3qtg21ilpt0m6dj1t37j.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "188535028372-c7lhtl9ku9qufa0v4b163icqepmrrl8a.apps.googleusercontent.com"

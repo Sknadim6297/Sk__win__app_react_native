@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import RNPickerSelect from 'react-native-picker-select';
 import { COLORS } from '../../styles/theme';
 import { dailyAutoMatchService, gameService, mapService } from '../../services/api';
+import { toPlayerMatchLabel } from '../../utils/tournamentHelpers';
 import Toast from '../../components/Toast';
 
 const ORANGE = COLORS.primary;
@@ -229,7 +230,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
                   <Text style={styles.id}>{item.displayId}</Text>
                   <Text style={styles.name}>{item.name}</Text>
                   <Text style={styles.meta}>
-                    {item.game?.name || 'Game'} · {(item.mode || 'solo').toUpperCase()} · {item.startTimeLabel || item.startTime}
+                    {item.game?.name || 'Game'} · {(item.category === 'custom' || item.category === 'custom_match') ? 'Clash Squad' : 'Battle Royale'} · {(item.mode || 'solo').toUpperCase()} · {item.startTimeLabel || item.startTime}
                   </Text>
                 </View>
                 <View style={[styles.statusPill, item.isActive ? styles.activePill : styles.inactivePill]}>
@@ -317,7 +318,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
             <RNPickerSelect
               value={form.gameMode}
               onValueChange={(gameMode) => setForm((p) => ({ ...p, gameMode }))}
-              items={gameModes.map((m) => ({ label: m.name, value: m._id }))}
+              items={gameModes.map((m) => ({ label: toPlayerMatchLabel(m.name), value: m._id }))}
               style={pickerStyle}
               placeholder={{ label: 'Select mode', value: '' }}
             />
@@ -327,7 +328,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
               onValueChange={(category) => setForm((p) => ({ ...p, category }))}
               items={[
                 { label: 'Battle Royale', value: 'battle_royale' },
-                { label: 'Custom Match', value: 'custom' },
+                { label: 'Clash Squad', value: 'custom' },
               ]}
               style={pickerStyle}
             />

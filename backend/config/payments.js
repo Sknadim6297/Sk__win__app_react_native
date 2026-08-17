@@ -1,7 +1,7 @@
 /**
  * Master payment switch for testing phase.
  * When PAYMENT_ENABLED=false, no real-money payment / top-up / gateway calls run.
- * Set PAYMENT_ENABLED=true in backend/.env to re-enable Cashfree (still requires credentials).
+ * Set PAYMENT_ENABLED=true in backend/.env to enable ZapUPI (still requires ZAPUPI_KEY).
  * Currently off so Add Coins credits the wallet directly for testing.
  */
 

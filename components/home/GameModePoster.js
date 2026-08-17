@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ImageBackground, StyleSheet } from 'react-native';
 import { COLORS, FONTS } from '../../styles/theme';
+import { toPlayerMatchLabel } from '../../utils/tournamentHelpers';
 
 /**
  * Free Fire mode poster card (2-col grid) — artwork + live count + mode name.
@@ -25,7 +26,7 @@ export default function GameModePoster({ item, width, height, onPress }) {
         ) : null}
         <View style={styles.titleBar}>
           <Text style={styles.title} numberOfLines={2}>
-            {item.name}
+            {toPlayerMatchLabel(item.name)}
           </Text>
         </View>
       </ImageBackground>

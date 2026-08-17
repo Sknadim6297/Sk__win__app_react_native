@@ -68,7 +68,7 @@ function paymentForUser(ordersByUser, userId, txnsByUser) {
     return {
       paymentStatus: paidStatus(chosen.status),
       orderId: chosen.orderId || null,
-      transactionId: chosen.cashfreePaymentId || chosen.orderId || null,
+      transactionId: chosen.zapupiTxnId || chosen.zapupiUtr || chosen.cashfreePaymentId || chosen.orderId || null,
       paidAmount: Number(chosen.amount) || 0,
       joinedAfterPayment: Boolean(chosen.tournamentJoined),
     };
@@ -125,7 +125,7 @@ async function loadLedger(tournamentIds) {
       .populate('userId', 'username email')
       .lean(),
     PaymentOrder.find({ tournamentId: { $in: ids }, purpose: 'tournament_entry' })
-      .select('tournamentId userId orderId status amount tournamentJoined cashfreePaymentId createdAt')
+      .select('tournamentId userId orderId status amount tournamentJoined cashfreePaymentId zapupiTxnId zapupiUtr createdAt')
       .lean(),
     WalletTransaction.find({
       tournamentId: { $in: ids },

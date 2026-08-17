@@ -2,7 +2,29 @@ import { walletService } from '../services/api';
 import { getPaymentSplit } from './tournamentHelpers';
 import { isPaymentEnabled } from './paymentConfig';
 
-export const CASHFREE_MIN_TOPUP = 10;
+export const ZAPUPI_MIN_TOPUP = 10;
+
+const WALLET_CREDIT_TYPES = new Set([
+  'deposit',
+  'tournament_reward',
+  'winning',
+  'refund',
+  'referral_bonus',
+]);
+
+const WALLET_DEBIT_TYPES = new Set([
+  'withdraw',
+  'tournament_entry',
+  'winning_reversal',
+]);
+
+/** Winner prizes use type `winning` — treat them as credits, not deductions. */
+export function isWalletCredit(type) {
+  const t = String(type || '').toLowerCase();
+  if (WALLET_CREDIT_TYPES.has(t)) return true;
+  if (WALLET_DEBIT_TYPES.has(t)) return false;
+  return false;
+}
 
 /** Walk up to the root stack navigator. */
 export function getRootNavigation(navigation) {
@@ -27,7 +49,7 @@ export async function fetchWalletForEntry(entryFee) {
     realRequired: split.realRequired,
     totalPayable: split.totalPayable,
     remaining,
-    qrAmount: remaining > 0 ? Math.max(CASHFREE_MIN_TOPUP, remaining) : 0,
+    qrAmount: remaining > 0 ? Math.max(ZAPUPI_MIN_TOPUP, remaining) : 0,
     sufficient: balance >= split.realRequired,
     totalBalance: w?.totalBalance ?? balance + bonusBalance,
   };
@@ -42,26 +64,16 @@ export function openRemainingJoinPayment(navigation, opts = {}) {
   if (!root) return;
 
   const remaining = Math.max(0, Number(opts.remainingAmount ?? opts.qrAmount) || 0);
-  const amount = Math.max(CASHFREE_MIN_TOPUP, remaining);
+  const amount = Math.max(ZAPUPI_MIN_TOPUP, remaining);
   const tournamentId = opts.tournamentId || null;
   const returnScreen = opts.returnScreen || 'TournamentDetails';
   const pendingJoin = opts.pendingJoin || null;
 
-  if (isPaymentEnabled()) {
-    root.navigate('CashfreeQrPayment', {
-      amount,
-      returnToTournamentId: tournamentId,
-      returnScreen,
-      pendingJoin,
-    });
-    return;
-  }
-
-  navigateToAddCoins(navigation, {
-    tournamentId,
+  root.navigate('ZapUpiPayment', {
+    purpose: 'wallet_topup',
+    amount,
+    returnToTournamentId: tournamentId,
     returnScreen,
-    openAddCoins: true,
-    suggestedAmount: amount,
     pendingJoin,
   });
 }
@@ -95,6 +107,16 @@ export function navigateToAddCoins(navigation, tournamentIdOrOpts) {
  */
 export function promptInsufficientBalance(navigation, tournamentId, returnScreen = 'TournamentDetails') {
   navigateToAddCoins(navigation, { tournamentId, returnScreen, openAddCoins: true });
+}
+
+/** Open ZapUPI in-app WebView to pay tournament entry (after slot / team details). */
+export function startTournamentZapUpiPayment(navigation, params = {}) {
+  const root = getRootNavigation(navigation);
+  if (!root) return;
+  root.navigate('ZapUpiPayment', {
+    purpose: 'tournament_entry',
+    ...params,
+  });
 }
 
 /** After successful top-up, return user to the originating tournament screen. */

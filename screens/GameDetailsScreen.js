@@ -17,6 +17,7 @@ import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import { LIST_PERF } from '../utils/listPerf';
 import ScreenHeader from '../components/navigation/ScreenHeader';
 import MatchListCard from '../components/contest/MatchListCard';
+import { toPlayerMatchLabel } from '../utils/tournamentHelpers';
 
 const STATUS_TABS = [
   { id: 'ongoing', label: 'LIVE' },
@@ -27,7 +28,7 @@ const STATUS_TABS = [
 export default function GameDetailsScreen({ navigation, route }) {
   const gameMode = route?.params?.gameMode;
   const modeId = gameMode?.id || gameMode?._id;
-  const headerTitle = (gameMode?.name || 'FULL MAP').toUpperCase();
+  const headerTitle = toPlayerMatchLabel((gameMode?.name || 'FULL MAP').toUpperCase());
   const gameModeImage =
     gameMode?.image?.uri ||
     (typeof gameMode?.image === 'string' ? resolveMediaUrl(gameMode.image) : null);

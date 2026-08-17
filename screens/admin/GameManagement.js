@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { gameService, uploadImageFile } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import { toPlayerMatchLabel } from '../../utils/tournamentHelpers';
 import { ensureMediaLibraryPermission, launchImageLibrary } from '../../utils/imagePicker';
 import { COLORS } from '../../styles/theme';
 
@@ -622,7 +623,7 @@ const GameManagement = ({ navigation }) => {
                       <Image source={{ uri: resolveMediaUrl(mode.image) }} style={styles.modeImage} />
                     )}
                     <View style={styles.modeInfo}>
-                      <Text style={styles.modeName}>{mode.name}</Text>
+                      <Text style={styles.modeName}>{toPlayerMatchLabel(mode.name)}</Text>
                       {mode.description ? (
                         <Text style={styles.modeDescription}>{mode.description}</Text>
                       ) : null}

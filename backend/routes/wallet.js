@@ -45,16 +45,15 @@ router.get('/balance', authMiddleware, async (req, res) => {
   }
 });
 
-// Top up wallet (testing / demo path — used when Cashfree QR gateway is not live)
+// Top up wallet (testing / demo path — used when ZapUPI gateway is not live)
 router.post('/topup', authMiddleware, async (req, res) => {
   try {
-    const { getCashfreeConfig } = require('../config/cashfree');
-    // When real gateway is live, force Cashfree QR — no direct credit shortcut
-    if (isPaymentEnabled() && getCashfreeConfig().ready) {
+    const { getZapUpiConfig } = require('../config/zapupi');
+    if (isPaymentEnabled() && getZapUpiConfig().ready) {
       return res.status(403).json({
         success: false,
-        code: 'USE_CASHFREE_QR',
-        message: 'Please complete payment via Cashfree QR. Direct top-up is disabled.',
+        code: 'USE_ZAPUPI',
+        message: 'Please complete payment via ZapUPI. Direct top-up is disabled.',
       });
     }
 

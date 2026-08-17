@@ -14,6 +14,7 @@ import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
 import ScreenHeader from '../components/navigation/ScreenHeader';
 import { tournamentService } from '../services/api';
+import { toPlayerMatchLabel } from '../utils/tournamentHelpers';
 
 const formatAmount = (v) => Math.round(Number(v) || 0).toLocaleString('en-IN');
 
@@ -34,7 +35,7 @@ const HistoryScreen = ({ navigation }) => {
               id: item._id,
               tournamentId: tournament._id,
               tournamentName: tournament.name || 'Tournament',
-              gameMode: tournament.gameMode?.name || tournament.game?.name || 'Tournament',
+              gameMode: toPlayerMatchLabel(tournament.gameMode?.name || tournament.game?.name || 'Tournament'),
               joinedAt: item.joinedAt || item.createdAt,
               status,
               tournamentStatus: tournament.status,

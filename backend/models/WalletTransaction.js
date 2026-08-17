@@ -72,6 +72,12 @@ const walletTransactionSchema = new mongoose.Schema({
     index: true,
     sparse: true,
   },
+  zapupiTxnId: {
+    type: String,
+    index: true,
+    sparse: true,
+  },
+  zapupiUtr: String,
   createdAt: {
     type: Date,
     default: Date.now,

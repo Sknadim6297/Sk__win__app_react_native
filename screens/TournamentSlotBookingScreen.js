@@ -19,7 +19,8 @@ import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
 import { tournamentService, walletService } from '../services/api';
 import { getPaymentSplit, getMatchStructure } from '../utils/tournamentHelpers';
-import { fetchWalletForEntry } from '../utils/walletFlow';
+import { fetchWalletForEntry, startTournamentZapUpiPayment } from '../utils/walletFlow';
+import { isPaymentEnabled } from '../utils/paymentConfig';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
 import Toast from '../components/Toast';
 import ScreenHeader from '../components/navigation/ScreenHeader';
@@ -132,6 +133,18 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     }
     try {
       setBooking(true);
+      if (Number(entryFee) > 0) {
+        startTournamentZapUpiPayment(navigation, {
+          tournamentId,
+          tournamentName: tournament?.name,
+          amount: entryFee,
+          joinKind: 'solo',
+          gamingUsername: gamingUsername.trim(),
+          gamingUID: gamingUID.trim(),
+          slotNumber: selected[0],
+        });
+        return;
+      }
       const walletCheck = await fetchWalletForEntry(entryFee);
       if (!walletCheck.sufficient) {
         showInsufficientBalance({

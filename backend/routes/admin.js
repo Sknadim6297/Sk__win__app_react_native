@@ -153,6 +153,8 @@ router.get('/transactions', authMiddleware, async (req, res) => {
       query.$or = [
         { transactionId: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
         { cashfreePaymentId: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+        { zapupiTxnId: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+        { zapupiUtr: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
         { userId: { $in: users.map((u) => u._id) } },
       ];
     }
