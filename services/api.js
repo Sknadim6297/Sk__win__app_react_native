@@ -646,3 +646,19 @@ export const gameService = {
   /** Alias used by Game Management image pickers */
   uploadImage: uploadImageFile,
 };
+
+export const dailyAutoMatchService = {
+  list: () => apiCall('/daily-auto-matches/admin/list'),
+  get: (id) => apiCall(`/daily-auto-matches/admin/${id}`),
+  create: (data) => apiCall('/daily-auto-matches/admin', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) =>
+    apiCall(`/daily-auto-matches/admin/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  activate: (id) => apiCall(`/daily-auto-matches/admin/${id}/activate`, { method: 'POST' }),
+  deactivate: (id) => apiCall(`/daily-auto-matches/admin/${id}/deactivate`, { method: 'POST' }),
+  duplicate: (id) => apiCall(`/daily-auto-matches/admin/${id}/duplicate`, { method: 'POST' }),
+  remove: (id) => apiCall(`/daily-auto-matches/admin/${id}`, { method: 'DELETE' }),
+  generateToday: (id) =>
+    apiCall(`/daily-auto-matches/admin/${id}/generate-today`, { method: 'POST' }),
+  getGenerated: (id) => apiCall(`/daily-auto-matches/admin/${id}/tournaments`),
+};
+

@@ -157,5 +157,22 @@ const AdminAPI = (() => {
     createSlider: (body) => request('/sliders/admin', { method: 'POST', body: JSON.stringify(body) }),
     updateSlider: (id, body) => request(`/sliders/admin/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     deleteSlider: (id) => request(`/sliders/admin/${id}`, { method: 'DELETE' }),
+    dailyAutoMatches: () => request('/daily-auto-matches/admin/list'),
+    dailyAutoMatch: (id) => request(`/daily-auto-matches/admin/${id}`),
+    createDailyAutoMatch: (body) =>
+      request('/daily-auto-matches/admin', { method: 'POST', body: JSON.stringify(body) }),
+    updateDailyAutoMatch: (id, body) =>
+      request(`/daily-auto-matches/admin/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    activateDailyAutoMatch: (id) =>
+      request(`/daily-auto-matches/admin/${id}/activate`, { method: 'POST' }),
+    deactivateDailyAutoMatch: (id) =>
+      request(`/daily-auto-matches/admin/${id}/deactivate`, { method: 'POST' }),
+    duplicateDailyAutoMatch: (id) =>
+      request(`/daily-auto-matches/admin/${id}/duplicate`, { method: 'POST' }),
+    deleteDailyAutoMatch: (id) => request(`/daily-auto-matches/admin/${id}`, { method: 'DELETE' }),
+    generateDailyAutoMatchToday: (id) =>
+      request(`/daily-auto-matches/admin/${id}/generate-today`, { method: 'POST' }),
+    dailyAutoMatchTournaments: (id) =>
+      request(`/daily-auto-matches/admin/${id}/tournaments`),
   };
 })();

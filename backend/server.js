@@ -29,6 +29,7 @@ const AppRelease = require('./models/AppRelease');
 const { initFcm } = require('./services/fcm');
 const { runTournamentNotifier } = require('./services/tournamentNotifier');
 const { processDuePayouts } = require('./services/winnerPayoutService');
+const { startDailyAutoMatchJob } = require('./jobs/dailyAutoMatchJob');
 
 const app = express();
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/sk-win';
@@ -202,6 +203,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/sliders', sliderRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/daily-auto-matches', require('./routes/dailyAutoMatches'));
 app.use('/api/download', downloadApiRouter);
 
 const ADMIN_WEB_ROOT = path.join(__dirname, 'admin-web');
@@ -295,6 +297,15 @@ async function connectDatabase() {
   } catch (idxErr) {
     console.warn('Team.syncIndexes warning:', idxErr.message);
   }
+
+  try {
+    const Tournament = require('./models/Tournament');
+    const DailyAutoMatch = require('./models/DailyAutoMatch');
+    await Tournament.syncIndexes();
+    await DailyAutoMatch.syncIndexes();
+  } catch (idxErr) {
+    console.warn('DailyAutoMatch/Tournament.syncIndexes warning:', idxErr.message);
+  }
 }
 
 async function startServer() {
@@ -316,6 +327,7 @@ async function startServer() {
         );
       }
       initFcm();
+      startDailyAutoMatchJob();
 
       cron.schedule('* * * * *', async () => {
         if (!isDbReady()) return;

@@ -174,6 +174,7 @@ function AppNavigator() {
                 <Stack.Screen name="UserDetails" {...screen(() => require('./screens/admin/UserDetails').default)} />
                 <Stack.Screen name="TournamentHistory" {...screen(() => require('./screens/admin/TournamentHistory').default)} />
                 <Stack.Screen name="TournamentManagement" {...screen(() => require('./screens/admin/TournamentManagement').default)} />
+                <Stack.Screen name="DailyAutoMatchManagement" {...screen(() => require('./screens/admin/DailyAutoMatchManagement').default)} />
                 <Stack.Screen name="TournamentManagementV2" {...screen(() => require('./screens/admin/TournamentManagementV2').default)} />
                 <Stack.Screen name="TournamentResultEntry" {...screen(() => require('./screens/admin/TournamentResultEntryScreen').default)} />
                 <Stack.Screen name="TournamentLeaderboard" {...screen(() => require('./screens/admin/TournamentLeaderboard').default)} />

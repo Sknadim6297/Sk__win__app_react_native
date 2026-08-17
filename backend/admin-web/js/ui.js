@@ -266,6 +266,7 @@ const AdminUI = (() => {
 
             <div class="nav-group">TOURNAMENT</div>
             <button class="nav-sub ${navActive(active, 'tournaments')}" data-nav="#/tournaments">${icon.trophy}All Tournaments</button>
+            <button class="nav-sub ${navActive(active, 'daily-auto')}" data-nav="#/daily-auto">Daily Auto Matches</button>
             <button class="nav-sub ${navActive(active, 'tournaments-live')}" data-nav="#/tournaments?status=live">Active</button>
             <button class="nav-sub ${navActive(active, 'tournaments-upcoming')}" data-nav="#/tournaments?status=upcoming">Upcoming</button>
             <button class="nav-sub ${navActive(active, 'tournaments-completed')}" data-nav="#/tournaments?status=completed">Completed</button>

@@ -164,6 +164,12 @@ export default function AdminDashboard({ navigation }) {
           onPress={() => navigation.navigate('TournamentManagement')}
         />
         <NavTile
+          icon="calendar-sync"
+          title="Daily Auto Matches"
+          subtitle="Templates that create matches every day"
+          onPress={() => navigation.navigate('DailyAutoMatchManagement')}
+        />
+        <NavTile
           icon="history"
           title="Tournament History"
           subtitle="Slots, payments & results"

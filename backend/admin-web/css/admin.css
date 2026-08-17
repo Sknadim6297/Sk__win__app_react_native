@@ -274,6 +274,7 @@ svg { stroke-linecap: round; stroke-linejoin: round; }
 .error-box { background: var(--danger-bg); color: var(--danger); padding: 16px; border-radius: 12px; }
 .detail-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 18px; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.auto-source { display: block; color: #64748b; font-size: 11px; font-weight: 700; margin-top: 4px; letter-spacing: .02em; }
 .sheet-filters { display: none; }
 .login {
   min-height: 100vh; display: grid; place-items: center; padding: 20px;
