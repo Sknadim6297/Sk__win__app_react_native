@@ -69,11 +69,22 @@ export function openRemainingJoinPayment(navigation, opts = {}) {
   const returnScreen = opts.returnScreen || 'TournamentDetails';
   const pendingJoin = opts.pendingJoin || null;
 
-  root.navigate('ZapUpiPayment', {
-    purpose: 'wallet_topup',
-    amount,
-    returnToTournamentId: tournamentId,
+  if (isPaymentEnabled()) {
+    root.navigate('ZapUpiPayment', {
+      purpose: 'wallet_topup',
+      amount,
+      returnToTournamentId: tournamentId,
+      returnScreen,
+      pendingJoin,
+    });
+    return;
+  }
+
+  navigateToAddCoins(navigation, {
+    tournamentId,
     returnScreen,
+    openAddCoins: true,
+    suggestedAmount: amount,
     pendingJoin,
   });
 }

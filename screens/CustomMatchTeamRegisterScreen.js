@@ -118,7 +118,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       return;
     }
 
-    if (Number(tournament.entryFee) > 0) {
+    if (isPaymentEnabled() && Number(tournament.entryFee) > 0) {
       startTournamentZapUpiPayment(navigation, {
         tournamentId,
         tournamentName: tournament?.name,

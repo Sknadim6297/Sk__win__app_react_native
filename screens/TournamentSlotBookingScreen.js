@@ -133,7 +133,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     }
     try {
       setBooking(true);
-      if (Number(entryFee) > 0) {
+      if (isPaymentEnabled() && Number(entryFee) > 0) {
         startTournamentZapUpiPayment(navigation, {
           tournamentId,
           tournamentName: tournament?.name,

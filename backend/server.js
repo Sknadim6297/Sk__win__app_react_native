@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ override: true });
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -317,6 +317,14 @@ async function startServer() {
           'Tip: set PUBLIC_BASE_URL=http://YOUR_LAN_IP:5000 in backend/.env so phone can load uploaded images'
         );
       }
+      const paymentsOn = String(process.env.PAYMENT_ENABLED || '').trim().toLowerCase();
+      const zapOn = String(process.env.ZAPUPI_ENABLED || '').trim().toLowerCase();
+      const gatewayLive = paymentsOn === 'true' && zapOn === 'true';
+      console.log(
+        gatewayLive
+          ? 'Payments: ZapUPI ON'
+          : 'Payments: OFF (testing coins — Add Money credits wallet directly)'
+      );
       initFcm();
       startDailyAutoMatchJob();
 

@@ -48,6 +48,7 @@ router.get('/balance', authMiddleware, async (req, res) => {
 // Top up wallet (testing / demo path — used when ZapUPI gateway is not live)
 router.post('/topup', authMiddleware, async (req, res) => {
   try {
+    // Testing (PAYMENT_ENABLED=false): always credit dummy coins. ZapUPI is paused.
     const { getZapUpiConfig } = require('../config/zapupi');
     if (isPaymentEnabled() && getZapUpiConfig().ready) {
       return res.status(403).json({

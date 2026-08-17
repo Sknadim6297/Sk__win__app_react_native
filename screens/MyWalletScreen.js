@@ -20,10 +20,10 @@ import ScreenHeader from '../components/navigation/ScreenHeader';
 import BrandCoin from '../components/ui/BrandCoin';
 import AddCoinsModal from '../components/AddCoinsModal';
 import CenterDialog from '../components/CenterDialog';
-import { walletService, userService } from '../services/api';
+import { walletService, userService, paymentService } from '../services/api';
 import { clearWalletReturnParams, isWalletCredit } from '../utils/walletFlow';
 import { toPlayerMatchLabel } from '../utils/tournamentHelpers';
-import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE } from '../utils/paymentConfig';
+import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE, TESTING_ADD_HINT } from '../utils/paymentConfig';
 
 const formatAmount = (value) => {
   const n = Number(value) || 0;
@@ -151,16 +151,41 @@ const MyWalletScreen = ({ navigation, route }) => {
       paymentInFlight.current = true;
       setProcessing(true);
 
-      // Always open ZapUPI payment page (QR). Never dummy-credit.
+      // Testing (PAYMENT_ENABLED=false): credit dummy coins immediately — no ZapUPI.
+      if (!isPaymentEnabled()) {
+        const res = await walletService.topup({
+          amount: amountNum,
+          paymentMethod: 'testing',
+        });
+        setShowAddMoneyModal(false);
+        setAddAmount('');
+        await loadWalletData(true);
+        Alert.alert('Success', res?.message || `₹${amountNum} added to your wallet`);
+        return;
+      }
+
+      const cfg = await paymentService.getConfig();
+      if (cfg?.enabled) {
+        setShowAddMoneyModal(false);
+        setAddAmount('');
+        navigation.navigate('ZapUpiPayment', {
+          purpose: 'wallet_topup',
+          amount: amountNum,
+          walletBalance: walletData.balance + walletData.bonusBalance,
+          returnToTournamentId: returnTournamentRef.current,
+          returnScreen: returnScreenRef.current,
+        });
+        return;
+      }
+
+      const res = await walletService.topup({
+        amount: amountNum,
+        paymentMethod: 'testing',
+      });
       setShowAddMoneyModal(false);
       setAddAmount('');
-      navigation.navigate('ZapUpiPayment', {
-        purpose: 'wallet_topup',
-        amount: amountNum,
-        walletBalance: walletData.balance + walletData.bonusBalance,
-        returnToTournamentId: returnTournamentRef.current,
-        returnScreen: returnScreenRef.current,
-      });
+      await loadWalletData(true);
+      Alert.alert('Success', res?.message || `₹${amountNum} added to your wallet`);
     } catch (err) {
       Alert.alert('Could not add coins', err.message || 'Check your connection and try again.');
     } finally {
@@ -343,9 +368,9 @@ const MyWalletScreen = ({ navigation, route }) => {
         onChangeAmount={(t) => setAddAmount(sanitizeAmountInput(t))}
         onSubmit={handleAddMoney}
         processing={processing}
-        title="Add Money"
-        hint="Pay with UPI QR (ZapUPI). Coins add after payment is confirmed."
-        submitLabel="Pay & Add Money"
+        title={isPaymentEnabled() ? 'Add Money' : 'Add Coins'}
+        hint={isPaymentEnabled() ? 'Pay with UPI QR (ZapUPI). Coins add after payment is confirmed.' : TESTING_ADD_HINT}
+        submitLabel={isPaymentEnabled() ? 'Pay & Add Money' : 'Add Coins'}
       />
 
       <CenterDialog
