@@ -34,9 +34,14 @@ export default function AppHeader({ navigation, style }) {
   };
 
   const openMenu = () => {
-    const parent = navigation.getParent?.();
-    if (parent?.navigate) parent.navigate('MenuTab');
-    else navigation.navigate('MenuTab');
+    const root = getRootNavigation(navigation);
+    if (root?.navigate) {
+      root.navigate('MainApp', { screen: 'MenuTab' });
+      return;
+    }
+    if (navigation.navigate) {
+      navigation.navigate('MainApp', { screen: 'MenuTab' });
+    }
   };
 
   return (

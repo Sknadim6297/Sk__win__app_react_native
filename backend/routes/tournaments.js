@@ -1865,6 +1865,9 @@ router.get('/:id/results', async (req, res) => {
     }
 
     const type = lifecycle.getTournamentType(tournament);
+    const viewerId = req.headers.authorization
+      ? await extractUserIdFromToken(req.headers.authorization)
+      : null;
 
     if (type === 'battle_royale') {
       const results = await BattleRoyaleResult.find({ tournamentId: req.params.id })
@@ -1884,6 +1887,20 @@ router.get('/:id/results', async (req, res) => {
         isWinner: r.position === 1,
       }));
 
+      const mine = viewerId
+        ? leaderboard.find((e) => String(e.userId) === String(viewerId))
+        : null;
+      const myResult = mine
+        ? {
+            participated: true,
+            outcome: mine.rank === 1 ? 'win' : 'loss',
+            playerName: mine.gamingID || mine.username,
+            gamingUID: mine.gamingUID,
+            rank: mine.rank,
+            prize: mine.totalReward || 0,
+          }
+        : { participated: false, outcome: null };
+
       return res.json({
         tournament: {
           _id: tournament._id,
@@ -1897,6 +1914,7 @@ router.get('/:id/results', async (req, res) => {
         isBattleRoyale: true,
         winner: leaderboard.find((e) => e.rank === 1) || null,
         leaderboard,
+        myResult,
       });
     }
 
@@ -1908,10 +1926,54 @@ router.get('/:id/results', async (req, res) => {
 
     if (!custom) return res.status(404).json({ error: 'Results not found' });
 
-    const mvpMember = await TeamMember.findOne({
-      tournamentId: req.params.id,
-      userId: custom.mvpUserId?._id || custom.mvpUserId,
-    }).lean();
+    const [teams, members] = await Promise.all([
+      Team.find({ tournamentId: req.params.id, status: 'registered' }).lean(),
+      TeamMember.find({ tournamentId: req.params.id }).populate('userId', 'username').lean(),
+    ]);
+
+    const winnerTeamId = custom.winnerTeamId?._id || custom.winnerTeamId;
+    const teamsWithMembers = teams.map((team) => ({
+      _id: team._id,
+      name: team.name,
+      side: team.side,
+      captainUserId: team.captainUserId,
+      isWinner: String(team._id) === String(winnerTeamId),
+      members: members
+        .filter((m) => String(m.teamId) === String(team._id))
+        .map((m) => ({
+          userId: m.userId?._id || m.userId,
+          username: m.userId?.username,
+          gamingUsername: m.gamingUsername,
+          gamingUID: m.gamingUID,
+          role: m.role,
+        })),
+    }));
+
+    const mvpMember = members.find(
+      (m) => String(m.userId?._id || m.userId) === String(custom.mvpUserId?._id || custom.mvpUserId)
+    );
+
+    let myResult = { participated: false, outcome: null };
+    if (viewerId) {
+      const membership = members.find(
+        (m) => String(m.userId?._id || m.userId) === String(viewerId)
+      );
+      if (membership) {
+        const team = teamsWithMembers.find((t) => String(t._id) === String(membership.teamId));
+        const isWin = Boolean(team?.isWinner);
+        myResult = {
+          participated: true,
+          outcome: isWin ? 'win' : 'loss',
+          teamId: team?._id || membership.teamId,
+          teamName: team?.name || '',
+          teamSide: team?.side || '',
+          playerName: membership.gamingUsername || membership.userId?.username || 'You',
+          gamingUID: membership.gamingUID || '',
+          role: membership.role || 'member',
+          prize: isWin ? custom.winnerPrize || 0 : 0,
+        };
+      }
+    }
 
     return res.json({
       tournament: {
@@ -1934,7 +1996,9 @@ router.get('/:id/results', async (req, res) => {
         },
         winnerPrize: custom.winnerPrize,
         runnerUpPrize: 0,
+        teams: teamsWithMembers,
       },
+      myResult,
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch tournament results' });
