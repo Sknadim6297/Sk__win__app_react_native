@@ -177,7 +177,6 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.sectionTitleRow}>
             <Text style={styles.contestsTitle}>Esports Games</Text>
           </View>
-          <Text style={styles.contestsSub}>Choose a game and join tournaments</Text>
         </View>
 
         {esportsModes.length > 0 ? (

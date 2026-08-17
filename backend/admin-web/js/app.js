@@ -323,7 +323,7 @@ const App = (() => {
       upcoming: ['Upcoming tournaments', 'Published matches waiting to start.'],
       completed: ['Completed tournaments', 'Finished matches ready for results and payouts.'],
     };
-    const [title, subtitle] = titles[params.status] || ['All tournaments', 'Search, filter and manage every match from one table.'];
+    const [title, subtitle] = titles[params.status] || ['All tournaments'];
     root().innerHTML = AdminUI.layout(nav, '<div class="loading">Loading tournaments…</div>');
     AdminUI.bindShell();
     const data = await AdminAPI.tournaments({
