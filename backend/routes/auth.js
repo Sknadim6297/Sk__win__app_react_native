@@ -106,7 +106,7 @@ router.post('/register', async (req, res) => {
 
     // Create JWT token
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId: user._id, role: user.role, v: user.authVersion },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -186,7 +186,7 @@ router.post('/login', async (req, res) => {
 
     // Create JWT token
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId: user._id, role: user.role, v: user.authVersion },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -249,7 +249,7 @@ router.post('/admin-login', async (req, res) => {
       return res.status(403).json({ error: 'Account is not active' });
     }
 
-    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ userId: user._id, role: user.role, v: user.authVersion }, JWT_SECRET, { expiresIn: '30d' });
     res.json({
       message: 'Login successful',
       token,
@@ -393,7 +393,7 @@ router.post('/google', async (req, res) => {
     await ensureUserReferralCode(user);
 
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId: user._id, role: user.role, v: user.authVersion },
       JWT_SECRET,
       { expiresIn: '30d' }
     );

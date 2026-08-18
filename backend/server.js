@@ -1,4 +1,7 @@
-require('dotenv').config({ override: true });
+require('dotenv').config({
+  path: require('path').join(__dirname, '.env'),
+  override: true,
+});
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -132,14 +135,14 @@ app.get('/downloads/:fileName', async (req, res) => {
     if (isDbReady()) {
       try {
         await AppRelease.findOneAndUpdate(
-          { fileName },
+          { fileName: stats.fileName || fileName },
           {
             $inc: { downloadCount: 1 },
             $setOnInsert: {
               version: '1.0.0',
-              title: 'WarZone AMR Tournament',
+              title: 'WAREZONE Tournament',
               androidMin: 'Android 8.0 (API 26)+',
-              releaseNotes: 'WarZone AMR Tournament release',
+              releaseNotes: 'WAREZONE Tournament release',
               isLatest: false,
               publishedAt: new Date(),
             },
@@ -151,8 +154,9 @@ app.get('/downloads/:fileName', async (req, res) => {
       }
     }
 
+    const outName = stats.fileName || fileName;
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${outName}"`);
     res.setHeader('Content-Length', String(stats.sizeBytes));
     return res.sendFile(stats.filePath);
   } catch (error) {

@@ -1,4 +1,7 @@
 const express = require('express');
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const validator = require('validator');
 const User = require('../models/User');
 const WalletTransaction = require('../models/WalletTransaction');
 const TournamentParticipant = require('../models/TournamentParticipant');
@@ -6,6 +9,7 @@ const Tournament = require('../models/Tournament');
 const CoinPack = require('../models/CoinPack');
 const HomeConfig = require('../models/HomeConfig');
 const { authMiddleware } = require('../middleware/auth');
+const AdminPasswordReset = require('../models/AdminPasswordReset');
 const router = express.Router();
 
 const requireAdmin = async (req, res, next) => {
@@ -22,6 +26,297 @@ const requireAdmin = async (req, res, next) => {
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+// ---------------------------
+// Admin password reset (email reset-link flow)
+// POST /api/admin/forgot-password
+// POST /api/admin/reset-password
+// ---------------------------
+
+const TARGET_ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || 'sknadim6297@gmail.com').trim().toLowerCase();
+const RESET_TTL_MS = Number(process.env.ADMIN_RESET_TOKEN_TTL_MS || 15 * 60 * 1000);
+const RATE_WINDOW_MS = Number(process.env.ADMIN_FORGOT_RATE_WINDOW_MS || 15 * 60 * 1000);
+const RATE_MAX = Number(process.env.ADMIN_FORGOT_RATE_MAX || 5);
+
+const forgotRate = new Map(); // key => { count, firstAtMs }
+
+function sha256(input) {
+  return crypto.createHash('sha256').update(String(input)).digest('hex');
+}
+
+function generateResetToken() {
+  // 256-bit token, hex-encoded.
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function rateLimitKey(email, ip) {
+  return `${String(email).toLowerCase()}|${String(ip || 'unknown')}`;
+}
+
+function checkForgotRateLimit({ email, ip }) {
+  const key = rateLimitKey(email, ip);
+  const now = Date.now();
+  const current = forgotRate.get(key);
+  if (!current) {
+    forgotRate.set(key, { count: 1, firstAtMs: now });
+    return;
+  }
+
+  if (now - current.firstAtMs > RATE_WINDOW_MS) {
+    forgotRate.set(key, { count: 1, firstAtMs: now });
+    return;
+  }
+
+  if (current.count >= RATE_MAX) {
+    const retryAfterSec = Math.ceil((current.firstAtMs + RATE_WINDOW_MS - now) / 1000);
+    return { limited: true, retryAfterSec: Math.max(0, retryAfterSec) };
+  }
+
+  forgotRate.set(key, { ...current, count: current.count + 1 });
+}
+
+function getMailConfig() {
+  // Preferred: MAIL_* variables (as requested)
+  const mailHost = process.env.MAIL_HOST || '';
+  const mailPort = Number(process.env.MAIL_PORT || 587);
+  const mailUser = process.env.MAIL_USER || '';
+  const mailPass = process.env.MAIL_PASSWORD || '';
+  const mailFrom = process.env.MAIL_FROM || 'WAREZONE <noreply@warezone.app>';
+
+  // Backward-compatible fallback to existing SMTP_* variables used by OTP delivery.
+  const smtpHost = process.env.SMTP_HOST || '';
+  const smtpUser = process.env.SMTP_USER || '';
+  const smtpPass = process.env.SMTP_PASS || '';
+  const smtpFrom = process.env.SMTP_FROM || mailFrom;
+  const smtpPort = Number(process.env.SMTP_PORT || mailPort);
+  const smtpSecure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
+
+  const usingPreferred =
+    Boolean(mailHost && mailUser && mailPass) || String(process.env.MAIL_HOST || '').trim();
+
+  const host = usingPreferred ? mailHost : smtpHost;
+  const user = usingPreferred ? mailUser : smtpUser;
+  const pass = usingPreferred ? mailPass : smtpPass;
+  const from = mailFrom || smtpFrom;
+  const port = usingPreferred ? mailPort : smtpPort;
+  const secure = usingPreferred ? String(process.env.MAIL_SECURE || '').toLowerCase() === 'true' : smtpSecure;
+
+  return { host, port, secure, user, pass, from };
+}
+
+async function sendAdminResetEmail({ toEmail, resetToken, expiresAt }) {
+  const nodemailer = require('nodemailer');
+
+  const { host, port, secure, user, pass, from } = getMailConfig();
+  if (!host || !user || !pass) {
+    // If email isn't configured, we don't leak details to the client.
+    const err = new Error('Mail transport not configured');
+    err.code = 'MAIL_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const resetDeepLinkBase = String(process.env.ADMIN_RESET_DEEPLINK_URL || 'warezone://admin-reset-password').trim();
+  const resetWebBase =
+    String(
+      process.env.ADMIN_RESET_WEB_URL ||
+        (process.env.PUBLIC_BASE_URL ? `${process.env.PUBLIC_BASE_URL}/admin/#/reset-password` : '')
+    ).trim();
+
+  const deepLink = `${resetDeepLinkBase}?token=${encodeURIComponent(resetToken)}`;
+  const webLink = resetWebBase ? `${resetWebBase}?token=${encodeURIComponent(resetToken)}` : '';
+
+  const expiresText = expiresAt ? `This reset link expires at ${expiresAt.toISOString()}.` : 'This reset link expires soon.';
+
+  const subject = 'SK WIN — Reset Admin Password';
+  const html = `
+    <div style="font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0B0E1E; color:#fff; padding:24px;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+        <div style="width:44px;height:44px;border-radius:14px;background:rgba(255,107,0,0.18);display:flex;align-items:center;justify-content:center;color:#FF6B00;font-weight:800;">SK</div>
+        <div>
+          <div style="font-size:18px;font-weight:800;">SK WIN</div>
+          <div style="font-size:12px;opacity:0.8;">Compete. Conquer. Win Big.</div>
+        </div>
+      </div>
+      <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:18px;">
+        <h2 style="margin:0 0 10px; font-size:18px; letter-spacing:0.2px;">Reset Admin Password</h2>
+        <p style="margin:0 0 14px; color:rgba(184,197,217,1); line-height:1.5;">
+          We received a request to reset the password for your admin account.
+        </p>
+        <p style="margin:0 0 14px; color:rgba(184,197,217,1); line-height:1.5;">
+          Click the button below to set a new password:
+        </p>
+        <div style="margin:18px 0;">
+          <a href="${deepLink}" style="display:inline-block; padding:12px 18px; background:#7B61FF; color:#fff; text-decoration:none; border-radius:12px; font-weight:800;">
+            Reset Password
+          </a>
+        </div>
+        ${
+          webLink
+            ? `<p style="margin:0 0 14px; color:rgba(184,197,217,1); line-height:1.5;">
+                 If the app link doesn’t work, use this web link:<br/>
+                 <a href="${webLink}" style="color:#4FD1C5; word-break:break-all;">${webLink}</a>
+               </p>`
+            : ''
+        }
+        <p style="margin:0 0 14px; color:rgba(184,197,217,1); line-height:1.5;">${expiresText}</p>
+        <p style="margin:0; color:rgba(184,197,217,1); line-height:1.5;">
+          Security warning: If you didn’t request this reset, you can safely ignore this email.
+        </p>
+      </div>
+      <div style="margin-top:18px; font-size:12px; opacity:0.75;">
+        SK WIN — Admin password reset
+      </div>
+    </div>
+  `;
+
+  await nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+  }).sendMail({
+    from,
+    to: toEmail,
+    subject,
+    html,
+    text:
+      `SK WIN — Reset Admin Password\n\n` +
+      `We received a request to reset your admin password.\n\n` +
+      `Reset link (app): ${deepLink}\n` +
+      (webLink ? `Reset link (web): ${webLink}\n` : '') +
+      `\n${expiresText}\n\n` +
+      `Security warning: If you didn't request this, ignore this email.`,
+  });
+}
+
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const ip = req.ip;
+
+    if (!email || !validator.isEmail(email)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+    }
+
+    // We only support the admin reset flow for the target admin account (for now).
+    const isTargetAdmin = email === TARGET_ADMIN_EMAIL;
+
+    // Rate limiting applies even when admin account doesn't exist to reduce abuse.
+    const rate = checkForgotRateLimit({ email, ip });
+    if (rate?.limited) {
+      return res
+        .status(429)
+        .json({ success: false, message: 'Too many requests. Try again later.', retryAfterSec: rate.retryAfterSec });
+    }
+
+    const generic = {
+      success: true,
+      message: 'If the admin account exists, a password reset email has been sent.',
+    };
+
+    if (!isTargetAdmin) return res.json(generic);
+
+    const admin = await User.findOne({ email, role: 'admin' }).select('_id email authVersion');
+    if (!admin) return res.json(generic);
+
+    const resetToken = generateResetToken();
+    const resetTokenSha256Hash = sha256(resetToken);
+    const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+
+    // Invalidate previous unused reset sessions for this admin.
+    await AdminPasswordReset.deleteMany({ email, used: false });
+
+    await AdminPasswordReset.create({
+      email,
+      userId: admin._id,
+      otpHash: null,
+      otpExpiresAt: new Date(Date.now() - 60 * 1000), // make OTP verification fail fast if someone tries OTP flow
+      verified: true,
+      resetTokenHash: null,
+      resetTokenExpiresAt: expiresAt,
+      resetTokenSha256Hash,
+      used: false,
+      channel: 'email',
+      phone: '',
+    });
+
+    try {
+      await sendAdminResetEmail({ toEmail: email, resetToken, expiresAt });
+    } catch (mailErr) {
+      // Do not leak whether email exists; client still gets generic success.
+      // We also avoid logging the reset token.
+      console.error('[admin-reset-email] failed:', mailErr.message);
+    }
+
+    return res.json(generic);
+  } catch (error) {
+    if (error?.limited) {
+      return res.status(429).json({ success: false, message: 'Too many requests. Try again later.' });
+    }
+    console.error('[admin forgot-password] error:', error?.message);
+    return res.status(500).json({ success: false, message: 'Password reset failed. Please try again later.' });
+  }
+});
+
+router.post('/reset-password', async (req, res) => {
+  try {
+    const token = String(req.body?.token || '').trim();
+    const password = String(req.body?.password || '');
+    const confirmPassword = String(req.body?.passwordConfirmation || '');
+
+    if (!token) return res.status(400).json({ success: false, message: 'Reset token is required.' });
+    if (!password || !confirmPassword) {
+      return res.status(400).json({ success: false, message: 'Please fill in all fields.' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters.' });
+    }
+    if (password !== confirmPassword) {
+      return res.status(400).json({ success: false, message: 'Passwords do not match.' });
+    }
+
+    const resetTokenSha256Hash = sha256(token);
+
+    const record = await AdminPasswordReset.findOne({
+      resetTokenSha256Hash,
+      used: false,
+      verified: true,
+    });
+
+    if (!record?.resetTokenExpiresAt) {
+      return res.status(400).json({ success: false, message: 'Reset link is invalid or expired.' });
+    }
+    if (new Date(record.resetTokenExpiresAt).getTime() < Date.now()) {
+      return res.status(400).json({ success: false, message: 'Reset link is invalid or expired.' });
+    }
+
+    const user = await User.findById(record.userId).select('_id email role authVersion password authProvider');
+    if (!user || user.role !== 'admin') {
+      return res.status(400).json({ success: false, message: 'Reset link is invalid or expired.' });
+    }
+    if (String(user.email).toLowerCase() !== TARGET_ADMIN_EMAIL) {
+      return res.status(400).json({ success: false, message: 'Reset link is invalid or expired.' });
+    }
+
+    const newPasswordHash = await bcrypt.hash(password, 10);
+    user.password = newPasswordHash;
+    user.authProvider = user.authProvider === 'google' ? 'google' : 'local';
+    user.updatedAt = new Date();
+    user.authVersion = (user.authVersion || 0) + 1; // invalidate existing admin sessions (best-effort)
+    await user.save();
+
+    record.used = true;
+    await record.save();
+    // Invalidate any other unused sessions just in case.
+    await AdminPasswordReset.deleteMany({ email: record.email, used: false });
+
+    return res.json({ success: true, message: 'Password updated successfully.' });
+  } catch (error) {
+    // Avoid leaking internals / token details.
+    console.error('[admin reset-password] error:', error?.message);
+    return res.status(500).json({ success: false, message: 'Password reset failed. Please try again later.' });
+  }
+});
 
 // Get all users (admin only). Optional page/limit/search keeps mobile array response.
 router.get('/all', authMiddleware, async (req, res) => {

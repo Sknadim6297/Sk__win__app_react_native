@@ -6,7 +6,7 @@ export default function PhoneShowcase({ news, modes = [], liveName }) {
           <div className="phone-app">
             <div className="phone-header">
               <div className="left">
-                <img className="logo" src="/logo.png" alt="" />
+                <img className="logo" src="/brand/logo.png?v=app" alt="" />
                 WAREZONE
               </div>
               <div className="coin-pill">
@@ -69,7 +69,7 @@ export default function PhoneShowcase({ news, modes = [], liveName }) {
           <div className="phone-app">
             <div className="phone-header">
               <div className="left">
-                <img className="logo" src="/logo.png" alt="" />
+                <img className="logo" src="/brand/logo.png?v=app" alt="" />
                 Wallet
               </div>
             </div>

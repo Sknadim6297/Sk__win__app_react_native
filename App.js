@@ -22,6 +22,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import CustomTabBar from './components/navigation/CustomTabBar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as ExpoLinking from 'expo-linking';
 import { useFonts } from 'expo-font';
 import {
   DMSans_700Bold,
@@ -117,6 +118,15 @@ export default function App() {
 
 function AppNavigator() {
   const { isAuthenticated, isLoading, isAdmin } = useContext(AuthContext);
+  const linking = {
+    prefixes: [ExpoLinking.createURL('/')],
+    config: {
+      screens: {
+        AdminResetPassword: 'admin-reset-password',
+        AdminForgotPassword: 'admin-forgot-password',
+      },
+    },
+  };
 
   useEffect(() => {
     if (!isLoading) {
@@ -139,7 +149,7 @@ function AppNavigator() {
   const navKey = isAuthenticated ? (isAdmin() ? 'admin' : 'user') : 'guest';
 
   return (
-    <NavigationContainer key={navKey} ref={navigationRef}>
+    <NavigationContainer key={navKey} ref={navigationRef} linking={linking}>
       <Stack.Navigator
         key={navKey}
         initialRouteName={
@@ -164,6 +174,14 @@ function AppNavigator() {
           <>
             <Stack.Screen name="Landing" component={LandingScreen} />
             <Stack.Screen name="Auth" component={AuthScreen} />
+            <Stack.Screen
+              name="AdminForgotPassword"
+              {...screen(() => require('./screens/AdminForgotPasswordScreen').default)}
+            />
+            <Stack.Screen
+              name="AdminResetPassword"
+              {...screen(() => require('./screens/AdminResetPasswordScreen').default)}
+            />
           </>
         ) : (
           <>

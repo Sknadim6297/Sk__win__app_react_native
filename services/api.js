@@ -266,6 +266,16 @@ export const authService = {
       method: 'POST',
       body: { email, resetToken, password, confirmPassword },
     }),
+  adminForgotPassword: ({ email }) =>
+    apiCall('/admin/forgot-password', {
+      method: 'POST',
+      body: { email },
+    }),
+  adminResetPassword: ({ token, password, passwordConfirmation }) =>
+    apiCall('/admin/reset-password', {
+      method: 'POST',
+      body: { token, password, passwordConfirmation },
+    }),
 };
 
 // User Services

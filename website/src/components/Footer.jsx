@@ -13,7 +13,7 @@ export default function Footer({ socials = {} }) {
       <div className="container footer-grid">
         <div>
           <Link to="/" className="brand" style={{ marginBottom: 12 }}>
-            <img src="/logo.png" alt="" width="42" height="42" />
+            <img src="/brand/logo.png?v=app" alt="" width="42" height="42" />
             {BRAND.name}
           </Link>
           <p>{BRAND.motto}</p>

@@ -79,8 +79,8 @@ export function modeName(t) {
 }
 
 export function apkHref(release) {
-  if (!release?.downloadUrl) return '/download';
+  if (!release?.downloadUrl) return '/downloads/WAREZONE-v1.0.0.apk';
   const u = String(release.downloadUrl);
   if (u.startsWith('http')) return u;
-  return `${API_BASE}${u.startsWith('/') ? u : `/${u}`}`;
+  return u.startsWith('/') ? u : `/${u}`;
 }

@@ -18,7 +18,7 @@ export default function Navbar() {
     <header className="nav">
       <div className="container nav-inner">
         <Link to="/" className="brand" onClick={() => setOpen(false)}>
-          <img src="/logo.png" alt="WAREZONE logo" />
+          <img src="/brand/logo.png?v=app" alt="WAREZONE logo" />
           WAREZONE
         </Link>
         <nav className="nav-links" aria-label="Primary">

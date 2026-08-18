@@ -12,12 +12,18 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('_id role status');
+    const user = await User.findById(decoded.userId).select('_id role status authVersion');
     if (!user) {
       return res.status(401).json({ error: 'Session expired. Please sign in again.' });
     }
     if (user.status === 'banned' || user.status === 'suspended') {
       return res.status(403).json({ error: 'Account is not active' });
+    }
+
+    // Best-effort JWT invalidation for admin sessions after password reset.
+    // Older tokens won't have `v`, so we keep them valid until the next admin login.
+    if (user.role === 'admin' && decoded.v !== undefined && decoded.v !== user.authVersion) {
+      return res.status(401).json({ error: 'Session expired. Please sign in again.' });
     }
 
     req.userId = user._id;

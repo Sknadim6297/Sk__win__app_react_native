@@ -5,9 +5,16 @@ const AppRelease = require('../models/AppRelease');
 
 const router = express.Router();
 
-/** Project-root public folder (APKs + download page assets) */
-const PUBLIC_ROOT = path.join(__dirname, '..', '..', 'public');
-const DOWNLOADS_DIR = path.join(PUBLIC_ROOT, 'downloads');
+const REPO_PUBLIC = path.join(__dirname, '..', '..', 'public');
+const BACKEND_PUBLIC = path.join(__dirname, '..', 'public');
+const DOWNLOAD_DIRS = [
+  path.join(REPO_PUBLIC, 'downloads'),
+  path.join(BACKEND_PUBLIC, 'downloads'),
+  path.join(process.cwd(), 'public', 'downloads'),
+];
+
+const PUBLIC_ROOT = fs.existsSync(REPO_PUBLIC) ? REPO_PUBLIC : BACKEND_PUBLIC;
+const DOWNLOADS_DIR = DOWNLOAD_DIRS.find((dir) => fs.existsSync(dir)) || path.join(REPO_PUBLIC, 'downloads');
 const PAGE_PATH = path.join(PUBLIC_ROOT, 'download', 'index.html');
 
 const DEFAULT_RELEASE = {
@@ -33,23 +40,49 @@ function formatBytes(bytes) {
   return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-function getApkStats(fileName) {
-  const filePath = path.join(DOWNLOADS_DIR, fileName);
-  try {
-    if (!fs.existsSync(filePath)) {
-      return { exists: false, sizeBytes: 0, sizeLabel: 'APK not uploaded yet', mtime: null };
+function listApkFiles() {
+  const found = [];
+  for (const dir of DOWNLOAD_DIRS) {
+    if (!fs.existsSync(dir)) continue;
+    let names = [];
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      continue;
     }
-    const st = fs.statSync(filePath);
-    return {
-      exists: true,
-      sizeBytes: st.size,
-      sizeLabel: formatBytes(st.size),
-      mtime: st.mtime,
-      filePath,
-    };
-  } catch {
-    return { exists: false, sizeBytes: 0, sizeLabel: '—', mtime: null };
+    names
+      .filter((n) => n.toLowerCase().endsWith('.apk'))
+      .forEach((name) => {
+        const filePath = path.join(dir, name);
+        try {
+          const st = fs.statSync(filePath);
+          if (st.isFile() && st.size > 1024) {
+            found.push({ name, filePath, size: st.size, mtime: st.mtime });
+          }
+        } catch {
+          /* skip */
+        }
+      });
   }
+  found.sort((a, b) => b.mtime - a.mtime);
+  return found;
+}
+
+function getApkStats(fileName) {
+  const wanted = path.basename(String(fileName || DEFAULT_RELEASE.fileName));
+  const all = listApkFiles();
+  const match = all.find((f) => f.name === wanted) || all[0] || null;
+  if (!match) {
+    return { exists: false, sizeBytes: 0, sizeLabel: 'APK not uploaded yet', mtime: null, fileName: wanted };
+  }
+  return {
+    exists: true,
+    sizeBytes: match.size,
+    sizeLabel: formatBytes(match.size),
+    mtime: match.mtime,
+    filePath: match.filePath,
+    fileName: match.name,
+  };
 }
 
 async function getOrCreateLatestRelease() {
@@ -57,26 +90,33 @@ async function getOrCreateLatestRelease() {
   if (!release) {
     release = await AppRelease.create(DEFAULT_RELEASE);
   }
+
+  const stats = getApkStats(release.fileName);
+  if (stats.exists && stats.fileName && stats.fileName !== release.fileName) {
+    release.fileName = stats.fileName;
+    await release.save().catch(() => {});
+  }
   return release;
 }
 
 /**
- * GET /api/download/release — public release info for the page
+ * GET /api/download/release — public release info for the website
  */
 router.get('/release', async (req, res) => {
   try {
     const release = await getOrCreateLatestRelease();
     const stats = getApkStats(release.fileName);
+    const fileName = stats.fileName || release.fileName;
     const updated = stats.mtime || release.publishedAt || release.updatedAt;
 
     res.json({
       success: true,
       release: {
-        title: release.title,
-        version: release.version,
-        fileName: release.fileName,
-        androidMin: release.androidMin,
-        releaseNotes: release.releaseNotes,
+        title: release.title || DEFAULT_RELEASE.title,
+        version: release.version || DEFAULT_RELEASE.version,
+        fileName,
+        androidMin: release.androidMin || DEFAULT_RELEASE.androidMin,
+        releaseNotes: release.releaseNotes || DEFAULT_RELEASE.releaseNotes,
         downloadCount: release.downloadCount || 0,
         apkExists: stats.exists,
         sizeLabel: stats.sizeLabel,
@@ -89,8 +129,8 @@ router.get('/release', async (req, res) => {
               year: 'numeric',
             })
           : '—',
-        downloadUrl: `/downloads/${encodeURIComponent(release.fileName)}`,
-        downloadLabel: `Download WAREZONE v${release.version}`,
+        downloadUrl: `/downloads/${encodeURIComponent(fileName)}`,
+        downloadLabel: `Download WAREZONE v${release.version || '1.0.0'}`,
       },
     });
   } catch (error) {

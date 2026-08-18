@@ -29,6 +29,8 @@ import OrDivider from '../components/auth/OrDivider';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import { isGoogleSignInConfigured } from '../utils/googleConfig';
 
+const TARGET_ADMIN_EMAIL = 'sknadim6297@gmail.com';
+
 export default function AuthScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { login, register, loginWithGoogle } = useContext(AuthContext);
@@ -184,7 +186,17 @@ export default function AuthScreen({ navigation, route }) {
     );
   };
 
-  const handleForgotPassword = () => setForgotVisible(true);
+  const handleForgotPassword = () => {
+    const current = String(email || '').trim().toLowerCase();
+    // For admin password reset we use the email reset-link flow.
+    // If the email field is empty, assume user wants the admin flow and show the prefilled screen.
+    if (!current || current === TARGET_ADMIN_EMAIL) {
+      navigation.navigate('AdminForgotPassword');
+      return;
+    }
+    // Keep the existing OTP forgot-password modal for non-admin accounts.
+    setForgotVisible(true);
+  };
 
   return (
     <View style={styles.root}>

@@ -169,6 +169,11 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  /**
+   * Increment this when the user's password changes (admin resets included),
+   * so we can invalidate previously issued admin JWTs.
+   */
+  authVersion: { type: Number, default: 0, index: true },
 });
 
 module.exports = mongoose.model('User', userSchema);

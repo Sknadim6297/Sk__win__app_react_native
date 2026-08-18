@@ -1,20 +1,15 @@
 # Render Blueprint — WAREZONE (SK-Win)
 #
-# Frontend (sk-win-web): static APK download landing at `/`
-#   Build:  node scripts/build-render-frontend.js
-#   Publish: dist/
-#   No start command (Static Site / CDN)
+# Frontend (sk-win-web): WAREZONE marketing website + APK
+#   Build:  npm install --prefix website && npm run website:build
+#   Publish: website/dist
 #
-# Backend (sk-win-api): Node API only — NOT the download page
-#   Build:  npm install
-#   Start:  npm start
+# Backend (sk-win-api): Node API + website + APK (repo root, so public/downloads is included)
+#   Build:  npm install --prefix backend && npm install --prefix website && npm run website:build
+#   Start:  node backend/server.js
 #
-# Architecture:
-#   Browser  → https://sk-win-app-react-native-65a3.onrender.com  (download page)
-#   Android  → https://sk-win-api.onrender.com/api                (API)
-#
-# APK must exist at: public/downloads/WAREZONE-v1.0.0.apk
-# (build fails if missing so production never shows a broken download button)
+# Custom domain: attach it to sk-win-web (site) and set VITE_API_URL to the API host.
+# APK file: public/downloads/WAREZONE-v1.0.0.apk (~16 MB, tracked in git)
 
 services:
   - type: web
@@ -22,9 +17,8 @@ services:
     runtime: node
     plan: free
     region: singapore
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: npm install --prefix backend && npm install --prefix website && npm run website:build
+    startCommand: node backend/server.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -53,11 +47,9 @@ services:
     runtime: static
     plan: free
     region: singapore
-    # Static site — no startCommand. Serves files from dist/ after build.
-    buildCommand: node scripts/build-render-frontend.js
-    staticPublishPath: dist
-    # No SPA catch-all rewrite: /downloads/*.apk must be served as binary files.
-    # Render serves existing files as-is; index.html is used for /.
+    # Static WAREZONE website. APK is copied into website/dist/downloads during build.
+    buildCommand: npm install --prefix website && npm run website:build
+    staticPublishPath: website/dist
     headers:
       - path: /downloads/*
         name: Content-Type
@@ -71,6 +63,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20.18.0"
+      - key: VITE_API_URL
+        value: https://sk-win-api.onrender.com
       - key: EXPO_PUBLIC_API_URL
         value: https://sk-win-api.onrender.com/api
       - key: EXPO_PUBLIC_APP_NAME
@@ -81,8 +75,11 @@ services:
         value: "1.0.0"
       - key: APK_FILE_NAME
         value: WAREZONE-v1.0.0.apk
-      # Prefer API host — sets Content-Disposition so Android 12 Chrome saves a real .apk
       - key: APK_DOWNLOAD_URL
-        value: https://sk-win-api.onrender.com/downloads/WAREZONE-v1.0.0.apk
+        value: /downloads/WAREZONE-v1.0.0.apk
       - key: CI
         value: "1"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
