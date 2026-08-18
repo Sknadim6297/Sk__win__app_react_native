@@ -1,15 +1,10 @@
 # Render Blueprint — WAREZONE (SK-Win)
 #
-# Frontend (sk-win-web): WAREZONE marketing website + APK
-#   Build:  npm install --prefix website && npm run website:build
-#   Publish: website/dist
+# IMPORTANT: sk-win-api Root Directory must be the REPO ROOT (leave blank).
+# If Root Directory is set to "backend", build fails looking for backend/backend/package.json.
 #
-# Backend (sk-win-api): Node API + website + APK (repo root, so public/downloads is included)
-#   Build:  npm install --prefix backend && npm install --prefix website && npm run website:build
-#   Start:  node backend/server.js
-#
-# Custom domain: attach it to sk-win-web (site) and set VITE_API_URL to the API host.
-# APK file: public/downloads/WAREZONE-v1.0.0.apk (~16 MB, tracked in git)
+# sk-win-api: Node API + marketing website + admin + APK
+# sk-win-web: Static marketing website (share this URL with players)
 
 services:
   - type: web
@@ -17,10 +12,13 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm install --prefix backend && npm install --prefix website && npm run website:build
+    # Repo root — do NOT set Root Directory to "backend" in the Render dashboard.
+    buildCommand: npm run render:build
     startCommand: node backend/server.js
     healthCheckPath: /api/health
     envVars:
+      - key: NODE_VERSION
+        value: "20.18.0"
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
@@ -31,7 +29,7 @@ services:
         sync: false
       - key: PAYMENT_ENABLED
         value: "false"
-      - key: CASHFREE_ENABLED
+      - key: ZAPUPI_ENABLED
         value: "false"
       - key: TRUST_PROXY
         value: "1"
@@ -47,9 +45,9 @@ services:
     runtime: static
     plan: free
     region: singapore
-    # Static WAREZONE website. APK is copied into website/dist/downloads during build.
-    buildCommand: npm install --prefix website && npm run website:build
-    staticPublishPath: website/dist
+    rootDir: website
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
     headers:
       - path: /downloads/*
         name: Content-Type
@@ -65,20 +63,6 @@ services:
         value: "20.18.0"
       - key: VITE_API_URL
         value: https://sk-win-api.onrender.com
-      - key: EXPO_PUBLIC_API_URL
-        value: https://sk-win-api.onrender.com/api
-      - key: EXPO_PUBLIC_APP_NAME
-        value: WAREZONE Tournament
-      - key: EXPO_PUBLIC_PAYMENT_ENABLED
-        value: "false"
-      - key: APK_VERSION
-        value: "1.0.0"
-      - key: APK_FILE_NAME
-        value: WAREZONE-v1.0.0.apk
-      - key: APK_DOWNLOAD_URL
-        value: /downloads/WAREZONE-v1.0.0.apk
-      - key: CI
-        value: "1"
     routes:
       - type: rewrite
         source: /*
