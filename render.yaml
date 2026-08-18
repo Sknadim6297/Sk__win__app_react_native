@@ -1,10 +1,9 @@
 # Render Blueprint — WAREZONE (SK-Win)
 #
-# IMPORTANT: sk-win-api Root Directory must be the REPO ROOT (leave blank).
-# If Root Directory is set to "backend", build fails looking for backend/backend/package.json.
+# sk-win-api  → Backend API + admin panel + APK downloads only
+# sk-win-web  → Marketing website (React/Vite) — share THIS URL with players
 #
-# sk-win-api: Node API + marketing website + admin + APK
-# sk-win-web: Static marketing website (share this URL with players)
+# IMPORTANT: sk-win-api Root Directory must be the REPO ROOT (leave blank).
 
 services:
   - type: web
@@ -12,8 +11,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    # Repo root — do NOT set Root Directory to "backend" in the Render dashboard.
-    buildCommand: npm run render:build
+    buildCommand: npm install --prefix backend
     startCommand: node backend/server.js
     healthCheckPath: /api/health
     envVars:
@@ -27,6 +25,10 @@ services:
         sync: false
       - key: PUBLIC_BASE_URL
         sync: false
+      - key: FRONTEND_URL
+        value: https://sk-win-web.onrender.com
+      - key: SERVE_WEBSITE
+        value: "false"
       - key: PAYMENT_ENABLED
         value: "false"
       - key: ZAPUPI_ENABLED

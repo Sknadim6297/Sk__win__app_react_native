@@ -1,3 +1,5 @@
+import { brandLogoUrl } from '../utils';
+
 export default function PhoneShowcase({ news, modes = [], liveName }) {
   return (
     <div className="phones" aria-hidden="true">
@@ -6,7 +8,7 @@ export default function PhoneShowcase({ news, modes = [], liveName }) {
           <div className="phone-app">
             <div className="phone-header">
               <div className="left">
-                <img className="logo" src="/brand/logo.png?v=app" alt="" />
+                <img className="logo" src={brandLogoUrl()} alt="" />
                 WAREZONE
               </div>
               <div className="coin-pill">
@@ -69,7 +71,7 @@ export default function PhoneShowcase({ news, modes = [], liveName }) {
           <div className="phone-app">
             <div className="phone-header">
               <div className="left">
-                <img className="logo" src="/brand/logo.png?v=app" alt="" />
+                <img className="logo" src={brandLogoUrl()} alt="" />
                 Wallet
               </div>
             </div>

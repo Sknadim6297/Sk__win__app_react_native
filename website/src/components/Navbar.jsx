@@ -1,5 +1,6 @@
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
+import { brandLogoUrl } from '../utils';
 
 const LINKS = [
   { to: '/', label: 'Home' },
@@ -18,7 +19,7 @@ export default function Navbar() {
     <header className="nav">
       <div className="container nav-inner">
         <Link to="/" className="brand" onClick={() => setOpen(false)}>
-          <img src="/brand/logo.png?v=app" alt="WAREZONE logo" />
+          <img src={brandLogoUrl()} alt="WAREZONE logo" />
           WAREZONE
         </Link>
         <nav className="nav-links" aria-label="Primary">

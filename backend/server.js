@@ -77,7 +77,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const WEBSITE_DIST = path.join(__dirname, '..', 'website', 'dist');
 const WEBSITE_INDEX = path.join(WEBSITE_DIST, 'index.html');
-const isWebsiteReady = () => fs.existsSync(WEBSITE_INDEX);
+/** Marketing site is deployed separately (sk-win-web). Set SERVE_WEBSITE=true to host it from the API. */
+const SERVE_WEBSITE = String(process.env.SERVE_WEBSITE || '').toLowerCase() === 'true';
+const isWebsiteReady = () => SERVE_WEBSITE && fs.existsSync(WEBSITE_INDEX);
+const frontendUrl = () =>
+  String(process.env.FRONTEND_URL || process.env.WEBSITE_URL || '').replace(/\/$/, '');
 
 if (!isWebsiteReady()) {
   app.use('/download', express.static(path.join(PUBLIC_ROOT, 'download')));
@@ -96,15 +100,19 @@ app.get(['/brand/logo.png', '/download/logo.png'], (req, res) => {
 
 const isDbReady = () => mongoose.connection.readyState === 1;
 
-/** Homepage → marketing website when built; otherwise APK landing */
+/** Homepage → marketing website when SERVE_WEBSITE=true; else redirect to frontend static site */
 app.get('/', (req, res, next) => {
   if (isWebsiteReady()) return next();
+  const site = frontendUrl();
+  if (site) return res.redirect(302, site);
   res.redirect(302, '/download');
 });
 
-/** Legacy APK landing — used only if the marketing website is not built yet */
+/** Legacy APK landing — redirects to frontend /download when FRONTEND_URL is set */
 app.get(['/download', '/download/'], (req, res, next) => {
   if (isWebsiteReady()) return next();
+  const site = frontendUrl();
+  if (site) return res.redirect(302, `${site}/download`);
   res.sendFile(PAGE_PATH, (err) => {
     if (err) {
       console.error('[download] page missing:', PAGE_PATH, err.message);
@@ -276,33 +284,35 @@ app.use('/api/*', (req, res) => {
   res.status(404).json({ error: 'API endpoint not found' });
 });
 
-app.use(
-  express.static(WEBSITE_DIST, {
-    index: false,
-    fallthrough: true,
-    maxAge: '1h',
-    setHeaders(res, filePath) {
-      if (String(filePath).endsWith('.html')) {
-        res.setHeader('Cache-Control', 'no-store');
-      }
-    },
-  })
-);
-app.get('*', (req, res, next) => {
-  if (!isWebsiteReady()) return next();
-  if (req.method !== 'GET') return next();
-  const p = req.path || '';
-  if (
-    p.startsWith('/api') ||
-    p.startsWith('/admin') ||
-    p.startsWith('/uploads') ||
-    p.startsWith('/downloads') ||
-    p.startsWith('/brand')
-  ) {
-    return next();
-  }
-  res.sendFile(WEBSITE_INDEX);
-});
+if (SERVE_WEBSITE && fs.existsSync(WEBSITE_INDEX)) {
+  app.use(
+    express.static(WEBSITE_DIST, {
+      index: false,
+      fallthrough: true,
+      maxAge: '1h',
+      setHeaders(res, filePath) {
+        if (String(filePath).endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-store');
+        }
+      },
+    })
+  );
+  app.get('*', (req, res, next) => {
+    if (!isWebsiteReady()) return next();
+    if (req.method !== 'GET') return next();
+    const p = req.path || '';
+    if (
+      p.startsWith('/api') ||
+      p.startsWith('/admin') ||
+      p.startsWith('/uploads') ||
+      p.startsWith('/downloads') ||
+      p.startsWith('/brand')
+    ) {
+      return next();
+    }
+    res.sendFile(WEBSITE_INDEX);
+  });
+}
 
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
@@ -351,10 +361,13 @@ async function startServer() {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);
       console.log(`Admin panel: http://localhost:${PORT}/admin`);
+      const site = frontendUrl();
       console.log(
         isWebsiteReady()
-          ? `WAREZONE website: http://localhost:${PORT}/`
-          : 'WAREZONE website: not built yet (run npm run website:build)'
+          ? `WAREZONE website (bundled): http://localhost:${PORT}/`
+          : site
+            ? `WAREZONE website (frontend): ${site}`
+            : 'WAREZONE website: deploy website/ to sk-win-web (or set FRONTEND_URL + SERVE_WEBSITE=true)'
       );
       console.log(`APK download page: http://localhost:${PORT}/download`);
       if (process.env.PUBLIC_BASE_URL) {
