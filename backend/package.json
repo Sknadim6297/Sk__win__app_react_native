@@ -11,6 +11,8 @@
     "dev": "nodemon server.js",
     "seed": "node seed.js",
     "seed:tournaments": "node seed-tournaments.js",
+    "create:admin": "node scripts/create-admin.js",
+    "make:admin": "node scripts/make-admin.js",
     "reset:data": "node scripts/reset-database.js"
   },
   "keywords": [],
