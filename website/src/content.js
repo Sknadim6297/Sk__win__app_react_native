@@ -21,7 +21,7 @@ export const ABOUT = {
 };
 
 export const HOW_IT_WORKS = [
-  { n: '1', title: 'Register', body: 'Create your account in the WAREZONE app with email, Google, or mobile number.' },
+  { n: '1', title: 'Register', body: 'Create your account in the WAREZONE Android app or the iPhone web app with email, Google, or mobile number.' },
   { n: '2', title: 'Join Match', body: 'Select a tournament and pay the entry fee from your in-app wallet.' },
   { n: '3', title: 'Win & Withdraw', body: 'Prizes credit to your wallet after results. Withdraw from the app wallet.' },
 ];
@@ -36,7 +36,7 @@ export const WHY = [
 export const FAQ = [
   {
     q: 'How do I join a tournament?',
-    a: 'Download the WAREZONE app, open a match, and tap Join. Enter your in-game name and UID. Joining is completed in the app, not on this website.',
+    a: 'Open the WAREZONE Android app or the iPhone web app, open a match, and tap Join. Enter your in-game name and UID. This marketing site is for browsing only.',
   },
   {
     q: 'How are prizes distributed?',
@@ -52,7 +52,7 @@ export const FAQ = [
   },
   {
     q: 'Where is WAREZONE available?',
-    a: 'WAREZONE currently offers an Android app. Use the Download App page for the latest APK release.',
+    a: 'Android players download the APK from the Download page. iPhone players open the WAREZONE web app in Safari and can Add to Home Screen. There is no iPhone IPA file, and the web app is not a native App Store app.',
   },
 ];
 

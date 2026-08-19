@@ -491,6 +491,14 @@ footer.site-footer {
 .os-card .btn { margin-top: 14px; width: 100%; }
 .os-help { margin-top: 12px; font-size: 13px; }
 .os-card-active { border-color: rgba(255, 107, 0, 0.55); box-shadow: 0 16px 36px rgba(255, 107, 0, 0.16); }
+.a2hs-steps {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.a2hs-steps li { margin: 6px 0; }
 .hero-banner {
   width: 100%;
   height: min(280px, 42vw);

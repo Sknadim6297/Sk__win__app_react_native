@@ -8,7 +8,7 @@ export default function Seo({ title, description }) {
     document.title = pageTitle;
     const desc =
       description ||
-      'WAREZONE Free Fire esports tournaments. Browse matches, results, and leaderboards — download the Android app to join.';
+      'WAREZONE Free Fire esports tournaments. Browse matches, then join from the Android app or iPhone web app.';
     let tag = document.querySelector('meta[name="description"]');
     if (!tag) {
       tag = document.createElement('meta');

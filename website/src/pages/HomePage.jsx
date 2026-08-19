@@ -6,6 +6,7 @@ import { api } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import { BRAND, HOW_IT_WORKS, WHY } from '../content';
 import { inr, mediaUrl, statusBucket } from '../utils';
+import { PWA_URL } from '../release';
 
 export default function HomePage() {
   const { data, loading } = useFetch(async () => {
@@ -56,16 +57,16 @@ export default function HomePage() {
               ))}
             </h1>
             <p className="lede">
-              {BRAND.tagline} Browse live Clash Squad and Battle Royale matches here — join and get
-              paid from the official WAREZONE Android app.
+              {BRAND.tagline} Browse live Clash Squad and Battle Royale matches here — join from
+              the Android app or the iPhone web app.
             </p>
             <div className="hero-actions">
               <Link className="btn btn-primary" to="/download">
-                Download App
+                Get the app
               </Link>
-              <Link className="btn btn-ghost" to="/tournaments">
-                View Tournaments
-              </Link>
+              <a className="btn btn-ghost" href={`${PWA_URL}/login`} target="_blank" rel="noreferrer">
+                Open web app
+              </a>
             </div>
             <div className="hero-meta">
               <div>
@@ -236,7 +237,7 @@ export default function HomePage() {
           <div className="section-head">
             <div>
               <h2>How it works</h2>
-              <p className="sub">Register, join, and withdraw from the official Android app.</p>
+              <p className="sub">Register, join, and withdraw from the Android app or iPhone web app.</p>
             </div>
             <Link className="link" to="/how-it-works">
               Full guide →

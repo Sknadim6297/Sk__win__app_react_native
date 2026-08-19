@@ -37,7 +37,17 @@
     },
     "web": {
       "favicon": "./assets/logo/ROUND_GAME_LOGO.png",
-      "backgroundColor": "#0a0e1a"
+      "name": "WAREZONE",
+      "shortName": "WAREZONE",
+      "lang": "en",
+      "scope": "/",
+      "themeColor": "#0a0e1a",
+      "backgroundColor": "#0a0e1a",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/",
+      "bundler": "metro",
+      "output": "single"
     },
     "androidStatusBar": {
       "backgroundColor": "#0a0e1a",

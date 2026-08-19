@@ -2,12 +2,30 @@
 <html lang="en" class="dm-sans">
   <head>
     <meta charset="utf-8" />
-    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>WAREZONE Tournament</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,700;0,9..40,800&display=swap" rel="stylesheet" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, shrink-to-fit=no"
+    />
+    <meta name="theme-color" content="#0a0e1a" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="WAREZONE Free Fire tournaments — join matches, view results, and manage your wallet."
+    />
+    <meta name="application-name" content="WAREZONE" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="WAREZONE" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="WAREZONE" />
+    <meta property="og:description" content="Compete. Conquer. Win Big. Free Fire tournaments." />
+    <meta property="og:image" content="/apple-touch-icon.png" />
+    <title>WAREZONE</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <style>
       html,
       body,
@@ -16,7 +34,10 @@
         margin: 0;
         padding: 0;
         min-height: 100%;
+        min-height: 100dvh;
         height: 100%;
+        overflow-x: hidden;
+        overscroll-behavior: none;
       }
       .dm-sans,
       html,
@@ -25,10 +46,26 @@
         font-family: "DM Sans", sans-serif;
         font-weight: 700;
         font-style: normal;
+        -webkit-tap-highlight-color: transparent;
+      }
+      @media (min-width: 768px) {
+        html, body { background: #05070f !important; }
+        #root {
+          max-width: 480px;
+          margin: 0 auto;
+          box-shadow: 0 0 80px rgba(0, 0, 0, 0.55);
+        }
       }
     </style>
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {});
+        });
+      }
+    </script>
   </body>
 </html>

@@ -9,6 +9,7 @@ import {
   Linking,
   Animated,
   Alert,
+  Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -86,6 +87,7 @@ export default function ZapUpiPaymentScreen({ navigation, route }) {
   const pollRef = useRef(null);
   const doneRef = useRef(false);
   const outcomeRef = useRef(null);
+  const webPayOpenedRef = useRef(false);
   const successScale = useRef(new Animated.Value(0.4)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
 
@@ -187,6 +189,7 @@ export default function ZapUpiPaymentScreen({ navigation, route }) {
     if (creating) return;
     doneRef.current = false;
     outcomeRef.current = null;
+    webPayOpenedRef.current = false;
     setCreating(true);
     setPhase('CREATING');
     setMessage('Creating ZapUPI order…');
@@ -332,6 +335,14 @@ export default function ZapUpiPaymentScreen({ navigation, route }) {
     return () => sub.remove();
   }, [confirmLeave]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !paymentUrl || phase !== 'PENDING' || webPayOpenedRef.current) {
+      return;
+    }
+    webPayOpenedRef.current = true;
+    Linking.openURL(paymentUrl).catch(() => {});
+  }, [paymentUrl, phase]);
+
   const goAfterSuccess = () => {
     if (isJoin && tournamentId) {
       navigation.replace('TournamentDetails', { tournamentId, joinedSuccess: true });
@@ -365,7 +376,18 @@ export default function ZapUpiPaymentScreen({ navigation, route }) {
         </View>
       </View>
 
-      {showWebView ? (
+      {showWebView && Platform.OS === 'web' ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={PAGE.cyan} size="large" />
+          <Text style={styles.hint}>
+            Complete UPI payment in the new browser tab. Stay here — we confirm with the server
+            (Safari cannot open UPI apps the same way the Android app can).
+          </Text>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => Linking.openURL(paymentUrl).catch(() => {})}>
+            <Text style={styles.primaryText}>Open payment page</Text>
+          </TouchableOpacity>
+        </View>
+      ) : showWebView ? (
         <WebView
           source={{ uri: paymentUrl }}
           style={styles.webview}

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useMemo } from 'react';
 import { InteractionManager, LogBox, View, StyleSheet, StatusBar, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as SplashScreen from 'expo-splash-screen';
@@ -21,9 +21,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import CustomTabBar from './components/navigation/CustomTabBar';
+import PwaChrome from './components/PwaChrome';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import * as ExpoLinking from 'expo-linking';
 import { useFonts } from 'expo-font';
+import { createAppLinking } from './utils/webLinking';
 import {
   DMSans_700Bold,
   DMSans_800ExtraBold,
@@ -102,7 +103,7 @@ export default function App() {
     <SafeAreaProvider style={styles.root}>
       <GestureHandlerRootView style={styles.root}>
         <StatusBar barStyle="light-content" backgroundColor={WELCOME_BG} translucent={false} />
-        <View style={styles.root}>
+        <View style={[styles.root, IS_WEB && styles.webShell]}>
           {!fontsLoaded ? (
             <AppLoadingScreen />
           ) : (
@@ -110,6 +111,7 @@ export default function App() {
               <AppNavigator />
             </AuthProvider>
           )}
+          {IS_WEB ? <PwaChrome /> : null}
         </View>
       </GestureHandlerRootView>
     </SafeAreaProvider>
@@ -118,15 +120,7 @@ export default function App() {
 
 function AppNavigator() {
   const { isAuthenticated, isLoading, isAdmin } = useContext(AuthContext);
-  const linking = {
-    prefixes: [ExpoLinking.createURL('/')],
-    config: {
-      screens: {
-        AdminResetPassword: 'admin-reset-password',
-        AdminForgotPassword: 'admin-forgot-password',
-      },
-    },
-  };
+  const linking = useMemo(() => createAppLinking(), []);
 
   useEffect(() => {
     if (!isLoading) {
@@ -259,9 +253,16 @@ const styles = StyleSheet.create({
     ...(IS_WEB
       ? {
           height: '100%',
-          minHeight: '100vh',
+          minHeight: '100dvh',
           width: '100%',
         }
       : null),
+  },
+  webShell: {
+    maxWidth: 480,
+    width: '100%',
+    alignSelf: 'center',
+    overflow: 'hidden',
+    boxShadow: '0 0 80px rgba(0, 0, 0, 0.55)',
   },
 });

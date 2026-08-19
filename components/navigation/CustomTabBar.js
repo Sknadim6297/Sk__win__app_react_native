@@ -16,7 +16,10 @@ const TABS = [
 
 export default function CustomTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 10);
+  const bottomInset = Math.max(
+    insets.bottom,
+    Platform.OS === 'web' ? 20 : Platform.OS === 'ios' ? 8 : 10
+  );
 
   return (
     <View style={[styles.shell, { paddingBottom: bottomInset }]}>

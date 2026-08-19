@@ -39,6 +39,9 @@ backend/.env
 backend/.env.*
 !backend/.env.example
 
+# generated PWA icon (copied from assets/logo at build)
+public/apple-touch-icon.png
+
 # typescript
 *.tsbuildinfo
 

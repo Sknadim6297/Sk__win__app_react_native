@@ -6,7 +6,7 @@ import { api } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import { apkHref } from '../utils';
 import { BRAND, WHY } from '../content';
-import { IOS_INSTALL_URL, IOS_APP_STORE_URL } from '../release';
+import { PWA_URL } from '../release';
 
 function detectPlatform() {
   if (typeof navigator === 'undefined') return 'other';
@@ -22,22 +22,22 @@ export default function DownloadPage() {
   const canDownload = Boolean(rel?.apkExists && rel?.downloadUrl);
   const href = canDownload ? apkHref(rel) : '/downloads/WAREZONE-v1.0.2.apk';
   const platform = useMemo(detectPlatform, []);
-  const iosReady = Boolean(IOS_INSTALL_URL);
+  const pwaHref = `${PWA_URL}/login`;
 
   return (
     <>
       <Seo
         title="Download App"
-        description="Download WAREZONE for Android. iPhone players install from TestFlight or the App Store."
+        description="Download the WAREZONE Android APK, or open the WAREZONE web app on iPhone and add it to your Home Screen."
       />
       <section className="page-hero">
         <div className="container hero-grid">
           <div>
             <p className="kicker">Android & iPhone</p>
-            <h1>Download WAREZONE</h1>
+            <h1>Get WAREZONE</h1>
             <p className="lede">
-              {BRAND.motto} Install the official app, create your account, and join Clash Squad or
-              Battle Royale matches.
+              {BRAND.motto} Android players install the official APK. iPhone players use the
+              WAREZONE web app in Safari — it is not a native App Store app.
             </p>
             {loading && <p className="muted">Loading release…</p>}
             {error && <p className="error">{error}</p>}
@@ -45,7 +45,7 @@ export default function DownloadPage() {
             <div className="os-grid">
               <article className={`card os-card ${platform === 'android' ? 'os-card-active' : ''}`}>
                 <p className="kicker">Android</p>
-                <h2>Get the APK</h2>
+                <h2>Download APK</h2>
                 <p className="muted">Version {rel?.version || '1.0.2'}</p>
                 <p className="muted">{rel?.androidMin || 'Android 8.0+'}</p>
                 <p className="muted">Size {rel?.apkExists ? rel.sizeLabel : '—'}</p>
@@ -60,30 +60,24 @@ export default function DownloadPage() {
 
               <article className={`card os-card ${platform === 'ios' ? 'os-card-active' : ''}`}>
                 <p className="kicker">iPhone / iPad</p>
-                <h2>{iosReady ? 'Install iOS app' : 'iOS via TestFlight'}</h2>
-                <p className="muted">iOS 15 or newer</p>
-                {iosReady ? (
-                  <>
-                    <a className="btn btn-ghost" href={IOS_INSTALL_URL} target="_blank" rel="noreferrer">
-                      {IOS_APP_STORE_URL ? 'Open App Store' : 'Get on TestFlight'}
-                    </a>
-                    <p className="dim os-help">
-                      Apple does not allow APK-style files on iPhone. Use TestFlight or the App
-                      Store, then open WAREZONE.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <a className="btn btn-ghost" href="https://apps.apple.com/app/testflight/id899247664" target="_blank" rel="noreferrer">
-                      Install TestFlight
-                    </a>
-                    <p className="dim os-help">
-                      iPhone cannot install an Android APK. After we publish WAREZONE on TestFlight,
-                      this button will open the invite. Until then, browse matches here and play on
-                      Android.
-                    </p>
-                  </>
-                )}
+                <h2>Open web app</h2>
+                <p className="muted">Safari on iOS 16.4 or newer</p>
+                <a className="btn btn-primary" href={pwaHref} target="_blank" rel="noreferrer">
+                  Open WAREZONE Web App
+                </a>
+                <p className="dim os-help">
+                  There is no iPhone APK or IPA download. WAREZONE on iPhone is a web app you can
+                  add to your Home Screen. It is not a native iOS App Store app.
+                </p>
+                <p className="muted" style={{ marginTop: 14, marginBottom: 6 }}>
+                  Add to Home Screen
+                </p>
+                <ol className="a2hs-steps">
+                  <li>Open the web app in Safari (not Chrome).</li>
+                  <li>Tap the Share button (square with an arrow).</li>
+                  <li>Scroll and tap Add to Home Screen.</li>
+                  <li>Tap Add. Open WAREZONE from your Home Screen like an app.</li>
+                </ol>
               </article>
             </div>
 

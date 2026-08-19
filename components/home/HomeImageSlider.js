@@ -4,16 +4,14 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Linking,
   Animated,
   ScrollView,
 } from 'react-native';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import { getLayoutWidth } from '../../utils/layout';
 import { COLORS } from '../../styles/theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SLIDER_WIDTH = SCREEN_WIDTH - 32;
 const SLIDER_HEIGHT = 180;
 const AUTO_PLAY_MS = 4500;
 
@@ -31,10 +29,11 @@ function SliderSkeleton() {
     return () => loop.stop();
   }, [pulse]);
 
-  return <Animated.View style={[styles.skeleton, { opacity: pulse }]} />;
+  return <Animated.View style={[styles.skeleton, { opacity: pulse, width: getLayoutWidth() - 32 }]} />;
 }
 
 export default function HomeImageSlider({ sliders = [], loading = false }) {
+  const sliderWidth = getLayoutWidth() - 32;
   const scrollRef = useRef(null);
   const [index, setIndex] = useState(0);
 
@@ -44,13 +43,13 @@ export default function HomeImageSlider({ sliders = [], loading = false }) {
     const timer = setInterval(() => {
       setIndex((prev) => {
         const next = (prev + 1) % sliders.length;
-        scrollRef.current?.scrollTo({ x: next * SLIDER_WIDTH, animated: true });
+        scrollRef.current?.scrollTo({ x: next * sliderWidth, animated: true });
         return next;
       });
     }, AUTO_PLAY_MS);
 
     return () => clearInterval(timer);
-  }, [sliders.length]);
+  }, [sliders.length, sliderWidth]);
 
   if (loading) {
     return <SliderSkeleton />;
@@ -76,7 +75,7 @@ export default function HomeImageSlider({ sliders = [], loading = false }) {
         nestedScrollEnabled
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) => {
-          const idx = Math.round(e.nativeEvent.contentOffset.x / SLIDER_WIDTH);
+          const idx = Math.round(e.nativeEvent.contentOffset.x / sliderWidth);
           setIndex(idx);
         }}
       >
@@ -90,7 +89,7 @@ export default function HomeImageSlider({ sliders = [], loading = false }) {
               activeOpacity={hasLink ? 0.9 : 1}
               disabled={!hasLink}
               onPress={() => openLink(item.link)}
-              style={styles.slide}
+              style={[styles.slide, { width: sliderWidth }]}
             >
               {uri ? (
                 <Image source={{ uri }} style={styles.image} resizeMode="cover" />
@@ -118,7 +117,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   slide: {
-    width: SLIDER_WIDTH,
     height: SLIDER_HEIGHT,
     borderRadius: 16,
     overflow: 'hidden',
@@ -132,7 +130,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#121B33',
   },
   skeleton: {
-    width: SLIDER_WIDTH,
     height: SLIDER_HEIGHT,
     borderRadius: 16,
     backgroundColor: '#1a2340',

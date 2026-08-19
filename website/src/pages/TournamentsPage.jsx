@@ -27,7 +27,7 @@ export default function TournamentsPage() {
         <div className="container">
           <p className="kicker">Matches</p>
           <h1>Tournaments</h1>
-          <p className="muted">Same match list the app uses. Join from the Android app.</p>
+          <p className="muted">Same match list the app uses. Join from the Android APK or the iPhone web app.</p>
         </div>
       </section>
       <section className="section" style={{ paddingTop: 12 }}>

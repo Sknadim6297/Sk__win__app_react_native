@@ -7,21 +7,20 @@ import {
   StatusBar,
   FlatList,
   ActivityIndicator,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { gameService } from '../services/api';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import { getLayoutWidth } from '../utils/layout';
 import GameModePoster from '../components/home/GameModePoster';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_PADDING = 12;
 const GRID_GAP = 12;
 const NUM_COLUMNS = 2;
 const CARD_WIDTH =
-  (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+  (getLayoutWidth() - GRID_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
 const CARD_HEIGHT = CARD_WIDTH * 0.72;
 
 const mapMode = (mode, index) => {

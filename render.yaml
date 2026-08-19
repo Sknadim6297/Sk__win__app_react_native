@@ -59,10 +59,49 @@ services:
         value: "20.18.0"
       - key: VITE_API_URL
         value: https://sk-win-api.onrender.com
+      - key: VITE_PWA_URL
+        value: https://sk-win-pwa.onrender.com
       - key: VITE_IOS_TESTFLIGHT_URL
         sync: false
       - key: VITE_IOS_APP_URL
         sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: web
+    name: sk-win-pwa
+    runtime: static
+    plan: free
+    region: singapore
+    buildCommand: npm install && node scripts/prepare-pwa-icons.js && npx expo export --platform web && node scripts/copy-pwa-public.js
+    staticPublishPath: dist
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /sw.js
+        name: Service-Worker-Allowed
+        value: /
+      - path: /manifest.webmanifest
+        name: Content-Type
+        value: application/manifest+json
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.0"
+      - key: EXPO_PUBLIC_API_URL
+        value: https://sk-win-api.onrender.com/api
+      - key: EXPO_PUBLIC_APP_NAME
+        value: WAREZONE
+      - key: EXPO_PUBLIC_PAYMENT_ENABLED
+        value: "false"
+      - key: EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+        value: 188535028372-q5ure3if58qkkrhgeimgrhoo5td7e9gs.apps.googleusercontent.com
+      - key: EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
+        value: 188535028372-vgg0o270r97e3qtg21ilpt0m6dj1t37j.apps.googleusercontent.com
+      - key: EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+        value: 188535028372-c7lhtl9ku9qufa0v4b163icqepmrrl8a.apps.googleusercontent.com
     routes:
       - type: rewrite
         source: /*

@@ -12,7 +12,7 @@ export default function HowItWorksPage() {
         <div className="container">
           <p className="kicker">Guide</p>
           <h1>How it works</h1>
-          <p className="muted">Discover matches here. Join, pay, and play in the WAREZONE app.</p>
+          <p className="muted">Discover matches here. Join, pay, and play in the Android app or iPhone web app.</p>
         </div>
       </section>
       <section className="section">

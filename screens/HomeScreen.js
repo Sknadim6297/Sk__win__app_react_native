@@ -8,12 +8,12 @@ import {
   ScrollView,
   Share,
   Linking,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
+import { getLayoutWidth } from '../utils/layout';
 import AppIcon from '../components/ui/AppIcon';
 import AppHeader from '../components/navigation/AppHeader';
 import GameModePoster from '../components/home/GameModePoster';
@@ -26,9 +26,7 @@ import {
 import HomeImageSlider from '../components/home/HomeImageSlider';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 
-const { width } = Dimensions.get('window');
-
-const MODE_CARD_WIDTH = (width - 32 - 12) / 2;
+const MODE_CARD_WIDTH = (getLayoutWidth() - 32 - 12) / 2;
 const MODE_CARD_HEIGHT = MODE_CARD_WIDTH * 0.72;
 
 export default function HomeScreen({ navigation }) {

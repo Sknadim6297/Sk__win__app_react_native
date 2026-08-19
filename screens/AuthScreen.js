@@ -212,13 +212,16 @@ export default function AuthScreen({ navigation, route }) {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' || Platform.OS === 'web' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
         <ScrollView
           contentContainerStyle={[
             styles.scroll,
-            { paddingTop: insets.top + 28, paddingBottom: insets.bottom + 28 },
+            {
+              paddingTop: insets.top + 28,
+              paddingBottom: insets.bottom + (Platform.OS === 'web' ? 96 : 28),
+            },
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

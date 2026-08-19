@@ -18,7 +18,7 @@ export default function Footer({ socials = {} }) {
             {BRAND.name}
           </Link>
           <p>{BRAND.motto}</p>
-          <p>Free Fire esports tournaments on Android.</p>
+          <p>Free Fire esports tournaments on Android and iPhone (web app).</p>
           {items.length > 0 && (
             <div className="socials" style={{ marginTop: 14 }}>
               {items.map((s) => (

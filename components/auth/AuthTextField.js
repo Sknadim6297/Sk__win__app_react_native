@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -54,7 +54,7 @@ export default function AuthTextField({
         />
       ) : null}
       <TextInput
-        style={styles.input}
+        style={[styles.input, Platform.OS === 'web' && styles.inputWeb]}
         placeholder={placeholder}
         placeholderTextColor="rgba(148, 163, 184, 0.65)"
         value={value}
@@ -62,6 +62,7 @@ export default function AuthTextField({
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
+        autoCorrect={false}
         onFocus={onFocus}
         onBlur={onBlur}
       />
@@ -91,6 +92,10 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     paddingVertical: 14,
     paddingHorizontal: 10,
+  },
+  inputWeb: {
+    fontSize: 16,
+    outlineStyle: 'none',
   },
   rightLabel: {
     ...TYPO.labelSm,

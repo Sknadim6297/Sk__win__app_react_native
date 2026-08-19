@@ -12,6 +12,7 @@ import {
   statusBucket,
   statusLabel,
 } from '../utils';
+import { PWA_URL } from '../release';
 
 export default function TournamentDetailsPage() {
   const { id } = useParams();
@@ -82,8 +83,11 @@ export default function TournamentDetailsPage() {
               </div>
 
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 22 }}>
-                <Link className="btn btn-primary" to="/download">
-                  Join in app
+                <a className="btn btn-primary" href={`${PWA_URL}/tournament/${t._id}`} target="_blank" rel="noreferrer">
+                  Join in web app
+                </a>
+                <Link className="btn btn-ghost" to="/download">
+                  Android APK
                 </Link>
                 {completed && (
                   <Link className="btn btn-ghost" to={`/results/${t._id}`}>
@@ -92,7 +96,7 @@ export default function TournamentDetailsPage() {
                 )}
               </div>
               <p className="dim" style={{ marginTop: 10, fontSize: 13 }}>
-                Room ID and password are never shown on this website. Open the WAREZONE app after you join.
+                Room ID and password stay inside the WAREZONE app / web app after you join.
               </p>
             </>
           )}
