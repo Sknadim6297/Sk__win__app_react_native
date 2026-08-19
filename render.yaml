@@ -1,9 +1,3 @@
-# Render Blueprint — WAREZONE (SK-Win)
-#
-# sk-win-api  → Backend API + admin panel + APK downloads only
-# sk-win-web  → Marketing website (React/Vite) — share THIS URL with players
-#
-# IMPORTANT: sk-win-api Root Directory must be the REPO ROOT (leave blank).
 
 services:
   - type: web
