@@ -68,15 +68,61 @@ const AdminAPI = (() => {
     return s ? `?${s}` : '';
   };
 
+    async function compressImage(file) {
+      if (!file || !String(file.type || '').startsWith('image/') || file.type === 'image/gif') {
+        return file;
+      }
+      if (file.size && file.size < 350 * 1024) return file;
+
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Could not read image'));
+        reader.readAsDataURL(file);
+      });
+
+      const img = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('Could not load image'));
+        image.src = dataUrl;
+      });
+
+      const maxW = 1600;
+      let width = img.width;
+      let height = img.height;
+      if (width > maxW) {
+        height = Math.round((height * maxW) / width);
+        width = maxW;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+      if (!blob) return file;
+      const name = String(file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg';
+      return new File([blob], name, { type: 'image/jpeg' });
+    }
+
     async function upload(file) {
       const headers = {
         Accept: 'application/json',
         'ngrok-skip-browser-warning': 'true',
       };
       if (token()) headers.Authorization = `Bearer ${token()}`;
+      const ready = await compressImage(file);
       const fd = new FormData();
-      fd.append('image', file);
-      const res = await fetch(`${base()}/api/upload`, { method: 'POST', headers, body: fd });
+      fd.append('image', ready);
+      const res = await fetch(`${base()}/api/upload`, {
+        method: 'POST',
+        headers,
+        body: fd,
+        cache: 'no-store',
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data?.error || data?.message || 'Upload failed');

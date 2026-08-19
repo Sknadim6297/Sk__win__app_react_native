@@ -1,16 +1,11 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const { authMiddleware } = require('../middleware/auth');
 const { getPublicBaseUrl } = require('../utils/publicUrl');
 
 const router = express.Router();
-
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+const { uploadsDir } = require('../utils/uploadsDir');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -27,7 +22,7 @@ const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 const upload = multer({
   storage,
-  limits: { fileSize: 8 * 1024 * 1024 },
+  limits: { fileSize: 4 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (!file.mimetype || !ALLOWED.has(file.mimetype)) {
       return cb(new Error('Upload a JPG, PNG, WEBP or GIF image'));
@@ -37,11 +32,13 @@ const upload = multer({
 });
 
 router.post('/', authMiddleware, (req, res) => {
+  req.setTimeout(120000);
+  res.setTimeout(120000);
   upload.single('image')(req, res, (err) => {
     if (err) {
       const message =
         err.code === 'LIMIT_FILE_SIZE'
-          ? 'Image must be 8MB or smaller'
+          ? 'Image must be 4MB or smaller'
           : err.message || 'Upload failed';
       return res.status(400).json({ error: message, message });
     }

@@ -72,8 +72,13 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use((req, res, next) => {
+  const type = String(req.headers['content-type'] || '');
+  if (type.includes('multipart/form-data')) return next();
+  express.json({ limit: '2mb' })(req, res, next);
+});
+const { uploadsDir } = require('./utils/uploadsDir');
+app.use('/uploads', express.static(uploadsDir));
 
 const WEBSITE_DIST = path.join(__dirname, '..', 'website', 'dist');
 const WEBSITE_INDEX = path.join(WEBSITE_DIST, 'index.html');
@@ -319,6 +324,9 @@ app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     console.error('JSON Parse Error:', err.message);
     return res.status(400).json({ error: 'Invalid JSON in request body' });
+  }
+  if (err?.type === 'entity.too.large' || err?.status === 413) {
+    return res.status(413).json({ error: 'File is too large. Use a smaller image.' });
   }
   console.error('Server Error:', err.stack);
   res.status(500).json({ error: 'Internal server error', message: err.message });

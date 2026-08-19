@@ -366,7 +366,7 @@ const AdminUI = (() => {
           <div class="uploader-actions">
             <label class="btn btn-ghost">Upload image<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden data-upload="${esc(name)}" /></label>
           </div>
-          <span class="help">Max 8MB. This image is shown in the player app.</span>
+          <span class="help">JPG, PNG or WEBP. Large photos are compressed before upload.</span>
         </div>
       </div>`;
   }
