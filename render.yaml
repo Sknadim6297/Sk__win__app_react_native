@@ -56,7 +56,7 @@ services:
         value: application/vnd.android.package-archive
       - path: /downloads/*
         name: Content-Disposition
-        value: attachment; filename="WAREZONE-v1.0.1.apk"
+        value: attachment; filename="WAREZONE-v1.0.2.apk"
       - path: /downloads/*
         name: X-Content-Type-Options
         value: nosniff

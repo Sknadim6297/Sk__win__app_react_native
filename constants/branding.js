@@ -2,7 +2,7 @@
 export const BRAND = {
   name: 'WAREZONE',
   fullName: 'WAREZONE Tournament',
-  tagline: 'AMR Tournament',
+  tagline: 'Free Fire esports tournaments',
   motto: 'Compete. Conquer. Win Big.',
 };
 

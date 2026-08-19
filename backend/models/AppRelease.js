@@ -7,7 +7,7 @@ const appReleaseSchema = new mongoose.Schema(
   {
     version: { type: String, required: true, trim: true },
     fileName: { type: String, required: true, trim: true },
-    title: { type: String, default: 'WarZone AMR Tournament' },
+    title: { type: String, default: 'WAREZONE Tournament' },
     androidMin: { type: String, default: 'Android 8.0+' },
     releaseNotes: { type: String, default: '' },
     downloadCount: { type: Number, default: 0, min: 0 },

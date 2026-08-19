@@ -85,12 +85,11 @@ export function brandLogoUrl() {
 }
 
 export function apkHref(releaseInfo) {
-  const fallback = `/downloads/${APP_RELEASE.fileName}`;
-  if (!releaseInfo?.downloadUrl) {
-    return API_BASE ? `${API_BASE}${fallback}` : fallback;
+  const fileName = APP_RELEASE.fileName || releaseInfo?.fileName || 'WAREZONE-v1.0.2.apk';
+  const path = `/downloads/${encodeURIComponent(fileName)}?v=${encodeURIComponent(APP_RELEASE.version)}`;
+  if (releaseInfo?.downloadUrl && String(releaseInfo.downloadUrl).startsWith('http')) {
+    const u = String(releaseInfo.downloadUrl);
+    return u.includes('?') ? `${u}&v=${APP_RELEASE.version}` : `${u}?v=${APP_RELEASE.version}`;
   }
-  const u = String(releaseInfo.downloadUrl);
-  if (u.startsWith('http')) return u;
-  const path = u.startsWith('/') ? u : `/${u}`;
   return API_BASE ? `${API_BASE}${path}` : path;
 }

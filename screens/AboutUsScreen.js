@@ -28,7 +28,7 @@ const AboutUsScreen = ({ navigation }) => {
               Our mission is to create a fair and exciting gaming environment for all players. Join
               tournaments, compete with top players, and win exciting prizes.
             </Text>
-            <Text style={styles.version}>Version 1.0.1</Text>
+            <Text style={styles.version}>Version 1.0.2</Text>
           </View>
         </View>
       </ScrollView>

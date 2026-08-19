@@ -10,7 +10,7 @@ export default function DownloadPage() {
   const { data, loading, error } = useFetch(() => api.downloadRelease(), []);
   const rel = data?.release;
   const canDownload = Boolean(rel?.apkExists && rel?.downloadUrl);
-  const href = canDownload ? apkHref(rel) : '/downloads/WAREZONE-v1.0.1.apk';
+  const href = canDownload ? apkHref(rel) : '/downloads/WAREZONE-v1.0.2.apk';
 
   return (
     <>
@@ -46,8 +46,9 @@ export default function DownloadPage() {
                   {rel.downloadLabel || 'Download APK'}
                 </a>
                 <p className="dim" style={{ marginTop: 14, fontSize: 13 }}>
-                  Android 8.0 or newer. After download, open the file and allow install from this
-                  source if Android asks.
+                  Android 8.0 or newer. Uninstall any old WAREZONE app first, then install this
+                  build. After download, open the file and allow install from this source if Android
+                  asks.
                 </p>
               </div>
             )}

@@ -2,7 +2,7 @@
   "expo": {
     "name": "WAREZONE",
     "slug": "sk-win",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/logo/ROUND_GAME_LOGO.png",
     "userInterfaceStyle": "dark",
@@ -31,7 +31,7 @@
         "backgroundColor": "#0a0e1a"
       },
       "package": "com.skwin.tournament",
-      "versionCode": 2,
+      "versionCode": 3,
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {

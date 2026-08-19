@@ -166,6 +166,7 @@ app.get('/downloads/:fileName', async (req, res) => {
     res.setHeader('Content-Type', 'application/vnd.android.package-archive');
     res.setHeader('Content-Disposition', `attachment; filename="${outName}"`);
     res.setHeader('Content-Length', String(stats.sizeBytes));
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     return res.sendFile(stats.filePath);
   } catch (error) {
     console.error('[download] serve error:', error.message);

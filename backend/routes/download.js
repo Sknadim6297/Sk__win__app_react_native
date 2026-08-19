@@ -92,11 +92,31 @@ async function getOrCreateLatestRelease() {
     release = await AppRelease.create(DEFAULT_RELEASE);
   }
 
-  const stats = getApkStats(release.fileName);
-  if (stats.exists && stats.fileName && stats.fileName !== release.fileName) {
-    release.fileName = stats.fileName;
-    const versionMatch = String(stats.fileName).match(/v(\d+\.\d+\.\d+)/i);
-    if (versionMatch) release.version = versionMatch[1];
+  const configured = getApkStats(DEFAULT_RELEASE.fileName);
+  const newest = listApkFiles()[0];
+  const stats = configured.exists
+    ? configured
+    : newest
+      ? getApkStats(newest.name)
+      : getApkStats(release.fileName);
+
+  const nextFile = stats.fileName || DEFAULT_RELEASE.fileName;
+  const versionMatch = String(nextFile).match(/v(\d+\.\d+\.\d+)/i);
+  const nextVersion = versionMatch?.[1] || DEFAULT_RELEASE.version;
+  const needsUpdate =
+    release.fileName !== nextFile ||
+    release.version !== nextVersion ||
+    release.title !== DEFAULT_RELEASE.title ||
+    release.releaseNotes !== DEFAULT_RELEASE.releaseNotes;
+
+  if (needsUpdate) {
+    release.fileName = nextFile;
+    release.version = nextVersion;
+    release.title = DEFAULT_RELEASE.title;
+    release.androidMin = DEFAULT_RELEASE.androidMin;
+    release.releaseNotes = DEFAULT_RELEASE.releaseNotes;
+    release.isLatest = true;
+    release.publishedAt = new Date();
     await release.save().catch(() => {});
   }
   return release;

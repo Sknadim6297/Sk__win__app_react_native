@@ -153,7 +153,7 @@ function AppNavigator() {
       <Stack.Navigator
         key={navKey}
         initialRouteName={
-          isAuthenticated ? (isAdmin() ? 'AdminDashboard' : 'MainApp') : 'Landing'
+          isAuthenticated ? (isAdmin() ? 'AdminDashboard' : 'MainApp') : 'Auth'
         }
         screenOptions={{
           headerShown: false,
