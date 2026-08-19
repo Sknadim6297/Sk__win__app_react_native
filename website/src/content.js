@@ -21,12 +21,9 @@ export const ABOUT = {
 };
 
 export const HOW_IT_WORKS = [
-  { n: '01', title: 'Download App', body: 'Install the official WAREZONE Android app from this website.' },
-  { n: '02', title: 'Create Account', body: 'Sign up with email or Google inside the app.' },
-  { n: '03', title: 'Choose Tournament', body: 'Pick Clash Squad or Battle Royale from live and upcoming matches.' },
-  { n: '04', title: 'Join Match', body: 'Enter your in-game name and UID, then join from your coin wallet.' },
-  { n: '05', title: 'Compete', body: 'Room details are shared in the app before the match starts.' },
-  { n: '06', title: 'Win Rewards', body: 'When results are published, prizes are credited to your in-app wallet.' },
+  { n: '1', title: 'Register', body: 'Create your account in the WAREZONE app with email, Google, or mobile number.' },
+  { n: '2', title: 'Join Match', body: 'Select a tournament and pay the entry fee from your in-app wallet.' },
+  { n: '3', title: 'Win & Withdraw', body: 'Prizes credit to your wallet after results. Withdraw from the app wallet.' },
 ];
 
 export const WHY = [

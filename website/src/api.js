@@ -37,6 +37,7 @@ export const api = {
   announcement: (id) => get(`/api/announcements/${id}`),
   tutorials: () => get('/api/tutorials'),
   downloadRelease: () => get('/api/download/release'),
+  site: () => get('/api/config/site'),
 };
 
 export { API_BASE, url };

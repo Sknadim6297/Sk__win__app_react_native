@@ -5,21 +5,22 @@ import PhoneShowcase from '../components/PhoneShowcase';
 import { api } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import { BRAND, HOW_IT_WORKS, WHY } from '../content';
-import { mediaUrl, statusBucket } from '../utils';
+import { inr, mediaUrl, statusBucket } from '../utils';
 
 export default function HomePage() {
   const { data, loading } = useFetch(async () => {
-    const [tournaments, home, sliders, games, board, news] = await Promise.all([
+    const [tournaments, home, sliders, games, board, news, site] = await Promise.all([
       api.tournaments().catch(() => []),
       api.homeConfig().catch(() => ({})),
       api.sliders().catch(() => []),
       api.games().catch(() => []),
       api.leaderboard('all').catch(() => ({ players: [] })),
       api.announcements().catch(() => []),
+      api.site().catch(() => ({ stats: {}, recentWithdrawals: [], modes: [] })),
     ]);
     const ff = (Array.isArray(games) ? games : []).find((g) => /free\s*fire/i.test(g.name || '')) || games?.[0];
-    const modes = ff?._id ? await api.gameModes(ff._id).catch(() => []) : [];
-    return { tournaments, home, sliders, modes, board, news };
+    const modesFromGame = ff?._id ? await api.gameModes(ff._id).catch(() => []) : [];
+    return { tournaments, home, sliders, modesFromGame, board, news, site };
   }, []);
 
   const list = Array.isArray(data?.tournaments) ? data.tournaments : [];
@@ -27,11 +28,18 @@ export default function HomePage() {
   const done = list.filter((t) => statusBucket(t) === 'completed').slice(0, 3);
   const players = data?.board?.players || [];
   const news = Array.isArray(data?.news) ? data.news.slice(0, 3) : [];
-  const modes = (data?.modes || []).map((m) => ({
+  const siteModes = Array.isArray(data?.site?.modes) ? data.site.modes : [];
+  const gameModes = Array.isArray(data?.modesFromGame) ? data.modesFromGame : [];
+  const modeCards = (siteModes.length ? siteModes : gameModes).slice(0, 6);
+  const modes = modeCards.map((m) => ({
     name: (m.name || 'MODE').toUpperCase(),
     image: mediaUrl(m.image),
   }));
   const ticker = data?.home?.latestAnnouncementTitle || data?.home?.latestNews?.text;
+  const stats = data?.site?.stats || {};
+  const withdrawals = Array.isArray(data?.site?.recentWithdrawals)
+    ? data.site.recentWithdrawals.filter((w) => Number(w.amount) > 0)
+    : [];
 
   return (
     <>
@@ -61,12 +69,16 @@ export default function HomePage() {
             </div>
             <div className="hero-meta">
               <div>
-                <strong>{list.length || '—'}</strong>
-                Matches listed
+                <strong>{stats.totalUsers ?? '—'}</strong>
+                Players
               </div>
               <div>
-                <strong>{players.length || '—'}</strong>
-                Ranked players
+                <strong>{stats.totalMatches ?? '—'}</strong>
+                Matches played
+              </div>
+              <div>
+                <strong>{stats.totalWinnings != null ? `₹${inr(stats.totalWinnings)}` : '—'}</strong>
+                Total winnings
               </div>
             </div>
           </div>
@@ -86,6 +98,81 @@ export default function HomePage() {
           </div>
         </section>
       )}
+
+      <section className="section">
+        <div className="container">
+          <div className="section-head">
+            <div>
+              <h2>Live stats</h2>
+              <p className="sub">Pulled live from the WAREZONE database — not placeholder numbers.</p>
+            </div>
+          </div>
+          <div className="big-stats">
+            <article className="card big-stat">
+              <strong>{inr(stats.totalUsers || 0)}</strong>
+              <span>Total Users</span>
+            </article>
+            <article className="card big-stat">
+              <strong>{inr(stats.totalMatches || 0)}</strong>
+              <span>Total Matches Played</span>
+            </article>
+            <article className="card big-stat">
+              <strong>₹{inr(stats.totalWinnings || 0)}</strong>
+              <span>Total Winnings</span>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          <div className="section-head">
+            <div>
+              <h2>Recent withdrawals</h2>
+              <p className="sub">Latest wallet withdrawals from the app. Amounts are real.</p>
+            </div>
+          </div>
+          {withdrawals.length === 0 ? (
+            <p className="empty">No withdrawals yet. They show here after players cash out in the app.</p>
+          ) : (
+            <div className="withdraw-list card">
+              {withdrawals.map((w, i) => (
+                <div className="withdraw-row" key={`${w.name}-${w.at}-${i}`}>
+                  <span className="withdraw-name">{w.name}</span>
+                  <span className="withdraw-amt">₹{inr(w.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          <div className="section-head">
+            <div>
+              <h2>Tournament modes</h2>
+              <p className="sub">Modes configured in Arena Control for Free Fire.</p>
+            </div>
+            <Link className="link" to="/tournaments">
+              Browse matches →
+            </Link>
+          </div>
+          {modeCards.length === 0 ? (
+            <p className="empty">Add game modes in the admin panel to show them here.</p>
+          ) : (
+            <div className="grid-3">
+              {modeCards.map((m) => (
+                <article className="card mode-card" key={m.id || m.name}>
+                  {m.image ? <img className="mode-card-img" src={mediaUrl(m.image)} alt="" /> : null}
+                  <h3>{m.name}</h3>
+                  <p>{m.description || 'Join this mode from the WAREZONE app.'}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
       <section className="section">
         <div className="container">
@@ -140,7 +227,7 @@ export default function HomePage() {
           <div className="section-head">
             <div>
               <h2>How it works</h2>
-              <p className="sub">Play happens in the app. This site is how you discover the arena.</p>
+              <p className="sub">Register, join, and withdraw from the official Android app.</p>
             </div>
             <Link className="link" to="/how-it-works">
               Full guide →
@@ -149,7 +236,9 @@ export default function HomePage() {
           <div className="grid-3">
             {HOW_IT_WORKS.map((s) => (
               <article className="card step-card" key={s.n}>
-                <div className="step-num">STEP {s.n}</div>
+                <div className="step-num">
+                  {s.n} — {s.title}
+                </div>
                 <h3>{s.title}</h3>
                 <p>{s.body}</p>
               </article>

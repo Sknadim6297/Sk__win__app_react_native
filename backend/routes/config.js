@@ -3,6 +3,10 @@ const CoinPack = require('../models/CoinPack');
 const HomeConfig = require('../models/HomeConfig');
 const TutorialVideo = require('../models/TutorialVideo');
 const Announcement = require('../models/Announcement');
+const User = require('../models/User');
+const Tournament = require('../models/Tournament');
+const WalletTransaction = require('../models/WalletTransaction');
+const GameMode = require('../models/GameMode');
 const { normalizeMediaUrl } = require('../utils/publicUrl');
 
 const router = express.Router();
@@ -76,6 +80,78 @@ router.get('/home', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to load home config' });
+  }
+});
+
+function publicPlayerName(user) {
+  const raw = String(user?.name || user?.username || 'Player').trim();
+  const first = raw.split(/\s+/)[0];
+  return first.slice(0, 18) || 'Player';
+}
+
+function modeBlurb(name, description) {
+  if (description && String(description).trim()) return String(description).trim();
+  const n = String(name || '').toLowerCase();
+  if (/per.?kill|kill/.test(n)) return 'Earn per kill. Fast-paced matches.';
+  if (/survival|last/.test(n)) return 'Top 3 share prize pool. Play smart, last long.';
+  if (/1\s*v\s*1|duel/.test(n)) return 'Quick matches with instant winners.';
+  if (/clash|squad/.test(n)) return 'Short Clash Squad matches with real rewards.';
+  if (/battle|royale|full.?map/.test(n)) return 'Battle Royale tournaments with prize pools.';
+  return 'Join this mode from the official WAREZONE app.';
+}
+
+router.get('/site', async (req, res) => {
+  try {
+    const [totalUsers, tournamentCount, playAgg, winAgg, withdrawals, modes] = await Promise.all([
+      User.countDocuments({ role: { $ne: 'admin' } }),
+      Tournament.countDocuments({}),
+      User.aggregate([
+        { $match: { role: { $ne: 'admin' } } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$tournament.participatedCount', 0] } } } },
+      ]),
+      User.aggregate([
+        { $match: { role: { $ne: 'admin' } } },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$wallet.totalWinnings', 0] } } } },
+      ]),
+      WalletTransaction.find({
+        type: 'withdraw',
+        status: { $in: ['completed', 'pending'] },
+      })
+        .sort({ createdAt: -1 })
+        .limit(12)
+        .populate('userId', 'username name')
+        .select('amount status createdAt userId')
+        .lean(),
+      GameMode.find({ status: 'active' }).sort({ createdAt: -1 }).limit(8).lean(),
+    ]);
+
+    const matchesPlayed = Number(playAgg[0]?.total || 0);
+    const totalWinnings = Math.round(Number(winAgg[0]?.total || 0));
+
+    res.json({
+      success: true,
+      stats: {
+        totalUsers,
+        totalMatches: matchesPlayed > 0 ? matchesPlayed : tournamentCount,
+        totalTournaments: tournamentCount,
+        totalWinnings,
+      },
+      recentWithdrawals: withdrawals.map((w) => ({
+        name: publicPlayerName(w.userId),
+        amount: Math.round(Number(w.amount) || 0),
+        status: w.status,
+        at: w.createdAt,
+      })),
+      modes: modes.map((m) => ({
+        id: String(m._id),
+        name: m.name,
+        description: modeBlurb(m.name, m.description),
+        image: normalizeMediaUrl(m.image, req),
+      })),
+    });
+  } catch (error) {
+    console.error('site stats:', error);
+    res.status(500).json({ error: 'Failed to load site stats' });
   }
 });
 
