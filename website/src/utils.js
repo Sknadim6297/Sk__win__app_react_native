@@ -78,16 +78,18 @@ export function modeName(t) {
   return matchLabel(t?.matchType || t?.gameMode?.name || t?.modeLabel || t?.mode || 'Match');
 }
 
+import { APP_RELEASE } from './release';
+
 export function brandLogoUrl() {
   return API_BASE ? `${API_BASE}/brand/logo.png?v=app` : '/logo.png?v=app';
 }
 
-export function apkHref(release) {
-  const fallback = '/downloads/WAREZONE-v1.0.0.apk';
-  if (!release?.downloadUrl) {
+export function apkHref(releaseInfo) {
+  const fallback = `/downloads/${APP_RELEASE.fileName}`;
+  if (!releaseInfo?.downloadUrl) {
     return API_BASE ? `${API_BASE}${fallback}` : fallback;
   }
-  const u = String(release.downloadUrl);
+  const u = String(releaseInfo.downloadUrl);
   if (u.startsWith('http')) return u;
   const path = u.startsWith('/') ? u : `/${u}`;
   return API_BASE ? `${API_BASE}${path}` : path;

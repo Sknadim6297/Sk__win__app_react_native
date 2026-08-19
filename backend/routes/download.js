@@ -17,13 +17,14 @@ const PUBLIC_ROOT = fs.existsSync(REPO_PUBLIC) ? REPO_PUBLIC : BACKEND_PUBLIC;
 const DOWNLOADS_DIR = DOWNLOAD_DIRS.find((dir) => fs.existsSync(dir)) || path.join(REPO_PUBLIC, 'downloads');
 const PAGE_PATH = path.join(PUBLIC_ROOT, 'download', 'index.html');
 
+const RELEASE = require('../../release.config.cjs');
+
 const DEFAULT_RELEASE = {
-  version: '1.0.0',
-  fileName: 'WAREZONE-v1.0.0.apk',
-  title: 'WAREZONE Tournament',
-  androidMin: 'Android 8.0 (API 26)+',
-  releaseNotes:
-    'WAREZONE — create & join tournaments, wallet top-up, live match updates, and prize distribution.',
+  version: RELEASE.version,
+  fileName: RELEASE.fileName,
+  title: RELEASE.title,
+  androidMin: RELEASE.androidMin,
+  releaseNotes: RELEASE.releaseNotes,
   isLatest: true,
   publishedAt: new Date(),
 };
@@ -94,6 +95,8 @@ async function getOrCreateLatestRelease() {
   const stats = getApkStats(release.fileName);
   if (stats.exists && stats.fileName && stats.fileName !== release.fileName) {
     release.fileName = stats.fileName;
+    const versionMatch = String(stats.fileName).match(/v(\d+\.\d+\.\d+)/i);
+    if (versionMatch) release.version = versionMatch[1];
     await release.save().catch(() => {});
   }
   return release;

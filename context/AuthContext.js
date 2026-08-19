@@ -53,7 +53,14 @@ async function parseJsonResponse(response) {
         'Ngrok blocked this request. Keep one ngrok tunnel running to port 5000, then try login again.'
       );
     }
-    throw new Error('Server returned an invalid response. Is the backend running?');
+    if (response.status === 404 && /not found/i.test(text)) {
+      throw new Error(
+        'The API server is not running (Render returned Not Found). Open Render Dashboard, start sk-win-api, wait until it is Live, then try again.'
+      );
+    }
+    throw new Error(
+      `Server returned an invalid response (HTTP ${response.status}). Is the backend running?`
+    );
   }
 }
 
@@ -196,12 +203,12 @@ export const AuthProvider = ({ children }) => {
       const diag = getApiConfigDiagnostics();
       const aborted = error?.name === 'AbortError';
       const message = aborted
-        ? `Login timed out talking to ${apiUrl}. Is the backend running on port 5000?`
+        ? `Login timed out talking to ${apiUrl}. The Render API may be waking up — wait 1 minute and try again.`
         : error.message?.includes('Network request failed') ||
             error.message?.includes('Failed to fetch')
           ? diag.isPrivate
             ? `Cannot reach server at ${apiUrl}. Start backend (npm run dev in /backend) and refresh.`
-            : `Cannot reach server at ${apiUrl}. Check internet / ngrok / CORS.`
+            : `Cannot reach server at ${apiUrl}. Check internet, and that sk-win-api is Live on Render.`
           : error.message || 'Login failed';
       return { success: false, error: message };
     }

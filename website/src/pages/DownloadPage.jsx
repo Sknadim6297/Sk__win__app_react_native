@@ -10,7 +10,7 @@ export default function DownloadPage() {
   const { data, loading, error } = useFetch(() => api.downloadRelease(), []);
   const rel = data?.release;
   const canDownload = Boolean(rel?.apkExists && rel?.downloadUrl);
-  const href = canDownload ? apkHref(rel) : '/downloads/WAREZONE-v1.0.0.apk';
+  const href = canDownload ? apkHref(rel) : '/downloads/WAREZONE-v1.0.1.apk';
 
   return (
     <>
