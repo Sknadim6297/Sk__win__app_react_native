@@ -21,6 +21,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.skwin.tournament",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

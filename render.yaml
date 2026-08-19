@@ -59,6 +59,10 @@ services:
         value: "20.18.0"
       - key: VITE_API_URL
         value: https://sk-win-api.onrender.com
+      - key: VITE_IOS_TESTFLIGHT_URL
+        sync: false
+      - key: VITE_IOS_APP_URL
+        sync: false
     routes:
       - type: rewrite
         source: /*
