@@ -1,9 +1,13 @@
 import { brandLogoUrl } from '../utils';
 
 export default function PhoneShowcase({ news, modes = [], liveName }) {
+  const tiles = modes.slice(0, 4).length
+    ? modes.slice(0, 4)
+    : [{ name: 'CLASH SQUAD', image: '/banner.jpg' }, { name: 'BATTLE ROYALE', image: '/banner.jpg' }];
+
   return (
     <div className="phones" aria-hidden="true">
-      <div className="phone">
+      <div className="phone phone-side">
         <div className="phone-screen">
           <div className="phone-app">
             <div className="phone-header">
@@ -25,24 +29,22 @@ export default function PhoneShowcase({ news, modes = [], liveName }) {
                 <p>Upcoming · Live · Completed</p>
               </div>
               <div className="mini-grid">
-                {(modes.slice(0, 4).length ? modes.slice(0, 4) : [{ name: 'CLASH SQUAD' }, { name: 'BATTLE ROYALE' }]).map(
-                  (m, i) => (
-                    <div
-                      key={i}
-                      className="mode-tile"
-                      style={m.image ? { backgroundImage: `url(${m.image})` } : undefined}
-                    >
-                      <span>{m.name}</span>
-                    </div>
-                  )
-                )}
+                {tiles.map((m, i) => (
+                  <div
+                    key={i}
+                    className="mode-tile"
+                    style={{ backgroundImage: `url(${m.image || '/banner.jpg'})` }}
+                  >
+                    <span>{m.name}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="phone">
+      <div className="phone phone-main">
         <div className="phone-screen">
           <div className="phone-app">
             <div className="phone-header">
@@ -66,7 +68,7 @@ export default function PhoneShowcase({ news, modes = [], liveName }) {
         </div>
       </div>
 
-      <div className="phone">
+      <div className="phone phone-side">
         <div className="phone-screen">
           <div className="phone-app">
             <div className="phone-header">

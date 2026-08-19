@@ -1,5 +1,5 @@
 import { NavLink, Link, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { brandLogoUrl } from '../utils';
 
 const LINKS = [
@@ -14,6 +14,10 @@ const LINKS = [
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
+
+  useEffect(() => {
+    setOpen(false);
+  }, [loc.pathname]);
 
   return (
     <header className="nav">

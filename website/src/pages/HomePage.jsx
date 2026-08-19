@@ -86,15 +86,21 @@ export default function HomePage() {
         </div>
       </section>
 
-      {Array.isArray(data?.sliders) && data.sliders[0]?.image && (
+      {Array.isArray(data?.sliders) && data.sliders[0]?.image ? (
         <section className="section" style={{ paddingTop: 10 }}>
-          <div className="container">
+          <div className="container reveal">
             <img
+              className="hero-banner"
               src={data.sliders[0].image}
               alt="WAREZONE tournament banner"
-              style={{ width: '100%', borderRadius: 22, maxHeight: 280, objectFit: 'cover' }}
               loading="lazy"
             />
+          </div>
+        </section>
+      ) : (
+        <section className="section" style={{ paddingTop: 10 }}>
+          <div className="container reveal">
+            <img className="hero-banner" src="/banner.jpg" alt="WAREZONE" loading="lazy" />
           </div>
         </section>
       )}
@@ -135,13 +141,16 @@ export default function HomePage() {
           {withdrawals.length === 0 ? (
             <p className="empty">No withdrawals yet. They show here after players cash out in the app.</p>
           ) : (
-            <div className="withdraw-list card">
-              {withdrawals.map((w, i) => (
-                <div className="withdraw-row" key={`${w.name}-${w.at}-${i}`}>
-                  <span className="withdraw-name">{w.name}</span>
-                  <span className="withdraw-amt">₹{inr(w.amount)}</span>
-                </div>
-              ))}
+            <div className="withdraw-track-wrap">
+              <div className="withdraw-track">
+                {[...withdrawals, ...withdrawals].map((w, i) => (
+                  <div className="withdraw-chip" key={`${w.name}-${w.at}-${i}`}>
+                    <span className="dot" />
+                    <span className="withdraw-name">{w.name}</span>
+                    <span className="withdraw-amt">₹{inr(w.amount)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -163,8 +172,8 @@ export default function HomePage() {
           ) : (
             <div className="grid-3">
               {modeCards.map((m) => (
-                <article className="card mode-card" key={m.id || m.name}>
-                  {m.image ? <img className="mode-card-img" src={mediaUrl(m.image)} alt="" /> : null}
+                <article className="card mode-card reveal" key={m.id || m.name}>
+                  <img className="mode-card-img" src={mediaUrl(m.image) || '/banner.jpg'} alt="" />
                   <h3>{m.name}</h3>
                   <p>{m.description || 'Join this mode from the WAREZONE app.'}</p>
                 </article>
@@ -247,7 +256,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="section">
+      <section className="section showcase-desktop">
         <div className="container">
           <div className="section-head">
             <div>
