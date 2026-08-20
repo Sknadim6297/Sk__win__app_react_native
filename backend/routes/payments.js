@@ -480,7 +480,8 @@ async function handleCreateTournamentOrder(req, res) {
 
     const isTeam =
       lifecycle.isCustomMatch(tournament) || lifecycle.usesTeamRegistration(tournament);
-    const amountNum = Number(tournament.entryFee) || 0;
+    const charge = lifecycle.resolveEntryCharge(tournament);
+    const amountNum = Number(charge.totalAmount) || 0;
     if (!amountNum || amountNum < cfg.minAmount || amountNum > cfg.maxAmount) {
       return res.status(400).json({
         success: false,
@@ -496,6 +497,9 @@ async function handleCreateTournamentOrder(req, res) {
       purpose: 'tournament_entry',
       tournamentName: tournament.name,
       joinKind: isTeam ? 'team' : 'solo',
+      feePerPlayer: charge.feePerPlayer,
+      playersCharged: charge.playersCharged,
+      totalAmount: charge.totalAmount,
     };
 
     if (isTeam) {

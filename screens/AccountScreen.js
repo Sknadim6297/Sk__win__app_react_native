@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -84,14 +85,33 @@ const AccountScreen = ({ navigation }) => {
   }, []);
 
   const handleLogout = () => {
+    const doLogout = async () => {
+      try {
+        await logout();
+      } catch (e) {
+        console.error('Logout failed:', e);
+        if (Platform.OS === 'web') {
+          window.alert('Logout failed. Please refresh and try again.');
+        } else {
+          Alert.alert('Error', 'Logout failed. Please try again.');
+        }
+      }
+    };
+
+    // RN Alert button callbacks do not work reliably on web
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Are you sure you want to logout?')) {
+        doLogout();
+      }
+      return;
+    }
+
     Alert.alert('Logout', 'Are you sure you want to logout?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Logout',
         style: 'destructive',
-        onPress: async () => {
-          await logout();
-        },
+        onPress: doLogout,
       },
     ]);
   };

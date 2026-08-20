@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONTS } from '../../styles/theme';
-import { BRAND } from '../../constants/branding';
+import WarezoneLogo from '../WarezoneLogo';
 import { useAppHeaderData } from '../../hooks/useAppHeaderData';
 import { getRootNavigation } from '../../utils/walletFlow';
 import BrandCoin from '../ui/BrandCoin';
@@ -53,9 +53,7 @@ export default function AppHeader({ navigation, style }) {
     >
       <TouchableOpacity style={styles.left} activeOpacity={0.85} onPress={openMenu}>
         <DefaultAvatar uri={profilePhoto} size={46} style={styles.avatarRing} />
-        <Text style={styles.brand} numberOfLines={1}>
-          {BRAND.name}
-        </Text>
+        <WarezoneLogo width={108} height={36} backgroundColor="transparent" />
       </TouchableOpacity>
 
       <View style={styles.right}>

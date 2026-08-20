@@ -44,7 +44,7 @@ img { max-width: 100%; }
 .brand-mark {
   display: flex; align-items: center; gap: 10px;
 }
-.brand-mark img { width: 34px; height: 34px; border-radius: 10px; object-fit: cover; }
+.brand-mark img { width: auto; height: 34px; max-width: 120px; border-radius: 0; object-fit: contain; }
 .brand-name { font-size: 18px; font-weight: 800; color: var(--primary); letter-spacing: -0.03em; }
 .brand-sub { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 .nav { padding: 12px 12px 20px; overflow: auto; flex: 1; }

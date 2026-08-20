@@ -226,6 +226,7 @@ router.get('/admin/:id', authMiddleware, async (req, res) => {
     let participants = [];
     let teams = [];
     const structure = lifecycle.getMatchStructure(tournament);
+    const charge = lifecycle.resolveEntryCharge(tournament);
 
     if (structure.usesTeamRegistration) {
       teams = await Team.find({ tournamentId: tournament._id, status: 'registered' })
@@ -259,6 +260,9 @@ router.get('/admin/:id', authMiddleware, async (req, res) => {
       playersPerTeam: structure.playersPerTeam,
       slotUnit: structure.slotUnit,
       entryUnit: structure.entryUnit,
+      feePerPlayer: charge.feePerPlayer,
+      entryChargeTotal: charge.totalAmount,
+      playersCharged: charge.playersCharged,
       teamSetup: structure.usesTeamSides
         ? 'Team A vs Team B'
         : structure.usesTeamRegistration
@@ -1300,11 +1304,12 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'You are already registered in this tournament' });
     }
 
-    // Entry fee is charged once per team (captain pays for the whole team)
-    const { bonusUsed, realMoneyRequired } = getEntryPaymentSplit(user, tournament.entryFee);
+    // Entry fee is per player; captain pays fee × roster size for duo/squad/clash
+    const charge = lifecycle.resolveEntryCharge(tournament);
+    const { bonusUsed, realMoneyRequired } = getEntryPaymentSplit(user, charge.totalAmount);
     if (user.wallet.balance < realMoneyRequired) {
       return res.status(400).json({
-        error: `Insufficient real balance! Team entry is ₹${tournament.entryFee} (need ₹${realMoneyRequired} real; can use ₹${bonusUsed} bonus). Current: ₹${user.wallet.balance}.`,
+        error: `Insufficient real balance! Team entry is ₹${charge.totalAmount} (₹${charge.feePerPlayer} × ${charge.playersCharged} players; need ₹${realMoneyRequired} real; can use ₹${bonusUsed} bonus). Current: ₹${user.wallet.balance}.`,
       });
     }
 
@@ -1340,9 +1345,9 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
     await WalletTransaction.create({
       userId: req.userId,
       type: 'tournament_entry',
-      amount: tournament.entryFee,
+      amount: charge.totalAmount,
       tournamentId: tournament._id,
-      description: `${entryLabel} team entry (₹${tournament.entryFee} per team) — ${tournament.name}${sideLabel}`,
+      description: `${entryLabel} team entry (₹${charge.feePerPlayer}/player × ${charge.playersCharged} = ₹${charge.totalAmount}) — ${tournament.name}${sideLabel}`,
       status: 'completed',
     });
 
@@ -1355,7 +1360,10 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
     await tournament.save();
 
     res.status(201).json({
-      message: 'Team registered successfully. Entry fee charged once for the whole team.',
+      message:
+        charge.playersCharged > 1
+          ? `Team registered. Charged ₹${charge.totalAmount} (₹${charge.feePerPlayer} × ${charge.playersCharged} players).`
+          : 'Team registered successfully.',
       team: {
         _id: team._id,
         name: team.name,
@@ -1363,8 +1371,11 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
         players: team.players,
       },
       payment: {
-        entryFee: tournament.entryFee,
-        chargedPer: 'team',
+        entryFee: charge.feePerPlayer,
+        feePerPlayer: charge.feePerPlayer,
+        playersCharged: charge.playersCharged,
+        totalAmount: charge.totalAmount,
+        chargedPer: charge.chargedPer,
         bonusUsed,
         realMoneyRequired,
       },

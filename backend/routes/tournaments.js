@@ -1633,16 +1633,22 @@ router.get('/:id/canJoin', authMiddleware, async (req, res) => {
 
     const joinStats = await lifecycle.getJoinStats(tournament._id, tournament);
     const eligibility = await getJoinEligibility(tournament, joinStats.joinedCount);
+    const charge = lifecycle.resolveEntryCharge(tournament);
 
-    const { realMoneyRequired } = getEntryPaymentSplit(user, tournament.entryFee);
+    const { realMoneyRequired } = getEntryPaymentSplit(user, charge.totalAmount);
     if (eligibility.canJoin && user.wallet.balance < realMoneyRequired) {
       return res.json({
         canJoin: false,
         code: 'INSUFFICIENT_BALANCE',
-        reason: `Insufficient balance. Need ₹${realMoneyRequired} real money for ${usesTeams ? 'team' : 'player'} entry.`,
+        reason: `Insufficient balance. Need ₹${realMoneyRequired} real money (₹${charge.feePerPlayer}/player${
+          charge.playersCharged > 1 ? ` × ${charge.playersCharged}` : ''
+        }).`,
         realMoneyRequired,
         balance: user.wallet.balance,
-        entryFee: tournament.entryFee,
+        entryFee: charge.feePerPlayer,
+        feePerPlayer: charge.feePerPlayer,
+        playersCharged: charge.playersCharged,
+        totalAmount: charge.totalAmount,
         isCustomMatch: isCustom,
         usesTeamRegistration: usesTeams,
       });
@@ -1659,6 +1665,11 @@ router.get('/:id/canJoin', authMiddleware, async (req, res) => {
       joinUnit: joinStats.unit,
       joinedCount: joinStats.joinedCount,
       capacity: joinStats.capacity,
+      entryFee: charge.feePerPlayer,
+      feePerPlayer: charge.feePerPlayer,
+      playersCharged: charge.playersCharged,
+      totalAmount: charge.totalAmount,
+      realMoneyRequired,
     });
   } catch (error) {
     console.error('Error checking eligibility:', error);
@@ -1681,7 +1692,8 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
 
     if (lifecycle.isCustomMatch(tournament) || lifecycle.usesTeamRegistration(tournament)) {
       return res.status(400).json({
-        error: 'This tournament requires team registration. Captain pays once for the whole team.',
+        error:
+          'This tournament requires team registration. Captain pays entry fee for every player on the roster.',
         code: 'TEAM_REGISTRATION_REQUIRED',
       });
     }

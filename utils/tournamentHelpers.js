@@ -57,7 +57,7 @@ export function isBattleRoyaleMatch(tournamentOrMode) {
   return String(name).toLowerCase().includes('battle royale');
 }
 
-/** Captain pays once: Custom Match (any size) or Battle Royale Duo/Squad. */
+/** Captain registers team: Custom Match (any size) or Battle Royale Duo/Squad. */
 export function isTeamEntryMode(modeOrTournament, tournament) {
   if (tournament || (modeOrTournament && typeof modeOrTournament === 'object' && modeOrTournament.mode)) {
     const t = tournament || modeOrTournament;
@@ -81,7 +81,7 @@ export function getMatchStructure(tournament) {
       playersPerTeam,
       totalSlots: 2,
       slotUnit: 'teams',
-      entryUnit: 'team',
+      entryUnit: 'player',
       hasKillRewards: false,
       usesTeamRegistration: true,
       usesSlotGrid: false,
@@ -99,11 +99,32 @@ export function getMatchStructure(tournament) {
     playersPerTeam,
     totalSlots,
     slotUnit: 'slots',
-    entryUnit: mode === 'solo' ? 'player' : 'team',
+    entryUnit: 'player',
     hasKillRewards: true,
     usesTeamRegistration: mode !== 'solo',
     usesSlotGrid: true,
     usesTeamSides: false,
+  };
+}
+
+/**
+ * entryFee on tournament = per player.
+ * Duo/Squad/Clash: captain pays fee × playersPerTeam.
+ */
+export function resolveEntryCharge(tournament) {
+  const feePerPlayer = Math.max(0, Number(tournament?.entryFee) || 0);
+  const structure = getMatchStructure(tournament);
+  const playersCharged = structure.usesTeamRegistration
+    ? Math.max(1, Number(structure.playersPerTeam) || 1)
+    : 1;
+  const totalAmount = feePerPlayer * playersCharged;
+  return {
+    feePerPlayer,
+    playersCharged,
+    totalAmount,
+    entryUnit: 'player',
+    chargedPer: playersCharged > 1 ? 'team_total' : 'player',
+    usesTeamRegistration: structure.usesTeamRegistration,
   };
 }
 

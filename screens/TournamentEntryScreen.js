@@ -14,7 +14,7 @@ import BrandCoin from '../components/ui/BrandCoin';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { AuthContext } from '../context/AuthContext';
 import { tournamentService, walletService } from '../services/api';
-import { getPaymentSplit, getTeamSize, formatModeLabel, getMatchStructure } from '../utils/tournamentHelpers';
+import { getPaymentSplit, getTeamSize, formatModeLabel, getMatchStructure, resolveEntryCharge } from '../utils/tournamentHelpers';
 import { navigateToAddCoins } from '../utils/walletFlow';
 
 const CYAN = '#00E5FF';
@@ -64,11 +64,12 @@ export default function TournamentEntryScreen({ navigation, route }) {
     );
   }
 
-  const split = getPaymentSplit(tournament.entryFee, bonusBalance);
+  const charge = resolveEntryCharge(tournament);
+  const split = getPaymentSplit(charge.totalAmount, bonusBalance);
   const hasFunds = balance >= split.realRequired;
   const teamSize = getTeamSize(tournament.mode);
   const perTeam = getMatchStructure(tournament).usesTeamRegistration;
-  const totalPayable = perTeam ? split.totalPayable : split.totalPayable;
+  const totalPayable = split.totalPayable;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -121,18 +122,24 @@ export default function TournamentEntryScreen({ navigation, route }) {
 
       <View style={styles.feeBlock}>
         <View style={styles.feeLine}>
-          <Text style={styles.feeText}>
-            {perTeam ? 'Team Entry Fee (captain pays once)' : 'Player Entry Fee'}
-          </Text>
-          <CoinRow value={tournament.entryFee} />
+          <Text style={styles.feeText}>Entry fee per player</Text>
+          <CoinRow value={charge.feePerPlayer} />
         </View>
+        {perTeam ? (
+          <View style={styles.feeLine}>
+            <Text style={styles.feeText}>
+              Players on team ({teamSize})
+            </Text>
+            <Text style={styles.feeText}>× {teamSize}</Text>
+          </View>
+        ) : null}
         <View style={styles.feeLine}>
           <Text style={styles.feeTextBold}>Total payable =</Text>
           <CoinRow value={totalPayable} />
         </View>
         {perTeam ? (
           <Text style={styles.feeHint}>
-            Covers all {teamSize} players on your team — teammates are not charged separately.
+            Captain pays ₹{charge.feePerPlayer} for each of the {teamSize} players (₹{charge.totalAmount} total).
           </Text>
         ) : null}
         {!hasFunds && (

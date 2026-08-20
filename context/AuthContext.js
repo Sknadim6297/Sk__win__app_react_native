@@ -1,7 +1,12 @@
 import React, { createContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiUrl, getApiConfigDiagnostics } from '../utils/apiConfig';
 import { clearPushTokenOnLogout } from '../utils/pushNotifications';
+import {
+  getGuestEntryRoute,
+  markPreferLoginAfterLogout,
+} from '../utils/welcomeOnboarding';
 
 export const AuthContext = createContext();
 
@@ -82,6 +87,8 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [role, setRole] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Cold open while logged out → Landing; after logout → Auth
+  const [guestInitialRoute, setGuestInitialRoute] = useState(() => getGuestEntryRoute());
 
   useEffect(() => {
     checkAuthStatus();
@@ -92,6 +99,11 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setRole(null);
     setIsAuthenticated(false);
+  };
+
+  const preferLoginScreen = () => {
+    markPreferLoginAfterLogout();
+    setGuestInitialRoute('Auth');
   };
 
   const checkAuthStatus = async () => {
@@ -114,6 +126,7 @@ export const AuthProvider = ({ children }) => {
           console.log('[Auth] Stored session invalid — clearing (DB reset or user deleted)');
         }
         await clearStoredSession();
+        preferLoginScreen();
         resetSessionState();
         return;
       }
@@ -134,6 +147,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Error checking auth status:', error);
       // Keep offline session briefly only if network flake — clear to avoid stuck blank admin/web
       await clearStoredSession().catch(() => {});
+      preferLoginScreen();
       resetSessionState();
     } finally {
       setIsLoading(false);
@@ -329,12 +343,37 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await clearPushTokenOnLogout().catch(() => {});
-      await clearStoredSession();
-      resetSessionState();
-    } catch (error) {
-      console.error('Logout error:', error);
+      // Don't let a slow/hanging push cleanup block web logout
+      await Promise.race([
+        clearPushTokenOnLogout().catch(() => {}),
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+      ]);
+    } catch {
+      /* ignore */
     }
+
+    try {
+      await clearStoredSession();
+    } catch (error) {
+      console.error('Logout storage clear error:', error);
+    }
+
+    // Web: rewrite URL before clearing auth state so the remounted guest navigator
+    // reads /login instead of an authenticated path like /profile or /home.
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        const path = String(window.location?.pathname || '');
+        if (!/\/(login|signin|welcome|register|signup)\/?$/i.test(path)) {
+          window.history.replaceState({}, '', '/login');
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // Next guest stack must open on login, not welcome
+    preferLoginScreen();
+    resetSessionState();
   };
 
   const getAuthToken = () => token;
@@ -348,6 +387,7 @@ export const AuthProvider = ({ children }) => {
         token,
         role,
         isLoading,
+        guestInitialRoute,
         login,
         loginWithGoogle,
         register,

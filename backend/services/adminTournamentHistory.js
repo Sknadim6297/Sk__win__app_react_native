@@ -8,7 +8,7 @@ const BattleRoyaleResult = require('../models/BattleRoyaleResult');
 const BattleRoyaleTeamResult = require('../models/BattleRoyaleTeamResult');
 const WinnerPayout = require('../models/WinnerPayout');
 const lifecycle = require('./tournamentLifecycle');
-const { getMatchStructure, collectedFromBooked } = require('./matchStructure');
+const { getMatchStructure, collectedFromBooked, resolveEntryCharge } = require('./matchStructure');
 
 function idKey(id) {
   return String(id);
@@ -167,8 +167,11 @@ function buildHistoryRow(tournament, ledger) {
   const availableSlots = Math.max(0, structure.totalSlots - bookedSlots);
   const walletCollected = entryTxns.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
   const paymentSummary = summarizePayments(orders);
+  const charge = resolveEntryCharge(tournament);
   const collectedAmount =
-    paymentSummary.collected > 0 ? paymentSummary.collected : walletCollected || collectedFromBooked(tournament.entryFee, bookedSlots);
+    paymentSummary.collected > 0
+      ? paymentSummary.collected
+      : walletCollected || collectedFromBooked(tournament, bookedSlots);
 
   const perKill = structure.hasKillRewards ? Number(tournament.perKill) || 0 : 0;
   let totalKills = 0;
@@ -209,7 +212,10 @@ function buildHistoryRow(tournament, ledger) {
     availableSlots,
     slotUnit: structure.slotUnit,
     entryUnit: structure.entryUnit,
-    entryFee: Number(tournament.entryFee) || 0,
+    entryFee: charge.feePerPlayer,
+    feePerPlayer: charge.feePerPlayer,
+    entryChargeTotal: charge.totalAmount,
+    playersCharged: charge.playersCharged,
     collectedAmount,
     prizePool: Number(tournament.prizePool) || 0,
     perKill,
@@ -587,7 +593,8 @@ async function getAdminEntries(tournamentId) {
   const payoutsByUser = groupBy(payouts, 'userId');
   const soloByUser = new Map(soloResults.map((r) => [idKey(r.userId), r]));
   const teamResultsById = new Map(teamResults.map((r) => [idKey(r.teamId), r]));
-  const entryFee = Number(tournament.entryFee) || 0;
+  const charge = resolveEntryCharge(tournament);
+  const entryFee = charge.totalAmount;
   const perKill = structure.hasKillRewards ? Number(tournament.perKill) || 0 : 0;
 
   let slots;
@@ -626,6 +633,9 @@ async function getAdminEntries(tournamentId) {
       name: tournament.name,
       game: tournament.game,
       gameMode: tournament.gameMode,
+      feePerPlayer: charge.feePerPlayer,
+      entryChargeTotal: charge.totalAmount,
+      playersCharged: charge.playersCharged,
       ...history,
     },
     slots,

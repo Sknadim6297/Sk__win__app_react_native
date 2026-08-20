@@ -29,6 +29,10 @@ function getMatchStructure(tournament) {
   return matchStructure.getMatchStructure(tournament);
 }
 
+function resolveEntryCharge(tournament) {
+  return matchStructure.resolveEntryCharge(tournament);
+}
+
 function getTournamentType(tournament) {
   return isCustomMatch(tournament) ? 'custom_match' : 'battle_royale';
 }
@@ -198,7 +202,7 @@ async function getTeamCount(tournamentId) {
   return Team.countDocuments({ tournamentId, status: 'registered' });
 }
 
-/** Custom Match or BR Duo/Squad — one payment per team. */
+/** Custom Match or BR Duo/Squad — captain registers a full roster (pays fee × players). */
 function usesTeamRegistration(tournament) {
   if (isCustomMatch(tournament)) return true;
   const m = String(tournament.mode || 'solo').toLowerCase();
@@ -499,6 +503,7 @@ module.exports = {
   isBattleRoyale,
   isCustomMatch,
   getMatchStructure,
+  resolveEntryCharge,
   getTournamentType,
   usesTeamRegistration,
   getPlayersPerTeam,

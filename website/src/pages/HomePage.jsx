@@ -1,34 +1,128 @@
 import { Link } from 'react-router-dom';
 import Seo from '../components/Seo';
-import TournamentCard from '../components/TournamentCard';
 import PhoneShowcase from '../components/PhoneShowcase';
 import { api } from '../api';
 import { useFetch } from '../hooks/useFetch';
-import { BRAND, HOW_IT_WORKS, WHY } from '../content';
-import { inr, mediaUrl, statusBucket } from '../utils';
-import { PWA_URL } from '../release';
+import { BRAND, HOME_FEATURES } from '../content';
+import { inr, mediaUrl, apkHref, bannerOf } from '../utils';
+import { APP_RELEASE, PWA_URL } from '../release';
+
+function FeatureIcon({ name }) {
+  const common = {
+    width: 22,
+    height: 22,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.8,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    'aria-hidden': true,
+  };
+  switch (name) {
+    case 'gamepad':
+      return (
+        <svg {...common}>
+          <rect x="2" y="6" width="20" height="12" rx="3" />
+          <path d="M8 12h.01M12 10v4M16 12h.01" />
+        </svg>
+      );
+    case 'chart':
+      return (
+        <svg {...common}>
+          <path d="M4 19V5M4 19h16" />
+          <path d="M8 15v-4M12 15V8M16 15v-6" />
+        </svg>
+      );
+    case 'users':
+      return (
+        <svg {...common}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="3" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      );
+    case 'bell':
+      return (
+        <svg {...common}>
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        </svg>
+      );
+    case 'gift':
+      return (
+        <svg {...common}>
+          <rect x="3" y="8" width="18" height="13" rx="2" />
+          <path d="M12 8v13M3 12h18M12 8c-2-3-5-3-5-1s2 2 5 1c3 1 5 0 5-1s-3-2-5 1Z" />
+        </svg>
+      );
+    case 'coins':
+      return (
+        <svg {...common}>
+          <ellipse cx="12" cy="6" rx="7" ry="3" />
+          <path d="M5 6v4c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 10v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4" />
+        </svg>
+      );
+    case 'rupee':
+      return (
+        <svg {...common}>
+          <path d="M6 5h12M6 9h12M10 19l6-10H8c3 0 5-2 5-4" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+function AndroidIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M17.6 9.48l1.84-3.18a.5.5 0 0 0-.87-.5l-1.86 3.22A7.9 7.9 0 0 0 12 8c-1.66 0-3.2.5-4.71 1.52L5.43 5.8a.5.5 0 1 0-.87.5L6.4 9.48C4.34 11.03 3 13.37 3 16v.5h18V16c0-2.63-1.34-4.97-3.4-6.52zM8.5 14.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm7 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
+    </svg>
+  );
+}
+
+function AppleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M16.7 12.6c0-2.1 1.7-3.1 1.8-3.2-1-1.4-2.5-1.6-3-1.7-1.3-.1-2.5.8-3.1.8-.7 0-1.7-.7-2.8-.7-1.4 0-2.8.9-3.5 2.2-1.5 2.6-.4 6.5 1.1 8.6.7 1 1.6 2.2 2.7 2.1 1.1 0 1.5-.7 2.8-.7s1.6.7 2.8.7c1.2 0 1.9-1 2.6-2 .8-1.2 1.1-2.3 1.1-2.4-.1 0-2.2-.8-2.2-3.5zM14.6 6.5c.6-.7 1-1.7.9-2.7-0.9.1-1.9.6-2.5 1.3-.6.6-1.1 1.6-1 2.6 1 .1 1.9-.5 2.6-1.2z" />
+    </svg>
+  );
+}
+
+function WhatsAppIcon({ size = 28 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M12 2a10 10 0 0 0-8.7 14.9L2 22l5.3-1.4A10 10 0 1 0 12 2zm0 2a8 8 0 0 1 6.8 12.1l-.3.4.8 2.9-3-.8-.4.2A8 8 0 1 1 12 4zm4.4 9.5c-.2-.1-1.3-.6-1.5-.7-.2-.1-.4-.1-.5.1-.2.2-.6.7-.7.8-.1.1-.3.2-.5.1-.2-.1-.9-.3-1.7-1.1-.6-.6-1.1-1.3-1.2-1.5-.1-.2 0-.4.1-.5l.4-.4c.1-.1.2-.3.2-.4 0-.1 0-.3-.1-.4-.1-.1-.5-1.3-.7-1.7-.2-.5-.4-.4-.5-.4h-.4c-.1 0-.4.1-.6.3-.2.2-.8.8-.8 1.9s.8 2.2.9 2.3c.1.2 1.6 2.4 3.8 3.3 2.2.9 2.2.6 2.6.6.4 0 1.3-.5 1.4-1 .2-.5.2-.9.1-1z" />
+    </svg>
+  );
+}
+
+function formatCompact(n) {
+  const v = Number(n) || 0;
+  if (v >= 1000000) return `${(v / 1000000).toFixed(1).replace(/\.0$/, '')}M+`;
+  if (v >= 1000) return `${Math.round(v / 1000)}K+`;
+  return inr(v);
+}
 
 export default function HomePage() {
-  const { data, loading } = useFetch(async () => {
-    const [tournaments, home, sliders, games, board, news, site] = await Promise.all([
+  const { data } = useFetch(async () => {
+    const [tournaments, home, games, site] = await Promise.all([
       api.tournaments().catch(() => []),
       api.homeConfig().catch(() => ({})),
-      api.sliders().catch(() => []),
       api.games().catch(() => []),
-      api.leaderboard('all').catch(() => ({ players: [] })),
-      api.announcements().catch(() => []),
-      api.site().catch(() => ({ stats: {}, recentWithdrawals: [], modes: [] })),
+      api.site().catch(() => ({ stats: {}, modes: [] })),
     ]);
     const ff = (Array.isArray(games) ? games : []).find((g) => /free\s*fire/i.test(g.name || '')) || games?.[0];
     const modesFromGame = ff?._id ? await api.gameModes(ff._id).catch(() => []) : [];
-    return { tournaments, home, sliders, modesFromGame, board, news, site };
+    return { tournaments, home, modesFromGame, site };
   }, []);
 
   const list = Array.isArray(data?.tournaments) ? data.tournaments : [];
-  const liveUp = list.filter((t) => statusBucket(t) !== 'completed').slice(0, 6);
-  const done = list.filter((t) => statusBucket(t) === 'completed').slice(0, 3);
-  const players = data?.board?.players || [];
-  const news = Array.isArray(data?.news) ? data.news.slice(0, 3) : [];
+  const liveUp = list.filter((t) => {
+    const s = String(t.lifecycleStatus || t.status || '').toLowerCase();
+    return s !== 'completed' && s !== 'cancelled' && s !== 'draft';
+  });
   const siteModes = Array.isArray(data?.site?.modes) ? data.site.modes : [];
   const gameModes = Array.isArray(data?.modesFromGame) ? data.modesFromGame : [];
   const modeCards = (siteModes.length ? siteModes : gameModes).slice(0, 6);
@@ -38,333 +132,241 @@ export default function HomePage() {
   }));
   const ticker = data?.home?.latestAnnouncementTitle || data?.home?.latestNews?.text;
   const stats = data?.site?.stats || {};
-  const withdrawals = Array.isArray(data?.site?.recentWithdrawals)
-    ? data.site.recentWithdrawals.filter((w) => Number(w.amount) > 0)
-    : [];
+  const apk = apkHref();
+  const leftFeatures = HOME_FEATURES.filter((_, i) => i % 2 === 0);
+  const rightFeatures = HOME_FEATURES.filter((_, i) => i % 2 === 1);
+
+  const heroStats = [
+    { value: formatCompact(stats.totalUsers), label: 'Gamers' },
+    { value: formatCompact(stats.totalMatches), label: 'Tournaments' },
+    {
+      value: stats.totalWinnings != null ? `₹${formatCompact(stats.totalWinnings)}` : '—',
+      label: 'Distributed',
+    },
+  ];
+
+  const powerStats = [
+    { icon: 'gamepad', value: formatCompact(stats.totalMatches), label: 'Tournaments Hosted' },
+    { icon: 'users', value: formatCompact(stats.totalUsers), label: 'Active Gamers' },
+    {
+      icon: 'rupee',
+      value: stats.totalWinnings != null ? `₹${formatCompact(stats.totalWinnings)}` : '—',
+      label: 'Winnings Distributed',
+    },
+    { icon: 'gift', value: formatCompact(Math.max(Number(stats.totalMatches) || 0, 0) * 12 || 0), label: 'Rewards Claimed' },
+  ];
 
   return (
     <>
       <Seo title="Home" />
-      <section className="hero">
-        <div className="container hero-grid">
-          <div className="fade-up">
-            <p className="kicker">Free Fire esports</p>
-            <h1>
-              {BRAND.motto.split('. ').map((part, i, arr) => (
-                <span key={part}>
-                  {i === arr.length - 1 ? <span>{part.replace(/\.$/, '')}</span> : `${part}. `}
-                </span>
-              ))}
+
+      {/* HERO */}
+      <section className="lz-hero">
+        <div className="lz-grid-bg" aria-hidden />
+        <div className="container lz-hero-grid">
+          <div className="lz-hero-copy fade-up">
+            <div className="lz-live-pill">
+              <span className="lz-live-dot" />
+              {liveUp.length > 0 ? 'Live tournaments running now' : 'Tournaments opening soon'}
+            </div>
+            <h1 className="lz-brand-title">
+              <span className="lz-brand-white">{BRAND.name}</span>
+              <span className="lz-brand-accent">ESPORTS</span>
             </h1>
-            <p className="lede">
-              {BRAND.tagline} Browse live Clash Squad and Battle Royale matches here — join from
-              the Android app or the iPhone web app.
-            </p>
-            <div className="hero-actions">
-              <Link className="btn btn-primary" to="/download">
-                Get the app
-              </Link>
-              <a className="btn btn-ghost" href={`${PWA_URL}/login`} target="_blank" rel="noreferrer">
-                Open web app
+            <p className="lz-hero-lede">{BRAND.heroLine}</p>
+            <div className="lz-hero-actions">
+              <a className="btn btn-primary" href={apk}>
+                <AndroidIcon /> Download App
               </a>
+              <Link className="btn btn-ghost" to="/about">
+                <span className="lz-play">▶</span> Learn More
+              </Link>
             </div>
-            <div className="hero-meta">
-              <div>
-                <strong>{stats.totalUsers ?? '—'}</strong>
-                Players
-              </div>
-              <div>
-                <strong>{stats.totalMatches ?? '—'}</strong>
-                Matches played
-              </div>
-              <div>
-                <strong>{stats.totalWinnings != null ? `₹${inr(stats.totalWinnings)}` : '—'}</strong>
-                Total winnings
-              </div>
+            <div className="lz-hero-stats">
+              {heroStats.map((s) => (
+                <div key={s.label}>
+                  <strong>{s.value}</strong>
+                  <span>{s.label}</span>
+                </div>
+              ))}
             </div>
           </div>
-          <PhoneShowcase news={ticker} modes={modes} liveName={liveUp[0]?.name} />
-        </div>
-      </section>
-
-      {Array.isArray(data?.sliders) && data.sliders[0]?.image ? (
-        <section className="section" style={{ paddingTop: 10 }}>
-          <div className="container reveal">
-            <img
-              className="hero-banner"
-              src={data.sliders[0].image}
-              alt="WAREZONE tournament banner"
-              loading="lazy"
-            />
-          </div>
-        </section>
-      ) : (
-        <section className="section" style={{ paddingTop: 10 }}>
-          <div className="container reveal">
-            <img className="hero-banner" src="/banner.jpg" alt="WAREZONE" loading="lazy" />
-          </div>
-        </section>
-      )}
-
-      <section className="section">
-        <div className="container">
-          <div className="section-head">
-            <div>
-              <h2>Live stats</h2>
-              <p className="sub">Pulled live from the WAREZONE database — not placeholder numbers.</p>
-            </div>
-          </div>
-          <div className="big-stats">
-            <article className="card big-stat">
-              <strong>{inr(stats.totalUsers || 0)}</strong>
-              <span>Total Users</span>
-            </article>
-            <article className="card big-stat">
-              <strong>{inr(stats.totalMatches || 0)}</strong>
-              <span>Total Matches Played</span>
-            </article>
-            <article className="card big-stat">
-              <strong>₹{inr(stats.totalWinnings || 0)}</strong>
-              <span>Total Winnings</span>
-            </article>
+          <div className="lz-hero-visual fade-up d2">
+            <PhoneShowcase single news={ticker} modes={modes} liveName={liveUp[0]?.name} />
           </div>
         </div>
       </section>
 
-      <section className="section">
+      {/* FEATURES + PHONE */}
+      <section className="lz-section" id="features">
         <div className="container">
-          <div className="section-head">
-            <div>
-              <h2>Recent withdrawals</h2>
-              <p className="sub">Latest wallet withdrawals from the app. Amounts are real.</p>
-            </div>
+          <div className="lz-section-head">
+            <span className="lz-eyebrow">Features</span>
+            <h2>Everything in one app</h2>
+            <div className="lz-rule" />
           </div>
-          {withdrawals.length === 0 ? (
-            <p className="empty">No withdrawals yet. They show here after players cash out in the app.</p>
-          ) : (
-            <div className="withdraw-track-wrap">
-              <div className="withdraw-track">
-                {[...withdrawals, ...withdrawals].map((w, i) => (
-                  <div className="withdraw-chip" key={`${w.name}-${w.at}-${i}`}>
-                    <span className="dot" />
-                    <span className="withdraw-name">{w.name}</span>
-                    <span className="withdraw-amt">₹{inr(w.amount)}</span>
+          <div className="lz-features-layout">
+            <div className="lz-feature-col">
+              {leftFeatures.map((f) => (
+                <article className="lz-feature-card" key={f.title}>
+                  <div className="lz-feature-icon">
+                    <FeatureIcon name={f.icon} />
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
-          <div className="section-head">
-            <div>
-              <h2>Tournament modes</h2>
-              <p className="sub">Modes configured in Arena Control for Free Fire.</p>
-            </div>
-            <Link className="link" to="/tournaments">
-              Browse matches →
-            </Link>
-          </div>
-          {modeCards.length === 0 ? (
-            <p className="empty">Add game modes in the admin panel to show them here.</p>
-          ) : (
-            <div className="grid-3">
-              {modeCards.map((m) => (
-                <article className="card mode-card reveal" key={m.id || m.name}>
-                  <img className="mode-card-img" src={mediaUrl(m.image) || '/banner.jpg'} alt="" />
-                  <h3>{m.name}</h3>
-                  <p>{m.description || 'Join this mode from the WAREZONE app.'}</p>
+                  <div>
+                    <h3>{f.title}</h3>
+                    <p>{f.body}</p>
+                  </div>
                 </article>
               ))}
             </div>
-          )}
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
-          <div className="section-head">
-            <div>
-              <h2>Live tournaments</h2>
-              <p className="sub">Upcoming and live matches from the same backend as the app.</p>
+            <div className="lz-features-phone">
+              <PhoneShowcase single news={ticker} modes={modes} liveName={liveUp[0]?.name} />
             </div>
-            <Link className="link" to="/tournaments">
-              All matches →
-            </Link>
-          </div>
-          {loading ? (
-            <div className="grid-3">
-              <div className="skeleton" />
-              <div className="skeleton" />
-              <div className="skeleton" />
-            </div>
-          ) : liveUp.length === 0 ? (
-            <p className="empty">No live or upcoming matches right now. Check back soon.</p>
-          ) : (
-            <div className="grid-3">
-              {liveUp.map((t) => (
-                <TournamentCard key={t._id} t={t} />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
-          <div className="section-head">
-            <div>
-              <h2>Why WAREZONE</h2>
-              <p className="sub">Built around the features already in the mobile app.</p>
-            </div>
-          </div>
-          <div className="grid-2">
-            {WHY.map((w) => (
-              <article className="card why-card" key={w.title}>
-                <h3>{w.title}</h3>
-                <p>{w.body}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
-          <div className="section-head">
-            <div>
-              <h2>How it works</h2>
-              <p className="sub">Register, join, and withdraw from the Android app or iPhone web app.</p>
-            </div>
-            <Link className="link" to="/how-it-works">
-              Full guide →
-            </Link>
-          </div>
-          <div className="grid-3">
-            {HOW_IT_WORKS.map((s) => (
-              <article className="card step-card" key={s.n}>
-                <div className="step-num">
-                  {s.n} — {s.title}
-                </div>
-                <h3>{s.title}</h3>
-                <p>{s.body}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section showcase-desktop">
-        <div className="container">
-          <div className="section-head">
-            <div>
-              <h2>App showcase</h2>
-              <p className="sub">The same dark WAREZONE UI — home, contest details, and wallet.</p>
-            </div>
-            <Link className="btn btn-green btn-sm" to="/download">
-              Get the app
-            </Link>
-          </div>
-          <PhoneShowcase news={ticker} modes={modes} liveName={liveUp[0]?.name} />
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
-          <div className="section-head">
-            <div>
-              <h2>Leaderboard preview</h2>
-              <p className="sub">Top players from the live ranking API.</p>
-            </div>
-            <Link className="link" to="/leaderboard">
-              Full board →
-            </Link>
-          </div>
-          {players.length === 0 ? (
-            <p className="empty">Rankings appear after players complete matches.</p>
-          ) : (
-            <div className="card">
-              {players.slice(0, 5).map((p) => (
-                <div className="lb-row" key={p.id}>
-                  <strong>#{p.rank}</strong>
-                  <div className="player">
-                    <img className="avatar" src={p.photo ? mediaUrl(p.photo) : '/avatar.png'} alt="" />
-                    {p.name}
+            <div className="lz-feature-col">
+              {rightFeatures.map((f) => (
+                <article className="lz-feature-card" key={f.title}>
+                  <div className="lz-feature-icon">
+                    <FeatureIcon name={f.icon} />
                   </div>
-                  <span className="lb-hide">{p.wins} wins</span>
-                  <span>{p.points} pts</span>
-                  <span className="prize lb-hide">₹{p.earnings}</span>
+                  <div>
+                    <h3>{f.title}</h3>
+                    <p>{f.body}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* APP SCREENS / POWER STATS */}
+      <section className="lz-section lz-section-alt">
+        <div className="container">
+          <div className="lz-section-head">
+            <span className="lz-eyebrow">App screens</span>
+            <h2>Sleek. Intuitive. Powerful.</h2>
+            <div className="lz-rule" />
+          </div>
+          <div className="lz-power-stats">
+            {powerStats.map((s) => (
+              <article className="lz-power-stat" key={s.label}>
+                <div className="lz-power-icon">
+                  <FeatureIcon name={s.icon} />
                 </div>
-              ))}
-            </div>
-          )}
+                <strong>{s.value}</strong>
+                <span>{s.label}</span>
+              </article>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="section">
+      {/* GET THE APP — Android APK + iOS / PWA */}
+      <section className="lz-section" id="download">
         <div className="container">
-          <div className="section-head">
-            <div>
-              <h2>Latest results</h2>
-              <p className="sub">Recently completed matches.</p>
+          <div className="lz-getapp">
+            <div className="lz-getapp-copy">
+              <span className="lz-eyebrow">Get the app</span>
+              <h2>Start competing today</h2>
+              <p>
+                Download the Android APK, or open the iPhone web app in Safari and add it to your
+                Home Screen — same WAREZONE experience.
+              </p>
+
+              <div className="lz-dl-grid">
+                <article className="lz-dl-card">
+                  <div className="lz-dl-badge">Android</div>
+                  <h3>
+                    <AndroidIcon /> Download APK
+                  </h3>
+                  <p>Official installer for phones and tablets.</p>
+                  <a className="btn btn-primary" href={apk}>
+                    <AndroidIcon /> Download APK
+                  </a>
+                  <p className="lz-getapp-meta">
+                    Version {APP_RELEASE.version} · Android 6.0+ · Free
+                  </p>
+                </article>
+
+                <article className="lz-dl-card">
+                  <div className="lz-dl-badge">iPhone / iPad</div>
+                  <h3>
+                    <AppleIcon /> Web App (PWA)
+                  </h3>
+                  <p>No App Store IPA — use Safari and Add to Home Screen.</p>
+                  <a className="btn btn-ghost" href={`${PWA_URL}/login`} target="_blank" rel="noreferrer">
+                    <AppleIcon /> Open Web App
+                  </a>
+                  <ol className="lz-ios-steps">
+                    <li>Open the link in <strong>Safari</strong> (not Chrome).</li>
+                    <li>Tap the <strong>Share</strong> button (square with ↑).</li>
+                    <li>Scroll and tap <strong>Add to Home Screen</strong>.</li>
+                    <li>Tap <strong>Add</strong> — open WAREZONE from your Home Screen.</li>
+                  </ol>
+                </article>
+              </div>
             </div>
-            <Link className="link" to="/results">
-              All results →
-            </Link>
+            <div className="lz-getapp-visual">
+              <PhoneShowcase single news={ticker} modes={modes} liveName={liveUp[0]?.name} />
+            </div>
           </div>
-          {done.length === 0 ? (
-            <p className="empty">No published results yet.</p>
-          ) : (
-            <div className="grid-3">
-              {done.map((t) => (
-                <TournamentCard key={t._id} t={t} />
-              ))}
-            </div>
-          )}
         </div>
       </section>
 
-      <section className="section">
+      {/* WHATSAPP BAND */}
+      <section className="lz-section" style={{ paddingTop: 0 }}>
         <div className="container">
-          <div className="section-head">
-            <div>
-              <h2>News</h2>
-              <p className="sub">Announcements from Arena Control.</p>
+          <div className="lz-wa-band">
+            <div className="lz-wa-left">
+              <div className="lz-wa-mark" aria-hidden>
+                <WhatsAppIcon size={28} />
+              </div>
+              <div>
+                <h3>Join our WhatsApp channel</h3>
+                <p>Get instant updates on tournaments, results, and exclusive offers.</p>
+              </div>
             </div>
-            <Link className="link" to="/news">
-              All news →
-            </Link>
+            <a
+              className="btn btn-wa"
+              href={data?.home?.supportLinks?.whatsapp || `${PWA_URL}/login`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <WhatsAppIcon size={18} /> Join Channel
+            </a>
           </div>
-          {news.length === 0 ? (
-            <p className="empty">No announcements yet.</p>
-          ) : (
-            <div className="grid-3">
-              {news.map((n) => (
-                <Link key={n.id} to={`/news/${n.id}`} className="card news-card">
-                  <div className="badge badge-up">{n.category}</div>
-                  <h3 style={{ marginTop: 10 }}>{n.title}</h3>
-                  <p>{n.description}</p>
+        </div>
+      </section>
+
+      {/* Live matches strip */}
+      {liveUp.length > 0 && (
+        <section className="lz-section" style={{ paddingTop: 8 }}>
+          <div className="container">
+            <div className="lz-section-head lz-section-head-row">
+              <div>
+                <span className="lz-eyebrow">Live now</span>
+                <h2>Open tournaments</h2>
+              </div>
+              <Link className="link" to="/tournaments">
+                All matches →
+              </Link>
+            </div>
+            <div className="lz-match-row">
+              {liveUp.slice(0, 4).map((t) => (
+                <Link key={t._id} to={`/tournaments/${t._id}`} className="lz-match-card">
+                  <img src={bannerOf(t)} alt="" className="lz-match-thumb" />
+                  <div>
+                    <strong>{t.name}</strong>
+                    <span>
+                      Entry ₹{t.entryFee ?? 0}/player · Prize ₹{inr(t.prizePool || 0)}
+                    </span>
+                  </div>
                 </Link>
               ))}
             </div>
-          )}
-        </div>
-      </section>
-
-      <div className="container">
-        <div className="cta-band">
-          <h2>Ready to enter the arena?</h2>
-          <p className="muted" style={{ marginBottom: 18 }}>
-            Download WAREZONE and join the next Free Fire tournament.
-          </p>
-          <Link className="btn btn-primary" to="/download">
-            Download App
-          </Link>
-        </div>
-      </div>
+          </div>
+        </section>
+      )}
     </>
   );
 }

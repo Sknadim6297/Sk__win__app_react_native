@@ -12,7 +12,7 @@ const PUBLIC_DOWNLOADS = path.join(ROOT, 'public', 'downloads');
 const WEBSITE_DIST_DOWNLOADS = path.join(ROOT, 'website', 'dist', 'downloads');
 const PUBLIC_DIR = path.join(ROOT, 'website', 'public');
 const SRC_DIRS = [PUBLIC_DOWNLOADS, path.join(ROOT, 'backend', 'public', 'downloads')];
-const APP_LOGO = path.join(ROOT, 'assets', 'logo', 'ROUND_GAME_LOGO.png');
+const APP_LOGO = path.join(ROOT, 'assets', 'logo', 'WAREZONE_LOGO.png');
 
 function syncBrandLogo() {
   if (!fs.existsSync(APP_LOGO)) return;

@@ -237,7 +237,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
                   <Text style={styles.statusText}>{item.isActive ? 'ACTIVE' : 'INACTIVE'}</Text>
                 </View>
               </View>
-              <Text style={styles.meta}>Entry ₹{item.entryFee ?? 0} · Prize ₹{item.prizePool ?? 0}</Text>
+              <Text style={styles.meta}>Entry ₹{item.entryFee ?? 0}/player · Prize ₹{item.prizePool ?? 0}</Text>
               <Text style={styles.meta}>Next: {item.nextMatchLabel || 'Paused'}</Text>
               <View style={styles.actions}>
                 <ActionBtn label="Edit" onPress={() => openEdit(item)} />
@@ -366,7 +366,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
               placeholder="10:00"
               placeholderTextColor="#6B7280"
             />
-            <Label>Entry fee</Label>
+            <Label>Entry fee per player (₹)</Label>
             <TextInput style={styles.input} keyboardType="numeric" value={form.entryFee} onChangeText={(entryFee) => setForm((p) => ({ ...p, entryFee }))} />
             <Label>Prize pool</Label>
             <TextInput style={styles.input} keyboardType="numeric" value={form.prizePool} onChangeText={(prizePool) => setForm((p) => ({ ...p, prizePool }))} />

@@ -77,6 +77,7 @@ const tournamentSchema = new mongoose.Schema({
   entryFee: {
     type: Number,
     required: true,
+    // Always priced per player. Team modes charge entryFee × playersPerTeam at join.
   },
   prizePool: {
     type: Number,

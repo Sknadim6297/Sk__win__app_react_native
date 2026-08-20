@@ -6,12 +6,27 @@ import { COLORS, TYPO, ICON } from '../../styles/theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export default function GoogleLoginButton({ onPress, disabled = false, loading = false }) {
+export default function GoogleLoginButton({
+  onPress,
+  disabled = false,
+  loading = false,
+  comingSoon = false,
+  label,
+}) {
   const scale = useSharedValue(1);
+  const inactive = disabled || loading || comingSoon;
+
+  const displayLabel =
+    label ||
+    (comingSoon
+      ? 'Continue with Google — Coming Soon'
+      : loading
+        ? 'Signing in with Google…'
+        : 'Continue with Google');
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    opacity: disabled || loading ? 0.65 : 1,
+    opacity: inactive ? 0.65 : 1,
   }));
 
   return (
@@ -19,21 +34,20 @@ export default function GoogleLoginButton({ onPress, disabled = false, loading =
       onPress={onPress}
       disabled={disabled || loading}
       onPressIn={() => {
+        if (inactive && !comingSoon) return;
         scale.value = withSpring(0.98, { damping: 14, stiffness: 300 });
       }}
       onPressOut={() => {
         scale.value = withSpring(1, { damping: 12, stiffness: 280 });
       }}
-      style={[styles.button, animatedStyle]}
+      style={[styles.button, comingSoon && styles.buttonSoon, animatedStyle]}
       accessibilityRole="button"
-      accessibilityLabel="Continue with Google"
+      accessibilityLabel={comingSoon ? 'Google Sign-In coming soon' : 'Continue with Google'}
     >
       <View style={styles.iconWrap}>
         <MaterialCommunityIcons name="google" size={ICON.sm} color="#EA4335" />
       </View>
-      <Text style={styles.label}>
-        {loading ? 'Signing in with Google…' : 'Continue with Google'}
-      </Text>
+      <Text style={[styles.label, comingSoon && styles.labelSoon]}>{displayLabel}</Text>
     </AnimatedPressable>
   );
 }
@@ -57,6 +71,9 @@ const styles = StyleSheet.create({
     elevation: 3,
     gap: 10,
   },
+  buttonSoon: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+  },
   iconWrap: {
     width: 28,
     alignItems: 'center',
@@ -64,5 +81,8 @@ const styles = StyleSheet.create({
   label: {
     ...TYPO.buttonSm,
     color: COLORS.textDark,
+  },
+  labelSoon: {
+    color: COLORS.gray || '#6B7280',
   },
 });

@@ -46,7 +46,7 @@ const MODE_MAX_PLAYERS = {
 
 const TOURNAMENT_CATEGORIES = [
   { label: 'Battle Royale', value: 'battle_royale', description: 'Full map · Solo / Duo / Squad · up to 50 slots · per-kill rewards' },
-  { label: 'Clash Squad', value: 'custom', description: 'Team vs team · 1v1 / 2v2 / 4v4 · Team A vs Team B · entry fee per team · no kill rewards' },
+  { label: 'Clash Squad', value: 'custom', description: 'Team vs team · 1v1 / 2v2 / 4v4 · entry fee per player · captain pays roster total · no kill rewards' },
 ];
 
 const MATCH_STATUSES = [
@@ -311,6 +311,15 @@ const TournamentManagement = ({ navigation }) => {
     return 1;
   };
 
+  const getMaxPlayerCount = () => {
+    const isCustom =
+      (form.category || form.tournamentType) === 'custom' ||
+      (form.category || form.tournamentType) === 'custom_match';
+    const teamSize = form.teamSize || getTeamSizeFromMode(form.mode);
+    if (isCustom) return teamSize * 2;
+    return parseInt(form.maxParticipants, 10) || 50;
+  };
+
   const getPayingUnits = () => {
     const isCustom =
       (form.category || form.tournamentType) === 'custom' ||
@@ -323,9 +332,15 @@ const TournamentManagement = ({ navigation }) => {
 
   const calculateTotalPrizePool = () => {
     if (form.prizePool) return parseFloat(form.prizePool) || 0;
-    const entryFee = parseFloat(form.entryFee) || 0;
-    const payingUnits = getPayingUnits();
-    const totalCollection = entryFee * payingUnits;
+    const feePerPlayer = parseFloat(form.entryFee) || 0;
+    const isCustom =
+      (form.category || form.tournamentType) === 'custom' ||
+      (form.category || form.tournamentType) === 'custom_match';
+    const teamSize = form.teamSize || getTeamSizeFromMode(form.mode);
+    const maxPlayers = isCustom
+      ? teamSize * 2
+      : parseInt(form.maxParticipants, 10) || 50;
+    const totalCollection = feePerPlayer * maxPlayers;
     return Math.floor(totalCollection * 0.9);
   };
 
@@ -1314,7 +1329,7 @@ const TournamentManagement = ({ navigation }) => {
 
               <View style={styles.formRow}>
                 <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                  <Text style={styles.label}>Entry Fee (₹) *</Text>
+                  <Text style={styles.label}>Entry Fee per player (₹) *</Text>
                   <TextInput
                     style={styles.input}
                     value={form.entryFee}
@@ -1370,18 +1385,19 @@ const TournamentManagement = ({ navigation }) => {
                     <View style={styles.prizePoolItem}>
                       <Text style={styles.prizePoolLabel}>Total Collection:</Text>
                       <Text style={styles.prizePoolValue}>
-                        ₹{((parseFloat(form.entryFee) || 0) * getPayingUnits()).toLocaleString()}
+                        ₹{((parseFloat(form.entryFee) || 0) * getMaxPlayerCount()).toLocaleString()}
                       </Text>
                       <Text style={styles.prizePoolHint}>
-                        {form.mode === 'solo'
-                          ? `${getPayingUnits()} players × entry fee`
-                          : `${getPayingUnits()} teams × team entry fee`}
+                        {`${getMaxPlayerCount()} players × ₹${form.entryFee || 0}/player`}
+                        {form.mode !== 'solo'
+                          ? ` (${getPayingUnits()} teams × ${form.teamSize || getTeamSizeFromMode(form.mode)})`
+                          : ''}
                       </Text>
                     </View>
                     <View style={styles.prizePoolItem}>
                       <Text style={styles.prizePoolLabel}>Platform Fee (10%):</Text>
                       <Text style={styles.prizePoolValue}>
-                        -₹{Math.floor(((parseFloat(form.entryFee) || 0) * getPayingUnits()) * 0.1).toLocaleString()}
+                        -₹{Math.floor(((parseFloat(form.entryFee) || 0) * getMaxPlayerCount()) * 0.1).toLocaleString()}
                       </Text>
                     </View>
                     <View style={[styles.prizePoolItem, styles.prizePoolTotal]}>
@@ -1465,7 +1481,7 @@ const TournamentManagement = ({ navigation }) => {
                       </Text>
                     </View>
                     <View style={styles.prizePoolItem}>
-                      <Text style={styles.prizePoolLabel}>Entry Fee (per player/team):</Text>
+                      <Text style={styles.prizePoolLabel}>Entry Fee (per player):</Text>
                       <Text style={styles.prizePoolValue}>₹{form.entryFee}</Text>
                     </View>
                     <View style={[styles.prizePoolItem, styles.prizePoolTotal]}>

@@ -2,6 +2,11 @@
  * Canonical split between the two live match products:
  *   team_vs_team  — Clash Squad 1v1 / 2v2 / 4v4 (Team A vs Team B)
  *   battle_royale — Full-map Solo / Duo / Squad (slot grid, optional kill rewards)
+ *
+ * Entry fee model:
+ *   tournament.entryFee = amount PER PLAYER
+ *   Solo join charges 1× entryFee
+ *   Duo/Squad/Clash team join charges entryFee × playersPerTeam (captain pays the team total)
  */
 
 function isCustomMatch(tournament) {
@@ -52,7 +57,7 @@ function getMatchStructure(tournament) {
       playersPerTeam,
       totalSlots: 2,
       slotUnit: 'teams',
-      entryUnit: 'team',
+      entryUnit: 'player',
       hasKillRewards: false,
       usesTeamRegistration: true,
       usesSlotGrid: false,
@@ -70,7 +75,7 @@ function getMatchStructure(tournament) {
     playersPerTeam,
     totalSlots,
     slotUnit: 'slots',
-    entryUnit: mode === 'solo' ? 'player' : 'team',
+    entryUnit: 'player',
     hasKillRewards: true,
     usesTeamRegistration: mode !== 'solo',
     usesSlotGrid: true,
@@ -78,8 +83,36 @@ function getMatchStructure(tournament) {
   };
 }
 
-function collectedFromBooked(entryFee, bookedSlots) {
-  return Math.max(0, Number(entryFee) || 0) * Math.max(0, Number(bookedSlots) || 0);
+/**
+ * Resolve what the joiner must pay.
+ * entryFee on the tournament is always per-player.
+ */
+function resolveEntryCharge(tournament) {
+  const feePerPlayer = Math.max(0, Number(tournament?.entryFee) || 0);
+  const structure = getMatchStructure(tournament);
+  const playersCharged = structure.usesTeamRegistration
+    ? Math.max(1, Number(structure.playersPerTeam) || 1)
+    : 1;
+  const totalAmount = feePerPlayer * playersCharged;
+  return {
+    feePerPlayer,
+    playersCharged,
+    totalAmount,
+    entryUnit: 'player',
+    chargedPer: playersCharged > 1 ? 'team_total' : 'player',
+    usesTeamRegistration: structure.usesTeamRegistration,
+  };
+}
+
+/** Estimated collection from booked joining units (players for solo, teams for team modes). */
+function collectedFromBooked(tournamentOrFee, bookedSlots, playersPerTeam) {
+  if (tournamentOrFee && typeof tournamentOrFee === 'object') {
+    const { totalAmount } = resolveEntryCharge(tournamentOrFee);
+    return totalAmount * Math.max(0, Number(bookedSlots) || 0);
+  }
+  const feePerPlayer = Math.max(0, Number(tournamentOrFee) || 0);
+  const ppt = Math.max(1, Number(playersPerTeam) || 1);
+  return feePerPlayer * ppt * Math.max(0, Number(bookedSlots) || 0);
 }
 
 module.exports = {
@@ -90,5 +123,6 @@ module.exports = {
   formatModeLabel,
   customFormatLabel,
   getMatchStructure,
+  resolveEntryCharge,
   collectedFromBooked,
 };

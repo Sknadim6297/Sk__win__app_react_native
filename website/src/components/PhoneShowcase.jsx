@@ -1,9 +1,66 @@
 import { brandLogoUrl } from '../utils';
 
-export default function PhoneShowcase({ news, modes = [], liveName }) {
+function HomePhone({ news, tiles }) {
+  return (
+    <div className="phone phone-main lz-phone">
+      <div className="phone-screen">
+        <div className="phone-app">
+          <div className="phone-header">
+            <div className="left">
+              <img className="logo" src={brandLogoUrl()} alt="WAREZONE" />
+            </div>
+            <div className="coin-pill">
+              120 <img src="/coin.png" alt="" />
+            </div>
+          </div>
+          <div className="phone-news">
+            <span className="tag">LATEST</span>
+            {news || 'Tournaments Are Back'}
+          </div>
+          <div className="phone-body">
+            <div className="mini-card">
+              <h4>My Contests</h4>
+              <p>Upcoming · Live · Completed</p>
+            </div>
+            <div className="mini-grid">
+              {tiles.map((m, i) => (
+                <div
+                  key={i}
+                  className="mode-tile"
+                  style={{ backgroundImage: `url(${m.image || '/banner.jpg'})` }}
+                >
+                  <span>{m.name}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mini-card" style={{ background: 'linear-gradient(90deg,#b91c1c,#e11d2e)', color: '#fff' }}>
+              <h4>Join in app</h4>
+              <p>Room ID stays private</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PhoneShowcase({ news, modes = [], liveName, single = false }) {
   const tiles = modes.slice(0, 4).length
     ? modes.slice(0, 4)
-    : [{ name: 'CLASH SQUAD', image: '/banner.jpg' }, { name: 'BATTLE ROYALE', image: '/banner.jpg' }];
+    : [
+        { name: 'CLASH SQUAD', image: '/banner.jpg' },
+        { name: 'BATTLE ROYALE', image: '/banner.jpg' },
+        { name: 'DUO', image: '/banner.jpg' },
+        { name: 'SQUAD', image: '/banner.jpg' },
+      ];
+
+  if (single) {
+    return (
+      <div className="phones phones-single" aria-hidden="true">
+        <HomePhone news={news} tiles={tiles} />
+      </div>
+    );
+  }
 
   return (
     <div className="phones" aria-hidden="true">
@@ -12,8 +69,7 @@ export default function PhoneShowcase({ news, modes = [], liveName }) {
           <div className="phone-app">
             <div className="phone-header">
               <div className="left">
-                <img className="logo" src={brandLogoUrl()} alt="" />
-                WAREZONE
+                <img className="logo" src={brandLogoUrl()} alt="WAREZONE" />
               </div>
               <div className="coin-pill">
                 120 <img src="/coin.png" alt="" />
@@ -59,7 +115,7 @@ export default function PhoneShowcase({ news, modes = [], liveName }) {
                 <h4>{liveName || 'WAREZONE Match'}</h4>
                 <p>Prize pool · Entry fee · Map</p>
               </div>
-              <div className="mini-card" style={{ background: '#00b368', color: '#fff' }}>
+              <div className="mini-card" style={{ background: '#e11d2e', color: '#fff' }}>
                 <h4>Join in app</h4>
                 <p>Room ID stays private</p>
               </div>

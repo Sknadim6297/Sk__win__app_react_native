@@ -21,7 +21,7 @@ import { PAGE, pageStyles } from '../styles/pageTheme';
 import { tournamentService, tournamentManagementService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import Toast from '../components/Toast';
-import { getTeamSize, isCustomMatch, getMatchStructure } from '../utils/tournamentHelpers';
+import { getTeamSize, isCustomMatch, getMatchStructure, resolveEntryCharge } from '../utils/tournamentHelpers';
 import { fetchWalletForEntry, startTournamentZapUpiPayment } from '../utils/walletFlow';
 import { isPaymentEnabled } from '../utils/paymentConfig';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
@@ -74,6 +74,10 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
     () => getTeamSize(tournament?.mode || 'solo'),
     [tournament?.mode]
   );
+  const entryCharge = useMemo(
+    () => resolveEntryCharge(tournament || {}),
+    [tournament]
+  );
 
   useEffect(() => {
     (async () => {
@@ -122,11 +126,11 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       return;
     }
 
-    if (isPaymentEnabled() && Number(tournament.entryFee) > 0) {
+    if (isPaymentEnabled() && Number(entryCharge.totalAmount) > 0) {
       startTournamentZapUpiPayment(navigation, {
         tournamentId,
         tournamentName: tournament?.name,
-        amount: tournament.entryFee,
+        amount: entryCharge.totalAmount,
         joinKind: 'team',
         teamName: join.teamName,
         teamSide: join.teamSide,
@@ -136,13 +140,13 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       return;
     }
 
-    const walletCheck = await fetchWalletForEntry(tournament.entryFee);
+    const walletCheck = await fetchWalletForEntry(entryCharge.totalAmount);
     if (!walletCheck.sufficient) {
       showInsufficientBalance({
         tournamentId,
         returnScreen: 'CustomMatchTeamRegister',
         forTeam: true,
-        requiredAmount: tournament.entryFee,
+        requiredAmount: entryCharge.totalAmount,
         currentBalance: walletCheck.balance,
         remainingAmount: walletCheck.remaining,
         qrAmount: walletCheck.qrAmount,
@@ -356,9 +360,12 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
         <Text style={styles.meta}>
           {matchStructure.matchType} · {matchStructure.formatLabel}
           {matchStructure.kind === 'battle_royale' ? ` · ${matchStructure.modeLabel}` : ''} ·{' '}
-          {playersPerTeam} player{playersPerTeam > 1 ? 's' : ''}/{matchStructure.entryUnit}
+          {playersPerTeam} player{playersPerTeam > 1 ? 's' : ''} per team
           {isCustom ? ' · Max 2 teams' : ` · ${matchStructure.totalSlots} slots`}
-          {'\n'}Entry fee ₹{tournament?.entryFee || 0} — paid once by team captain
+          {'\n'}₹{entryCharge.feePerPlayer}/player
+          {entryCharge.playersCharged > 1
+            ? ` × ${entryCharge.playersCharged} = ₹${entryCharge.totalAmount} total (captain pays)`
+            : ' — captain pays'}
         </Text>
 
         <View style={styles.warnBox}>
@@ -602,8 +609,12 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
         <Text style={styles.confirmTitle}>Are you sure?</Text>
         <Text style={styles.confirmText}>
           Confirm join for {teamName || 'your team'}
-          {showSidePicker ? ` (Team ${teamSide})` : ` (Slot ${teamSlot})`}. Entry fee ₹{tournament?.entryFee || 0} will be
-          paid once by the team captain.
+          {showSidePicker ? ` (Team ${teamSide})` : ` (Slot ${teamSlot})`}. Total entry ₹
+          {entryCharge.totalAmount}
+          {entryCharge.playersCharged > 1
+            ? ` (₹${entryCharge.feePerPlayer} × ${entryCharge.playersCharged} players)`
+            : ''}{' '}
+          will be paid by the team captain.
         </Text>
         {players.slice(0, 4).map((player, index) => (
           <View key={`confirm-${index}`} style={styles.confirmRow}>

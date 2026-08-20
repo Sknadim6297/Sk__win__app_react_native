@@ -10,12 +10,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BRAND_COLORS } from '../constants/branding';
-import SKWinLogo from './SKWinLogo';
+import WarezoneLogo from './WarezoneLogo';
 
 export const WELCOME_BG = BRAND_COLORS.background;
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const LOGO_SIZE = Math.min(SCREEN_W * 0.34, 128);
+const LOGO_SIZE = Math.min(SCREEN_W * 0.52, 220);
 
 const AppLoadingScreen = ({ subtitle = 'Loading battleground...' }) => {
   const insets = useSafeAreaInsets();
@@ -47,7 +47,7 @@ const AppLoadingScreen = ({ subtitle = 'Loading battleground...' }) => {
       <StatusBar barStyle="light-content" backgroundColor={WELCOME_BG} />
 
       <View style={styles.logoCenter}>
-        <SKWinLogo size={LOGO_SIZE} />
+        <WarezoneLogo size={LOGO_SIZE} rounded />
       </View>
 
       <View

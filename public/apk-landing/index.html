@@ -65,13 +65,13 @@
       padding-top: 36px;
     }
     .logo {
-      width: 112px;
-      height: 112px;
-      border-radius: 28px;
-      object-fit: cover;
-      background: var(--card);
+      width: min(280px, 88vw);
+      height: auto;
+      max-height: 120px;
+      object-fit: contain;
+      background: transparent;
       margin-bottom: 22px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      box-shadow: none;
     }
     .brand-name {
       font-size: clamp(2rem, 8vw, 2.75rem);
@@ -208,7 +208,7 @@
   <div class="atmosphere">
     <div class="wrap">
       <header class="brand">
-        <img class="logo" src="/brand/logo.png" alt="WAREZONE" width="112" height="112" />
+        <img class="logo" src="/brand/logo.png" alt="WAREZONE" />
         <h1 class="brand-name">WARE<span>ZONE</span></h1>
         <p class="eyebrow">Official Android App</p>
         <p class="tagline">Download the official WAREZONE Android app, install it, and login to join tournaments.</p>

@@ -5,13 +5,56 @@ export const BRAND = {
   fullName: 'WAREZONE Tournament',
   motto: 'Compete. Conquer. Win Big.',
   tagline: 'Competitive Free Fire tournaments with real rewards.',
+  heroLine:
+    "Join India's fastest-growing Free Fire esports platform. Compete in Clash Squad & Battle Royale, climb the leaderboards, and earn real rewards.",
 };
+
+export const HOME_FEATURES = [
+  {
+    title: 'Top Titles',
+    body: 'Clash Squad and Battle Royale matches with clear schedules and slots.',
+    icon: 'gamepad',
+  },
+  {
+    title: 'Live Leaderboard',
+    body: 'Track ranks, kills, and earnings as results publish from Arena Control.',
+    icon: 'chart',
+  },
+  {
+    title: 'Social Login',
+    body: 'Sign in fast with email — Google Sign-In is coming soon.',
+    icon: 'users',
+  },
+  {
+    title: 'Smart Notifications',
+    body: 'Room IDs, match live alerts, and result updates when you need them.',
+    icon: 'bell',
+  },
+  {
+    title: 'Refer & Earn',
+    body: 'Invite friends from the app and grow your squad rewards.',
+    icon: 'gift',
+  },
+  {
+    title: 'Daily Bonuses',
+    body: 'Wallet credits, prize pools, and fair payouts after every match.',
+    icon: 'coins',
+  },
+];
 
 export const SUPPORT = {
   email: 'support@warzoneff.com',
   phoneDisplay: '+91 6297616918',
   teamLabel: 'WAREZONE Support Team',
 };
+
+/** Legal / policy links used in navbar + footer dropdowns */
+export const POLICY_LINKS = [
+  { to: '/terms', label: 'Terms & Conditions' },
+  { to: '/privacy', label: 'Privacy Policy' },
+  { to: '/terms', label: 'Fair Play Policy', hash: 'fair-play' },
+  { to: '/terms', label: 'Return Policy', hash: 'return' },
+];
 
 export const ABOUT = {
   paragraphs: [

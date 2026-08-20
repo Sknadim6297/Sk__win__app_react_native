@@ -23,6 +23,7 @@ import {
   formatScheduleLine,
   isCustomMatch,
   getMatchStructure,
+  resolveEntryCharge,
   resolveDisplayPrizePool,
   resolvePrizePlaces,
   resolveMatchRules,
@@ -134,7 +135,8 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           tournamentId,
           returnScreen: isTeamFlow ? 'CustomMatchTeamRegister' : 'TournamentSlotBooking',
           forTeam: isTeamFlow,
-          requiredAmount: eligibility?.realMoneyRequired ?? tournament.entryFee,
+          requiredAmount:
+            eligibility?.totalAmount ?? eligibility?.realMoneyRequired ?? resolveEntryCharge(tournament).totalAmount,
           currentBalance: eligibility?.balance,
         });
         return;
@@ -156,7 +158,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           tournamentId,
           returnScreen: isTeamFlow ? 'CustomMatchTeamRegister' : 'TournamentSlotBooking',
           forTeam: isTeamFlow,
-          requiredAmount: tournament?.entryFee,
+          requiredAmount: resolveEntryCharge(tournament).totalAmount,
         });
       } else {
         showToast(msg, 'error');
@@ -254,7 +256,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
         <View style={styles.grid2}>
           <InfoCell
             label="Entry"
-            value={`₹${tournament.entryFee || 0} / ${structure.entryUnit}`}
+            value={`₹${tournament.entryFee || 0} / player`}
             flex={1}
           />
           <InfoCell label="Slots" value={`${joined}/${maxP} ${structure.slotUnit}`} flex={1} />

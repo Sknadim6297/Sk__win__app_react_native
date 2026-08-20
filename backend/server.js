@@ -93,7 +93,7 @@ if (!isWebsiteReady()) {
 }
 
 // Single brand logo (no copies) — used by download page favicon/OG/hero
-const BRAND_LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo', 'ROUND_GAME_LOGO.png');
+const BRAND_LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo', 'WAREZONE_LOGO.png');
 app.get(['/brand/logo.png', '/download/logo.png'], (req, res) => {
   res.sendFile(BRAND_LOGO_PATH, (err) => {
     if (err) {

@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const SRC = path.join(ROOT, 'assets', 'logo', 'ROUND_GAME_LOGO.png');
+const SRC = path.join(ROOT, 'assets', 'logo', 'WAREZONE_LOGO.png');
 const PUBLIC = path.join(ROOT, 'public');
 
 function copy(name) {

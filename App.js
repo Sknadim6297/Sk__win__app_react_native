@@ -119,7 +119,7 @@ export default function App() {
 }
 
 function AppNavigator() {
-  const { isAuthenticated, isLoading, isAdmin } = useContext(AuthContext);
+  const { isAuthenticated, isLoading, isAdmin, guestInitialRoute } = useContext(AuthContext);
   const linking = useMemo(() => createAppLinking(), []);
 
   useEffect(() => {
@@ -140,15 +140,25 @@ function AppNavigator() {
     return <AppLoadingScreen />;
   }
 
-  const navKey = isAuthenticated ? (isAdmin() ? 'admin' : 'user') : 'guest';
+  const navKey = isAuthenticated
+    ? isAdmin()
+      ? 'admin'
+      : 'user'
+    : `guest-${guestInitialRoute || 'Landing'}`;
+
+  const initialRouteName = isAuthenticated
+    ? isAdmin()
+      ? 'AdminDashboard'
+      : 'MainApp'
+    : guestInitialRoute === 'Auth'
+      ? 'Auth'
+      : 'Landing';
 
   return (
     <NavigationContainer key={navKey} ref={navigationRef} linking={linking}>
       <Stack.Navigator
         key={navKey}
-        initialRouteName={
-          isAuthenticated ? (isAdmin() ? 'AdminDashboard' : 'MainApp') : 'Auth'
-        }
+        initialRouteName={initialRouteName}
         screenOptions={{
           headerShown: false,
           gestureEnabled: false,

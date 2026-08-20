@@ -16,7 +16,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
 const TEMPLATE = path.join(ROOT, 'public', 'apk-landing', 'index.html');
-const LOGO_SRC = path.join(ROOT, 'assets', 'logo', 'ROUND_GAME_LOGO.png');
+const LOGO_SRC = path.join(ROOT, 'assets', 'logo', 'WAREZONE_LOGO.png');
 const DOWNLOADS_DIR = path.join(ROOT, 'public', 'downloads');
 
 const DEFAULT_FILE = 'WAREZONE-v1.0.0.apk';

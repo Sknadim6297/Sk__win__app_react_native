@@ -37,14 +37,14 @@ module.exports = ({ config }) => ({
   ...config,
   splash: {
     ...(config.splash || {}),
-    image: './assets/logo/ROUND_GAME_LOGO.png',
+    image: './assets/logo/WAREZONE_LOGO.png',
     resizeMode: 'contain',
     backgroundColor: splashBg,
   },
   web: {
     ...(config.web || {}),
     backgroundColor: splashBg,
-    favicon: './assets/logo/ROUND_GAME_LOGO.png',
+    favicon: './assets/logo/WAREZONE_LOGO.png',
     name: 'WAREZONE',
     shortName: 'WAREZONE',
     lang: 'en',
@@ -70,7 +70,7 @@ module.exports = ({ config }) => ({
     ...(config.android || {}),
     adaptiveIcon: {
       ...(config.android?.adaptiveIcon || {}),
-      foregroundImage: './assets/logo/ROUND_GAME_LOGO.png',
+      foregroundImage: './assets/logo/WAREZONE_LOGO.png',
       backgroundColor: splashBg,
     },
     ...(googleAndroidScheme
@@ -105,7 +105,7 @@ module.exports = ({ config }) => ({
       'expo-splash-screen',
       {
         backgroundColor: splashBg,
-        image: './assets/logo/ROUND_GAME_LOGO.png',
+        image: './assets/logo/WAREZONE_LOGO.png',
         imageWidth: 180,
         resizeMode: 'contain',
       },

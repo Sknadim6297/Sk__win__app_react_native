@@ -6,6 +6,7 @@ const WalletTransaction = require('../models/WalletTransaction');
 const TournamentRefund = require('../models/TournamentRefund');
 const { logAdminAction } = require('./adminAudit');
 const { notifyUser, buildEventKey, SCREENS } = require('./notificationService');
+const matchStructure = require('./matchStructure');
 
 /**
  * Cancel tournament + idempotent entry-fee refunds for all paid participants.
@@ -54,7 +55,8 @@ async function cancelTournamentWithRefunds(tournamentId, adminId, reason = 'Canc
     await tournament.save();
   }
 
-  const entryFee = Number(tournament.entryFee) || 0;
+  const charge = matchStructure.resolveEntryCharge(tournament);
+  const entryFee = charge.totalAmount;
   const userIds = new Set();
 
   const participants = await TournamentParticipant.find({ tournamentId });

@@ -4,7 +4,7 @@
     "slug": "sk-win",
     "version": "1.0.2",
     "orientation": "portrait",
-    "icon": "./assets/logo/ROUND_GAME_LOGO.png",
+    "icon": "./assets/logo/WAREZONE_LOGO.png",
     "userInterfaceStyle": "dark",
     "jsEngine": "hermes",
     "extra": {
@@ -14,7 +14,7 @@
       "appName": "WAREZONE"
     },
     "splash": {
-      "image": "./assets/logo/ROUND_GAME_LOGO.png",
+      "image": "./assets/logo/WAREZONE_LOGO.png",
       "resizeMode": "contain",
       "backgroundColor": "#0a0e1a"
     },
@@ -28,7 +28,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo/ROUND_GAME_LOGO.png",
+        "foregroundImage": "./assets/logo/WAREZONE_LOGO.png",
         "backgroundColor": "#0a0e1a"
       },
       "package": "com.skwin.tournament",
@@ -36,7 +36,7 @@
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
-      "favicon": "./assets/logo/ROUND_GAME_LOGO.png",
+      "favicon": "./assets/logo/WAREZONE_LOGO.png",
       "name": "WAREZONE",
       "shortName": "WAREZONE",
       "lang": "en",
@@ -62,7 +62,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#0a0e1a",
-          "image": "./assets/logo/ROUND_GAME_LOGO.png",
+          "image": "./assets/logo/WAREZONE_LOGO.png",
           "imageWidth": 200,
           "resizeMode": "contain"
         }
@@ -79,7 +79,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/logo/ROUND_GAME_LOGO.png",
+          "icon": "./assets/logo/WAREZONE_LOGO.png",
           "color": "#22C55E",
           "sounds": [],
           "defaultChannel": "default"
@@ -110,7 +110,7 @@
     ],
     "scheme": "warezone",
     "notification": {
-      "icon": "./assets/logo/ROUND_GAME_LOGO.png",
+      "icon": "./assets/logo/WAREZONE_LOGO.png",
       "color": "#22C55E",
       "androidMode": "default",
       "androidCollapsedTitle": "WAREZONE"

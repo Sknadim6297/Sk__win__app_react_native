@@ -1,5 +1,11 @@
 import Constants from 'expo-constants';
 
+/**
+ * Flip to `false` when Google Sign-In should go live again.
+ * Keeps all OAuth / bridge / backend code intact while UI shows Coming Soon.
+ */
+export const GOOGLE_SIGNIN_COMING_SOON = true;
+
 /** Read Google OAuth client IDs from app.config extra (reliable) then .env. */
 export function getGoogleClientIds() {
   const extra = Constants.expoConfig?.extra || {};

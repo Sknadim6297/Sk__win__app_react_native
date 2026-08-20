@@ -23,7 +23,7 @@ async function main() {
     sharp = require('sharp');
   }
 
-  const logoPath = path.join(ROOT, 'assets', 'logo', 'ROUND_GAME_LOGO.png');
+  const logoPath = path.join(ROOT, 'assets', 'logo', 'WAREZONE_LOGO.png');
   const bannerPath = path.join(
     ROOT,
     'assets',

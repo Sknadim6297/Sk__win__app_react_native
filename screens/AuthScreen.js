@@ -27,7 +27,7 @@ import GoogleLoginButton from '../components/auth/GoogleLoginButton';
 import GoogleSignInBridge from '../components/auth/GoogleSignInBridge';
 import OrDivider from '../components/auth/OrDivider';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
-import { isGoogleSignInConfigured } from '../utils/googleConfig';
+import { isGoogleSignInConfigured, GOOGLE_SIGNIN_COMING_SOON } from '../utils/googleConfig';
 
 const TARGET_ADMIN_EMAIL = 'sknadim6297@gmail.com';
 
@@ -180,6 +180,10 @@ export default function AuthScreen({ navigation, route }) {
 
   const handleGoogleLogin = () => {
     if (submitting || googleLoading) return;
+    if (GOOGLE_SIGNIN_COMING_SOON) {
+      showToast('Google Sign-In is coming soon', 'warning');
+      return;
+    }
     showToast(
       'Google Sign-In not configured. Add EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID to .env and restart Expo (npx expo start -c).',
       'warning'
@@ -289,7 +293,13 @@ export default function AuthScreen({ navigation, route }) {
             />
 
             <OrDivider label={isLogin ? 'or Login' : 'or SignUp'} />
-            {googleConfigured ? (
+            {GOOGLE_SIGNIN_COMING_SOON ? (
+              <GoogleLoginButton
+                comingSoon
+                onPress={handleGoogleLogin}
+                disabled={submitting}
+              />
+            ) : googleConfigured ? (
               <GoogleSignInBridge
                 onToken={onGoogleToken}
                 onError={onGoogleError}

@@ -127,7 +127,7 @@ const App = (() => {
     root().innerHTML = `
       <div class="login">
         <form class="login-card" id="login-form">
-          <img src="/brand/logo.png" alt="" style="width:48px;height:48px;border-radius:12px" />
+          <img src="/brand/logo.png" alt="WAREZONE" style="width:auto;height:40px;max-width:160px;object-fit:contain;border-radius:0" />
           <h1>Arena Control</h1>
           <p style="color:var(--text-2);margin:0 0 18px">Sign in to manage tournaments, players and payouts.</p>
           ${error ? `<div class="alert">${AdminUI.esc(error)}</div>` : ''}
@@ -492,9 +492,9 @@ const App = (() => {
 
           <div class="form-section">
             <h3>Entry & prizes</h3>
-            <p>Entry is charged per team for Clash Squad, and per slot/team for Battle Royale. Per-kill is Battle Royale only.</p>
+            <p>Entry fee is <b>per player</b>. Duo / Squad / Clash Squad: captain pays fee × number of players on the roster. Per-kill is Battle Royale only.</p>
           </div>
-          <div class="field"><label>Entry fee</label><input name="entryFee" type="number" min="0" value="${t.entryFee ?? 0}" /></div>
+          <div class="field"><label>Entry fee per player (₹)</label><input name="entryFee" type="number" min="0" value="${t.entryFee ?? 0}" /></div>
           <div class="field"><label>Prize pool</label><input name="prizePool" type="number" min="0" value="${t.prizePool ?? 0}" /></div>
           <div class="field" id="kill-wrap"><label>Per-kill reward</label><input name="perKill" type="number" min="0" value="${t.perKill ?? 0}" /><span class="help">Shown in match details for Battle Royale. Hidden for Clash Squad.</span></div>
 
@@ -634,7 +634,14 @@ const App = (() => {
     const format = detail.formatLabel || formatLabel(t);
     const modeLabel = modeDisplay(detail, t, custom);
     const teamSetup = detail.teamSetup || (custom ? 'Team A vs Team B' : usesTeams ? `${modeLabel} teams` : 'Solo — individual slots');
-    const joinUnit = detail.joinUnit || detail.entryUnit || (custom || usesTeams ? 'team' : 'player');
+    const joinUnit = 'player';
+    const ppt = Number(detail.playersPerTeam || detail.playersCharged || (t.mode === 'squad' ? 4 : t.mode === 'duo' ? 2 : 1));
+    const feePerPlayer = Number(detail.feePerPlayer ?? t.entryFee ?? 0);
+    const teamTotal = Number(detail.entryChargeTotal ?? (custom || usesTeams ? feePerPlayer * ppt : feePerPlayer));
+    const entryFeeDisplay =
+      custom || usesTeams
+        ? `${AdminUI.money(feePerPlayer)} / player · team total ${AdminUI.money(teamTotal)}`
+        : `${AdminUI.money(feePerPlayer)} / player`;
     const slotUnit = detail.slotUnit || (custom ? 'teams' : 'slots');
     let current = tab || 'overview';
     if (custom && current === 'slots') current = 'teams';
@@ -675,7 +682,7 @@ const App = (() => {
         ${infoCell('Game mode', AdminUI.esc(gameModeName))}
         ${infoCell('Team setup', AdminUI.esc(teamSetup))}
         ${infoCell('Slots', `${detail.joinedCount ?? 0}/${detail.capacity ?? 0} ${AdminUI.esc(slotUnit)}`)}
-        ${infoCell('Entry fee', `${AdminUI.money(t.entryFee)} / ${AdminUI.esc(joinUnit)}`)}
+        ${infoCell('Entry fee', entryFeeDisplay)}
         ${infoCell('Prize pool', AdminUI.money(t.prizePool))}
         ${infoCell('Per kill', detail.hasKillRewards ? AdminUI.money(t.perKill) : 'Not applicable')}
         ${infoCell('Start time', AdminUI.dt(t.startDate))}
@@ -1812,7 +1819,7 @@ const App = (() => {
             <h3>Entry & prizes</h3>
             <p>Copied onto each day’s tournament. You can still override that day’s match in All Tournaments.</p>
           </div>
-          <div class="field"><label>Entry fee</label><input name="entryFee" type="number" min="0" value="${t.entryFee ?? 0}" /></div>
+          <div class="field"><label>Entry fee per player (₹)</label><input name="entryFee" type="number" min="0" value="${t.entryFee ?? 0}" /></div>
           <div class="field"><label>Prize pool</label><input name="prizePool" type="number" min="0" value="${t.prizePool ?? 0}" /></div>
           <div class="field" id="kill-wrap"><label>Per-kill reward</label><input name="perKill" type="number" min="0" value="${t.perKill ?? 0}" /></div>
 

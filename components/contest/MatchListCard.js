@@ -83,7 +83,7 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
           items={[
             { label: 'TYPE', value: modeName },
             {
-              label: structure.entryUnit === 'team' ? 'ENTRY PER TEAM' : 'ENTRY PER SLOT',
+              label: 'ENTRY / PLAYER',
               value: item.entryFee ?? 0,
               coin: true,
             },

@@ -20,7 +20,7 @@ import { AuthContext } from '../context/AuthContext';
 import { COLORS, TYPO } from '../styles/theme';
 import { ONBOARDING } from '../styles/onboardingTheme';
 import { BRAND } from '../constants/branding';
-import SKWinLogo from '../components/SKWinLogo';
+import WarezoneLogo from '../components/WarezoneLogo';
 import BackgroundLayer from '../components/onboarding/BackgroundLayer';
 import PrimaryButton from '../components/auth/PrimaryButton';
 
@@ -69,7 +69,7 @@ const LandingScreen = ({ navigation }) => {
     transform: [{ translateY: footerY.value }],
   }));
 
-  const logoSize = Math.min(ONBOARDING.layout.width * 0.28, 112);
+  const logoSize = Math.min(ONBOARDING.layout.width * 0.55, 220);
 
   return (
     <View style={styles.root}>
@@ -90,8 +90,8 @@ const LandingScreen = ({ navigation }) => {
       >
         <Animated.View style={[styles.heroSection, fadeStyle]}>
           <Animated.View style={[styles.logoWrap, logoStyle]}>
-            <View style={styles.logoGlow} />
-            <SKWinLogo size={logoSize} backgroundColor="transparent" />
+            <View style={[styles.logoGlow, { width: logoSize + 36, height: logoSize + 36, borderRadius: (logoSize + 36) / 2 }]} />
+            <WarezoneLogo size={logoSize} rounded backgroundColor="transparent" />
           </Animated.View>
 
           <Animated.View style={[styles.brandBlock, contentStyle]}>
@@ -160,9 +160,6 @@ const styles = StyleSheet.create({
   },
   logoGlow: {
     position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
     backgroundColor: ONBOARDING.colors.purpleGlow,
   },
   brandBlock: {

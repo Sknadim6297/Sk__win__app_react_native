@@ -64,11 +64,11 @@
       padding-top: 28px;
     }
     .logo {
-      width: 112px;
-      height: 112px;
-      border-radius: 28px;
-      object-fit: cover;
-      background: var(--card);
+      width: min(280px, 88vw);
+      height: auto;
+      max-height: 120px;
+      object-fit: contain;
+      background: transparent;
       margin-bottom: 22px;
     }
     .brand-name {
@@ -282,7 +282,7 @@
   <div class="atmosphere">
     <div class="wrap">
       <header class="brand">
-        <img class="logo" src="/brand/logo.png" alt="WAREZONE" width="112" height="112" />
+        <img class="logo" src="/brand/logo.png" alt="WAREZONE" />
         <h1 class="brand-name">WARE<span>ZONE</span></h1>
         <p class="tagline">Download the official Android app, install, and login to join tournaments.</p>
 
