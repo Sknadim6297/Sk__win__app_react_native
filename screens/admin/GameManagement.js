@@ -13,6 +13,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -39,6 +40,8 @@ const GameManagement = ({ navigation }) => {
     players: '0',
     description: '',
     isPopular: false,
+    sortOrder: '0',
+    status: 'active',
   });
   
   const [uploading, setUploading] = useState(false);
@@ -48,6 +51,8 @@ const GameManagement = ({ navigation }) => {
     name: '',
     description: '',
     image: '',
+    sortOrder: '0',
+    status: 'active',
   });
   
   const [editingGameId, setEditingGameId] = useState(null);
@@ -76,7 +81,7 @@ const GameManagement = ({ navigation }) => {
 
   const fetchGameModes = async (gameId) => {
     try {
-      const data = await gameService.getGameModes(gameId);
+      const data = await gameService.getAdminGameModes(gameId);
       setGameModes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching game modes:', error);
@@ -104,6 +109,8 @@ const GameManagement = ({ navigation }) => {
         players: formData.players,
         description: formData.description,
         isPopular: formData.isPopular,
+        sortOrder: parseInt(formData.sortOrder, 10) || 0,
+        status: formData.status === 'inactive' ? 'inactive' : 'active',
       };
 
       if (isEditing && editingGameId) {
@@ -135,6 +142,8 @@ const GameManagement = ({ navigation }) => {
         name: modeFormData.name,
         description: modeFormData.description,
         image: modeFormData.image,
+        sortOrder: parseInt(modeFormData.sortOrder, 10) || 0,
+        status: modeFormData.status === 'inactive' ? 'inactive' : 'active',
       };
 
       if (editingModeId) {
@@ -205,10 +214,12 @@ const GameManagement = ({ navigation }) => {
     setFormData({
       name: game.name,
       image: game.image,
-      rating: game.rating.toString(),
+      rating: String(game.rating ?? 4.5),
       players: game.players,
       description: game.description || '',
       isPopular: game.isPopular || false,
+      sortOrder: String(game.sortOrder ?? 0),
+      status: game.status === 'inactive' ? 'inactive' : 'active',
     });
     setShowModal(true);
   };
@@ -239,6 +250,8 @@ const GameManagement = ({ navigation }) => {
       name: mode.name || '',
       description: mode.description || '',
       image: mode.image || '',
+      sortOrder: String(mode.sortOrder ?? 0),
+      status: mode.status === 'inactive' ? 'inactive' : 'active',
     });
     setTimeout(scrollToModeForm, 100);
   };
@@ -271,6 +284,8 @@ const GameManagement = ({ navigation }) => {
       players: '0',
       description: '',
       isPopular: false,
+      sortOrder: '0',
+      status: 'active',
     });
     setIsEditing(false);
     setEditingGameId(null);
@@ -281,8 +296,30 @@ const GameManagement = ({ navigation }) => {
       name: '',
       description: '',
       image: '',
+      sortOrder: '0',
+      status: 'active',
     });
     setEditingModeId(null);
+  };
+
+  const toggleGameStatus = async (game) => {
+    const next = game.status === 'inactive' ? 'active' : 'inactive';
+    try {
+      await gameService.updateGame(game._id, { status: next });
+      await fetchGames();
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to update status');
+    }
+  };
+
+  const toggleModeStatus = async (mode) => {
+    const next = mode.status === 'inactive' ? 'active' : 'inactive';
+    try {
+      await gameService.updateGameMode(mode._id, { status: next });
+      await fetchGameModes(selectedGameForModes._id);
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to update status');
+    }
   };
 
   const pickGameImage = async () => {
@@ -416,7 +453,13 @@ const GameManagement = ({ navigation }) => {
             </View>
           ) : (
             games.map((game) => (
-              <View key={game._id} style={styles.gameCard}>
+              <View
+                key={game._id}
+                style={[
+                  styles.gameCard,
+                  game.status === 'inactive' && styles.cardInactive,
+                ]}
+              >
                 <View style={styles.gameCardContent}>
                   <View style={styles.gameIcon}>
                     {game.image ? (
@@ -439,17 +482,42 @@ const GameManagement = ({ navigation }) => {
                       <Text style={styles.gameStat}>{game.rating}</Text>
                       <Text style={styles.gameStat}>•</Text>
                       <Text style={styles.gameStat}>{game.players}</Text>
+                      <Text style={styles.gameStat}>•</Text>
+                      <Text style={styles.gameStat}>Order {game.sortOrder ?? 0}</Text>
                     </View>
-                    {game.isPopular && (
-                      <View style={styles.popularBadge}>
-                        <MaterialCommunityIcons name="fire" size={12} color={COLORS.error} />
-                        <Text style={styles.popularText}>Popular</Text>
+                    <View style={styles.badgeRow}>
+                      {game.isPopular && (
+                        <View style={styles.popularBadge}>
+                          <MaterialCommunityIcons name="fire" size={12} color={COLORS.error} />
+                          <Text style={styles.popularText}>Popular</Text>
+                        </View>
+                      )}
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          game.status === 'inactive' && styles.statusBadgeInactive,
+                        ]}
+                      >
+                        <Text style={styles.statusBadgeText}>
+                          {game.status === 'inactive' ? 'Inactive' : 'Active'}
+                        </Text>
                       </View>
-                    )}
+                    </View>
                   </View>
                 </View>
 
                 <View style={styles.gameActions}>
+                  <View style={styles.statusToggleRow}>
+                    <Text style={styles.statusToggleLabel}>
+                      {game.status === 'inactive' ? 'Off' : 'On'}
+                    </Text>
+                    <Switch
+                      value={game.status !== 'inactive'}
+                      onValueChange={() => toggleGameStatus(game)}
+                      trackColor={{ false: COLORS.lightGray, true: COLORS.accent }}
+                      thumbColor={COLORS.white}
+                    />
+                  </View>
                   <TouchableOpacity 
                     style={styles.modeButton}
                     onPress={() => handleViewModes(game)}
@@ -549,6 +617,20 @@ const GameManagement = ({ navigation }) => {
             </View>
 
             <View style={styles.formGroup}>
+              <Text style={styles.label}>Order (0 = first)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0"
+                placeholderTextColor={COLORS.gray}
+                keyboardType="number-pad"
+                value={formData.sortOrder}
+                onChangeText={(text) =>
+                  setFormData({ ...formData, sortOrder: text.replace(/[^0-9-]/g, '') })
+                }
+              />
+            </View>
+
+            <View style={styles.formGroup}>
               <Text style={styles.label}>Description</Text>
               <TextInput
                 style={[styles.input, { minHeight: 80 }]}
@@ -569,6 +651,18 @@ const GameManagement = ({ navigation }) => {
               </View>
               <Text style={styles.toggleLabel}>Mark as Popular</Text>
             </TouchableOpacity>
+
+            <View style={styles.popularToggle}>
+              <Text style={styles.toggleLabel}>Active (visible to players)</Text>
+              <Switch
+                value={formData.status !== 'inactive'}
+                onValueChange={(on) =>
+                  setFormData({ ...formData, status: on ? 'active' : 'inactive' })
+                }
+                trackColor={{ false: COLORS.lightGray, true: COLORS.accent }}
+                thumbColor={COLORS.white}
+              />
+            </View>
 
             <TouchableOpacity 
               style={styles.submitButton}
@@ -617,19 +711,36 @@ const GameManagement = ({ navigation }) => {
               </View>
             ) : (
               gameModes.map((mode) => (
-                <View key={mode._id} style={styles.modeCard}>
+                <View
+                  key={mode._id}
+                  style={[
+                    styles.modeCard,
+                    mode.status === 'inactive' && styles.cardInactive,
+                  ]}
+                >
                   <View style={styles.modeContent}>
                     {mode.image && (
                       <Image source={{ uri: resolveMediaUrl(mode.image) }} style={styles.modeImage} />
                     )}
                     <View style={styles.modeInfo}>
                       <Text style={styles.modeName}>{toPlayerMatchLabel(mode.name)}</Text>
+                      <Text style={styles.modeMeta}>
+                        Order {mode.sortOrder ?? 0}
+                        {' · '}
+                        {mode.status === 'inactive' ? 'Inactive' : 'Active'}
+                      </Text>
                       {mode.description ? (
                         <Text style={styles.modeDescription}>{mode.description}</Text>
                       ) : null}
                     </View>
                   </View>
                   <View style={styles.modeActions}>
+                    <Switch
+                      value={mode.status !== 'inactive'}
+                      onValueChange={() => toggleModeStatus(mode)}
+                      trackColor={{ false: COLORS.lightGray, true: COLORS.accent }}
+                      thumbColor={COLORS.white}
+                    />
                     <TouchableOpacity onPress={() => handleEditMode(mode)}>
                       <Ionicons name="create-outline" size={22} color={COLORS.accent} />
                     </TouchableOpacity>
@@ -655,6 +766,23 @@ const GameManagement = ({ navigation }) => {
                 placeholderTextColor={COLORS.gray}
                 value={modeFormData.name}
                 onChangeText={(text) => setModeFormData({ ...modeFormData, name: text })}
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Order (0 = first on modes screen)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0"
+                placeholderTextColor={COLORS.gray}
+                keyboardType="number-pad"
+                value={modeFormData.sortOrder}
+                onChangeText={(text) =>
+                  setModeFormData({
+                    ...modeFormData,
+                    sortOrder: text.replace(/[^0-9-]/g, ''),
+                  })
+                }
               />
             </View>
 
@@ -693,6 +821,21 @@ const GameManagement = ({ navigation }) => {
                   <Image source={{ uri: resolveMediaUrl(modeFormData.image) }} style={styles.previewImage} />
                 </View>
               ) : null}
+            </View>
+
+            <View style={styles.popularToggle}>
+              <Text style={styles.toggleLabel}>Active (visible to players)</Text>
+              <Switch
+                value={modeFormData.status !== 'inactive'}
+                onValueChange={(on) =>
+                  setModeFormData({
+                    ...modeFormData,
+                    status: on ? 'active' : 'inactive',
+                  })
+                }
+                trackColor={{ false: COLORS.lightGray, true: COLORS.accent }}
+                thumbColor={COLORS.white}
+              />
             </View>
 
             <TouchableOpacity style={styles.submitButton} onPress={handleAddGameMode}>
@@ -821,7 +964,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
-    marginTop: 4,
     alignSelf: 'flex-start',
     gap: 4,
   },
@@ -830,9 +972,48 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     fontWeight: '600',
   },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  statusBadge: {
+    backgroundColor: `${COLORS.accent}25`,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusBadgeInactive: {
+    backgroundColor: `${COLORS.gray}40`,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  cardInactive: {
+    opacity: 0.72,
+    borderLeftColor: COLORS.gray,
+  },
+  statusToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusToggleLabel: {
+    fontSize: 11,
+    color: COLORS.gray,
+    fontWeight: '600',
+  },
   gameActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 8,
+    maxWidth: 160,
   },
   modeButton: {
     backgroundColor: `${COLORS.accent}20`,
@@ -923,6 +1104,7 @@ const styles = StyleSheet.create({
   popularToggle: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 12,
     gap: 12,
     marginBottom: 20,
@@ -1014,6 +1196,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.white,
   },
+  modeMeta: {
+    fontSize: 11,
+    color: COLORS.gray,
+    marginTop: 2,
+  },
   modeDescription: {
     fontSize: 12,
     color: COLORS.gray,
@@ -1021,7 +1208,8 @@ const styles = StyleSheet.create({
   },
   modeActions: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    gap: 10,
   },
 });
 

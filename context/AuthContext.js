@@ -2,7 +2,10 @@ import React, { createContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiUrl, getApiConfigDiagnostics } from '../utils/apiConfig';
-import { clearPushTokenOnLogout } from '../utils/pushNotifications';
+import {
+  clearPushTokenOnLogout,
+  dismissPendingNotificationNavigation,
+} from '../utils/pushNotifications';
 import {
   getGuestEntryRoute,
   markPreferLoginAfterLogout,
@@ -199,6 +202,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       const userRole = data.user?.role || 'user';
+      await dismissPendingNotificationNavigation();
       await persistSession(data);
       applySession(data);
 
@@ -254,6 +258,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (data.token && data.user) {
+        await dismissPendingNotificationNavigation();
         await persistSession(data);
         applySession(data);
         return {
@@ -316,6 +321,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: 'Invalid server response' };
       }
 
+      await dismissPendingNotificationNavigation();
       await persistSession(data);
       applySession(data);
 

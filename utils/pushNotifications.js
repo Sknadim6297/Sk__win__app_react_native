@@ -120,6 +120,42 @@ export async function clearPushTokenOnLogout() {
   }
 }
 
+let initialNotificationHandled = false;
+
+async function clearLastNotificationResponse() {
+  if (!Notifications?.clearLastNotificationResponseAsync) return;
+  try {
+    await Notifications.clearLastNotificationResponseAsync();
+  } catch {
+    // ignore
+  }
+}
+
+/** Call on login/register so a stale push tap does not open Notifications. */
+export async function dismissPendingNotificationNavigation() {
+  initialNotificationHandled = true;
+  await clearLastNotificationResponse();
+}
+
+function notificationHasNavIntent(data) {
+  if (!data || typeof data !== 'object') return false;
+  return Boolean(
+    data.screen ||
+      data.deepLink ||
+      data.tournamentId ||
+      data.type ||
+      data.resultId ||
+      data.matchId
+  );
+}
+
+function notificationAgeMs(response) {
+  const raw = response?.notification?.date;
+  if (raw == null) return null;
+  const ts = typeof raw === 'number' ? (raw < 1e12 ? raw * 1000 : raw) : Date.parse(raw);
+  return Number.isFinite(ts) ? Date.now() - ts : null;
+}
+
 export function setupNotificationListeners() {
   if (!Notifications) return () => {};
 
@@ -133,6 +169,7 @@ export function setupNotificationListeners() {
   responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
     const data = response?.notification?.request?.content?.data || {};
     handleNotificationNavigation(data);
+    clearLastNotificationResponse();
   });
 
   return () => {
@@ -143,12 +180,29 @@ export function setupNotificationListeners() {
   };
 }
 
+/**
+ * Only when the app was opened by tapping a recent notification.
+ * Stale getLastNotificationResponseAsync() must not hijack register/login → Home.
+ */
 export async function handleInitialNotificationResponse() {
-  if (!Notifications) return;
+  if (!Notifications || initialNotificationHandled) return;
+  initialNotificationHandled = true;
+
   const response = await Notifications.getLastNotificationResponseAsync();
-  if (response?.notification?.request?.content?.data) {
-    setTimeout(() => {
-      handleNotificationNavigation(response.notification.request.content.data);
-    }, 600);
+  if (!response) return;
+
+  const data = response?.notification?.request?.content?.data;
+  const ageMs = notificationAgeMs(response);
+  // No reliable date → treat as stale (common leftover after register/login)
+  const freshEnough = ageMs != null && ageMs <= 45_000;
+
+  if (!freshEnough || !notificationHasNavIntent(data)) {
+    await clearLastNotificationResponse();
+    return;
   }
+
+  setTimeout(() => {
+    handleNotificationNavigation(data);
+    clearLastNotificationResponse();
+  }, 600);
 }

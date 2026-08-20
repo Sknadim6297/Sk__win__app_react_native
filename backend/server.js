@@ -78,7 +78,10 @@ app.use((req, res, next) => {
   express.json({ limit: '2mb' })(req, res, next);
 });
 const { uploadsDir } = require('./utils/uploadsDir');
+const { serveUpload } = require('./middleware/serveUpload');
+// Disk cache first (express.static), then MongoDB fallback for post-deploy survival
 app.use('/uploads', express.static(uploadsDir));
+app.get('/uploads/:filename', serveUpload);
 
 const WEBSITE_DIST = path.join(__dirname, '..', 'website', 'dist');
 const WEBSITE_INDEX = path.join(WEBSITE_DIST, 'index.html');

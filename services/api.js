@@ -620,6 +620,8 @@ export const gameService = {
   getGamesList: () => apiCall('/games/list'),
   getGameDetails: (gameId) => apiCall(`/games/${gameId}`),
   getGameModes: (gameId) => apiCall(`/games/${gameId}/modes`),
+  /** Admin list includes inactive modes and respects sortOrder */
+  getAdminGameModes: (gameId) => apiCall(`/games/admin/${gameId}/modes`),
   createGame: (data) => apiCall('/games/admin/create', { method: 'POST', body: JSON.stringify(data) }),
   updateGame: (gameId, data) =>
     apiCall(`/games/admin/${gameId}`, { method: 'PUT', body: JSON.stringify(data) }),

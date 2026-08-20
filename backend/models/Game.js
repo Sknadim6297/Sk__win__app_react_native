@@ -23,6 +23,11 @@ const gameSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  /** Lower number shows first on Home / game list (0 = first). */
+  sortOrder: {
+    type: Number,
+    default: 0,
+  },
   status: {
     type: String,
     enum: ['active', 'inactive'],

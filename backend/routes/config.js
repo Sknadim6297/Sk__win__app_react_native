@@ -122,7 +122,7 @@ router.get('/site', async (req, res) => {
         .populate('userId', 'username name')
         .select('amount status createdAt userId')
         .lean(),
-      GameMode.find({ status: 'active' }).sort({ createdAt: -1 }).limit(8).lean(),
+      GameMode.find({ status: 'active' }).sort({ sortOrder: 1, name: 1 }).limit(8).lean(),
     ]);
 
     const matchesPlayed = Number(playAgg[0]?.total || 0);

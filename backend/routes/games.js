@@ -64,10 +64,23 @@ const router = express.Router();
 
 // ====== ADMIN ENDPOINTS (MUST COME FIRST) ======
 
+function parseSortOrder(value, fallback = 0) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function parseStatus(value, fallback = 'active') {
+  if (value === true || value === 'true' || value === 'active') return 'active';
+  if (value === false || value === 'false' || value === 'inactive') return 'inactive';
+  if (value === 'active' || value === 'inactive') return value;
+  return fallback;
+}
+
 // Get all games (Admin)
 router.get('/admin/all', authMiddleware, async (req, res) => {
   try {
-    const games = await Game.find().sort({ createdAt: -1 });
+    const games = await Game.find().sort({ sortOrder: 1, name: 1 });
     res.json(games.map((g) => withNormalizedImage(g, req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch games', message: error.message });
@@ -77,7 +90,7 @@ router.get('/admin/all', authMiddleware, async (req, res) => {
 // Create a new game (Admin)
 router.post('/admin/create', authMiddleware, async (req, res) => {
   try {
-    const { name, image, rating, players, description, isPopular } = req.body;
+    const { name, image, rating, players, description, isPopular, sortOrder, status } = req.body;
 
     if (!name || !image) {
       return res.status(400).json({ error: 'Game name and image are required' });
@@ -90,6 +103,8 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       players: players || '0',
       description,
       isPopular: isPopular || false,
+      sortOrder: parseSortOrder(sortOrder, 0),
+      status: parseStatus(status, 'active'),
     });
 
     await game.save();
@@ -105,11 +120,30 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
 // Update game (Admin)
 router.put('/admin/:id', authMiddleware, async (req, res) => {
   try {
-    const game = await Game.findByIdAndUpdate(
-      req.params.id,
-      { ...req.body, updatedAt: new Date() },
-      { new: true }
-    );
+    const updates = { updatedAt: new Date() };
+    const {
+      name,
+      image,
+      rating,
+      players,
+      description,
+      isPopular,
+      sortOrder,
+      status,
+    } = req.body;
+
+    if (name !== undefined) updates.name = name;
+    if (image !== undefined) updates.image = image;
+    if (rating !== undefined) updates.rating = rating;
+    if (players !== undefined) updates.players = players;
+    if (description !== undefined) updates.description = description;
+    if (isPopular !== undefined) {
+      updates.isPopular = isPopular === true || isPopular === 'true';
+    }
+    if (sortOrder !== undefined) updates.sortOrder = parseSortOrder(sortOrder, 0);
+    if (status !== undefined) updates.status = parseStatus(status);
+
+    const game = await Game.findByIdAndUpdate(req.params.id, updates, { new: true });
 
     if (!game) {
       return res.status(404).json({ error: 'Game not found' });
@@ -142,7 +176,10 @@ router.delete('/admin/:id', authMiddleware, async (req, res) => {
 // All modes for a game (Admin, includes inactive)
 router.get('/admin/:gameId/modes', authMiddleware, async (req, res) => {
   try {
-    const modes = await GameMode.find({ game: req.params.gameId }).sort({ createdAt: -1 });
+    const modes = await GameMode.find({ game: req.params.gameId }).sort({
+      sortOrder: 1,
+      name: 1,
+    });
     res.json(modes.map((m) => withNormalizedImage(m, req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch game modes', message: error.message });
@@ -152,7 +189,7 @@ router.get('/admin/:gameId/modes', authMiddleware, async (req, res) => {
 // Create game mode (Admin)
 router.post('/modes/admin/create', authMiddleware, async (req, res) => {
   try {
-    const { gameId, name, description, image } = req.body;
+    const { gameId, name, description, image, sortOrder, status } = req.body;
 
     if (!gameId || !name) {
       return res.status(400).json({ error: 'Game ID and mode name are required' });
@@ -169,6 +206,8 @@ router.post('/modes/admin/create', authMiddleware, async (req, res) => {
       name,
       description,
       image,
+      sortOrder: parseSortOrder(sortOrder, 0),
+      status: parseStatus(status, 'active'),
     });
 
     await mode.save();
@@ -181,12 +220,13 @@ router.post('/modes/admin/create', authMiddleware, async (req, res) => {
 // Update game mode (Admin)
 router.put('/modes/admin/:id', authMiddleware, async (req, res) => {
   try {
-    const { name, description, image, status } = req.body;
+    const { name, description, image, status, sortOrder } = req.body;
     const updates = { updatedAt: new Date() };
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
     if (image !== undefined) updates.image = image;
-    if (status !== undefined) updates.status = status;
+    if (status !== undefined) updates.status = parseStatus(status);
+    if (sortOrder !== undefined) updates.sortOrder = parseSortOrder(sortOrder, 0);
 
     const mode = await GameMode.findByIdAndUpdate(req.params.id, updates, { new: true });
 
@@ -220,7 +260,7 @@ router.delete('/modes/admin/:id', authMiddleware, async (req, res) => {
 // Get all games
 router.get('/list', async (req, res) => {
   try {
-    const games = await Game.find({ status: 'active' }).sort({ createdAt: -1 });
+    const games = await Game.find({ status: 'active' }).sort({ sortOrder: 1, name: 1 });
     const countMap = await countTournamentsByGame(games.map((g) => g._id));
     res.json(games.map((g) => withTournamentCount(g, countMap, '_id', req)));
   } catch (error) {
@@ -231,7 +271,10 @@ router.get('/list', async (req, res) => {
 // Get popular games for home screen (admin: isPopular + active)
 router.get('/popular', async (req, res) => {
   try {
-    const games = await Game.find({ status: 'active', isPopular: true }).sort({ createdAt: -1 });
+    const games = await Game.find({ status: 'active', isPopular: true }).sort({
+      sortOrder: 1,
+      name: 1,
+    });
     const countMap = await countTournamentsByGame(games.map((g) => g._id));
     res.json(games.map((g) => withTournamentCount(g, countMap, '_id', req)));
   } catch (error) {
@@ -256,7 +299,8 @@ router.get('/:id', async (req, res) => {
 router.get('/:gameId/modes', async (req, res) => {
   try {
     const modes = await GameMode.find({ game: req.params.gameId, status: 'active' }).sort({
-      createdAt: -1,
+      sortOrder: 1,
+      name: 1,
     });
     const countMap = await countTournamentsByMode(modes.map((m) => m._id));
     res.json(modes.map((m) => withTournamentCount(m, countMap, '_id', req)));

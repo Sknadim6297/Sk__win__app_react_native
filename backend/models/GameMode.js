@@ -12,6 +12,11 @@ const gameModeSchema = new mongoose.Schema({
   },
   description: String,
   image: String,
+  /** Lower number shows first on the modes screen (0 = first). */
+  sortOrder: {
+    type: Number,
+    default: 0,
+  },
   status: {
     type: String,
     enum: ['active', 'inactive'],

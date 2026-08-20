@@ -1365,6 +1365,13 @@ const App = (() => {
     return `
       <div class="field"><label>Game name <span class="req">*</span></label><input name="name" required value="${AdminUI.esc(g.name || '')}" placeholder="Free Fire" /></div>
       ${AdminUI.imageField('image', g.image || '', 'Game image', true)}
+      <div class="field"><label>Order (0 = first)</label><input name="sortOrder" type="number" value="${AdminUI.esc(String(g.sortOrder ?? 0))}" /></div>
+      <div class="field"><label>Status</label>
+        <select name="status">
+          <option value="active" ${(g.status || 'active') !== 'inactive' ? 'selected' : ''}>Active</option>
+          <option value="inactive" ${g.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+        </select>
+      </div>
       <div class="field full"><label>Description</label><textarea name="description" placeholder="Shown on the game page">${AdminUI.esc(g.description || '')}</textarea></div>
       <label class="help" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="isPopular" value="true" ${g.isPopular ? 'checked' : ''} /> Show on home as popular</label>`;
   }
@@ -1373,6 +1380,13 @@ const App = (() => {
     return `
       <div class="field"><label>Mode name <span class="req">*</span></label><input name="name" required value="${AdminUI.esc(m.name || '')}" placeholder="Battle Royale / Clash Squad" /></div>
       ${AdminUI.imageField('image', m.image || '', 'Mode image', true)}
+      <div class="field"><label>Order (0 = first)</label><input name="sortOrder" type="number" value="${AdminUI.esc(String(m.sortOrder ?? 0))}" /></div>
+      <div class="field"><label>Status</label>
+        <select name="status">
+          <option value="active" ${(m.status || 'active') !== 'inactive' ? 'selected' : ''}>Active</option>
+          <option value="inactive" ${m.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+        </select>
+      </div>
       <div class="field full"><label>Description</label><textarea name="description">${AdminUI.esc(m.description || '')}</textarea></div>`;
   }
 
@@ -1385,7 +1399,7 @@ const App = (() => {
       blocks.push({ game: g, modes: await AdminAPI.modes(g._id).catch(() => []) });
     }
     root().innerHTML = AdminUI.layout('games', `
-      ${AdminUI.pageHead('Games & modes', 'Upload a game image, add modes with images, then create tournaments.', `<button class="btn btn-primary" id="add-game">${AdminUI.icon.plus} Add game</button>`)}
+      ${AdminUI.pageHead('Games & modes', 'Upload a game image, add modes with images, then create tournaments. Order 0 shows first. Inactive hides from players.', `<button class="btn btn-primary" id="add-game">${AdminUI.icon.plus} Add game</button>`)}
       ${blocks.length ? blocks.map(({ game, modes }) => `
         <div class="panel" style="margin-bottom:14px">
           <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
@@ -1393,21 +1407,26 @@ const App = (() => {
               ${game.image ? AdminUI.img(game.image, 'game-hero') : '<div class="game-hero"></div>'}
               <div>
                 <strong>${AdminUI.esc(game.name)}</strong>
-                <div style="color:var(--text-2);font-size:13px">${AdminUI.esc(game.status || 'active')}${game.isPopular ? ' · Popular' : ''}</div>
+                <div style="color:var(--text-2);font-size:13px">Order ${AdminUI.esc(String(game.sortOrder ?? 0))} · ${AdminUI.esc(game.status || 'active')}${game.isPopular ? ' · Popular' : ''}</div>
               </div>
             </div>
-            <div style="display:flex;gap:8px">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-ghost" data-toggle-game="${game._id}" data-status="${game.status === 'inactive' ? 'inactive' : 'active'}">${game.status === 'inactive' ? 'Set active' : 'Set inactive'}</button>
               <button class="btn btn-ghost" data-addmode="${game._id}">Add mode</button>
               ${AdminUI.actionsMenu(game._id, [{ act: 'edit', label: 'Edit' }, { act: 'delete', label: 'Delete', danger: true }])}
             </div>
           </div>
           <div class="table-wrap" style="margin-top:12px"><table>
-            <thead><tr><th>Mode</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Mode</th><th>Order</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>${modes.map((m) => `<tr>
               <td>${m.image ? AdminUI.img(m.image, 'mode-thumb') : ''}${AdminUI.esc(toPlayerMatchLabel(m.name))}</td>
+              <td>${AdminUI.esc(String(m.sortOrder ?? 0))}</td>
               <td>${badge(m.status || 'active')}</td>
-              <td>${AdminUI.actionsMenu('mode:' + m._id, [{ act: 'edit-mode', label: 'Edit' }, { act: 'delete-mode', label: 'Delete', danger: true }])}</td>
-            </tr>`).join('') || `<tr><td colspan="3">${AdminUI.empty('No modes yet', 'Add Battle Royale and Clash Squad modes with images.')}</td></tr>`}</tbody>
+              <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <button class="btn btn-ghost" data-toggle-mode="${m._id}" data-status="${m.status === 'inactive' ? 'inactive' : 'active'}">${m.status === 'inactive' ? 'Activate' : 'Deactivate'}</button>
+                ${AdminUI.actionsMenu('mode:' + m._id, [{ act: 'edit-mode', label: 'Edit' }, { act: 'delete-mode', label: 'Delete', danger: true }])}
+              </td>
+            </tr>`).join('') || `<tr><td colspan="4">${AdminUI.empty('No modes yet', 'Add Battle Royale and Clash Squad modes with images.')}</td></tr>`}</tbody>
           </table></div>
         </div>`).join('') : `<div class="panel">${AdminUI.empty('No games yet', 'Add your first game, upload its image, then add modes.')}</div>`}
     `);
@@ -1418,6 +1437,8 @@ const App = (() => {
         return false;
       }
       body.isPopular = body.isPopular === 'true';
+      body.sortOrder = Number(body.sortOrder) || 0;
+      body.status = body.status === 'inactive' ? 'inactive' : 'active';
       if (id) await AdminAPI.updateGame(id, body);
       else await AdminAPI.createGame(body);
       AdminUI.toast(id ? 'Game updated' : 'Game created');
@@ -1429,6 +1450,8 @@ const App = (() => {
         AdminUI.toast('Mode name and image are required', 'err');
         return false;
       }
+      body.sortOrder = Number(body.sortOrder) || 0;
+      body.status = body.status === 'inactive' ? 'inactive' : 'active';
       if (modeId) await AdminAPI.updateMode(modeId, body);
       else await AdminAPI.createMode({ ...body, gameId });
       AdminUI.toast(modeId ? 'Mode updated' : 'Mode created');
@@ -1438,6 +1461,22 @@ const App = (() => {
     document.getElementById('add-game').onclick = () => catalogForm('Add game', 'Upload the poster players will see on Home.', gameFields(), (body) => saveGame(body));
     document.querySelectorAll('[data-addmode]').forEach((btn) => {
       btn.onclick = () => catalogForm('Add mode', 'Upload the mode poster shown on the game page.', modeFields(), (body) => saveMode(body, btn.dataset.addmode));
+    });
+    document.querySelectorAll('[data-toggle-game]').forEach((btn) => {
+      btn.onclick = () => guarded(async () => {
+        const next = btn.dataset.status === 'inactive' ? 'active' : 'inactive';
+        await AdminAPI.updateGame(btn.dataset.toggleGame, { status: next });
+        AdminUI.toast(next === 'active' ? 'Game activated' : 'Game deactivated');
+        games();
+      });
+    });
+    document.querySelectorAll('[data-toggle-mode]').forEach((btn) => {
+      btn.onclick = () => guarded(async () => {
+        const next = btn.dataset.status === 'inactive' ? 'active' : 'inactive';
+        await AdminAPI.updateMode(btn.dataset.toggleMode, { status: next });
+        AdminUI.toast(next === 'active' ? 'Mode activated' : 'Mode deactivated');
+        games();
+      });
     });
     AdminUI.bindActions(root(), async (act, id) => {
       await guarded(async () => {
