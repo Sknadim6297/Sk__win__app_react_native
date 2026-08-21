@@ -102,6 +102,8 @@ services:
         value: 188535028372-vgg0o270r97e3qtg21ilpt0m6dj1t37j.apps.googleusercontent.com
       - key: EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
         value: 188535028372-c7lhtl9ku9qufa0v4b163icqepmrrl8a.apps.googleusercontent.com
+      - key: EXPO_PUBLIC_PWA_URL
+        value: https://sk-win-pwa.onrender.com
     routes:
       - type: rewrite
         source: /*

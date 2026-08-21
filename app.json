@@ -45,7 +45,7 @@
       "backgroundColor": "#0a0e1a",
       "display": "standalone",
       "orientation": "portrait",
-      "startUrl": "/",
+      "startUrl": "/login",
       "bundler": "metro",
       "output": "single"
     },

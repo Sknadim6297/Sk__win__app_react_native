@@ -178,9 +178,9 @@ export default function HomePage() {
               <a className="btn btn-primary" href={apk}>
                 <AndroidIcon /> Download App
               </a>
-              <Link className="btn btn-ghost" to="/about">
-                <span className="lz-play">▶</span> Learn More
-              </Link>
+              <a className="btn btn-ghost" href={`${PWA_URL}/login`}>
+                <AppleIcon /> iPhone Web App
+              </a>
             </div>
             <div className="lz-hero-stats">
               {heroStats.map((s) => (
@@ -293,15 +293,26 @@ export default function HomePage() {
                   <h3>
                     <AppleIcon /> Web App (PWA)
                   </h3>
-                  <p>No App Store IPA — use Safari and Add to Home Screen.</p>
-                  <a className="btn btn-ghost" href={`${PWA_URL}/login`} target="_blank" rel="noreferrer">
-                    <AppleIcon /> Open Web App
+                  <p>
+                    This Download page is not the app. Open the web app first, then add{' '}
+                    <strong>that</strong> screen to Home Screen.
+                  </p>
+                  <a className="btn btn-primary" href={`${PWA_URL}/login`}>
+                    <AppleIcon /> Open Web App &amp; Login
                   </a>
                   <ol className="lz-ios-steps">
-                    <li>Open the link in <strong>Safari</strong> (not Chrome).</li>
-                    <li>Tap the <strong>Share</strong> button (square with ↑).</li>
-                    <li>Scroll and tap <strong>Add to Home Screen</strong>.</li>
-                    <li>Tap <strong>Add</strong> — open WAREZONE from your Home Screen.</li>
+                    <li>
+                      Tap <strong>Open Web App &amp; Login</strong> above (Safari only — not Chrome).
+                    </li>
+                    <li>
+                      Wait for the WAREZONE <strong>login / Get Started</strong> screen (not this
+                      Download page).
+                    </li>
+                    <li>
+                      Tap <strong>Share</strong> → <strong>Add to Home Screen</strong> →{' '}
+                      <strong>Add</strong>.
+                    </li>
+                    <li>Open the new Home Screen icon and log in to play.</li>
                   </ol>
                 </article>
               </div>

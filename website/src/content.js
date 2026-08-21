@@ -95,7 +95,7 @@ export const FAQ = [
   },
   {
     q: 'Where is WAREZONE available?',
-    a: 'Android players download the APK from the Download page. iPhone players open the WAREZONE web app in Safari and can Add to Home Screen. There is no iPhone IPA file, and the web app is not a native App Store app.',
+    a: 'Android players download the APK from the Download page. iPhone players must open https://sk-win-pwa.onrender.com/login in Safari (the login screen), then Share → Add to Home Screen. Do not add the marketing Download page — that is only instructions, not the app.',
   },
 ];
 

@@ -52,7 +52,7 @@ module.exports = ({ config }) => ({
     themeColor: splashBg,
     display: 'standalone',
     orientation: 'portrait',
-    startUrl: '/',
+    startUrl: '/login',
     bundler: 'metro',
     output: 'single',
   },

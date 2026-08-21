@@ -123,16 +123,20 @@ export default function Footer({ socials = {} }) {
 
         <div className="lz-footer-col lz-footer-download">
           <h4>Download App</h4>
-          <p className="lz-footer-dl-copy">Android APK or iPhone web app.</p>
+          <p className="lz-footer-dl-copy">
+            Android APK or iPhone web app — open the web app first, then Add to Home Screen.
+          </p>
           <div className="lz-footer-dl-actions">
             <a className="btn btn-primary btn-sm" href={apk}>
               <AndroidIcon /> Android APK
             </a>
-            <a className="btn btn-ghost btn-sm" href={pwa} target="_blank" rel="noreferrer">
+            <a className="btn btn-ghost btn-sm" href={pwa}>
               <AppleIcon /> iPhone Web App
             </a>
           </div>
-          <p className="lz-footer-ver">v{APP_RELEASE.version} · Safari → Share → Add to Home Screen</p>
+          <p className="lz-footer-ver">
+            APK v{APP_RELEASE.version} · iPhone: open web app → Share → Add to Home Screen
+          </p>
         </div>
       </div>
 

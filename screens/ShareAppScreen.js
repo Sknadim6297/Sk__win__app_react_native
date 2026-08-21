@@ -21,6 +21,11 @@ import { userService } from '../services/api';
 import BrandCoin from '../components/ui/BrandCoin';
 import { getApiOrigin } from '../utils/apiConfig';
 
+const PWA_URL = String(process.env.EXPO_PUBLIC_PWA_URL || 'https://sk-win-pwa.onrender.com').replace(
+  /\/$/,
+  ''
+);
+
 function getDownloadPageUrl() {
   try {
     const origin = getApiOrigin();
@@ -29,6 +34,12 @@ function getDownloadPageUrl() {
   } catch {
     return '';
   }
+}
+
+function getShareAppUrl() {
+  // Prefer the playable iPhone/web app so referrals do not land only on the APK page.
+  if (PWA_URL) return `${PWA_URL}/login`;
+  return getDownloadPageUrl();
 }
 
 const STEPS = [
@@ -63,16 +74,18 @@ const ShareAppScreen = ({ navigation, route }) => {
   }, [user?.referralCode]);
 
   const downloadUrl = getDownloadPageUrl();
+  const shareUrl = getShareAppUrl();
 
   const handleShare = async () => {
     try {
-      const linkLine = downloadUrl
-        ? `\n\nDownload WAREZONE:\n${downloadUrl}`
+      const apkLine = downloadUrl ? `\nAndroid APK: ${downloadUrl}` : '';
+      const linkLine = shareUrl
+        ? `\n\nOpen WAREZONE (iPhone web app / login):\n${shareUrl}${apkLine}`
         : '\n\nAsk me for the official download link.';
       await Share.share({
         message: `Join WAREZONE and play Free Fire tournaments for real rewards! Use my referral code ${referralCode} during signup.${linkLine}`,
         title: 'Refer & Earn — WAREZONE',
-        url: downloadUrl || undefined,
+        url: shareUrl || undefined,
       });
     } catch (error) {
       Alert.alert('Error', error.message);
@@ -151,17 +164,17 @@ const ShareAppScreen = ({ navigation, route }) => {
           ))}
         </View>
 
-        <Text style={pageStyles.sectionTitle}>App download link</Text>
+        <Text style={pageStyles.sectionTitle}>App link (web / iPhone)</Text>
         <View style={pageStyles.card}>
           <View style={[pageStyles.row, pageStyles.rowLast, styles.linkRow]}>
             <Text style={styles.linkText} numberOfLines={3}>
-              {downloadUrl || 'Download link is not configured yet'}
+              {shareUrl || 'App link is not configured yet'}
             </Text>
           </View>
-          {!!downloadUrl && (
+          {!!shareUrl && (
             <TouchableOpacity
               style={[styles.copyBtn, styles.linkCopy]}
-              onPress={() => copyText(downloadUrl, 'Download link copied')}
+              onPress={() => copyText(shareUrl, 'App link copied')}
               activeOpacity={0.85}
             >
               <Ionicons name="link-outline" size={18} color={COLORS.white} />

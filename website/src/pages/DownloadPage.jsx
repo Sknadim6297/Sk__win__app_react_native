@@ -62,21 +62,21 @@ export default function DownloadPage() {
                 <p className="kicker">iPhone / iPad</p>
                 <h2>Open web app</h2>
                 <p className="muted">Safari on iOS 16.4 or newer</p>
-                <a className="btn btn-primary" href={pwaHref} target="_blank" rel="noreferrer">
-                  Open WAREZONE Web App
+                <a className="btn btn-primary" href={pwaHref}>
+                  Open Web App &amp; Login
                 </a>
                 <p className="dim os-help">
-                  There is no iPhone APK or IPA download. WAREZONE on iPhone is a web app you can
-                  add to your Home Screen. It is not a native iOS App Store app.
+                  There is no iPhone APK or IPA. This Download page is only instructions — the real
+                  app is the web login screen. Do not Add to Home Screen from this page.
                 </p>
                 <p className="muted" style={{ marginTop: 14, marginBottom: 6 }}>
-                  Add to Home Screen
+                  Add to Home Screen (after login screen opens)
                 </p>
                 <ol className="a2hs-steps">
-                  <li>Open the web app in Safari (not Chrome).</li>
-                  <li>Tap the Share button (square with an arrow).</li>
-                  <li>Scroll and tap Add to Home Screen.</li>
-                  <li>Tap Add. Open WAREZONE from your Home Screen like an app.</li>
+                  <li>Tap Open Web App &amp; Login above (must use Safari, not Chrome).</li>
+                  <li>Wait until you see WAREZONE Get Started / Login — not this Download page.</li>
+                  <li>Tap Share (square with arrow) → Add to Home Screen → Add.</li>
+                  <li>Open the Home Screen icon and log in to join tournaments.</li>
                 </ol>
               </article>
             </div>

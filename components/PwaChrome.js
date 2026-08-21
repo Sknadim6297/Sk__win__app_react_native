@@ -85,7 +85,7 @@ export default function PwaChrome() {
             <Text style={styles.installBody}>
               {installEvent
                 ? 'Install the web app on this device. This is not an App Store listing.'
-                : 'In Safari tap Share, then Add to Home Screen. This is a web app, not a native iPhone app.'}
+                : 'First open https://sk-win-pwa.onrender.com/login in Safari. When you see Login / Get Started, tap Share → Add to Home Screen. Do not add the Download page.'}
             </Text>
           </View>
           <View style={styles.installActions}>

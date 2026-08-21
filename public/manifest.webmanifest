@@ -2,7 +2,7 @@
   "name": "WAREZONE",
   "short_name": "WAREZONE",
   "description": "WAREZONE Free Fire tournaments. Join matches, track results, and manage your wallet.",
-  "start_url": "/",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
