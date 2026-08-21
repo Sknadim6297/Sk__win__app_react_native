@@ -1364,8 +1364,12 @@ const App = (() => {
   function gameFields(g = {}) {
     return `
       <div class="field"><label>Game name <span class="req">*</span></label><input name="name" required value="${AdminUI.esc(g.name || '')}" placeholder="Free Fire" /></div>
+      <div class="field" style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:12px">
+        <label>Display order <span class="req">*</span> (0 = first on player app)</label>
+        <input name="sortOrder" type="number" min="0" step="1" required value="${AdminUI.esc(String(g.sortOrder ?? 0))}" />
+        <span class="help">Lower number shows first. Example: 0, then 1, then 2…</span>
+      </div>
       ${AdminUI.imageField('image', g.image || '', 'Game image', true)}
-      <div class="field"><label>Order (0 = first)</label><input name="sortOrder" type="number" value="${AdminUI.esc(String(g.sortOrder ?? 0))}" /></div>
       <div class="field"><label>Status</label>
         <select name="status">
           <option value="active" ${(g.status || 'active') !== 'inactive' ? 'selected' : ''}>Active</option>
@@ -1379,8 +1383,12 @@ const App = (() => {
   function modeFields(m = {}) {
     return `
       <div class="field"><label>Mode name <span class="req">*</span></label><input name="name" required value="${AdminUI.esc(m.name || '')}" placeholder="Battle Royale / Clash Squad" /></div>
+      <div class="field" style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:12px">
+        <label>Display order <span class="req">*</span> (0 = first on player app)</label>
+        <input name="sortOrder" type="number" min="0" step="1" required value="${AdminUI.esc(String(Number.isFinite(Number(m.sortOrder)) ? m.sortOrder : 0))}" />
+        <span class="help">This controls Home / Game List order. 0 shows first, 1 second, and so on.</span>
+      </div>
       ${AdminUI.imageField('image', m.image || '', 'Mode image', true)}
-      <div class="field"><label>Order (0 = first)</label><input name="sortOrder" type="number" value="${AdminUI.esc(String(m.sortOrder ?? 0))}" /></div>
       <div class="field"><label>Status</label>
         <select name="status">
           <option value="active" ${(m.status || 'active') !== 'inactive' ? 'selected' : ''}>Active</option>
@@ -1445,7 +1453,17 @@ const App = (() => {
               <td>${m.image ? AdminUI.img(m.image, 'mode-thumb') : ''}${AdminUI.esc(toPlayerMatchLabel(m.name))}</td>
               <td>
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                  <strong style="min-width:1.5rem">${AdminUI.esc(String(Number.isFinite(Number(m.sortOrder)) ? m.sortOrder : idx))}</strong>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value="${AdminUI.esc(String(Number.isFinite(Number(m.sortOrder)) ? m.sortOrder : idx))}"
+                    data-order-input="${m._id}"
+                    data-game="${game._id}"
+                    style="width:64px;height:36px;border:1px solid var(--border);border-radius:8px;padding:0 8px;font-weight:700"
+                    title="0 = first on player app"
+                  />
+                  <button type="button" class="btn btn-ghost btn-icon" title="Save order" data-save-order="${m._id}" data-game="${game._id}">Save</button>
                   <button type="button" class="btn btn-ghost btn-icon" title="Move up (lower order)" data-move-mode="${m._id}" data-game="${game._id}" data-dir="up" ${idx === 0 ? 'disabled' : ''}>↑</button>
                   <button type="button" class="btn btn-ghost btn-icon" title="Move down (higher order)" data-move-mode="${m._id}" data-game="${game._id}" data-dir="down" ${idx === modes.length - 1 ? 'disabled' : ''}>↓</button>
                 </div>
@@ -1461,12 +1479,17 @@ const App = (() => {
     `);
     AdminUI.bindShell();
     const saveGame = async (body, id) => {
-      if (!body.name || !body.image) {
-        AdminUI.toast('Game name and image are required', 'err');
+      if (!body.name) {
+        AdminUI.toast('Game name is required', 'err');
         return false;
       }
+      if (!body.image && !id) {
+        AdminUI.toast('Game image is required', 'err');
+        return false;
+      }
+      if (!body.image && id) delete body.image;
       body.isPopular = body.isPopular === 'true';
-      body.sortOrder = Number(body.sortOrder) || 0;
+      body.sortOrder = Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0;
       body.status = body.status === 'inactive' ? 'inactive' : 'active';
       if (id) await AdminAPI.updateGame(id, body);
       else await AdminAPI.createGame(body);
@@ -1475,11 +1498,16 @@ const App = (() => {
       return true;
     };
     const saveMode = async (body, gameId, modeId) => {
-      if (!body.name || !body.image) {
-        AdminUI.toast('Mode name and image are required', 'err');
+      if (!body.name) {
+        AdminUI.toast('Mode name is required', 'err');
         return false;
       }
-      body.sortOrder = Number(body.sortOrder) || 0;
+      if (!body.image && !modeId) {
+        AdminUI.toast('Mode image is required', 'err');
+        return false;
+      }
+      if (!body.image && modeId) delete body.image;
+      body.sortOrder = Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0;
       body.status = body.status === 'inactive' ? 'inactive' : 'active';
       if (modeId) await AdminAPI.updateMode(modeId, body);
       else await AdminAPI.createMode({ ...body, gameId });
@@ -1494,6 +1522,20 @@ const App = (() => {
     document.querySelectorAll('[data-move-mode]').forEach((btn) => {
       btn.onclick = () => guarded(async () => {
         await reorderModes(btn.dataset.game, btn.dataset.moveMode, btn.dataset.dir);
+      });
+    });
+    document.querySelectorAll('[data-save-order]').forEach((btn) => {
+      btn.onclick = () => guarded(async () => {
+        const modeId = btn.dataset.saveOrder;
+        const input = root().querySelector(`[data-order-input="${modeId}"]`);
+        const sortOrder = Number(input?.value);
+        if (!Number.isFinite(sortOrder) || sortOrder < 0) {
+          AdminUI.toast('Enter a valid order number (0 or higher)', 'err');
+          return;
+        }
+        await AdminAPI.updateMode(modeId, { sortOrder });
+        AdminUI.toast(`Order saved as ${sortOrder} — lower shows first on app`);
+        games();
       });
     });
     document.querySelectorAll('[data-toggle-game]').forEach((btn) => {
@@ -1519,12 +1561,12 @@ const App = (() => {
         }
         if (act === 'edit') {
           const g = (list || []).find((x) => x._id === id);
-          return catalogForm('Edit game', 'Replace the image or update the name.', gameFields(g || {}), (body) => saveGame(body, id));
+          return catalogForm('Edit game', 'Change Display order (0 = first), image, or name.', gameFields(g || {}), (body) => saveGame(body, id));
         }
         if (act === 'edit-mode') {
           const modeId = id.replace('mode:', '');
           const found = blocks.flatMap((b) => b.modes.map((m) => ({ ...m, gameId: b.game._id }))).find((m) => String(m._id) === String(modeId));
-          return catalogForm('Edit mode', 'Set Order so 0 appears first on Home / Game List.', modeFields(found || {}), (body) => saveMode(body, found?.gameId, modeId));
+          return catalogForm('Edit mode', 'Set Display order first (0 = first on Home / Game List), then image/name.', modeFields(found || {}), (body) => saveMode(body, found?.gameId, modeId));
         }
         if (act === 'delete-mode') {
           const modeId = id.replace('mode:', '');

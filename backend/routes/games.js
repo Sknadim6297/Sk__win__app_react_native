@@ -11,6 +11,8 @@ function withNormalizedImage(doc, req) {
   if (obj.image) {
     obj.image = normalizeMediaUrl(obj.image, req);
   }
+  const order = Number(obj.sortOrder);
+  obj.sortOrder = Number.isFinite(order) ? order : 0;
   return obj;
 }
 

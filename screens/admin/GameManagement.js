@@ -97,7 +97,11 @@ const GameManagement = ({ navigation }) => {
   };
 
   const handleAddGame = async () => {
-    if (!formData.name.trim() || !formData.image.trim()) {
+    if (!formData.name.trim()) {
+      Alert.alert('Error', 'Game name is required');
+      return;
+    }
+    if (!formData.image.trim() && !(isEditing && editingGameId)) {
       Alert.alert('Error', 'Game name and image URL are required');
       return;
     }
@@ -105,14 +109,21 @@ const GameManagement = ({ navigation }) => {
     try {
       const gameData = {
         name: formData.name,
-        image: formData.image,
         rating: parseFloat(formData.rating) || 4.5,
         players: formData.players,
         description: formData.description,
         isPopular: formData.isPopular,
-        sortOrder: parseInt(formData.sortOrder, 10) || 0,
+        sortOrder: Number.isFinite(parseInt(formData.sortOrder, 10))
+          ? parseInt(formData.sortOrder, 10)
+          : 0,
         status: formData.status === 'inactive' ? 'inactive' : 'active',
       };
+      if (formData.image?.trim()) {
+        gameData.image = formData.image.trim();
+      } else if (!(isEditing && editingGameId)) {
+        Alert.alert('Error', 'Game name and image URL are required');
+        return;
+      }
 
       if (isEditing && editingGameId) {
         await gameService.updateGame(editingGameId, gameData);
@@ -142,10 +153,17 @@ const GameManagement = ({ navigation }) => {
         gameId: selectedGameForModes._id,
         name: modeFormData.name,
         description: modeFormData.description,
-        image: modeFormData.image,
-        sortOrder: parseInt(modeFormData.sortOrder, 10) || 0,
+        sortOrder: Number.isFinite(parseInt(modeFormData.sortOrder, 10))
+          ? parseInt(modeFormData.sortOrder, 10)
+          : 0,
         status: modeFormData.status === 'inactive' ? 'inactive' : 'active',
       };
+      if (modeFormData.image?.trim()) {
+        modeData.image = modeFormData.image.trim();
+      } else if (!editingModeId) {
+        Alert.alert('Error', 'Mode image is required');
+        return;
+      }
 
       if (editingModeId) {
         await gameService.updateGameMode(editingModeId, modeData);
@@ -160,6 +178,25 @@ const GameManagement = ({ navigation }) => {
     } catch (error) {
       console.error('Error saving game mode:', error);
       Alert.alert('Error', error.message || 'Failed to save game mode');
+    }
+  };
+
+  const moveMode = async (modeId, direction) => {
+    if (!selectedGameForModes?._id) return;
+    const sorted = sortBySortOrder(gameModes);
+    const i = sorted.findIndex((m) => String(m._id) === String(modeId));
+    const j = direction === 'up' ? i - 1 : i + 1;
+    if (i < 0 || j < 0 || j >= sorted.length) return;
+    const next = [...sorted];
+    const [moved] = next.splice(i, 1);
+    next.splice(j, 0, moved);
+    try {
+      await Promise.all(
+        next.map((m, idx) => gameService.updateGameMode(m._id, { sortOrder: idx }))
+      );
+      await fetchGameModes(selectedGameForModes._id);
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to reorder modes');
     }
   };
 
@@ -567,6 +604,21 @@ const GameManagement = ({ navigation }) => {
               />
             </View>
 
+            <View style={[styles.formGroup, styles.orderHighlight]}>
+              <Text style={styles.label}>Display order * (0 = first on player app)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0"
+                placeholderTextColor={COLORS.gray}
+                keyboardType="number-pad"
+                value={formData.sortOrder}
+                onChangeText={(text) =>
+                  setFormData({ ...formData, sortOrder: text.replace(/[^0-9]/g, '') })
+                }
+              />
+              <Text style={styles.orderHelp}>Lower number shows first in the app game list.</Text>
+            </View>
+
             <View style={styles.formGroup}>
               <Text style={styles.label}>Game Image *</Text>
               <TouchableOpacity 
@@ -615,20 +667,6 @@ const GameManagement = ({ navigation }) => {
                   onChangeText={(text) => setFormData({ ...formData, players: text })}
                 />
               </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Order (0 = first)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0"
-                placeholderTextColor={COLORS.gray}
-                keyboardType="number-pad"
-                value={formData.sortOrder}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, sortOrder: text.replace(/[^0-9-]/g, '') })
-                }
-              />
             </View>
 
             <View style={styles.formGroup}>
@@ -711,7 +749,7 @@ const GameManagement = ({ navigation }) => {
                 <Text style={styles.emptySubtext}>Add a game mode below</Text>
               </View>
             ) : (
-              gameModes.map((mode) => (
+              gameModes.map((mode, idx) => (
                 <View
                   key={mode._id}
                   style={[
@@ -726,7 +764,7 @@ const GameManagement = ({ navigation }) => {
                     <View style={styles.modeInfo}>
                       <Text style={styles.modeName}>{toPlayerMatchLabel(mode.name)}</Text>
                       <Text style={styles.modeMeta}>
-                        Order {mode.sortOrder ?? 0}
+                        Order {mode.sortOrder ?? idx}
                         {' · '}
                         {mode.status === 'inactive' ? 'Inactive' : 'Active'}
                       </Text>
@@ -736,6 +774,27 @@ const GameManagement = ({ navigation }) => {
                     </View>
                   </View>
                   <View style={styles.modeActions}>
+                    <TouchableOpacity
+                      onPress={() => moveMode(mode._id, 'up')}
+                      disabled={idx === 0}
+                      style={[styles.reorderBtn, idx === 0 && styles.reorderBtnDisabled]}
+                    >
+                      <Ionicons name="arrow-up" size={18} color={idx === 0 ? COLORS.gray : COLORS.accent} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => moveMode(mode._id, 'down')}
+                      disabled={idx === gameModes.length - 1}
+                      style={[
+                        styles.reorderBtn,
+                        idx === gameModes.length - 1 && styles.reorderBtnDisabled,
+                      ]}
+                    >
+                      <Ionicons
+                        name="arrow-down"
+                        size={18}
+                        color={idx === gameModes.length - 1 ? COLORS.gray : COLORS.accent}
+                      />
+                    </TouchableOpacity>
                     <Switch
                       value={mode.status !== 'inactive'}
                       onValueChange={() => toggleModeStatus(mode)}
@@ -770,8 +829,8 @@ const GameManagement = ({ navigation }) => {
               />
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Order (0 = first on modes screen)</Text>
+            <View style={[styles.formGroup, styles.orderHighlight]}>
+              <Text style={styles.label}>Display order * (0 = first on player app)</Text>
               <TextInput
                 style={styles.input}
                 placeholder="0"
@@ -781,10 +840,11 @@ const GameManagement = ({ navigation }) => {
                 onChangeText={(text) =>
                   setModeFormData({
                     ...modeFormData,
-                    sortOrder: text.replace(/[^0-9-]/g, ''),
+                    sortOrder: text.replace(/[^0-9]/g, ''),
                   })
                 }
               />
+              <Text style={styles.orderHelp}>Lower number shows first on Home / Game List.</Text>
             </View>
 
             <View style={styles.formGroup}>
@@ -1082,6 +1142,24 @@ const styles = StyleSheet.create({
   },
   formGroup: {
     marginBottom: 16,
+  },
+  orderHighlight: {
+    backgroundColor: 'rgba(255, 107, 0, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 0, 0.45)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  orderHelp: {
+    marginTop: 6,
+    fontSize: 12,
+    color: COLORS.gray,
+  },
+  reorderBtn: {
+    padding: 4,
+  },
+  reorderBtnDisabled: {
+    opacity: 0.4,
   },
   formRow: {
     flexDirection: 'row',
