@@ -8,6 +8,7 @@ const Tournament = require('../models/Tournament');
 const WalletTransaction = require('../models/WalletTransaction');
 const GameMode = require('../models/GameMode');
 const { normalizeMediaUrl } = require('../utils/publicUrl');
+const { sortBySortOrder } = require('../utils/sortBySortOrder');
 
 const router = express.Router();
 
@@ -122,11 +123,12 @@ router.get('/site', async (req, res) => {
         .populate('userId', 'username name')
         .select('amount status createdAt userId')
         .lean(),
-      GameMode.find({ status: 'active' }).sort({ sortOrder: 1, name: 1 }).limit(8).lean(),
+      GameMode.find({ status: 'active' }).lean(),
     ]);
 
     const matchesPlayed = Number(playAgg[0]?.total || 0);
     const totalWinnings = Math.round(Number(winAgg[0]?.total || 0));
+    const sortedModes = sortBySortOrder(modes).slice(0, 8);
 
     res.json({
       success: true,
@@ -142,11 +144,12 @@ router.get('/site', async (req, res) => {
         status: w.status,
         at: w.createdAt,
       })),
-      modes: modes.map((m) => ({
+      modes: sortedModes.map((m) => ({
         id: String(m._id),
         name: m.name,
         description: modeBlurb(m.name, m.description),
         image: normalizeMediaUrl(m.image, req),
+        sortOrder: Number.isFinite(Number(m.sortOrder)) ? Number(m.sortOrder) : 0,
       })),
     });
   } catch (error) {

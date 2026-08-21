@@ -25,6 +25,7 @@ import {
 } from '../services/api';
 import HomeImageSlider from '../components/home/HomeImageSlider';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import { sortBySortOrder } from '../utils/sortBySortOrder';
 
 const MODE_CARD_WIDTH = (getLayoutWidth() - 32 - 12) / 2;
 const MODE_CARD_HEIGHT = MODE_CARD_WIDTH * 0.72;
@@ -57,12 +58,16 @@ export default function HomeScreen({ navigation }) {
       setEsportsGameId(freeFire?._id || null);
       if (freeFire?._id) {
         const modesData = await gameService.getGameModes(freeFire._id).catch(() => []);
-        const modes = (Array.isArray(modesData) ? modesData : []).map((mode, index) => ({
-          id: mode._id || mode.id || String(index),
-          name: (mode.name || 'GAME MODE').toUpperCase(),
-          tournamentCount: mode.tournamentCount ?? mode.liveCount ?? mode.activeTournaments ?? 0,
-          image: mode.image ? { uri: resolveMediaUrl(mode.image) } : null,
-        }));
+        const modes = sortBySortOrder(Array.isArray(modesData) ? modesData : []).map((mode, index) => {
+          const sortOrder = Number(mode.sortOrder);
+          return {
+            id: mode._id || mode.id || String(index),
+            name: (mode.name || 'GAME MODE').toUpperCase(),
+            tournamentCount: mode.tournamentCount ?? mode.liveCount ?? mode.activeTournaments ?? 0,
+            image: mode.image ? { uri: resolveMediaUrl(mode.image) } : null,
+            sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
+          };
+        });
         setEsportsModes(modes);
       } else {
         setEsportsModes([]);

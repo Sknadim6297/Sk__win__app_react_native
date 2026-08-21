@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { gameService } from '../services/api';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import { sortBySortOrder } from '../utils/sortBySortOrder';
 import { getLayoutWidth } from '../utils/layout';
 import GameModePoster from '../components/home/GameModePoster';
 
@@ -27,13 +28,14 @@ const mapMode = (mode, index) => {
   const id = mode._id || mode.id || String(index);
   const imageUri =
     mode.image && typeof mode.image === 'string' ? resolveMediaUrl(mode.image) : null;
-
+  const sortOrder = Number(mode.sortOrder);
   return {
     id,
     name: (mode.name || 'GAME MODE').toUpperCase(),
     description: mode.description,
     tournamentCount: mode.tournamentCount ?? mode.liveCount ?? mode.activeTournaments ?? 0,
     image: imageUri ? { uri: imageUri } : null,
+    sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
   };
 };
 
@@ -52,7 +54,7 @@ export default function GameModesScreen({ navigation, route }) {
     try {
       setLoading(true);
       const modesData = await gameService.getGameModes(gameId).catch(() => []);
-      const list = Array.isArray(modesData) ? modesData : [];
+      const list = sortBySortOrder(Array.isArray(modesData) ? modesData : []);
       setGameModes(list.map(mapMode));
     } catch (error) {
       console.error('Failed to load game modes:', error);

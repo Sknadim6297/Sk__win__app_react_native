@@ -1395,11 +1395,34 @@ const App = (() => {
     AdminUI.bindShell();
     const list = await AdminAPI.games();
     const blocks = [];
+    const sortModes = (modes) => [...(modes || [])].sort((a, b) => {
+      const ao = Number(a?.sortOrder); const bo = Number(b?.sortOrder);
+      const aOrder = Number.isFinite(ao) ? ao : 0;
+      const bOrder = Number.isFinite(bo) ? bo : 0;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { sensitivity: 'base' });
+    });
     for (const g of list || []) {
-      blocks.push({ game: g, modes: await AdminAPI.modes(g._id).catch(() => []) });
+      blocks.push({ game: g, modes: sortModes(await AdminAPI.modes(g._id).catch(() => [])) });
     }
+
+    async function reorderModes(gameId, modeId, direction) {
+      const block = blocks.find((b) => String(b.game._id) === String(gameId));
+      if (!block) return;
+      const sorted = [...block.modes];
+      const i = sorted.findIndex((m) => String(m._id) === String(modeId));
+      const j = direction === 'up' ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= sorted.length) return;
+      const next = [...sorted];
+      const [moved] = next.splice(i, 1);
+      next.splice(j, 0, moved);
+      await Promise.all(next.map((m, idx) => AdminAPI.updateMode(m._id, { sortOrder: idx })));
+      AdminUI.toast('Mode order updated — 0 is first on the player app');
+      games();
+    }
+
     root().innerHTML = AdminUI.layout('games', `
-      ${AdminUI.pageHead('Games & modes', 'Upload a game image, add modes with images, then create tournaments. Order 0 shows first. Inactive hides from players.', `<button class="btn btn-primary" id="add-game">${AdminUI.icon.plus} Add game</button>`)}
+      ${AdminUI.pageHead('Games & modes', 'Set <b>Order</b> so players see modes correctly. <b>0 = first</b> on Home / Game List. Use ↑ ↓ or Edit → Order.', `<button class="btn btn-primary" id="add-game">${AdminUI.icon.plus} Add game</button>`)}
       ${blocks.length ? blocks.map(({ game, modes }) => `
         <div class="panel" style="margin-bottom:14px">
           <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
@@ -1417,10 +1440,16 @@ const App = (() => {
             </div>
           </div>
           <div class="table-wrap" style="margin-top:12px"><table>
-            <thead><tr><th>Mode</th><th>Order</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>${modes.map((m) => `<tr>
+            <thead><tr><th>Mode</th><th style="min-width:140px">Order (0=first)</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>${modes.map((m, idx) => `<tr>
               <td>${m.image ? AdminUI.img(m.image, 'mode-thumb') : ''}${AdminUI.esc(toPlayerMatchLabel(m.name))}</td>
-              <td>${AdminUI.esc(String(m.sortOrder ?? 0))}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <strong style="min-width:1.5rem">${AdminUI.esc(String(Number.isFinite(Number(m.sortOrder)) ? m.sortOrder : idx))}</strong>
+                  <button type="button" class="btn btn-ghost btn-icon" title="Move up (lower order)" data-move-mode="${m._id}" data-game="${game._id}" data-dir="up" ${idx === 0 ? 'disabled' : ''}>↑</button>
+                  <button type="button" class="btn btn-ghost btn-icon" title="Move down (higher order)" data-move-mode="${m._id}" data-game="${game._id}" data-dir="down" ${idx === modes.length - 1 ? 'disabled' : ''}>↓</button>
+                </div>
+              </td>
               <td>${badge(m.status || 'active')}</td>
               <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <button class="btn btn-ghost" data-toggle-mode="${m._id}" data-status="${m.status === 'inactive' ? 'inactive' : 'active'}">${m.status === 'inactive' ? 'Activate' : 'Deactivate'}</button>
@@ -1460,7 +1489,12 @@ const App = (() => {
     };
     document.getElementById('add-game').onclick = () => catalogForm('Add game', 'Upload the poster players will see on Home.', gameFields(), (body) => saveGame(body));
     document.querySelectorAll('[data-addmode]').forEach((btn) => {
-      btn.onclick = () => catalogForm('Add mode', 'Upload the mode poster shown on the game page.', modeFields(), (body) => saveMode(body, btn.dataset.addmode));
+      btn.onclick = () => catalogForm('Add mode', 'Upload the mode poster. Order 0 shows first on the player app.', modeFields(), (body) => saveMode(body, btn.dataset.addmode));
+    });
+    document.querySelectorAll('[data-move-mode]').forEach((btn) => {
+      btn.onclick = () => guarded(async () => {
+        await reorderModes(btn.dataset.game, btn.dataset.moveMode, btn.dataset.dir);
+      });
     });
     document.querySelectorAll('[data-toggle-game]').forEach((btn) => {
       btn.onclick = () => guarded(async () => {
@@ -1490,7 +1524,7 @@ const App = (() => {
         if (act === 'edit-mode') {
           const modeId = id.replace('mode:', '');
           const found = blocks.flatMap((b) => b.modes.map((m) => ({ ...m, gameId: b.game._id }))).find((m) => String(m._id) === String(modeId));
-          return catalogForm('Edit mode', 'Replace the mode image or update the name.', modeFields(found || {}), (body) => saveMode(body, found?.gameId, modeId));
+          return catalogForm('Edit mode', 'Set Order so 0 appears first on Home / Game List.', modeFields(found || {}), (body) => saveMode(body, found?.gameId, modeId));
         }
         if (act === 'delete-mode') {
           const modeId = id.replace('mode:', '');

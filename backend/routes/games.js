@@ -4,6 +4,7 @@ const GameMode = require('../models/GameMode');
 const Tournament = require('../models/Tournament');
 const { authMiddleware } = require('../middleware/auth');
 const { normalizeMediaUrl } = require('../utils/publicUrl');
+const { sortBySortOrder } = require('../utils/sortBySortOrder');
 
 function withNormalizedImage(doc, req) {
   const obj = doc.toObject ? doc.toObject() : { ...doc };
@@ -80,8 +81,8 @@ function parseStatus(value, fallback = 'active') {
 // Get all games (Admin)
 router.get('/admin/all', authMiddleware, async (req, res) => {
   try {
-    const games = await Game.find().sort({ sortOrder: 1, name: 1 });
-    res.json(games.map((g) => withNormalizedImage(g, req)));
+    const games = await Game.find().lean();
+    res.json(sortBySortOrder(games).map((g) => withNormalizedImage(g, req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch games', message: error.message });
   }
@@ -176,11 +177,8 @@ router.delete('/admin/:id', authMiddleware, async (req, res) => {
 // All modes for a game (Admin, includes inactive)
 router.get('/admin/:gameId/modes', authMiddleware, async (req, res) => {
   try {
-    const modes = await GameMode.find({ game: req.params.gameId }).sort({
-      sortOrder: 1,
-      name: 1,
-    });
-    res.json(modes.map((m) => withNormalizedImage(m, req)));
+    const modes = await GameMode.find({ game: req.params.gameId }).lean();
+    res.json(sortBySortOrder(modes).map((m) => withNormalizedImage(m, req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch game modes', message: error.message });
   }
@@ -260,9 +258,10 @@ router.delete('/modes/admin/:id', authMiddleware, async (req, res) => {
 // Get all games
 router.get('/list', async (req, res) => {
   try {
-    const games = await Game.find({ status: 'active' }).sort({ sortOrder: 1, name: 1 });
-    const countMap = await countTournamentsByGame(games.map((g) => g._id));
-    res.json(games.map((g) => withTournamentCount(g, countMap, '_id', req)));
+    const games = await Game.find({ status: 'active' }).lean();
+    const sorted = sortBySortOrder(games);
+    const countMap = await countTournamentsByGame(sorted.map((g) => g._id));
+    res.json(sorted.map((g) => withTournamentCount(g, countMap, '_id', req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch games', message: error.message });
   }
@@ -271,12 +270,10 @@ router.get('/list', async (req, res) => {
 // Get popular games for home screen (admin: isPopular + active)
 router.get('/popular', async (req, res) => {
   try {
-    const games = await Game.find({ status: 'active', isPopular: true }).sort({
-      sortOrder: 1,
-      name: 1,
-    });
-    const countMap = await countTournamentsByGame(games.map((g) => g._id));
-    res.json(games.map((g) => withTournamentCount(g, countMap, '_id', req)));
+    const games = await Game.find({ status: 'active', isPopular: true }).lean();
+    const sorted = sortBySortOrder(games);
+    const countMap = await countTournamentsByGame(sorted.map((g) => g._id));
+    res.json(sorted.map((g) => withTournamentCount(g, countMap, '_id', req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch popular games', message: error.message });
   }
@@ -298,12 +295,10 @@ router.get('/:id', async (req, res) => {
 // Get game modes for a specific game
 router.get('/:gameId/modes', async (req, res) => {
   try {
-    const modes = await GameMode.find({ game: req.params.gameId, status: 'active' }).sort({
-      sortOrder: 1,
-      name: 1,
-    });
-    const countMap = await countTournamentsByMode(modes.map((m) => m._id));
-    res.json(modes.map((m) => withTournamentCount(m, countMap, '_id', req)));
+    const modes = await GameMode.find({ game: req.params.gameId, status: 'active' }).lean();
+    const sorted = sortBySortOrder(modes);
+    const countMap = await countTournamentsByMode(sorted.map((m) => m._id));
+    res.json(sorted.map((m) => withTournamentCount(m, countMap, '_id', req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch game modes', message: error.message });
   }

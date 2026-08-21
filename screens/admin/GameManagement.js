@@ -21,6 +21,7 @@ import { gameService, uploadImageFile } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 import { toPlayerMatchLabel } from '../../utils/tournamentHelpers';
 import { ensureMediaLibraryPermission, launchImageLibrary } from '../../utils/imagePicker';
+import { sortBySortOrder } from '../../utils/sortBySortOrder';
 import { COLORS } from '../../styles/theme';
 
 const GameManagement = ({ navigation }) => {
@@ -70,7 +71,7 @@ const GameManagement = ({ navigation }) => {
     try {
       setLoading(true);
       const data = await gameService.getAllGames();
-      setGames(Array.isArray(data) ? data : []);
+      setGames(sortBySortOrder(Array.isArray(data) ? data : []));
     } catch (error) {
       console.error('Error fetching games:', error);
       Alert.alert('Error', 'Failed to load games');
@@ -82,7 +83,7 @@ const GameManagement = ({ navigation }) => {
   const fetchGameModes = async (gameId) => {
     try {
       const data = await gameService.getAdminGameModes(gameId);
-      setGameModes(Array.isArray(data) ? data : []);
+      setGameModes(sortBySortOrder(Array.isArray(data) ? data : []));
     } catch (error) {
       console.error('Error fetching game modes:', error);
       Alert.alert('Error', 'Failed to load game modes');

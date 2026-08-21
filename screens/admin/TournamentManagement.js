@@ -23,6 +23,7 @@ import { tournamentService, tournamentManagementService, gameService, uploadImag
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
 import { getPrizeBreakdown, buildPrizesForCategory, getCustomWinnerPrize, getMatchStructure, toPlayerMatchLabel } from '../../utils/tournamentHelpers';
 import { ensureMediaLibraryPermission, launchImageLibrary } from '../../utils/imagePicker';
+import { sortBySortOrder } from '../../utils/sortBySortOrder';
 import WebSafeDateTimePicker from '../../components/WebSafeDateTimePicker';
 import Toast from '../../components/Toast';
 
@@ -243,7 +244,7 @@ const TournamentManagement = ({ navigation }) => {
   const fetchGameModes = async (gameId) => {
     try {
       const data = await gameService.getGameModes(gameId);
-      setGameModes(data);
+      setGameModes(sortBySortOrder(Array.isArray(data) ? data : []));
     } catch (error) {
       showToast(error.message || 'Failed to fetch game modes', 'error');
     }

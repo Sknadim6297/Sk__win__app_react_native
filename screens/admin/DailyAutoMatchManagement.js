@@ -20,6 +20,7 @@ import RNPickerSelect from 'react-native-picker-select';
 import { COLORS } from '../../styles/theme';
 import { dailyAutoMatchService, gameService, mapService } from '../../services/api';
 import { toPlayerMatchLabel } from '../../utils/tournamentHelpers';
+import { sortBySortOrder } from '../../utils/sortBySortOrder';
 import Toast from '../../components/Toast';
 
 const ORANGE = COLORS.primary;
@@ -94,7 +95,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
     }
     let cancelled = false;
     gameService.getGameModes(form.game).then((modes) => {
-      if (!cancelled) setGameModes(Array.isArray(modes) ? modes : []);
+      if (!cancelled) setGameModes(sortBySortOrder(Array.isArray(modes) ? modes : []));
     }).catch(() => {
       if (!cancelled) setGameModes([]);
     });

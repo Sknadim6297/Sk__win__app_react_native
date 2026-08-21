@@ -5,6 +5,7 @@ import { api } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import { BRAND, HOME_FEATURES } from '../content';
 import { inr, mediaUrl, apkHref, bannerOf } from '../utils';
+import { sortBySortOrder } from '../sortBySortOrder';
 import { APP_RELEASE, PWA_URL } from '../release';
 
 function FeatureIcon({ name }) {
@@ -125,7 +126,7 @@ export default function HomePage() {
   });
   const siteModes = Array.isArray(data?.site?.modes) ? data.site.modes : [];
   const gameModes = Array.isArray(data?.modesFromGame) ? data.modesFromGame : [];
-  const modeCards = (siteModes.length ? siteModes : gameModes).slice(0, 6);
+  const modeCards = sortBySortOrder(siteModes.length ? siteModes : gameModes).slice(0, 6);
   const modes = modeCards.map((m) => ({
     name: (m.name || 'MODE').toUpperCase(),
     image: mediaUrl(m.image),
