@@ -505,7 +505,8 @@ async function handleCreateTournamentOrder(req, res) {
     if (isTeam) {
       const teamName = String(req.body?.teamName || '').trim();
       const players = Array.isArray(req.body?.players) ? req.body.players : [];
-      const requiredPlayers = lifecycle.getPlayersPerTeam(tournament.mode);
+      const structure = lifecycle.getMatchStructure(tournament);
+      const requiredPlayers = Math.max(1, Number(structure.playersPerTeam) || 1);
       if (!teamName) {
         return res.status(400).json({
           success: false,
@@ -517,7 +518,7 @@ async function handleCreateTournamentOrder(req, res) {
         return res.status(400).json({
           success: false,
           code: 'INVALID_ORDER',
-          message: `Provide exactly ${requiredPlayers} players with Game ID + UID`,
+          message: `Provide exactly ${requiredPlayers} players with Game ID + UID (${structure.playerFormatLabel || 'Solo'})`,
         });
       }
       const normalizedPlayers = players.map((p) => ({

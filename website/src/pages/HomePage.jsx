@@ -108,15 +108,16 @@ function formatCompact(n) {
 
 export default function HomePage() {
   const { data } = useFetch(async () => {
-    const [tournaments, home, games, site] = await Promise.all([
+    const [tournaments, home, games, site, release] = await Promise.all([
       api.tournaments().catch(() => []),
       api.homeConfig().catch(() => ({})),
       api.games().catch(() => []),
       api.site().catch(() => ({ stats: {}, modes: [] })),
+      api.downloadRelease().catch(() => null),
     ]);
     const ff = (Array.isArray(games) ? games : []).find((g) => /free\s*fire/i.test(g.name || '')) || games?.[0];
     const modesFromGame = ff?._id ? await api.gameModes(ff._id).catch(() => []) : [];
-    return { tournaments, home, modesFromGame, site };
+    return { tournaments, home, modesFromGame, site, release: release?.release || null };
   }, []);
 
   const list = Array.isArray(data?.tournaments) ? data.tournaments : [];
@@ -133,7 +134,8 @@ export default function HomePage() {
   }));
   const ticker = data?.home?.latestAnnouncementTitle || data?.home?.latestNews?.text;
   const stats = data?.site?.stats || {};
-  const apk = apkHref();
+  const apk = apkHref(data?.release);
+  const apkVersion = data?.release?.version || APP_RELEASE.version;
   const leftFeatures = HOME_FEATURES.filter((_, i) => i % 2 === 0);
   const rightFeatures = HOME_FEATURES.filter((_, i) => i % 2 === 1);
 
@@ -177,7 +179,7 @@ export default function HomePage() {
             <p className="lz-hero-lede">{BRAND.heroLine}</p>
             <div className="lz-hero-actions">
               <a className="btn btn-primary" href={apk}>
-                <AndroidIcon /> Download App
+                <AndroidIcon /> Download App v{apkVersion}
               </a>
               <a className="btn btn-ghost" href={`${PWA_URL}/login`}>
                 <AppleIcon /> iPhone Web App

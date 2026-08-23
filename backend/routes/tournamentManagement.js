@@ -1217,17 +1217,19 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Team side must be Team A or Team B' });
     }
 
-    const requiredPlayers = lifecycle.getPlayersPerTeam(tournament.mode);
+    const requiredPlayers = Math.max(1, Number(structure.playersPerTeam) || 1);
+    const formatKey = String(structure.playerFormat || tournament.playerFormat || tournament.mode || 'solo').toLowerCase();
     if (!Array.isArray(players) || players.length !== requiredPlayers) {
-      const modeLabel = String(tournament.mode || 'solo').toLowerCase();
       return res.status(400).json({
         error:
-          modeLabel === 'squad'
+          formatKey === 'squad'
             ? 'Squad requires exactly 4 players (Game ID + UID each)'
-            : modeLabel === 'duo'
+            : formatKey === 'duo'
               ? 'Duo requires exactly 2 players (Game ID + UID each)'
               : 'Solo requires exactly 1 player (Game ID + UID)',
         requiredPlayers,
+        playerFormat: structure.playerFormat || formatKey,
+        playerFormatLabel: structure.playerFormatLabel,
       });
     }
 

@@ -15,10 +15,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import Constants from 'expo-constants';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS, FONTS } from '../styles/theme';
 import { userService } from '../services/api';
+import { getAppVersion } from '../utils/appVersion';
 import AppHeader from '../components/navigation/AppHeader';
 import AppIcon from '../components/ui/AppIcon';
 import BrandCoin from '../components/ui/BrandCoin';
@@ -136,7 +136,7 @@ const AccountScreen = ({ navigation }) => {
   const matchesPlayed = userData?.tournament?.participatedCount ?? 0;
   const totalKilled = userData?.gameStats?.totalKills ?? 0;
   const amountWon = userData?.tournament?.earnings ?? userData?.wallet?.totalWinnings ?? 0;
-  const appVersion = Constants.expoConfig?.version?.split('.')[0] || '1';
+  const appVersion = getAppVersion();
   const profilePhoto = userData?.profilePhoto ? resolveMediaUrl(userData.profilePhoto) : '';
 
   const renderAvatar = (size, rounded = true) => {

@@ -1491,6 +1491,9 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
     res.json({
       ...omitRoomSecrets(doc),
       ...publicFields,
+      mode: structure.playerFormat || structure.mode,
+      playerFormat: structure.playerFormat,
+      playersPerTeam: structure.playersPerTeam,
       rules: publicRules.length ? publicRules : DEFAULT_MATCH_RULES,
       matchNumber: resolveMatchNumber(doc),
       status: calculatedStatus,
@@ -2271,21 +2274,23 @@ router.get('/:id/slots', async (req, res) => {
 });
 
 // Book slot(s) for tournament — Solo: 1, Duo: 2, Squad: 4 (charged once)
+function resolveBookSlotPlayers(body, nums) {
+  const list = Array.isArray(body?.players) ? body.players : null;
+  if (list && list.length === nums.length) {
+    return list.map((p, i) => ({
+      slotNumber: nums[i],
+      gamingUsername: String(p?.gamingUsername || p?.gamingID || p?.name || '').trim(),
+      gamingUID: String(p?.gamingUID || p?.uid || '').trim(),
+    }));
+  }
+  const gamingUsername = String(body?.gamingID || body?.gamingUsername || '').trim();
+  const gamingUID = String(body?.gamingUID || '').trim();
+  return nums.map((n) => ({ slotNumber: n, gamingUsername, gamingUID }));
+}
+
 router.post('/:id/book-slot', authMiddleware, async (req, res) => {
   try {
-    const { slotNumber, slotNumbers, gamingID, gamingUID, gamingUsername } = req.body;
-    const gamingIdValue = String(gamingID || gamingUsername || '').trim();
-    const gamingUidValue = String(gamingUID || '').trim();
-
-    if (!gamingIdValue || !gamingUidValue) {
-      return res.status(400).json({ error: 'Gaming ID and UID are required' });
-    }
-    if (gamingIdValue.length < 3) {
-      return res.status(400).json({ error: 'Gaming ID must be at least 3 characters' });
-    }
-    if (gamingUidValue.length < 3) {
-      return res.status(400).json({ error: 'UID must be at least 3 characters' });
-    }
+    const { slotNumber, slotNumbers } = req.body;
 
     const user = await User.findById(req.userId);
     if (!user) {
@@ -2325,6 +2330,22 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
         selectedCount: nums.length,
       });
     }
+
+    const players = resolveBookSlotPlayers(req.body, nums);
+    for (const p of players) {
+      if (!p.gamingUsername || !p.gamingUID) {
+        return res.status(400).json({ error: `Slot ${p.slotNumber}: Game Name and Game UID are required` });
+      }
+      if (p.gamingUsername.length < 3) {
+        return res.status(400).json({ error: `Slot ${p.slotNumber}: Game Name must be at least 3 characters` });
+      }
+      if (p.gamingUID.length < 3) {
+        return res.status(400).json({ error: `Slot ${p.slotNumber}: Game UID must be at least 3 characters` });
+      }
+    }
+    const primary = players[0];
+    const gamingIdValue = primary.gamingUsername;
+    const gamingUidValue = primary.gamingUID;
 
     for (const n of nums) {
       if (n < 1 || n > structure.totalSlots) {
@@ -2427,14 +2448,17 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
         warning: 'You can continue, but no refund will be given if details are wrong.',
         requiresConfirmation: true,
         slotNumbers: nums,
+        players,
       });
     }
 
     const now = new Date();
-    for (const slot of targetSlots) {
+    for (let i = 0; i < targetSlots.length; i += 1) {
+      const slot = targetSlots[i];
+      const p = players[i];
       slot.userId = req.userId;
-      slot.gamingUsername = gamingIdValue;
-      slot.gamingUID = gamingUidValue;
+      slot.gamingUsername = p.gamingUsername;
+      slot.gamingUID = p.gamingUID;
       slot.bookedAt = now;
       slot.isBooked = true;
     }
@@ -2498,13 +2522,7 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
 // Confirm username mismatch and proceed with booking (multi-slot aware)
 router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
   try {
-    const { slotNumber, slotNumbers, gamingID, gamingUID, gamingUsername } = req.body;
-    const gamingIdValue = String(gamingID || gamingUsername || '').trim();
-    const gamingUidValue = String(gamingUID || '').trim();
-
-    if (!gamingIdValue || !gamingUidValue) {
-      return res.status(400).json({ error: 'Gaming ID and UID are required' });
-    }
+    const { slotNumber, slotNumbers } = req.body;
 
     const user = await User.findById(req.userId);
     if (!user) {
@@ -2541,6 +2559,16 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
       });
     }
 
+    const players = resolveBookSlotPlayers(req.body, nums);
+    for (const p of players) {
+      if (!p.gamingUsername || p.gamingUsername.length < 3 || !p.gamingUID || p.gamingUID.length < 3) {
+        return res.status(400).json({ error: `Slot ${p.slotNumber}: Game Name and Game UID are required` });
+      }
+    }
+    const primary = players[0];
+    const gamingIdValue = primary.gamingUsername;
+    const gamingUidValue = primary.gamingUID;
+
     if (!tournament.slots || !tournament.slots.length) {
       return res.status(400).json({ error: 'Slots are not initialized' });
     }
@@ -2568,10 +2596,12 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
     }
 
     const now = new Date();
-    for (const slot of targetSlots) {
+    for (let i = 0; i < targetSlots.length; i += 1) {
+      const slot = targetSlots[i];
+      const p = players[i];
       slot.userId = req.userId;
-      slot.gamingUsername = gamingIdValue;
-      slot.gamingUID = gamingUidValue;
+      slot.gamingUsername = p.gamingUsername;
+      slot.gamingUID = p.gamingUID;
       slot.bookedAt = now;
       slot.isBooked = true;
     }

@@ -46,6 +46,7 @@ import AccountScreen from './screens/AccountScreen';
 import ShareAppScreen from './screens/ShareAppScreen';
 import LeaderboardScreen from './screens/LeaderboardScreen';
 import AppLoadingScreen, { WELCOME_BG } from './components/AppLoadingScreen';
+import UpdateAvailableGate from './components/UpdateAvailableGate';
 import { applyGlobalTypography } from './styles/typography';
 
 const Stack = createStackNavigator();
@@ -109,6 +110,7 @@ export default function App() {
           ) : (
             <AuthProvider>
               <AppNavigator />
+              <UpdateAvailableGate />
             </AuthProvider>
           )}
           {IS_WEB ? <PwaChrome /> : null}

@@ -122,6 +122,87 @@ async function getOrCreateLatestRelease() {
   return release;
 }
 
+function parseSemver(version) {
+  const parts = String(version || '0')
+    .trim()
+    .replace(/^v/i, '')
+    .split(/[.+-]/)
+    .map((p) => parseInt(p, 10) || 0);
+  while (parts.length < 3) parts.push(0);
+  return parts.slice(0, 3);
+}
+
+/** True when `latest` is strictly newer than `current`. */
+function isVersionNewer(latest, current) {
+  const a = parseSemver(latest);
+  const b = parseSemver(current);
+  for (let i = 0; i < 3; i += 1) {
+    if (a[i] > b[i]) return true;
+    if (a[i] < b[i]) return false;
+  }
+  return false;
+}
+
+function requestOrigin(req) {
+  const env =
+    process.env.PUBLIC_API_URL ||
+    process.env.API_PUBLIC_URL ||
+    process.env.BACKEND_PUBLIC_URL ||
+    '';
+  if (env) {
+    return String(env)
+      .trim()
+      .replace(/\/api\/?$/, '')
+      .replace(/\/$/, '');
+  }
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+  const host = req.get('x-forwarded-host') || req.get('host');
+  return host ? `${proto}://${host}` : '';
+}
+
+function websiteDownloadPageUrl(req) {
+  const site = String(process.env.FRONTEND_URL || process.env.WEBSITE_URL || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (site) return `${site}/download`;
+  const origin = requestOrigin(req);
+  return origin ? `${origin}/download` : null;
+}
+
+function buildReleasePayload(req, release, stats) {
+  const fileName = stats.fileName || release.fileName;
+  const version = release.version || DEFAULT_RELEASE.version;
+  const updated = stats.mtime || release.publishedAt || release.updatedAt;
+  const relativePath = `/downloads/${encodeURIComponent(fileName)}`;
+  const origin = requestOrigin(req);
+  const absoluteUrl = origin ? `${origin}${relativePath}` : relativePath;
+
+  return {
+    title: release.title || DEFAULT_RELEASE.title,
+    version,
+    fileName,
+    androidMin: release.androidMin || DEFAULT_RELEASE.androidMin,
+    releaseNotes: release.releaseNotes || DEFAULT_RELEASE.releaseNotes,
+    downloadCount: release.downloadCount || 0,
+    apkExists: stats.exists,
+    sizeLabel: stats.sizeLabel,
+    sizeBytes: stats.sizeBytes,
+    lastUpdated: updated,
+    lastUpdatedLabel: updated
+      ? new Date(updated).toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+      : '—',
+    downloadUrl: absoluteUrl,
+    downloadPath: relativePath,
+    websiteDownloadUrl: websiteDownloadPageUrl(req),
+    downloadLabel: `Download WAREZONE v${version}`,
+    forceUpdate: false,
+  };
+}
+
 /**
  * GET /api/download/release — public release info for the website
  */
@@ -129,36 +210,38 @@ router.get('/release', async (req, res) => {
   try {
     const release = await getOrCreateLatestRelease();
     const stats = getApkStats(release.fileName);
-    const fileName = stats.fileName || release.fileName;
-    const updated = stats.mtime || release.publishedAt || release.updatedAt;
-
     res.json({
       success: true,
-      release: {
-        title: release.title || DEFAULT_RELEASE.title,
-        version: release.version || DEFAULT_RELEASE.version,
-        fileName,
-        androidMin: release.androidMin || DEFAULT_RELEASE.androidMin,
-        releaseNotes: release.releaseNotes || DEFAULT_RELEASE.releaseNotes,
-        downloadCount: release.downloadCount || 0,
-        apkExists: stats.exists,
-        sizeLabel: stats.sizeLabel,
-        sizeBytes: stats.sizeBytes,
-        lastUpdated: updated,
-        lastUpdatedLabel: updated
-          ? new Date(updated).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })
-          : '—',
-        downloadUrl: `/downloads/${encodeURIComponent(fileName)}`,
-        downloadLabel: `Download WAREZONE v${release.version || '1.0.0'}`,
-      },
+      release: buildReleasePayload(req, release, stats),
     });
   } catch (error) {
     console.error('[download] release info error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to load release info' });
+  }
+});
+
+/**
+ * GET /api/download/check?current=1.0.2
+ * Soft update check for app / PWA — never force-blocks; client may dismiss.
+ */
+router.get('/check', async (req, res) => {
+  try {
+    const currentVersion = String(req.query.current || req.query.version || '').trim() || '0.0.0';
+    const release = await getOrCreateLatestRelease();
+    const stats = getApkStats(release.fileName);
+    const latest = buildReleasePayload(req, release, stats);
+    const updateAvailable = isVersionNewer(latest.version, currentVersion);
+
+    res.json({
+      success: true,
+      updateAvailable,
+      forceUpdate: false,
+      currentVersion,
+      latest,
+    });
+  } catch (error) {
+    console.error('[download] check error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to check for updates' });
   }
 });
 
@@ -170,4 +253,5 @@ module.exports = {
   getOrCreateLatestRelease,
   getApkStats,
   formatBytes,
+  isVersionNewer,
 };

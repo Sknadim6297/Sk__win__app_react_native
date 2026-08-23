@@ -504,6 +504,74 @@ footer.site-footer {
 .os-card .btn { margin-top: 14px; width: 100%; }
 .os-help { margin-top: 12px; font-size: 13px; }
 .os-card-active { border-color: rgba(255, 107, 0, 0.55); box-shadow: 0 16px 36px rgba(255, 107, 0, 0.16); }
+.os-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.release-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #ffb070;
+  background: rgba(255, 107, 0, 0.14);
+  border: 1px solid rgba(255, 107, 0, 0.35);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+.release-notes {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.release-banner {
+  position: relative;
+  z-index: 40;
+  background: linear-gradient(90deg, rgba(255, 107, 0, 0.18), rgba(21, 29, 54, 0.95));
+  border-bottom: 1px solid rgba(255, 107, 0, 0.28);
+}
+.release-banner-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.release-banner p {
+  margin: 0;
+  font-size: 13px;
+  color: #e8eefc;
+}
+.release-banner a {
+  color: #ffb070;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.release-banner-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c5d0e6;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.release-banner-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
 .a2hs-steps {
   margin: 0;
   padding-left: 18px;

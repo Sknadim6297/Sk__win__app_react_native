@@ -80,10 +80,17 @@ export function isTeamEntryMode(modeOrTournament, tournament) {
 }
 
 export function getMatchStructure(tournament) {
-  // Prefer backend-resolved public fields when present
-  if (tournament?.playersPerTeam != null && tournament?.totalSlots != null && tournament?.matchTypeName) {
-    const playerFormat = String(tournament.playerFormat || tournament.mode || 'solo').toLowerCase();
-    const playersPerTeam = Number(tournament.playersPerTeam) || getTeamSize(playerFormat);
+  const playerFormat = String(tournament?.playerFormat || tournament?.mode || 'solo').toLowerCase();
+  const formatPpt = getTeamSize(playerFormat);
+  // Prefer Player Format over a stale playersPerTeam / playersCharged value
+  const apiPpt = Number(tournament?.playersPerTeam);
+  const playersPerTeam =
+    apiPpt > 0 && apiPpt === formatPpt
+      ? apiPpt
+      : formatPpt;
+
+  // Prefer backend-resolved public fields when present (and consistent)
+  if (tournament?.totalSlots != null && tournament?.matchTypeName) {
     const custom = isCustomMatch(tournament) || tournament.matchKind === 'team_vs_team';
     const slots = custom
       ? Number(tournament.slots ?? tournament.totalSlots) || 2
@@ -122,10 +129,10 @@ export function getMatchStructure(tournament) {
     };
   }
 
-  const playerFormat = String(tournament?.playerFormat || tournament?.mode || 'solo').toLowerCase();
-  const playersPerTeam = getTeamSize(playerFormat);
+  const fallbackFormat = String(tournament?.playerFormat || tournament?.mode || 'solo').toLowerCase();
+  const fallbackPpt = getTeamSize(fallbackFormat);
   const custom = isCustomMatch(tournament);
-  const playerFormatLabel = formatModeLabel(playerFormat);
+  const playerFormatLabel = formatModeLabel(fallbackFormat);
   const mt =
     (tournament?.matchType && typeof tournament.matchType === 'object' && tournament.matchType.name) ||
     (typeof tournament?.matchType === 'string' && !/^[a-f0-9]{24}$/i.test(tournament.matchType)
@@ -138,16 +145,16 @@ export function getMatchStructure(tournament) {
       kind: 'team_vs_team',
       matchType: mt || 'Clash Squad',
       matchTypeName: mt || 'Clash Squad',
-      playerFormat,
+      playerFormat: fallbackFormat,
       playerFormatLabel,
-      formatLabel: playersPerTeam === 4 ? '4v4' : playersPerTeam === 2 ? '2v2' : '1v1',
-      mode: playerFormat,
+      formatLabel: fallbackPpt === 4 ? '4v4' : fallbackPpt === 2 ? '2v2' : '1v1',
+      mode: fallbackFormat,
       modeLabel: playerFormatLabel,
-      playersPerTeam,
-      slotsRequiredToJoin: playersPerTeam,
+      playersPerTeam: fallbackPpt,
+      slotsRequiredToJoin: fallbackPpt,
       slots: 2,
       totalSlots: 2,
-      totalPlayerCapacity: 2 * playersPerTeam,
+      totalPlayerCapacity: 2 * fallbackPpt,
       slotUnit: 'teams',
       entryUnit: 'player',
       hasKillRewards: false,
@@ -161,13 +168,13 @@ export function getMatchStructure(tournament) {
     kind: 'battle_royale',
     matchType: mt || 'Battle Royale',
     matchTypeName: mt || 'Battle Royale',
-    playerFormat,
+    playerFormat: fallbackFormat,
     playerFormatLabel,
     formatLabel: mt || 'Battle Royale',
-    mode: playerFormat,
+    mode: fallbackFormat,
     modeLabel: playerFormatLabel,
-    playersPerTeam,
-    slotsRequiredToJoin: playersPerTeam,
+    playersPerTeam: fallbackPpt,
+    slotsRequiredToJoin: fallbackPpt,
     slots: 48,
     totalSlots: 48,
     totalPlayerCapacity: 48,

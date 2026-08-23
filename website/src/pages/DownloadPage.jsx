@@ -6,7 +6,7 @@ import { api } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import { apkHref } from '../utils';
 import { BRAND, WHY } from '../content';
-import { PWA_URL } from '../release';
+import { APP_RELEASE, PWA_URL } from '../release';
 
 function detectPlatform() {
   if (typeof navigator === 'undefined') return 'other';
@@ -19,16 +19,17 @@ function detectPlatform() {
 export default function DownloadPage() {
   const { data, loading, error } = useFetch(() => api.downloadRelease(), []);
   const rel = data?.release;
-  const canDownload = Boolean(rel?.apkExists && rel?.downloadUrl);
-  const href = canDownload ? apkHref(rel) : '/downloads/WAREZONE-v1.0.2.apk';
+  const canDownload = Boolean(rel?.apkExists !== false && (rel?.downloadUrl || rel?.fileName));
+  const href = apkHref(rel);
   const platform = useMemo(detectPlatform, []);
   const pwaHref = `${PWA_URL}/login`;
+  const version = rel?.version || APP_RELEASE.version;
 
   return (
     <>
       <Seo
         title="Download App"
-        description="Download the WAREZONE Android APK, or open the WAREZONE web app on iPhone and add it to your Home Screen."
+        description="Download the latest WAREZONE Android APK, or open the WAREZONE web app on iPhone and add it to your Home Screen."
       />
       <section className="page-hero">
         <div className="container hero-grid">
@@ -39,18 +40,24 @@ export default function DownloadPage() {
               {BRAND.motto} Android players install the official APK. iPhone players use the
               WAREZONE web app in Safari — it is not a native App Store app.
             </p>
-            {loading && <p className="muted">Loading release…</p>}
+            {loading && <p className="muted">Loading latest release…</p>}
             {error && <p className="error">{error}</p>}
 
             <div className="os-grid">
               <article className={`card os-card ${platform === 'android' ? 'os-card-active' : ''}`}>
-                <p className="kicker">Android</p>
+                <div className="os-card-head">
+                  <p className="kicker">Android</p>
+                  <span className="release-pill">Latest v{version}</span>
+                </div>
                 <h2>Download APK</h2>
-                <p className="muted">Version {rel?.version || '1.0.2'}</p>
                 <p className="muted">{rel?.androidMin || 'Android 8.0+'}</p>
-                <p className="muted">Size {rel?.apkExists ? rel.sizeLabel : '—'}</p>
-                <a className="btn btn-primary" href={href} download>
-                  {rel?.downloadLabel || 'Download APK'}
+                <p className="muted">
+                  Size {rel?.apkExists ? rel.sizeLabel : '—'}
+                  {rel?.lastUpdatedLabel ? ` · Updated ${rel.lastUpdatedLabel}` : ''}
+                </p>
+                {rel?.releaseNotes ? <p className="release-notes">{rel.releaseNotes}</p> : null}
+                <a className="btn btn-primary" href={canDownload ? href : '/download'} download={canDownload || undefined}>
+                  {rel?.downloadLabel || `Download WAREZONE v${version}`}
                 </a>
                 <p className="dim os-help">
                   Uninstall any old WAREZONE app first. Allow install from this source if Android

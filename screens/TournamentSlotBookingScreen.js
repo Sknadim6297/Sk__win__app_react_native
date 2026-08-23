@@ -38,8 +38,10 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
   const [slots, setSlots] = useState([]);
   const [selected, setSelected] = useState([]);
   const [step, setStep] = useState('slots');
-  const [gamingUsername, setGamingUsername] = useState(initialUsername);
-  const [gamingUID, setGamingUID] = useState('');
+  const [slotPlayers, setSlotPlayers] = useState({}); // { [slotNumber]: { name, uid } }
+  const [editingSlot, setEditingSlot] = useState(null);
+  const [draftName, setDraftName] = useState('');
+  const [draftUID, setDraftUID] = useState('');
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
   const [balance, setBalance] = useState(0);
@@ -111,6 +113,11 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     if (slot?.isBooked) return;
     if (selected.includes(num)) {
       setSelected(selected.filter((n) => n !== num));
+      setSlotPlayers((prev) => {
+        const next = { ...prev };
+        delete next[num];
+        return next;
+      });
       return;
     }
     if (selected.length >= slotsRequired) {
@@ -120,8 +127,30 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
       );
       return;
     }
-    setSelected([...selected, num].sort((a, b) => a - b));
+    const nextSelected = [...selected, num].sort((a, b) => a - b);
+    setSelected(nextSelected);
+    setSlotPlayers((prev) => ({
+      ...prev,
+      [num]: prev[num] || { name: num === nextSelected[0] ? initialUsername : '', uid: '' },
+    }));
   };
+
+  const buildPlayersPayload = (slotNums = selected) =>
+    slotNums.map((n) => ({
+      slotNumber: n,
+      gamingUsername: String(slotPlayers[n]?.name || '').trim(),
+      gamingUID: String(slotPlayers[n]?.uid || '').trim(),
+      name: String(slotPlayers[n]?.name || '').trim(),
+    }));
+
+  const allPlayersComplete = (slotNums = selected) =>
+    slotNums.length === slotsRequired &&
+    slotNums.every((n) => {
+      const p = slotPlayers[n];
+      return (
+        String(p?.name || '').trim().length >= 3 && String(p?.uid || '').trim().length >= 3
+      );
+    });
 
   const entryFeePerPlayer = Number(
     tournament?.entryFeePerPlayer ??
@@ -150,14 +179,17 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
   };
 
   const bookOne = async (slotNums) => {
+    const players = buildPlayersPayload(slotNums);
+    const primary = players[0] || {};
     const res = await tournamentService.bookSlot(
       tournamentId,
       slotNums,
-      gamingUsername.trim(),
-      gamingUID.trim()
+      primary.gamingUsername,
+      primary.gamingUID,
+      players
     );
     if (res.step === 'confirm_username_mismatch') {
-      return { mismatch: res, slotNumbers: slotNums };
+      return { mismatch: res, slotNumbers: slotNums, players };
     }
     if (!res.success) throw new Error(res.message || 'Booking failed');
     return { success: true };
@@ -165,16 +197,17 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
 
   const handleBook = async () => {
     if (bookingLockRef.current) return;
-    if (!gamingUsername || gamingUsername.trim().length < 3) {
-      setStep('details');
-      showToast('Enter your in-game name', 'warning');
+    if (!allPlayersComplete()) {
+      const missing = selected.find((n) => {
+        const p = slotPlayers[n];
+        return !(String(p?.name || '').trim().length >= 3 && String(p?.uid || '').trim().length >= 3);
+      });
+      openPlayerDetails(missing || selected[0]);
+      showToast(`Enter Game Name & UID for all ${slotsRequired} players`, 'warning');
       return;
     }
-    if (!gamingUID || gamingUID.trim().length < 3) {
-      setStep('details');
-      showToast('Enter your in-game ID', 'warning');
-      return;
-    }
+    const players = buildPlayersPayload();
+    const primary = players[0];
     try {
       bookingLockRef.current = true;
       setBooking(true);
@@ -184,10 +217,11 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           tournamentName: tournament?.name,
           amount: payableTotal,
           joinKind: 'solo',
-          gamingUsername: gamingUsername.trim(),
-          gamingUID: gamingUID.trim(),
+          gamingUsername: primary.gamingUsername,
+          gamingUID: primary.gamingUID,
           slotNumber: selected[0],
           slotNumbers: selected,
+          players,
         });
         return;
       }
@@ -205,8 +239,9 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
             kind: 'solo',
             slotNumber: selected[0],
             slotNumbers: selected,
-            gamingUsername: gamingUsername.trim(),
-            gamingUID: gamingUID.trim(),
+            gamingUsername: primary.gamingUsername,
+            gamingUID: primary.gamingUID,
+            players,
           },
         });
         return;
@@ -218,6 +253,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           slotNumber: selected[0],
           slotNumbers: selected,
           pendingSlots: selected,
+          players,
         });
         setStep('mismatch');
         return;
@@ -251,11 +287,26 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     if (pendingJoin.kind && pendingJoin.kind !== 'solo') return;
     autoJoinRef.current = true;
     const slotNums = pendingJoin.slotNumbers || (pendingJoin.slotNumber ? [pendingJoin.slotNumber] : []);
-    const name = pendingJoin.gamingUsername || '';
-    const uid = pendingJoin.gamingUID || '';
+    const restored = {};
+    if (Array.isArray(pendingJoin.players) && pendingJoin.players.length) {
+      pendingJoin.players.forEach((p, i) => {
+        const n = Number(p.slotNumber || slotNums[i]);
+        if (!n) return;
+        restored[n] = {
+          name: String(p.gamingUsername || p.name || '').trim(),
+          uid: String(p.gamingUID || '').trim(),
+        };
+      });
+    } else {
+      slotNums.forEach((n) => {
+        restored[n] = {
+          name: String(pendingJoin.gamingUsername || '').trim(),
+          uid: String(pendingJoin.gamingUID || '').trim(),
+        };
+      });
+    }
     setSelected(slotNums);
-    setGamingUsername(name);
-    setGamingUID(uid);
+    setSlotPlayers(restored);
     setStep('confirm');
     navigation.setParams({ walletRecharged: undefined, pendingJoin: undefined });
     (async () => {
@@ -276,13 +327,27 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           });
           return;
         }
-        const res = await tournamentService.bookSlot(tournamentId, slotNums, name, uid);
+        const players = slotNums.map((n) => ({
+          slotNumber: n,
+          gamingUsername: restored[n]?.name || '',
+          gamingUID: restored[n]?.uid || '',
+          name: restored[n]?.name || '',
+        }));
+        const primary = players[0] || {};
+        const res = await tournamentService.bookSlot(
+          tournamentId,
+          slotNums,
+          primary.gamingUsername,
+          primary.gamingUID,
+          players
+        );
         if (res.step === 'confirm_username_mismatch') {
           setMismatchData({
             ...res,
             slotNumber: slotNums[0],
             slotNumbers: slotNums,
             pendingSlots: slotNums,
+            players,
           });
           setStep('mismatch');
           return;
@@ -309,11 +374,14 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
         mismatchData?.slotNumbers ||
         mismatchData?.pendingSlots ||
         selected;
+      const players = mismatchData?.players || buildPlayersPayload(slotNums);
+      const primary = players[0] || {};
       const res = await tournamentService.confirmSlotBooking(
         tournamentId,
         slotNums,
-        gamingUsername.trim(),
-        gamingUID.trim()
+        primary.gamingUsername,
+        primary.gamingUID,
+        players
       );
       if (res.success) {
         goToJoinedDetails();
@@ -330,14 +398,28 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     }
   };
 
+  const openPlayerDetails = (slotNum) => {
+    const p = slotPlayers[slotNum] || { name: '', uid: '' };
+    setEditingSlot(slotNum);
+    setDraftName(p.name || '');
+    setDraftUID(p.uid || '');
+    setStep('details');
+  };
+
   const saveDetails = () => {
-    if (!gamingUsername || gamingUsername.trim().length < 3) {
-      showToast('inGameName must be at least 3 characters', 'warning');
+    if (!draftName || draftName.trim().length < 3) {
+      showToast('Game Name must be at least 3 characters', 'warning');
       return;
     }
-    if (!gamingUID || gamingUID.trim().length < 3) {
-      showToast('inGameId must be at least 3 characters', 'warning');
+    if (!draftUID || draftUID.trim().length < 3) {
+      showToast('Game UID must be at least 3 characters', 'warning');
       return;
+    }
+    if (editingSlot != null) {
+      setSlotPlayers((prev) => ({
+        ...prev,
+        [editingSlot]: { name: draftName.trim(), uid: draftUID.trim() },
+      }));
     }
     setStep('confirm');
   };
@@ -350,8 +432,7 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     );
   }
 
-  const picked = selected[0];
-  const hasInfo = gamingUsername.trim().length >= 3 && gamingUID.trim().length >= 3;
+  const hasInfo = allPlayersComplete();
 
   const renderSlot = ({ item }) => {
     const num = item.slotNumber;
@@ -445,29 +526,45 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           <ScrollView contentContainerStyle={styles.confirmScroll}>
             <BalanceBlock />
             <View style={styles.positionCard}>
-              <Text style={styles.positionTitle}>Selected Position</Text>
+              <Text style={styles.positionTitle}>SELECTED POSITION</Text>
               <View style={styles.posHeadRow}>
-                <Text style={[styles.posCol, styles.posHead]}>Slot</Text>
-                <Text style={[styles.posCol, styles.posHead]}>Status</Text>
-                <Text style={[styles.posColWide, styles.posHead]}>InGameName</Text>
+                <Text style={[styles.posCol, styles.posHead]}>SLOT</Text>
+                <Text style={[styles.posCol, styles.posHead]}>STATUS</Text>
+                <Text style={[styles.posColWide, styles.posHead]}>INGAMENAME</Text>
               </View>
-              <View style={styles.posDataRow}>
-                <Text style={styles.posCol}>Slot {picked}</Text>
-                <Text style={styles.posCol}>Selected</Text>
-                <View style={styles.posColWide}>
-                  {hasInfo ? (
-                    <Text style={styles.inGameName} numberOfLines={1}>
-                      {gamingUsername}
-                    </Text>
-                  ) : (
-                    <TouchableOpacity style={styles.addInfoBtn} onPress={() => setStep('details')}>
-                      <Text style={styles.addInfoText}>Add info</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
+              {selected.map((num) => {
+                const p = slotPlayers[num];
+                const complete =
+                  String(p?.name || '').trim().length >= 3 &&
+                  String(p?.uid || '').trim().length >= 3;
+                return (
+                  <View key={num} style={styles.posDataRow}>
+                    <Text style={styles.posCol}>SLOT {num}</Text>
+                    <Text style={styles.posCol}>SELECTED</Text>
+                    <View style={styles.posColWide}>
+                      {complete ? (
+                        <TouchableOpacity onPress={() => openPlayerDetails(num)}>
+                          <Text style={styles.inGameName} numberOfLines={1}>
+                            {String(p.name).toUpperCase()}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.addInfoBtn}
+                          onPress={() => openPlayerDetails(num)}
+                        >
+                          <Text style={styles.addInfoText}>ADD INFO</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
             </View>
-            <Text style={styles.note}>Note - Please Enter Your In Game Username/Name</Text>
+            <Text style={styles.note}>
+              NOTE – PLEASE ENTER GAME NAME & UID FOR ALL {slotsRequired} PLAYER
+              {slotsRequired > 1 ? 'S' : ''}
+            </Text>
           </ScrollView>
           <View style={[styles.pairFooter, { paddingBottom: Math.max(insets.bottom, 12) }]}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setStep('slots')}>
@@ -475,7 +572,20 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.saveBtn}
-              onPress={hasInfo ? handleBook : () => setStep('details')}
+              onPress={
+                hasInfo
+                  ? handleBook
+                  : () => {
+                      const missing = selected.find((n) => {
+                        const p = slotPlayers[n];
+                        return !(
+                          String(p?.name || '').trim().length >= 3 &&
+                          String(p?.uid || '').trim().length >= 3
+                        );
+                      });
+                      openPlayerDetails(missing || selected[0]);
+                    }
+              }
               disabled={booking}
             >
               {booking ? (
@@ -494,29 +604,31 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
             <BalanceBlock />
             <View style={styles.detailsCard}>
               <View style={styles.detailsHead}>
-                <Text style={styles.detailsHeadText}>Player Game Details</Text>
+                <Text style={styles.detailsHeadText}>
+                  PLAYER GAME DETAILS · SLOT {editingSlot}
+                </Text>
               </View>
               <View style={styles.detailsBody}>
-                <Text style={styles.fieldLabel}>Game Name</Text>
+                <Text style={styles.fieldLabel}>GAME NAME</Text>
                 <TextInput
                   style={styles.underlineInput}
-                  value={gamingUsername}
-                  onChangeText={setGamingUsername}
+                  value={draftName}
+                  onChangeText={setDraftName}
                   placeholder="Enter game name"
                   placeholderTextColor={PAGE.muted}
                   autoCapitalize="none"
                 />
-                <Text style={styles.fieldLabel}>Game UID</Text>
+                <Text style={styles.fieldLabel}>GAME UID</Text>
                 <TextInput
                   style={styles.underlineInput}
-                  value={gamingUID}
-                  onChangeText={setGamingUID}
+                  value={draftUID}
+                  onChangeText={setDraftUID}
                   placeholder="Enter game UID"
                   placeholderTextColor={PAGE.muted}
                   autoCapitalize="none"
                 />
                 <Text style={styles.helper}>
-                  Make sure you have entered correct Game Name & Game UID
+                  MAKE SURE YOU ENTERED CORRECT GAME NAME & GAME UID
                 </Text>
                 <View style={styles.pairInline}>
                   <TouchableOpacity style={styles.cancelBtn} onPress={() => setStep('confirm')}>

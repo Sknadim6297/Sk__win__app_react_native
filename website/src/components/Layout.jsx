@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import LatestReleaseBanner from './LatestReleaseBanner';
 import { api } from '../api';
 
 export default function Layout() {
@@ -22,6 +23,7 @@ export default function Layout() {
   return (
     <div className="page-shell">
       <div className="bg-glow" />
+      <LatestReleaseBanner />
       <Navbar />
       <main>
         <Outlet context={{ socials }} />

@@ -172,18 +172,52 @@ async function joinSoloFromPayment(claim, tournament, user) {
   }
 
   const meta = claim.metadata || {};
-  const gamingUsername = String(meta.gamingUsername || meta.gamingID || '').trim();
-  const gamingUID = String(meta.gamingUID || '').trim();
-  if (gamingUsername.length < 3 || gamingUID.length < 3) {
-    return {
-      ok: false,
-      reason: 'MISSING_GAME_IDS',
-      message: 'Game ID and UID are required to join after payment',
-    };
-  }
-
   const structure = lifecycle.getMatchStructure(tournament);
   const required = Math.max(1, Number(structure.slotsRequiredToJoin || structure.playersPerTeam) || 1);
+
+  let nums = [];
+  if (Array.isArray(meta.slotNumbers) && meta.slotNumbers.length) {
+    nums = meta.slotNumbers.map((n) => Number(n)).filter((n) => Number.isFinite(n));
+  } else if (meta.slotNumber != null) {
+    nums = [Number(meta.slotNumber)];
+  }
+  nums = [...new Set(nums)].sort((a, b) => a - b);
+
+  let players = [];
+  if (Array.isArray(meta.players) && meta.players.length === (nums.length || required)) {
+    players = meta.players.map((p, i) => ({
+      slotNumber: nums[i] || null,
+      gamingUsername: String(p?.gamingUsername || p?.gamingID || p?.name || '').trim(),
+      gamingUID: String(p?.gamingUID || p?.uid || '').trim(),
+    }));
+  } else {
+    const gamingUsername = String(meta.gamingUsername || meta.gamingID || '').trim();
+    const gamingUID = String(meta.gamingUID || '').trim();
+    if (gamingUsername.length < 3 || gamingUID.length < 3) {
+      return {
+        ok: false,
+        reason: 'MISSING_GAME_IDS',
+        message: 'Game ID and UID are required to join after payment',
+      };
+    }
+    players = (nums.length ? nums : Array.from({ length: required })).map((n) => ({
+      slotNumber: Number.isFinite(n) ? n : null,
+      gamingUsername,
+      gamingUID,
+    }));
+  }
+
+  for (const p of players) {
+    if (!p.gamingUsername || p.gamingUsername.length < 3 || !p.gamingUID || p.gamingUID.length < 3) {
+      return {
+        ok: false,
+        reason: 'MISSING_GAME_IDS',
+        message: 'Game Name and Game UID are required for every selected slot',
+      };
+    }
+  }
+  const gamingUsername = players[0].gamingUsername;
+  const gamingUID = players[0].gamingUID;
 
   if (!tournament.slots || tournament.slots.length === 0) {
     const newSlots = [];
@@ -199,14 +233,6 @@ async function joinSoloFromPayment(claim, tournament, user) {
     }
     tournament.slots = newSlots;
   }
-
-  let nums = [];
-  if (Array.isArray(meta.slotNumbers) && meta.slotNumbers.length) {
-    nums = meta.slotNumbers.map((n) => Number(n)).filter((n) => Number.isFinite(n));
-  } else if (meta.slotNumber != null) {
-    nums = [Number(meta.slotNumber)];
-  }
-  nums = [...new Set(nums)].sort((a, b) => a - b);
 
   if (nums.length && nums.length !== required) {
     return {
@@ -235,6 +261,7 @@ async function joinSoloFromPayment(claim, tournament, user) {
     }
     targetSlots.push(...free.slice(0, required));
     nums = targetSlots.map((s) => s.slotNumber);
+    players = players.map((p, i) => ({ ...p, slotNumber: nums[i] }));
   }
 
   const booked = tournament.slots.filter((s) => s.isBooked).length;
@@ -243,10 +270,12 @@ async function joinSoloFromPayment(claim, tournament, user) {
   }
 
   const now = new Date();
-  for (const targetSlot of targetSlots) {
+  for (let i = 0; i < targetSlots.length; i += 1) {
+    const targetSlot = targetSlots[i];
+    const p = players[i] || players[0];
     targetSlot.userId = user._id;
-    targetSlot.gamingUsername = gamingUsername;
-    targetSlot.gamingUID = gamingUID;
+    targetSlot.gamingUsername = p.gamingUsername;
+    targetSlot.gamingUID = p.gamingUID;
     targetSlot.bookedAt = now;
     targetSlot.isBooked = true;
   }
@@ -294,7 +323,8 @@ async function joinTeamFromPayment(claim, tournament, user) {
   const meta = claim.metadata || {};
   const teamName = String(meta.teamName || '').trim();
   const players = Array.isArray(meta.players) ? meta.players : [];
-  const requiredPlayers = lifecycle.getPlayersPerTeam(tournament.mode);
+  const structure = lifecycle.getMatchStructure(tournament);
+  const requiredPlayers = Math.max(1, Number(structure.playersPerTeam) || 1);
   const isCustom = lifecycle.isCustomMatch(tournament);
 
   if (!teamName) {

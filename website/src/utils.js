@@ -103,11 +103,19 @@ export function brandLogoUrl() {
 }
 
 export function apkHref(releaseInfo) {
-  const fileName = APP_RELEASE.fileName || releaseInfo?.fileName || 'WAREZONE-v1.0.2.apk';
-  const path = `/downloads/${encodeURIComponent(fileName)}?v=${encodeURIComponent(APP_RELEASE.version)}`;
-  if (releaseInfo?.downloadUrl && String(releaseInfo.downloadUrl).startsWith('http')) {
-    const u = String(releaseInfo.downloadUrl);
-    return u.includes('?') ? `${u}&v=${APP_RELEASE.version}` : `${u}?v=${APP_RELEASE.version}`;
+  const fileName = releaseInfo?.fileName || APP_RELEASE.fileName || 'WAREZONE-v1.0.2.apk';
+  const version = releaseInfo?.version || APP_RELEASE.version || '1.0.0';
+  const cache = `v=${encodeURIComponent(version)}`;
+
+  const raw = releaseInfo?.downloadUrl ? String(releaseInfo.downloadUrl) : '';
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    return raw.includes('?') ? `${raw}&${cache}` : `${raw}?${cache}`;
   }
+  if (raw.startsWith('/')) {
+    const path = raw.includes('?') ? `${raw}&${cache}` : `${raw}?${cache}`;
+    return API_BASE ? `${API_BASE}${path}` : path;
+  }
+
+  const path = `/downloads/${encodeURIComponent(fileName)}?${cache}`;
   return API_BASE ? `${API_BASE}${path}` : path;
 }

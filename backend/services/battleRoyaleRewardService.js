@@ -3,7 +3,7 @@ const TeamMember = require('../models/TeamMember');
 const {
   getPlacementPrize,
   calculateBrReward,
-  getPlayersPerTeam,
+  getMatchStructure,
 } = require('./tournamentLifecycle');
 
 /**
@@ -147,8 +147,9 @@ function enrichTeamEntry(tournament, entry) {
 }
 
 function expectedTeamCapacity(tournament) {
-  const perTeam = getPlayersPerTeam(tournament.mode);
-  const maxPlayers = Number(tournament.maxParticipants) || 50;
+  const structure = getMatchStructure(tournament);
+  const perTeam = Math.max(1, Number(structure.playersPerTeam) || 1);
+  const maxPlayers = Number(tournament.maxParticipants) || structure.totalPlayerCapacity || 50;
   if (perTeam <= 1) return maxPlayers;
   return Math.floor(maxPlayers / perTeam);
 }

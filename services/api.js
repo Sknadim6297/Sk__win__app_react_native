@@ -394,21 +394,23 @@ export const tournamentService = {
   getResults: (id) => apiCall(`/tournaments/${id}/results`),
   getHistory: () => apiCall('/tournaments/user/history'),
   getSlots: (id) => apiCall(`/tournaments/${id}/slots`),
-  bookSlot: (id, slotNumberOrNumbers, gamingID, gamingUID) => {
+  bookSlot: (id, slotNumberOrNumbers, gamingID, gamingUID, players) => {
     const body =
       Array.isArray(slotNumberOrNumbers)
         ? { slotNumbers: slotNumberOrNumbers, gamingID, gamingUID }
         : { slotNumber: slotNumberOrNumbers, slotNumbers: [slotNumberOrNumbers], gamingID, gamingUID };
+    if (Array.isArray(players) && players.length) body.players = players;
     return apiCall(`/tournaments/${id}/book-slot`, {
       method: 'POST',
       body: JSON.stringify(body),
     });
   },
-  confirmSlotBooking: (id, slotNumberOrNumbers, gamingID, gamingUID) => {
+  confirmSlotBooking: (id, slotNumberOrNumbers, gamingID, gamingUID, players) => {
     const body =
       Array.isArray(slotNumberOrNumbers)
         ? { slotNumbers: slotNumberOrNumbers, gamingID, gamingUID }
         : { slotNumber: slotNumberOrNumbers, slotNumbers: [slotNumberOrNumbers], gamingID, gamingUID };
+    if (Array.isArray(players) && players.length) body.players = players;
     return apiCall(`/tournaments/${id}/confirm-slot-booking`, {
       method: 'POST',
       body: JSON.stringify(body),
@@ -658,5 +660,12 @@ export const dailyAutoMatchService = {
   generateToday: (id) =>
     apiCall(`/daily-auto-matches/admin/${id}/generate-today`, { method: 'POST' }),
   getGenerated: (id) => apiCall(`/daily-auto-matches/admin/${id}/tournaments`),
+};
+
+/** Public APK release + soft update check */
+export const downloadService = {
+  getRelease: () => apiCall('/download/release'),
+  checkUpdate: (currentVersion) =>
+    apiCall(`/download/check?current=${encodeURIComponent(currentVersion || '0.0.0')}`),
 };
 
