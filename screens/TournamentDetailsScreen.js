@@ -8,10 +8,12 @@ import {
   StatusBar,
   ActivityIndicator,
   ImageBackground,
+  Share,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
 import { tournamentService } from '../services/api';
@@ -27,11 +29,65 @@ import {
   resolveDisplayPrizePool,
   resolvePrizePlaces,
   resolveMatchRules,
+  toPlayerMatchLabel,
 } from '../utils/tournamentHelpers';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
 import { CoinValue, TimeLeftBar, InfoCell } from '../components/contest/ContestShared';
 
 const DEFAULT_BANNER = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
+
+async function copyToClipboard(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
+  try {
+    await Share.share({ message: text });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function CredentialRow({ label, value, onCopy }) {
+  if (!value) return null;
+  return (
+    <View style={styles.credRow}>
+      <View style={styles.credCopy}>
+        <Text style={styles.credLabel}>{label}</Text>
+        <Text style={styles.credValue} selectable>
+          {value}
+        </Text>
+      </View>
+      <TouchableOpacity style={styles.copyBtn} onPress={onCopy} activeOpacity={0.85}>
+        <Ionicons name="copy-outline" size={16} color={COLORS.white} />
+        <Text style={styles.copyBtnText}>Copy</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function PlayerJoinRow({ gameName, gameId, slotLabel }) {
+  return (
+    <View style={styles.joiningRow}>
+      {slotLabel ? <Text style={styles.joiningSlot}>{slotLabel}</Text> : null}
+      <View style={styles.joiningInfo}>
+        <Text style={styles.joiningName} numberOfLines={1}>
+          {gameName || '—'}
+        </Text>
+        <Text style={styles.joiningMeta} numberOfLines={1}>
+          Game UID: {gameId || '—'}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 export default function TournamentDetailsScreen({ navigation, route }) {
   const { tournamentId, walletRecharged, joinedSuccess } = route.params || {};
@@ -92,6 +148,11 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     }
   }, [joinedSuccess, navigation, loadDetails]);
 
+  const handleCopy = async (value, label) => {
+    const ok = await copyToClipboard(value);
+    showToast(ok ? `${label} copied` : `Could not copy ${label}`, ok ? 'success' : 'error');
+  };
+
   const handleJoinNow = async () => {
     const status = tournament?.lifecycleStatus || tournament?.status;
     if (status === 'completed' || status === 'result_published') {
@@ -136,7 +197,9 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           returnScreen: isTeamFlow ? 'CustomMatchTeamRegister' : 'TournamentSlotBooking',
           forTeam: isTeamFlow,
           requiredAmount:
-            eligibility?.totalAmount ?? eligibility?.realMoneyRequired ?? resolveEntryCharge(tournament).totalAmount,
+            eligibility?.totalAmount ??
+            eligibility?.realMoneyRequired ??
+            resolveEntryCharge(tournament).totalAmount,
           currentBalance: eligibility?.balance,
         });
         return;
@@ -204,7 +267,8 @@ export default function TournamentDetailsScreen({ navigation, route }) {
   const lifecycleStatus = tournament.lifecycleStatus || tournament.status;
   const isJoinOpen = lifecycleStatus === 'upcoming' || lifecycleStatus === 'incoming';
   const canViewResults = lifecycleStatus === 'completed' || lifecycleStatus === 'result_published';
-  const resultsPublished = Boolean(tournament.resultsPublished) || lifecycleStatus === 'result_published';
+  const resultsPublished =
+    Boolean(tournament.resultsPublished) || lifecycleStatus === 'result_published';
   const joinDisabled = canViewResults ? false : hasJoined || joining || !isJoinOpen;
   const joinButtonLabel = canViewResults
     ? resultsPublished
@@ -215,16 +279,27 @@ export default function TournamentDetailsScreen({ navigation, route }) {
       : isJoinOpen
         ? 'Join Match'
         : lifecycleStatus === 'ongoing' || lifecycleStatus === 'live'
-          ? 'Live'
+          ? 'Ongoing'
           : String(lifecycleStatus || 'Closed');
 
   const teams = tournament.teams || [];
   const players = tournament.participants || [];
+  const showRoom =
+    Boolean(hasJoined) &&
+    Boolean(tournament.roomCredentialsVisible) &&
+    Boolean(String(tournament.roomId || '').trim() || String(tournament.roomPassword || '').trim());
+  const teamFormat = structure.playerFormatLabel || structure.modeLabel || 'Solo';
+  const modeName = toPlayerMatchLabel(
+    tournament.gameMode?.name || structure.matchType || 'Match'
+  ).toUpperCase();
+  const mapName = String(tournament.map || 'BERMUDA').toUpperCase();
+  const matchTypePaid = Number(tournament.entryFee) > 0 ? 'Paid' : 'Free';
+  const entryFee = Number(tournament.entryFee) || 0;
 
   return (
     <SafeAreaView style={pageStyles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
-      <ScreenHeader title={`Contest Details #${matchNo}`} onBack={() => navigation.goBack()} />
+      <ScreenHeader title={`Contest #${matchNo}`} onBack={() => navigation.goBack()} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -237,7 +312,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           resizeMode="cover"
         >
           <LinearGradient
-            colors={['rgba(11,14,30,0.05)', 'rgba(11,14,30,0.55)']}
+            colors={['rgba(11,14,30,0.05)', 'rgba(11,14,30,0.7)']}
             style={StyleSheet.absoluteFill}
           />
         </ImageBackground>
@@ -245,23 +320,21 @@ export default function TournamentDetailsScreen({ navigation, route }) {
         <TimeLeftBar startDate={tournament.startDate} />
 
         <Text style={styles.matchTitle}>
-          {tournament.name || 'Tournament'} — ID#{matchNo}
+          {tournament.name || 'Tournament'} - ID#{matchNo}
         </Text>
 
-        <View style={styles.grid3}>
-          <InfoCell label="Format" value={structure.formatLabel} flex={1} />
-          <InfoCell label="Mode" value={custom ? structure.matchType : structure.modeLabel} flex={1} />
-          <InfoCell label="Map" value={(tournament.map || 'BERMUDA').toUpperCase()} flex={1} />
+        <View style={styles.metaBlock}>
+          <View style={styles.grid3}>
+            <InfoCell label="Team" value={teamFormat} flex={1} />
+            <InfoCell label="Mode" value={modeName} flex={1} />
+            <InfoCell label="Map" value={mapName} flex={1} />
+          </View>
+          <View style={styles.grid2}>
+            <InfoCell label="Match Type" value={matchTypePaid} flex={1} inline />
+            <InfoCell label="Entry Fee" value={entryFee} coin flex={1} inline />
+          </View>
+          <InfoCell label="Match Schedule" value={formatScheduleLine(tournament.startDate)} inline />
         </View>
-        <View style={styles.grid2}>
-          <InfoCell
-            label="Entry"
-            value={`₹${tournament.entryFee || 0} / player`}
-            flex={1}
-          />
-          <InfoCell label="Slots" value={`${joined}/${maxP} ${structure.slotUnit}`} flex={1} />
-        </View>
-        <InfoCell label="Match Schedule" value={formatScheduleLine(tournament.startDate)} />
 
         <Text style={styles.sectionHead}>Prize Details</Text>
         <View style={styles.prizeCard}>
@@ -288,12 +361,45 @@ export default function TournamentDetailsScreen({ navigation, route }) {
             </View>
           ) : null}
           {places.third > 0 ? (
-            <View style={styles.prizeLine}>
+            <View style={[styles.prizeLine, styles.prizeLineLast]}>
               <Text style={styles.prizeLabel}>3rd Place</Text>
               <CoinValue value={places.third} color={PAGE.gold} />
             </View>
           ) : null}
+          {!totalPrize && !places.first && !places.second && !places.third ? (
+            <View style={[styles.prizeLine, styles.prizeLineLast]}>
+              <Text style={styles.prizeLabel}>No prize details yet</Text>
+            </View>
+          ) : null}
         </View>
+
+        {showRoom ? (
+          <View style={styles.roomBox}>
+            <Text style={styles.roomTitle}>Match ID & Password</Text>
+            <Text style={styles.roomHint}>
+              Only visible because you joined this match. Copy into Free Fire before start.
+            </Text>
+            <CredentialRow
+              label="Match ID"
+              value={tournament.roomId}
+              onCopy={() => handleCopy(tournament.roomId, 'Match ID')}
+            />
+            <CredentialRow
+              label="Password"
+              value={tournament.roomPassword}
+              onCopy={() => handleCopy(tournament.roomPassword, 'Password')}
+            />
+          </View>
+        ) : null}
+
+        {hasJoined && !showRoom ? (
+          <View style={styles.roomWaitBox}>
+            <Text style={styles.roomWaitText}>
+              {tournament.roomCredentialsMessage ||
+                'Please wait. Match ID and password will be available 2 minutes before the match starts.'}
+            </Text>
+          </View>
+        ) : null}
 
         {aboutText ? (
           <>
@@ -317,63 +423,43 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           ))}
         </View>
 
-        {hasJoined && tournament.roomCredentialsVisible && (tournament.roomId || tournament.roomPassword) ? (
-          <View style={styles.roomBox}>
-            <Text style={styles.roomTitle}>Room credentials</Text>
-            {tournament.roomId ? (
-              <Text style={styles.roomLine} selectable>
-                ID: {tournament.roomId}
-              </Text>
-            ) : null}
-            {tournament.roomPassword ? (
-              <Text style={styles.roomLine} selectable>
-                Password: {tournament.roomPassword}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-
-        {hasJoined && !tournament.roomCredentialsVisible ? (
-          <View style={styles.roomWaitBox}>
-            <Text style={styles.roomWaitText}>
-              {tournament.roomCredentialsMessage ||
-                'Please wait. Room details will be available 2 minutes before the match starts.'}
-            </Text>
-          </View>
-        ) : null}
-
         {showJoinings ? (
           <View style={styles.joiningsBox}>
             <Text style={styles.sectionHead}>
-              {custom ? 'Teams' : 'Slots'} ({joined}/{maxP})
+              Players ({joined}/{maxP})
             </Text>
             {teamEntry ? (
               teams.length ? (
-                teams.map((team) => (
-                  <View key={team._id || team.side || team.slotNumber} style={styles.joiningRow}>
-                    <Text style={styles.joiningName}>
-                      {custom
-                        ? `Team ${team.side || ''} · ${team.name}`
-                        : `Slot ${team.slotNumber || '—'} · ${team.name}`}
-                    </Text>
-                    <Text style={styles.joiningMeta}>
-                      {(team.players || []).map((p) => p.name || p.gamingUsername).filter(Boolean).join(', ') ||
-                        `${(team.players || []).length} players`}
-                    </Text>
-                  </View>
-                ))
+                teams.flatMap((team) =>
+                  (team.players || []).map((p, i) => (
+                    <PlayerJoinRow
+                      key={`${team._id || team.side || team.slotNumber}-${i}`}
+                      slotLabel={
+                        custom
+                          ? `T${team.side || ''}`
+                          : team.slotNumber
+                            ? `S${team.slotNumber}`
+                            : null
+                      }
+                      gameName={p.name || p.gamingUsername}
+                      gameId={p.gamingUID || p.uid || p.gameUID}
+                    />
+                  ))
+                )
               ) : (
-                <Text style={styles.emptyJoinings}>{custom ? 'No teams registered yet.' : 'No slots booked yet.'}</Text>
+                <Text style={styles.emptyJoinings}>No players joined yet.</Text>
               )
             ) : players.length ? (
               players.map((p, i) => (
-                <View key={`${p.slotNumber}-${i}`} style={styles.joiningRow}>
-                  <Text style={styles.joiningSlot}>Slot {p.slotNumber || i + 1}</Text>
-                  <Text style={styles.joiningName}>{p.gamingUsername || p.username || 'Player'}</Text>
-                </View>
+                <PlayerJoinRow
+                  key={`${p.slotNumber}-${i}`}
+                  slotLabel={p.slotNumber ? `S${p.slotNumber}` : null}
+                  gameName={p.gamingUsername || p.username}
+                  gameId={p.gamingUID}
+                />
               ))
             ) : (
-              <Text style={styles.emptyJoinings}>No slots booked yet.</Text>
+              <Text style={styles.emptyJoinings}>No players joined yet.</Text>
             )}
           </View>
         ) : null}
@@ -386,7 +472,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           activeOpacity={0.88}
         >
           <Text style={styles.viewJoiningsText}>
-            {showJoinings ? 'HIDE JOININGS' : 'VIEW ALL JOININGS'}
+            {showJoinings ? 'HIDE PLAYERS' : 'VIEW PLAYERS'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -411,7 +497,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   banner: {
-    height: 180,
+    height: 168,
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: 4,
@@ -420,13 +506,16 @@ const styles = StyleSheet.create({
   bannerImg: { borderRadius: 16 },
   matchTitle: {
     fontFamily: FONTS.bold,
-    fontSize: 16,
+    fontSize: 17,
     color: PAGE.cyan,
-    lineHeight: 22,
+    lineHeight: 24,
     marginBottom: 12,
   },
-  grid3: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  grid2: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  metaBlock: {
+    gap: 8,
+  },
+  grid3: { flexDirection: 'row', gap: 8 },
+  grid2: { flexDirection: 'row', gap: 8 },
   sectionHead: {
     fontFamily: FONTS.bold,
     fontSize: 15,
@@ -440,22 +529,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PAGE.border,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   prizeLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: PAGE.border,
   },
+  prizeLineLast: { borderBottomWidth: 0 },
   prizeLabel: { ...TEXT.body, color: PAGE.muted },
   aboutCard: {
-    backgroundColor: 'rgba(91, 57, 168, 0.18)',
+    backgroundColor: PAGE.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: PAGE.borderAccent,
+    borderColor: PAGE.border,
     padding: 14,
   },
   ruleLine: {
@@ -463,18 +553,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.white,
     lineHeight: 22,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   roomBox: {
     marginTop: 16,
     padding: 14,
     backgroundColor: PAGE.card,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: PAGE.borderAccent,
+    gap: 10,
   },
-  roomTitle: { color: PAGE.cyan, fontFamily: FONTS.bold, marginBottom: 8 },
-  roomLine: { color: COLORS.white, fontSize: 14, marginBottom: 4 },
+  roomTitle: { color: PAGE.cyan, fontFamily: FONTS.bold, fontSize: 15 },
+  roomHint: { color: PAGE.muted, fontSize: 12, lineHeight: 17, marginTop: -4 },
+  credRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: PAGE.cardAlt,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+  },
+  credCopy: { flex: 1, minWidth: 0 },
+  credLabel: { color: PAGE.muted, fontSize: 11, fontFamily: FONTS.bold, marginBottom: 2 },
+  credValue: { color: COLORS.white, fontSize: 15, fontFamily: FONTS.bold },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: PAGE.purple,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  copyBtnText: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 12 },
   roomWaitBox: {
     marginTop: 16,
     padding: 14,
@@ -497,9 +612,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PAGE.border,
   },
-  joiningSlot: { color: PAGE.cyan, fontFamily: FONTS.bold, width: 36 },
-  joiningName: { color: COLORS.white, fontFamily: FONTS.bold, flex: 1, fontSize: 13 },
-  joiningMeta: { color: PAGE.muted, fontSize: 12 },
+  joiningSlot: { color: PAGE.cyan, fontFamily: FONTS.bold, minWidth: 28 },
+  joiningInfo: { flex: 1, minWidth: 0 },
+  joiningName: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 14 },
+  joiningMeta: { color: PAGE.muted, fontSize: 12, marginTop: 2 },
   emptyJoinings: { color: PAGE.muted, textAlign: 'center', paddingVertical: 16 },
   bottomBar: {
     position: 'absolute',

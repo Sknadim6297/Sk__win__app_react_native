@@ -23,13 +23,25 @@ export function resolveMatchRules(tournament) {
 export function getTeamSize(mode) {
   const m = (mode || 'solo').toLowerCase();
   if (m === 'duo') return 2;
-  if (m === 'squad') return 4;
+  if (m === 'squad' || m === 'team') return 4;
   return 1;
 }
 
 export function formatModeLabel(mode) {
   const m = (mode || 'solo').toLowerCase();
+  if (m === 'team') return 'Team';
+  if (m === 'duo') return 'Duo';
+  if (m === 'squad') return 'Squad';
+  if (m === 'solo') return 'Solo';
   return m.charAt(0).toUpperCase() + m.slice(1);
+}
+
+/** Player-facing format: Solo / Duo / Squad / Team */
+export function getPlayerFormatLabel(modeOrTournament) {
+  if (modeOrTournament && typeof modeOrTournament === 'object') {
+    return formatModeLabel(modeOrTournament.mode || 'solo');
+  }
+  return formatModeLabel(modeOrTournament);
 }
 
 export const CLASH_SQUAD_LABEL = 'Clash Squad';
@@ -71,13 +83,16 @@ export function getMatchStructure(tournament) {
   const playersPerTeam = getTeamSize(mode);
   const custom = isCustomMatch(tournament);
 
+  const playerFormatLabel = formatModeLabel(mode);
+
   if (custom) {
     return {
       kind: 'team_vs_team',
       matchType: 'Clash Squad',
       formatLabel: playersPerTeam === 4 ? '4v4' : playersPerTeam === 2 ? '2v2' : '1v1',
+      playerFormatLabel,
       mode,
-      modeLabel: formatModeLabel(mode),
+      modeLabel: playerFormatLabel,
       playersPerTeam,
       totalSlots: 2,
       slotUnit: 'teams',
@@ -94,8 +109,9 @@ export function getMatchStructure(tournament) {
     kind: 'battle_royale',
     matchType: 'Battle Royale',
     formatLabel: 'Battle Royale',
+    playerFormatLabel,
     mode,
-    modeLabel: formatModeLabel(mode),
+    modeLabel: playerFormatLabel,
     playersPerTeam,
     totalSlots,
     slotUnit: 'slots',
@@ -248,8 +264,8 @@ const STATUS_LABELS = {
   incoming: 'Upcoming',
   upcoming: 'Upcoming',
   locked: 'Upcoming',
-  ongoing: 'Live',
-  live: 'Live',
+  ongoing: 'Ongoing',
+  live: 'Ongoing',
   completed: 'Completed',
   cancelled: 'Cancelled',
 };

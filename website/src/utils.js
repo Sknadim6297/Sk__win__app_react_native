@@ -1,4 +1,5 @@
 import { API_BASE } from './api';
+import { APP_RELEASE } from './release';
 
 export const DEFAULT_RULES = [
   'Minimum level 40+ required to join.',
@@ -78,7 +79,17 @@ export function modeName(t) {
   return matchLabel(t?.matchType || t?.gameMode?.name || t?.modeLabel || t?.mode || 'Match');
 }
 
-import { APP_RELEASE } from './release';
+/** Player-facing format: Solo / Duo / Squad / Team */
+export function formatName(t) {
+  if (t?.playerFormatLabel) return t.playerFormatLabel;
+  if (t?.modeLabel && /^(Solo|Duo|Squad|Team)$/i.test(String(t.modeLabel))) return t.modeLabel;
+  const mode = String(t?.mode || '').toLowerCase();
+  if (mode === 'solo') return 'Solo';
+  if (mode === 'duo') return 'Duo';
+  if (mode === 'squad') return 'Squad';
+  if (mode === 'team') return 'Team';
+  return t?.formatLabel || modeName(t);
+}
 
 export function brandLogoUrl() {
   return API_BASE ? `${API_BASE}/brand/logo.png?v=app` : '/logo.png?v=app';

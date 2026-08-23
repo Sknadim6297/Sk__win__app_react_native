@@ -158,7 +158,7 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.contestsRow}>
           {[
             { key: 'upcoming', label: 'Upcoming', icon: 'clock-outline' },
-            { key: 'live', label: 'Live', icon: 'broadcast' },
+            { key: 'live', label: 'Ongoing', icon: 'broadcast' },
             { key: 'completed', label: 'Completed', icon: 'check-circle-outline' },
           ].map((item) => (
             <TouchableOpacity

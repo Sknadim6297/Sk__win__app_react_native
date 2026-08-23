@@ -55,6 +55,7 @@ async function notifyUser({
   deepLink = null,
   data = {},
   scheduleMinutes = undefined,
+  // Real device push (background / killed) + in-app inbox row.
   sendPushNotification = true,
 }) {
   if (!userId || !title || !message) {

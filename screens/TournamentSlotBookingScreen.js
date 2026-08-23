@@ -444,26 +444,26 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
                 <Text style={styles.detailsHeadText}>Player Game Details</Text>
               </View>
               <View style={styles.detailsBody}>
-                <Text style={styles.fieldLabel}>inGameName</Text>
+                <Text style={styles.fieldLabel}>Game Name</Text>
                 <TextInput
                   style={styles.underlineInput}
                   value={gamingUsername}
                   onChangeText={setGamingUsername}
-                  placeholder="Enter in-game name"
+                  placeholder="Enter game name"
                   placeholderTextColor={PAGE.muted}
                   autoCapitalize="none"
                 />
-                <Text style={styles.fieldLabel}>inGameId</Text>
+                <Text style={styles.fieldLabel}>Game UID</Text>
                 <TextInput
                   style={styles.underlineInput}
                   value={gamingUID}
                   onChangeText={setGamingUID}
-                  placeholder="Enter in-game UID"
+                  placeholder="Enter game UID"
                   placeholderTextColor={PAGE.muted}
                   autoCapitalize="none"
                 />
                 <Text style={styles.helper}>
-                  Make sure you have entered correct inGameName & inGameId
+                  Make sure you have entered correct Game Name & Game UID
                 </Text>
                 <View style={styles.pairInline}>
                   <TouchableOpacity style={styles.cancelBtn} onPress={() => setStep('confirm')}>

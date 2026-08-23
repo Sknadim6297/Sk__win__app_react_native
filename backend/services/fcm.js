@@ -55,6 +55,8 @@ const sendExpoPush = async (token, title, body, data = {}, options = {}) => {
     sound: options.sound || 'default',
     priority: 'high',
     channelId: options.channelId || 'default',
+    // Ensure the full title/body show on lock screen and shade
+    _displayInForeground: true,
     data: data || {},
   };
   if (options.badge != null) payload.badge = Number(options.badge) || 0;
@@ -92,17 +94,27 @@ const sendFcmPush = async (token, title, body, data = {}, options = {}) => {
     android: {
       priority: 'high',
       notification: {
+        title,
+        body,
         sound: options.sound || 'default',
         channelId: options.channelId || 'default',
+        priority: 'high',
+        visibility: 'public',
+        defaultSound: true,
         ...(options.badge != null ? { notificationCount: Number(options.badge) || 0 } : {}),
       },
     },
     apns: {
       payload: {
         aps: {
+          alert: { title, body },
           sound: options.sound || 'default',
+          'content-available': 1,
           ...(options.badge != null ? { badge: Number(options.badge) || 0 } : {}),
         },
+      },
+      headers: {
+        'apns-priority': '10',
       },
     },
   };

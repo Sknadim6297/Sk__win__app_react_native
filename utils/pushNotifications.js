@@ -17,6 +17,7 @@ function getNotifications() {
 const Notifications = getNotifications();
 
 if (Notifications) {
+  // Show system banners while the app is open; OS still delivers when background/killed.
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -41,13 +42,17 @@ function getProjectId() {
 
 export async function ensureAndroidChannel() {
   if (!Notifications || Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync('default', {
+  const channel = {
     name: 'WAREZONE',
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#22C55E',
     sound: 'default',
-  });
+  };
+  if (Notifications.AndroidNotificationVisibility?.PUBLIC != null) {
+    channel.lockscreenVisibility = Notifications.AndroidNotificationVisibility.PUBLIC;
+  }
+  await Notifications.setNotificationChannelAsync('default', channel);
 }
 
 export async function registerForPushNotificationsAsync() {
@@ -163,7 +168,7 @@ export function setupNotificationListeners() {
   if (responseSub) responseSub.remove();
 
   receiveSub = Notifications.addNotificationReceivedListener(() => {
-    // Foreground: system banner handled by setNotificationHandler
+    // Foreground banner/alert controlled by setNotificationHandler
   });
 
   responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -193,7 +198,6 @@ export async function handleInitialNotificationResponse() {
 
   const data = response?.notification?.request?.content?.data;
   const ageMs = notificationAgeMs(response);
-  // No reliable date → treat as stale (common leftover after register/login)
   const freshEnough = ageMs != null && ageMs <= 45_000;
 
   if (!freshEnough || !notificationHasNavIntent(data)) {

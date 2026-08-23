@@ -22,7 +22,7 @@ import MatchListCard from '../components/contest/MatchListCard';
 
 const STATUS_TABS = [
   { id: 'upcoming', label: 'UPCOMING', match: ['upcoming', 'incoming'] },
-  { id: 'live', label: 'LIVE', match: ['ongoing', 'live'] },
+  { id: 'live', label: 'ONGOING', match: ['ongoing', 'live'] },
   { id: 'completed', label: 'COMPLETED', match: ['completed', 'result_published'] },
 ];
 
@@ -33,9 +33,12 @@ function getEffective(t) {
 }
 
 export default function MyContestsScreen({ navigation, route }) {
-  const initialTab = route?.params?.initialTab === 'result_published'
-    ? 'completed'
-    : route?.params?.initialTab || 'upcoming';
+  const initialTab =
+    route?.params?.initialTab === 'result_published'
+      ? 'completed'
+      : route?.params?.initialTab === 'ongoing'
+        ? 'live'
+        : route?.params?.initialTab || 'upcoming';
   const [selectedTab, setSelectedTab] = useState(initialTab);
   const [contests, setContests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +72,9 @@ export default function MyContestsScreen({ navigation, route }) {
     useCallback(() => {
       const tab = route?.params?.initialTab;
       if (!tab) return;
-      setSelectedTab(tab === 'result_published' ? 'completed' : tab);
+      if (tab === 'result_published') setSelectedTab('completed');
+      else if (tab === 'ongoing') setSelectedTab('live');
+      else setSelectedTab(tab);
     }, [route?.params?.initialTab])
   );
 

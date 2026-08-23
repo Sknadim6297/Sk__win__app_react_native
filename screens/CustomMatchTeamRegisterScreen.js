@@ -39,6 +39,13 @@ function isPlayerComplete(player) {
   return String(player?.name || '').trim().length >= 3 && String(player?.gamingUID || '').trim().length >= 3;
 }
 
+/** Backend still needs a team name — auto from captain Game Name + side/slot (not shown in UI). */
+function buildAutoTeamName(players, { isCustom, side, slot }) {
+  const captain = String(players?.[0]?.name || '').trim() || 'Player';
+  const tag = isCustom ? `Team ${side || 'A'}` : `Slot ${slot || 1}`;
+  return `${captain} · ${tag}`.slice(0, 60);
+}
+
 function isAlreadyJoinedError(err) {
   return /already joined|already registered in this tournament/i.test(String(err?.message || err || ''));
 }
@@ -110,11 +117,18 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       name: String(p.name || '').trim(),
       gamingUID: String(p.gamingUID || '').trim(),
     }));
+    const side = override?.teamSide || teamSide;
+    const slot = override?.slotNumber || teamSlot;
+    const autoName = buildAutoTeamName(roster, {
+      isCustom: isCustomMatch(tournament),
+      side,
+      slot,
+    });
     return {
       kind: 'team',
-      teamName: String(override?.teamName || teamName).trim(),
-      teamSide: override?.teamSide || teamSide,
-      slotNumber: override?.slotNumber || teamSlot,
+      teamName: String(override?.teamName || teamName || autoName).trim() || autoName,
+      teamSide: side,
+      slotNumber: slot,
       players: roster,
     };
   };
@@ -226,7 +240,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
         }
       }
     }
-    setDraftTeamName(teamName);
+    setDraftTeamName('');
     setDraftTeamSide(nextSide);
     setDraftTeamSlot(nextSlot);
     setDraftPlayers(clonePlayers(players));
@@ -238,10 +252,6 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
   };
 
   const handleModalSubmit = () => {
-    if (!draftTeamName.trim()) {
-      showToast('Enter team name');
-      return;
-    }
     if (isCustomMatch(tournament) && takenSides.has(draftTeamSide)) {
       showToast(`Team ${draftTeamSide} is already taken`);
       return;
@@ -255,7 +265,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       const name = String(draftPlayers[i].name || '').trim();
       const uid = String(draftPlayers[i].gamingUID || '').trim();
       if (name.length < 3) {
-        showToast(`Player ${i + 1}: enter Game ID (min 3 characters)`, 'warning');
+        showToast(`Player ${i + 1}: enter Game Name (min 3 characters)`, 'warning');
         return;
       }
       if (uid.length < 3) {
@@ -264,19 +274,26 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       }
     }
 
-    setTeamName(draftTeamName.trim());
-    setTeamSide(draftTeamSide);
-    setTeamSlot(draftTeamSlot);
-    setPlayers(clonePlayers(draftPlayers).map((p) => ({
+    const roster = clonePlayers(draftPlayers).map((p) => ({
       name: p.name.trim(),
       gamingUID: p.gamingUID.trim(),
-    })));
+    }));
+    const autoName = buildAutoTeamName(roster, {
+      isCustom: isCustomMatch(tournament),
+      side: draftTeamSide,
+      slot: draftTeamSlot,
+    });
+
+    setTeamName(autoName);
+    setTeamSide(draftTeamSide);
+    setTeamSlot(draftTeamSlot);
+    setPlayers(roster);
     setTeamSubmitted(true);
     setEntryVisible(false);
   };
 
   const handleJoinPress = () => {
-    if (!teamSubmitted || !players.every(isPlayerComplete) || !teamName.trim()) {
+    if (!teamSubmitted || !players.every(isPlayerComplete)) {
       openEntryModal();
       return;
     }
@@ -296,10 +313,6 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       showToast('This tournament does not use team registration');
       return;
     }
-    if (!teamName.trim()) {
-      showToast('Enter team name');
-      return;
-    }
     if (isCustomMatch(tournament) && takenSides.has(teamSide)) {
       showToast(`Team ${teamSide} is already taken`);
       return;
@@ -313,7 +326,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       const name = String(players[i].name || '').trim();
       const uid = String(players[i].gamingUID || '').trim();
       if (name.length < 3) {
-        showToast(`Player ${i + 1}: enter Game ID (min 3 characters)`, 'warning');
+        showToast(`Player ${i + 1}: enter Game Name (min 3 characters)`, 'warning');
         return;
       }
       if (uid.length < 3) {
@@ -325,7 +338,9 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
     try {
       setSubmitting(true);
       setConfirmVisible(false);
-      await completeTeamJoin(buildPendingJoin());
+      const join = buildPendingJoin();
+      setTeamName(join.teamName);
+      await completeTeamJoin(join);
     } catch (e) {
       showToast(e.message || 'Failed to register team');
     } finally {
@@ -358,8 +373,9 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.matchName}>{tournament?.name}</Text>
         <Text style={styles.meta}>
-          {matchStructure.matchType} · {matchStructure.formatLabel}
-          {matchStructure.kind === 'battle_royale' ? ` · ${matchStructure.modeLabel}` : ''} ·{' '}
+          {matchStructure.matchType} · {matchStructure.playerFormatLabel || matchStructure.modeLabel}
+          {matchStructure.kind === 'battle_royale' ? '' : ` · ${matchStructure.formatLabel}`}
+          {' · '}
           {playersPerTeam} player{playersPerTeam > 1 ? 's' : ''} per team
           {isCustom ? ' · Max 2 teams' : ` · ${matchStructure.totalSlots} slots`}
           {'\n'}₹{entryCharge.feePerPlayer}/player
@@ -369,9 +385,9 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
         </Text>
 
         <View style={styles.warnBox}>
-          <Text style={styles.warnTitle}>Mandatory Game ID & UID</Text>
+          <Text style={styles.warnTitle}>Mandatory Game Name & Game UID</Text>
           <Text style={styles.warnText}>
-            Enter correct Free Fire Game ID and UID for every player. Wrong name or UID can get the
+            Enter correct Free Fire Game Name and Game UID for every player. Wrong details can get the
             player removed from the match by the organizer.
           </Text>
         </View>
@@ -381,8 +397,10 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
             <View style={styles.teamSummary}>
               <View style={styles.teamSummaryTop}>
                 <View style={styles.flex}>
-                  <Text style={styles.summaryLabel}>Team Name</Text>
-                  <Text style={styles.summaryValue}>{teamName}</Text>
+                  <Text style={styles.summaryLabel}>Position</Text>
+                  <Text style={styles.summaryValue}>
+                    {showSidePicker ? `Team ${teamSide}` : `Slot ${teamSlot}`}
+                  </Text>
                 </View>
                 {showSidePicker ? (
                   <View style={styles.sideBadge}>
@@ -395,7 +413,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
                 )}
               </View>
               <Text style={styles.rosterCount}>
-                Team Players ({filledCount}/{playersPerTeam})
+                Players ({filledCount}/{playersPerTeam})
               </Text>
             </View>
 
@@ -409,13 +427,13 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
                 </View>
                 <View style={styles.memberBody}>
                   <View style={styles.memberRow}>
-                    <Text style={styles.memberKey}>Game ID</Text>
+                    <Text style={styles.memberKey}>Game Name</Text>
                     <Text style={styles.memberVal} numberOfLines={1}>
                       {player.name}
                     </Text>
                   </View>
                   <View style={styles.memberRow}>
-                    <Text style={styles.memberKey}>UID</Text>
+                    <Text style={styles.memberKey}>Game UID</Text>
                     <Text style={styles.memberVal} numberOfLines={1}>
                       {player.gamingUID}
                     </Text>
@@ -426,17 +444,18 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
 
             <TouchableOpacity style={styles.editLink} onPress={openEntryModal}>
               <MaterialCommunityIcons name="pencil-outline" size={16} color={PAGE.cyan} />
-              <Text style={styles.editLinkText}>Edit team details</Text>
+              <Text style={styles.editLinkText}>Edit player details</Text>
             </TouchableOpacity>
           </>
         ) : (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Team details required</Text>
+            <Text style={styles.emptyTitle}>Player details required</Text>
             <Text style={styles.emptyText}>
-              Add team name, {isCustom ? 'side' : 'slot'}, and Game ID + UID for all {playersPerTeam} players before joining.
+              Add {isCustom ? 'team side' : 'slot'} and Game Name + Game UID for all {playersPerTeam}{' '}
+              players before joining.
             </Text>
             <TouchableOpacity style={styles.enterBtn} onPress={openEntryModal}>
-              <Text style={styles.enterBtnText}>Enter Team Details</Text>
+              <Text style={styles.enterBtnText}>Enter Player Details</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -451,7 +470,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
           {submitting ? (
             <ActivityIndicator color={COLORS.white} />
           ) : (
-            <Text style={styles.submitText}>{teamSubmitted ? 'Join Now' : 'Enter Team & Join'}</Text>
+            <Text style={styles.submitText}>{teamSubmitted ? 'Join Now' : 'Enter Details & Join'}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -469,7 +488,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
           <View style={styles.modalOverlay}>
             <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Team Entry</Text>
+                <Text style={styles.modalTitle}>Player Entry</Text>
                 <TouchableOpacity onPress={() => setEntryVisible(false)} hitSlop={12}>
                   <MaterialCommunityIcons name="close" size={22} color={PAGE.muted} />
                 </TouchableOpacity>
@@ -480,15 +499,6 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
               >
-                <Text style={styles.label}>Team Name *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={draftTeamName}
-                  onChangeText={setDraftTeamName}
-                  placeholder="Enter team name"
-                  placeholderTextColor={PAGE.muted}
-                />
-
                 {showSidePicker ? (
                   <>
                     <Text style={styles.label}>Team Side *</Text>
@@ -559,7 +569,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
                 ) : null}
 
                 <Text style={styles.label}>
-                  Team Players * ({playersPerTeam}/{playersPerTeam}) — Game ID + UID required
+                  Players * ({playersPerTeam}/{playersPerTeam}) — Game Name + Game UID
                 </Text>
                 {draftPlayers.map((player, index) => (
                   <View key={`draft-player-${index}`} style={styles.playerCard}>
@@ -570,21 +580,21 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
                       </Text>
                     </View>
                     <View style={styles.playerBody}>
-                      <Text style={styles.fieldLabel}>inGameName</Text>
+                      <Text style={styles.fieldLabel}>Game Name</Text>
                       <TextInput
                         style={styles.underlineInput}
                         value={player.name}
                         onChangeText={(text) => updateDraftPlayer(index, 'name', text)}
-                        placeholder="Game ID (in-game name)"
+                        placeholder="Enter game name"
                         placeholderTextColor={PAGE.muted}
                         autoCapitalize="none"
                       />
-                      <Text style={styles.fieldLabel}>inGameId</Text>
+                      <Text style={styles.fieldLabel}>Game UID</Text>
                       <TextInput
                         style={styles.underlineInput}
                         value={player.gamingUID}
                         onChangeText={(text) => updateDraftPlayer(index, 'gamingUID', text)}
-                        placeholder="Game UID"
+                        placeholder="Enter game UID"
                         placeholderTextColor={PAGE.muted}
                         autoCapitalize="none"
                       />
@@ -594,7 +604,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
               </ScrollView>
 
               <TouchableOpacity style={styles.modalSaveBtn} onPress={handleModalSubmit}>
-                <Text style={styles.modalSaveText}>Save Team</Text>
+                <Text style={styles.modalSaveText}>Save Players</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -608,13 +618,13 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       >
         <Text style={styles.confirmTitle}>Are you sure?</Text>
         <Text style={styles.confirmText}>
-          Confirm join for {teamName || 'your team'}
+          Confirm join
           {showSidePicker ? ` (Team ${teamSide})` : ` (Slot ${teamSlot})`}. Total entry ₹
           {entryCharge.totalAmount}
           {entryCharge.playersCharged > 1
             ? ` (₹${entryCharge.feePerPlayer} × ${entryCharge.playersCharged} players)`
             : ''}{' '}
-          will be paid by the team captain.
+          will be paid by the captain.
         </Text>
         {players.slice(0, 4).map((player, index) => (
           <View key={`confirm-${index}`} style={styles.confirmRow}>

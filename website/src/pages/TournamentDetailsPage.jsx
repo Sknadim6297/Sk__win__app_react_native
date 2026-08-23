@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useFetch } from '../hooks/useFetch';
 import {
   bannerOf,
+  formatName,
   inr,
   modeName,
   parseRules,
@@ -26,7 +27,7 @@ export default function TournamentDetailsPage() {
 
   return (
     <>
-      <Seo title={t?.name || 'Tournament'} description={t ? `${t.name} — ${modeName(t)}` : 'WAREZONE match details'} />
+      <Seo title={t?.name || 'Tournament'} description={t ? `${t.name} — ${formatName(t)}` : 'WAREZONE match details'} />
       <section className="page-hero">
         <div className="container">
           {loading && <div className="skeleton" style={{ minHeight: 280 }} />}
@@ -40,11 +41,16 @@ export default function TournamentDetailsPage() {
                   </span>
                   <h1 style={{ marginTop: 12 }}>{t.name}</h1>
                   <p className="muted">
-                    Match #{t.matchNumber || '—'} · {modeName(t)} {t.formatLabel ? `· ${t.formatLabel}` : ''}
+                    Match #{t.matchNumber || '—'} · {modeName(t)} · {formatName(t)}
+                    {t.map ? ` · ${t.map}` : ''}
                   </p>
                 </div>
               </div>
               <div className="stat-grid">
+                <div className="stat">
+                  <span>Format</span>
+                  <strong>{formatName(t)}</strong>
+                </div>
                 <div className="stat">
                   <span>Prize pool</span>
                   <strong className="prize">₹{inr(prizePool(t))}</strong>
@@ -96,7 +102,7 @@ export default function TournamentDetailsPage() {
                 )}
               </div>
               <p className="dim" style={{ marginTop: 10, fontSize: 13 }}>
-                Room ID and password stay inside the WAREZONE app / web app after you join.
+                Match ID and password are shown only inside the WAREZONE app after you join this match.
               </p>
             </>
           )}

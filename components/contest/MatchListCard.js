@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS } from '../../styles/theme';
 import { PAGE } from '../../styles/pageTheme';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
-import { getMatchStructure } from '../../utils/tournamentHelpers';
+import { getMatchStructure, toPlayerMatchLabel } from '../../utils/tournamentHelpers';
 import { StatTriple, useTimeLeft } from './ContestShared';
 
 const DEFAULT_BANNER = require('../../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
@@ -13,6 +13,10 @@ function getMatchNumber(item) {
   if (item.matchNumber) return item.matchNumber;
   const id = String(item._id || item.id || '');
   return 10000 + (parseInt(id.slice(-6), 16) % 80000);
+}
+
+function toPlayerMode(item, structure) {
+  return toPlayerMatchLabel(item.gameMode?.name || structure.matchType || 'Match').toUpperCase();
 }
 
 export default function MatchListCard({ item, gameModeImage, onPress }) {
@@ -27,11 +31,13 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
   const isJoinOpen = lifecycleStatus === 'upcoming' || lifecycleStatus === 'incoming';
   const isJoined = Boolean(item.userJoined);
   const timeLeft = useTimeLeft(item.startDate);
-  const modeName =
-    structure.formatLabel === 'Battle Royale'
-      ? structure.modeLabel.toUpperCase()
-      : structure.formatLabel;
-  const typeLabel = Number(item.entryFee) > 0 ? 'PAID' : 'FREE';
+  const paidFree = Number(item.entryFee) > 0 ? 'Paid' : 'Free';
+  /** Admin-created game mode name (e.g. LONE WOLF) — same as Mode on details */
+  const adminMatchType = toPlayerMode(item, structure);
+  const teamFormat = (structure.playerFormatLabel || structure.modeLabel || 'Solo').toUpperCase();
+  const mapName = (item.map || 'BERMUDA').toUpperCase();
+  const entryPerPlayer = item.entryFee ?? 0;
+  const hasPerKill = Boolean(structure.hasKillRewards) && Number(item.perKill) > 0;
 
   const bannerUri = item.bannerImage
     ? resolveMediaUrl(item.bannerImage)
@@ -44,7 +50,7 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
     ? 'JOINED'
     : !isJoinOpen
       ? lifecycleStatus === 'ongoing' || lifecycleStatus === 'live'
-        ? 'LIVE'
+        ? 'ONGOING'
         : lifecycleStatus === 'completed' || lifecycleStatus === 'result_published'
           ? 'COMPLETED'
           : String(lifecycleStatus || 'CLOSED').toUpperCase()
@@ -53,6 +59,31 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
         : 'Join Match';
 
   const ctaDisabled = isJoined || !isJoinOpen || full;
+
+  // Same fields as Match Details: Prize → Per Kill (if any) → Type → Team → Entry → Map → Match Type
+  const topStats = hasPerKill
+    ? [
+        { label: 'PRIZE POOL', value: item.prizePool ?? 0, coin: true },
+        { label: 'PER KILL', value: item.perKill ?? 0, coin: true },
+        { label: 'TYPE', value: adminMatchType },
+      ]
+    : [
+        { label: 'PRIZE POOL', value: item.prizePool ?? 0, coin: true },
+        { label: 'TYPE', value: adminMatchType },
+        { label: 'ENTRY / PLAYER', value: entryPerPlayer, coin: true },
+      ];
+
+  const bottomStats = hasPerKill
+    ? [
+        { label: 'TEAM', value: teamFormat },
+        { label: 'ENTRY / PLAYER', value: entryPerPlayer, coin: true },
+        { label: 'MAP', value: mapName },
+      ]
+    : [
+        { label: 'TEAM', value: teamFormat },
+        { label: 'MATCH TYPE', value: paidFree.toUpperCase() },
+        { label: 'MAP', value: mapName },
+      ];
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.92} onPress={() => onPress(item)}>
@@ -65,31 +96,12 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
 
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>
-          {item.name || 'Tournament'} #{matchNo}
+          {item.name || 'Tournament'} - ID#{matchNo}
         </Text>
         <Text style={styles.timeLine}>Time Left : {timeLeft}</Text>
 
-        <StatTriple
-          items={[
-            { label: 'PRIZE POOL', value: item.prizePool ?? 0, coin: true },
-            structure.hasKillRewards
-              ? { label: 'PER KILL', value: item.perKill ?? 0, coin: true }
-              : { label: 'FORMAT', value: structure.formatLabel },
-            { label: 'ENTRY FEE', value: item.entryFee ?? 0, coin: true },
-          ]}
-        />
-
-        <StatTriple
-          items={[
-            { label: 'TYPE', value: modeName },
-            {
-              label: 'ENTRY / PLAYER',
-              value: item.entryFee ?? 0,
-              coin: true,
-            },
-            { label: 'MAP', value: (item.map || 'BERMUDA').toUpperCase() },
-          ]}
-        />
+        <StatTriple items={topStats} />
+        <StatTriple items={bottomStats} />
 
         <View style={styles.spotRow}>
           <View style={styles.spotBlock}>
@@ -114,7 +126,7 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
         </View>
 
         <View style={styles.ctaRow}>
-          <Text style={styles.matchType}>{typeLabel}</Text>
+          <Text style={styles.matchType}>{paidFree.toUpperCase()}</Text>
           <TouchableOpacity
             style={[
               styles.joinBtn,

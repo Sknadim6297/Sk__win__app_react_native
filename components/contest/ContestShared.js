@@ -35,12 +35,26 @@ export function TimeLeftBar({ startDate }) {
   );
 }
 
-export function InfoCell({ label, value, coin, flex }) {
+export function InfoCell({ label, value, coin, flex, inline }) {
+  if (inline) {
+    return (
+      <View style={[styles.infoCell, styles.infoCellInline, flex != null && { flex }]}>
+        <Text style={styles.infoLabelInline}>{label}: </Text>
+        {coin ? (
+          <CoinValue value={value} size={16} color={PAGE.gold} />
+        ) : (
+          <Text style={styles.infoValueInline} numberOfLines={2}>
+            {value}
+          </Text>
+        )}
+      </View>
+    );
+  }
   return (
     <View style={[styles.infoCell, flex != null && { flex }]}>
-      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoLabel}>{label}:</Text>
       {coin ? (
-        <CoinValue value={value} size={15} color={COLORS.white} />
+        <CoinValue value={value} size={16} color={PAGE.gold} />
       ) : (
         <Text style={styles.infoValue} numberOfLines={2}>
           {value}
@@ -51,10 +65,12 @@ export function InfoCell({ label, value, coin, flex }) {
 }
 
 export function StatTriple({ items }) {
+  const list = (items || []).filter(Boolean);
+  if (!list.length) return null;
   return (
     <View style={styles.triple}>
-      {items.map((item, i) => (
-        <View key={item.label} style={styles.tripleCol}>
+      {list.map((item, i) => (
+        <View key={`${item.label}-${i}`} style={styles.tripleCol}>
           <Text style={styles.tripleLabel}>{item.label}</Text>
           {item.coin ? (
             <CoinValue value={item.value} size={16} color={PAGE.gold} />
@@ -63,7 +79,7 @@ export function StatTriple({ items }) {
               {item.value}
             </Text>
           )}
-          {i < items.length - 1 ? <View style={styles.tripleRule} /> : null}
+          {i < list.length - 1 ? <View style={styles.tripleRule} /> : null}
         </View>
       ))}
     </View>
@@ -102,15 +118,33 @@ const styles = StyleSheet.create({
     minHeight: 58,
     justifyContent: 'center',
   },
+  infoCellInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    minHeight: 48,
+    paddingVertical: 12,
+  },
   infoLabel: {
     ...TEXT.caption,
-    color: PAGE.cyan,
+    color: PAGE.muted,
     marginBottom: 4,
+  },
+  infoLabelInline: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: PAGE.muted,
   },
   infoValue: {
     fontFamily: FONTS.bold,
     fontSize: 13,
     color: COLORS.white,
+  },
+  infoValueInline: {
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: COLORS.white,
+    flexShrink: 1,
   },
   triple: {
     flexDirection: 'row',

@@ -99,7 +99,7 @@ const AdminUI = (() => {
 
   function statusLabel(status) {
     const map = {
-      upcoming: 'Upcoming', incoming: 'Upcoming', ongoing: 'Live', live: 'Live',
+      upcoming: 'Upcoming', incoming: 'Upcoming', ongoing: 'Ongoing', live: 'Ongoing',
       completed: 'Completed', result_published: 'Results published', draft: 'Draft',
       cancelled: 'Cancelled', paid: 'Paid', pending: 'Pending', available: 'Available',
       joined: 'Joined', active: 'Active', banned: 'Banned', suspended: 'Suspended',

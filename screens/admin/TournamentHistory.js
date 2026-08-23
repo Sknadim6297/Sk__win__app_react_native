@@ -152,7 +152,7 @@ export default function TournamentHistory({ navigation }) {
           <Text style={styles.statValue}>
             {tournaments.filter((t) => t.status === 'ongoing' || t.status === 'live').length}
           </Text>
-          <Text style={styles.statLabel}>Live</Text>
+          <Text style={styles.statLabel}>Ongoing</Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
@@ -172,7 +172,7 @@ export default function TournamentHistory({ navigation }) {
         {[
           { key: 'all', label: 'ALL' },
           { key: 'completed', label: 'DONE' },
-          { key: 'ongoing', label: 'LIVE' },
+          { key: 'ongoing', label: 'ONGOING' },
           { key: 'incoming', label: 'UPCOMING' },
         ].map((tab) => (
           <TouchableOpacity

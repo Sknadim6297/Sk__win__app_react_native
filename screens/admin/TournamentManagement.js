@@ -31,29 +31,32 @@ const GAME_MODES = [
   { label: 'Solo', value: 'solo', teamSize: 1 },
   { label: 'Duo', value: 'duo', teamSize: 2 },
   { label: 'Squad', value: 'squad', teamSize: 4 },
+  { label: 'Team', value: 'team', teamSize: 4 },
 ];
 
 const CUSTOM_GAME_MODES = [
-  { label: '1v1', value: 'solo', teamSize: 1 },
-  { label: '2v2', value: 'duo', teamSize: 2 },
-  { label: '4v4', value: 'squad', teamSize: 4 },
+  { label: 'Solo', value: 'solo', teamSize: 1 },
+  { label: 'Duo', value: 'duo', teamSize: 2 },
+  { label: 'Squad', value: 'squad', teamSize: 4 },
+  { label: 'Team', value: 'team', teamSize: 4 },
 ];
 
 const MODE_MAX_PLAYERS = {
   solo: 50,
   duo: 50,
   squad: 50,
+  team: 50,
 };
 
 const TOURNAMENT_CATEGORIES = [
-  { label: 'Battle Royale', value: 'battle_royale', description: 'Full map · Solo / Duo / Squad · up to 50 slots · per-kill rewards' },
-  { label: 'Clash Squad', value: 'custom', description: 'Team vs team · 1v1 / 2v2 / 4v4 · entry fee per player · captain pays roster total · no kill rewards' },
+  { label: 'Battle Royale', value: 'battle_royale', description: 'Full map · Solo / Duo / Squad / Team · up to 50 slots · per-kill rewards' },
+  { label: 'Clash Squad', value: 'custom', description: 'Team vs team · Solo / Duo / Squad / Team · entry fee per player · captain pays roster total · no kill rewards' },
 ];
 
 const MATCH_STATUSES = [
   { label: 'Draft', value: 'draft' },
   { label: 'Upcoming', value: 'upcoming' },
-  { label: 'Live', value: 'ongoing' },
+  { label: 'Ongoing', value: 'ongoing' },
   { label: 'Completed', value: 'completed' },
 ];
 
@@ -61,8 +64,8 @@ const STATUS_LABELS = {
   draft: 'DRAFT',
   upcoming: 'UPCOMING',
   incoming: 'UPCOMING',
-  ongoing: 'LIVE',
-  live: 'LIVE',
+  ongoing: 'ONGOING',
+  live: 'ONGOING',
   locked: 'UPCOMING',
   completed: 'COMPLETED',
   result_published: 'COMPLETED',
@@ -144,8 +147,15 @@ const TournamentManagement = ({ navigation }) => {
     const isCustom = (form.category || form.tournamentType) === 'custom';
     if (isCustom) {
       const customMode =
-        form.mode === 'squad' ? 'squad' : form.mode === 'duo' ? 'duo' : 'solo';
-      const perTeam = customMode === 'squad' ? 4 : customMode === 'duo' ? 2 : 1;
+        form.mode === 'team'
+          ? 'team'
+          : form.mode === 'squad'
+            ? 'squad'
+            : form.mode === 'duo'
+              ? 'duo'
+              : 'solo';
+      const perTeam =
+        customMode === 'squad' || customMode === 'team' ? 4 : customMode === 'duo' ? 2 : 1;
       const nextMax = String(perTeam * 2);
       setForm((prev) => {
         if (
@@ -308,7 +318,7 @@ const TournamentManagement = ({ navigation }) => {
 
   const getTeamSizeFromMode = (mode) => {
     if (mode === 'duo') return 2;
-    if (mode === 'squad') return 4;
+    if (mode === 'squad' || mode === 'team') return 4;
     return 1;
   };
 
@@ -1693,27 +1703,27 @@ const TournamentManagement = ({ navigation }) => {
               {/* Room Credentials Section */}
               <View style={styles.sectionDivider}>
                 <MaterialCommunityIcons name="key" size={20} color={COLORS.accent} />
-                <Text style={styles.sectionDividerText}>Room Credentials</Text>
+                <Text style={styles.sectionDividerText}>Match ID & Password</Text>
               </View>
 
               <View style={styles.formRow}>
                 <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                  <Text style={styles.label}>Room ID</Text>
+                  <Text style={styles.label}>Match ID</Text>
                   <TextInput
                     style={styles.input}
                     value={form.roomId}
                     onChangeText={(text) => setForm(prev => ({ ...prev, roomId: text }))}
-                    placeholder="Enter room ID"
+                    placeholder="Enter Match ID"
                     placeholderTextColor={COLORS.gray}
                   />
                 </View>
                 <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                  <Text style={styles.label}>Room Password</Text>
+                  <Text style={styles.label}>Password</Text>
                   <TextInput
                     style={styles.input}
                     value={form.roomPassword}
                     onChangeText={(text) => setForm(prev => ({ ...prev, roomPassword: text }))}
-                    placeholder="Enter room password"
+                    placeholder="Enter password"
                     placeholderTextColor={COLORS.gray}
                   />
                 </View>
@@ -1722,7 +1732,7 @@ const TournamentManagement = ({ navigation }) => {
               <View style={styles.formGroup}>
                 <View style={styles.switchRow}>
                   <MaterialCommunityIcons name="eye" size={20} color={COLORS.accent} />
-                  <Text style={styles.switchLabel}>Show Room Credentials to Players</Text>
+                  <Text style={styles.switchLabel}>Show to joined players only</Text>
                   <Switch
                     value={form.showRoomCredentials}
                     onValueChange={(value) => setForm(prev => ({ ...prev, showRoomCredentials: value }))}
@@ -1760,7 +1770,7 @@ const TournamentManagement = ({ navigation }) => {
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                Room Credentials - {selectedTournamentForRoom?.name}
+                Match ID & Password - {selectedTournamentForRoom?.name}
               </Text>
               <TouchableOpacity onPress={() => setShowRoomModal(false)}>
                 <Ionicons name="close" size={24} color={COLORS.white} />
@@ -1768,29 +1778,29 @@ const TournamentManagement = ({ navigation }) => {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Room ID</Text>
+              <Text style={styles.label}>Match ID</Text>
               <TextInput
                 style={styles.input}
                 value={roomForm.roomId}
                 onChangeText={(text) => setRoomForm(prev => ({ ...prev, roomId: text }))}
-                placeholder="Enter room ID"
+                placeholder="Enter Match ID"
                 placeholderTextColor={COLORS.gray}
               />
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Room Password</Text>
+              <Text style={styles.label}>Password</Text>
               <TextInput
                 style={styles.input}
                 value={roomForm.roomPassword}
                 onChangeText={(text) => setRoomForm(prev => ({ ...prev, roomPassword: text }))}
-                placeholder="Enter room password"
+                placeholder="Enter password"
                 placeholderTextColor={COLORS.gray}
               />
             </View>
 
             <Text style={styles.helperText}>
-              Players see Room ID & Password automatically 2 minutes before match start. You can update these anytime.
+              Players who joined see Match ID & Password automatically 2 minutes before match start (or sooner if you force-show). Non-joined users never see them.
             </Text>
 
             <View style={styles.formGroup}>
@@ -1817,7 +1827,7 @@ const TournamentManagement = ({ navigation }) => {
             <View style={styles.roomStatusSection}>
               <Text style={styles.roomStatusTitle}>Current Status:</Text>
               <View style={styles.roomStatusItem}>
-                <Text style={styles.roomStatusLabel}>Room ID:</Text>
+                <Text style={styles.roomStatusLabel}>Match ID:</Text>
                 <Text style={[styles.roomStatusValue, !roomForm.roomId && styles.roomStatusEmpty]}>
                   {roomForm.roomId || 'Not set'}
                 </Text>

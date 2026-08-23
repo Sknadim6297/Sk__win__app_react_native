@@ -19,8 +19,8 @@ const STATUS_LABELS = {
   draft: 'Draft',
   upcoming: 'Upcoming',
   incoming: 'Upcoming',
-  ongoing: 'Live',
-  live: 'Live',
+  ongoing: 'Ongoing',
+  live: 'Ongoing',
   completed: 'Completed',
   result_published: 'Completed',
   cancelled: 'Cancelled',
@@ -34,7 +34,7 @@ const TYPE_LABELS = {
 
 const SECTION_ORDER = [
   { key: 'upcoming', title: 'Upcoming', statuses: ['upcoming', 'incoming'] },
-  { key: 'ongoing', title: 'Live', statuses: ['ongoing', 'live'] },
+  { key: 'ongoing', title: 'Ongoing', statuses: ['ongoing', 'live'] },
   { key: 'completed', title: 'Completed', statuses: ['completed', 'result_published'] },
   { key: 'draft', title: 'Draft', statuses: ['draft'] },
   { key: 'cancelled', title: 'Cancelled', statuses: ['cancelled'] },

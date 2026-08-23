@@ -202,16 +202,16 @@ async function getTeamCount(tournamentId) {
   return Team.countDocuments({ tournamentId, status: 'registered' });
 }
 
-/** Custom Match or BR Duo/Squad — captain registers a full roster (pays fee × players). */
+/** Custom Match or BR Duo/Squad/Team — captain registers a full roster (pays fee × players). */
 function usesTeamRegistration(tournament) {
   if (isCustomMatch(tournament)) return true;
   const m = String(tournament.mode || 'solo').toLowerCase();
-  return m === 'duo' || m === 'squad';
+  return m === 'duo' || m === 'squad' || m === 'team';
 }
 
 function getPlayersPerTeam(mode) {
   const m = String(mode || 'solo').toLowerCase();
-  if (m === 'squad') return 4;
+  if (m === 'squad' || m === 'team') return 4;
   if (m === 'duo') return 2;
   return 1;
 }
@@ -225,8 +225,8 @@ function resolveTournamentCapacity({ category, mode, maxParticipants, maxTeams }
   const perTeam = getPlayersPerTeam(modeNorm);
 
   if (isCustom) {
-    if (!['solo', 'duo', 'squad'].includes(modeNorm)) {
-      return { ok: false, error: 'Clash Squad supports Solo, Duo, or Squad only' };
+    if (!['solo', 'duo', 'squad', 'team'].includes(modeNorm)) {
+      return { ok: false, error: 'Clash Squad supports Solo, Duo, Squad, or Team only' };
     }
     return {
       ok: true,
@@ -239,8 +239,8 @@ function resolveTournamentCapacity({ category, mode, maxParticipants, maxTeams }
   }
 
   // Battle Royale
-  if (!['solo', 'duo', 'squad'].includes(modeNorm)) {
-    return { ok: false, error: 'Battle Royale supports Solo, Duo, or Squad only' };
+  if (!['solo', 'duo', 'squad', 'team'].includes(modeNorm)) {
+    return { ok: false, error: 'Battle Royale supports Solo, Duo, Squad, or Team only' };
   }
   const players = BR_MAX_PLAYERS;
   const teams =
@@ -291,6 +291,8 @@ async function getJoinStats(tournamentId, tournament) {
       usesTeams: true,
       matchKind: structure.kind,
       formatLabel: structure.formatLabel,
+      playerFormatLabel: structure.playerFormatLabel,
+      modeLabel: structure.modeLabel,
     };
   }
 
@@ -303,6 +305,8 @@ async function getJoinStats(tournamentId, tournament) {
     usesTeams: false,
     matchKind: structure.kind,
     formatLabel: structure.formatLabel,
+    playerFormatLabel: structure.playerFormatLabel,
+    modeLabel: structure.modeLabel,
   };
 }
 
@@ -336,7 +340,7 @@ function getRoomCredentialsVisibility(tournament, { userJoined = false } = {}) {
       visible: false,
       hasCredentials: false,
       message: userJoined
-        ? 'Please wait. Room details will be available 2 minutes before the match starts.'
+        ? 'Please wait. Match ID and password will be available 2 minutes before the match starts.'
         : null,
       unlockAt: tournament.startDate
         ? new Date(new Date(tournament.startDate).getTime() - ROOM_VISIBLE_BEFORE_MS)
@@ -366,7 +370,7 @@ function getRoomCredentialsVisibility(tournament, { userJoined = false } = {}) {
   return {
     visible: false,
     hasCredentials: true,
-    message: 'Please wait. Room details will be available 2 minutes before the match starts.',
+    message: 'Please wait. Match ID and password will be available 2 minutes before the match starts.',
     unlockAt,
   };
 }

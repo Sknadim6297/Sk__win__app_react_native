@@ -169,7 +169,7 @@ const TournamentScreen = ({ navigation }) => {
     const start = new Date(startDate);
     const diff = start - now;
 
-    if (diff < 0) return 'Live';
+    if (diff < 0) return 'Ongoing';
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);

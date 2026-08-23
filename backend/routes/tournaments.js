@@ -40,6 +40,21 @@ function parseRulesInput(rules) {
   return lines.flatMap((line) => String(line).split(/\r?\n/)).map((line) => line.trim()).filter(Boolean);
 }
 
+/** Never leak Match ID / Password on public list payloads. */
+function omitRoomSecrets(doc = {}) {
+  const {
+    roomId: _roomId,
+    roomPassword: _roomPassword,
+    ...rest
+  } = doc;
+  return {
+    ...rest,
+    roomId: null,
+    roomPassword: null,
+    hasRoomCredentials: !!(String(_roomId || '').trim() || String(_roomPassword || '').trim()),
+  };
+}
+
 const getEntryPaymentSplit = (user, entryFee) => {
   const fee = Number(entryFee) || 0;
   const bonusBalance = Number(user?.wallet?.bonusBalance) || 0;
@@ -1243,7 +1258,7 @@ router.get('/list', async (req, res) => {
         const publicStatus = toPublicStatus(tournament);
         const publicRules = parseRulesInput(doc.rules);
         return {
-          ...doc,
+          ...omitRoomSecrets(doc),
           rules: publicRules.length ? publicRules : DEFAULT_MATCH_RULES,
           matchNumber: resolveMatchNumber(doc),
           currentParticipants: joinStats.joinedCount,
@@ -1254,6 +1269,7 @@ router.get('/list', async (req, res) => {
           matchKind: structure.kind,
           matchType: structure.matchType,
           formatLabel: structure.formatLabel,
+          playerFormatLabel: structure.playerFormatLabel,
           modeLabel: structure.modeLabel,
           hasKillRewards: structure.hasKillRewards,
           isCustomMatch: lifecycle.isCustomMatch(tournament),
@@ -1365,7 +1381,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
     const startMs = new Date(tournament.startDate).getTime() - Date.now();
 
     res.json({
-      ...doc,
+      ...omitRoomSecrets(doc),
       rules: publicRules.length ? publicRules : DEFAULT_MATCH_RULES,
       matchNumber: resolveMatchNumber(doc),
       status: calculatedStatus,
@@ -1375,6 +1391,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
       matchKind: structure.kind,
       matchType: structure.matchType,
       formatLabel: structure.formatLabel,
+      playerFormatLabel: structure.playerFormatLabel,
       modeLabel: structure.modeLabel,
       hasKillRewards: structure.hasKillRewards,
       usesSlotGrid: structure.usesSlotGrid,
@@ -1531,7 +1548,7 @@ router.get('/my-tournaments', authMiddleware, async (req, res) => {
       const doc = tournament.toObject ? tournament.toObject() : { ...tournament };
       const publicStatus = toPublicStatus(tournament);
       myTournaments.push({
-        ...doc,
+        ...omitRoomSecrets(doc),
         status: publicStatus,
         lifecycleStatus: effective,
         displayStatus: effective === 'ongoing' ? 'live' : publicStatus,
@@ -1832,7 +1849,7 @@ router.get('/:id/room-info', authMiddleware, async (req, res) => {
       return res.status(400).json({
         error:
           visibility.message ||
-          'Please wait. Room details will be available 2 minutes before the match starts.',
+          'Please wait. Match ID and password will be available 2 minutes before the match starts.',
         unlockAt: visibility.unlockAt,
       });
     }

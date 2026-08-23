@@ -20,8 +20,8 @@ import MatchListCard from '../components/contest/MatchListCard';
 import { toPlayerMatchLabel } from '../utils/tournamentHelpers';
 
 const STATUS_TABS = [
-  { id: 'ongoing', label: 'LIVE' },
   { id: 'upcoming', label: 'UPCOMING' },
+  { id: 'ongoing', label: 'ONGOING' },
   { id: 'completed', label: 'COMPLETED' },
 ];
 

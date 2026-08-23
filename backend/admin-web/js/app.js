@@ -49,10 +49,14 @@ const App = (() => {
   }
 
   function formatLabel(row) {
+    if (row.playerFormatLabel) return row.playerFormatLabel;
+    if (row.modeLabel && /^(Solo|Duo|Squad|Team)$/i.test(String(row.modeLabel))) return row.modeLabel;
+    const mode = String(row.mode || '').toLowerCase();
+    if (mode === 'solo') return 'Solo';
+    if (mode === 'duo') return 'Duo';
+    if (mode === 'squad') return 'Squad';
+    if (mode === 'team') return 'Team';
     if (row.formatLabel) return row.formatLabel;
-    if (isCustom(row)) {
-      return row.mode === 'squad' ? '4v4' : row.mode === 'duo' ? '2v2' : '1v1';
-    }
     return row.modeLabel || row.mode || '—';
   }
 
@@ -78,14 +82,16 @@ const App = (() => {
     const custom = category === 'custom' || category === 'custom_match';
     const opts = custom
       ? [
-        ['solo', '1v1 — Solo (1 player per side)'],
-        ['duo', '2v2 — Duo (2 players per side)'],
-        ['squad', '4v4 — Squad (4 players per side)'],
+        ['solo', 'Solo — 1v1 (1 player per side)'],
+        ['duo', 'Duo — 2v2 (2 players per side)'],
+        ['squad', 'Squad — 4v4 (4 players per side)'],
+        ['team', 'Team — 4 players per side'],
       ]
       : [
         ['solo', 'Solo — 50 individual players'],
         ['duo', 'Duo — 25 teams of 2'],
         ['squad', 'Squad — 12 teams of 4'],
+        ['team', 'Team — 12 teams of 4'],
       ];
     return opts.map(([value, label]) =>
       `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`
@@ -176,7 +182,7 @@ const App = (() => {
         <div class="card card-pad">
           <h3 style="margin:0 0 14px">Tournament performance</h3>
           <div class="bars">
-            ${[['Upcoming', t.upcoming], ['Live', t.live], ['Completed', t.completed]].map(([label, n]) => `
+            ${[['Upcoming', t.upcoming], ['Ongoing', t.live], ['Completed', t.completed]].map(([label, n]) => `
               <div class="bar-row"><span>${label}</span><div class="bar"><span style="width:${Math.round((Number(n || 0) / maxCount) * 100)}%"></span></div><b>${n || 0}</b></div>
             `).join('')}
           </div>
@@ -366,7 +372,7 @@ const App = (() => {
           <option value="">All status</option>
           <option value="draft">Draft</option>
           <option value="upcoming">Upcoming</option>
-          <option value="live">Live</option>
+          <option value="live">Ongoing</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>
         </select>
@@ -376,10 +382,11 @@ const App = (() => {
           <option value="battle_royale">Battle Royale</option>
         </select>
         <select id="t-mode">
-          <option value="">Mode</option>
-          <option value="solo">Solo / 1v1</option>
-          <option value="duo">Duo / 2v2</option>
-          <option value="squad">Squad / 4v4</option>
+          <option value="">Format</option>
+          <option value="solo">Solo</option>
+          <option value="duo">Duo</option>
+          <option value="squad">Squad</option>
+          <option value="team">Team</option>
         </select>
         <input id="t-from" type="date" value="${AdminUI.esc(params.from || '')}" />
         <input id="t-to" type="date" value="${AdminUI.esc(params.to || '')}" />
@@ -515,14 +522,14 @@ const App = (() => {
           </div>
 
           <div class="form-section">
-            <h3>Room credentials</h3>
-            <p>Optional now. You can add or share them later from the Room tab.</p>
+            <h3>Match ID &amp; Password</h3>
+            <p>Optional now. Only players who have <b>joined this match</b> can see these (when unlocked or force-shown). Non-joined users never see them.</p>
           </div>
-          <div class="field"><label>Room ID</label><input name="roomId" value="${AdminUI.esc(t.roomId || '')}" placeholder="Game room ID" /></div>
-          <div class="field"><label>Room password</label><input name="roomPassword" value="${AdminUI.esc(t.roomPassword || '')}" placeholder="Room password" /></div>
+          <div class="field"><label>Match ID</label><input name="roomId" value="${AdminUI.esc(t.roomId || '')}" placeholder="Game Match / Room ID" /></div>
+          <div class="field"><label>Password</label><input name="roomPassword" value="${AdminUI.esc(t.roomPassword || '')}" placeholder="Match password" /></div>
           <div class="field full"><label style="display:flex;gap:8px;align-items:center;font-weight:600">
             <input type="checkbox" name="showRoomCredentials" ${t.showRoomCredentials ? 'checked' : ''} />
-            Show room ID and password to joined players
+            Show Match ID and Password to joined players now
           </label></div>
           ${id ? '' : `<div class="field full"><label style="display:flex;gap:8px;align-items:center;font-weight:600">
             <input type="checkbox" name="publishNow" value="true" checked />
@@ -550,10 +557,10 @@ const App = (() => {
       const selected = format.value || t.mode || 'solo';
       format.innerHTML = formatOptions(cat, selected);
       document.getElementById('kill-wrap').style.display = cat === 'battle_royale' ? '' : 'none';
-      document.getElementById('f-format-label').textContent = cat === 'custom' ? 'Format (team size)' : 'Mode';
+      document.getElementById('f-format-label').textContent = 'Format';
       document.getElementById('f-format-help').textContent = cat === 'custom'
-        ? 'Clash Squad is always Team A vs Team B. Choose 1v1, 2v2 or 4v4.'
-        : 'Battle Royale: Solo players, Duo teams, or Squad teams on a slot grid.';
+        ? 'Shown on Match Details as Solo, Duo, Squad, or Team. Clash Squad is Team A vs Team B.'
+        : 'Shown on Match Details as Solo, Duo, Squad, or Team.';
     };
     fillModes();
     syncMatchType();
@@ -631,11 +638,11 @@ const App = (() => {
     const gameName = t.game?.name || '—';
     const gameModeName = t.gameMode?.name || '—';
     const bannerSrc = AdminUI.mediaUrl(t.bannerImage || t.gameMode?.image || t.game?.image || '');
-    const format = detail.formatLabel || formatLabel(t);
+    const format = detail.playerFormatLabel || detail.modeLabel || formatLabel(t);
     const modeLabel = modeDisplay(detail, t, custom);
     const teamSetup = detail.teamSetup || (custom ? 'Team A vs Team B' : usesTeams ? `${modeLabel} teams` : 'Solo — individual slots');
     const joinUnit = 'player';
-    const ppt = Number(detail.playersPerTeam || detail.playersCharged || (t.mode === 'squad' ? 4 : t.mode === 'duo' ? 2 : 1));
+    const ppt = Number(detail.playersPerTeam || detail.playersCharged || (t.mode === 'squad' || t.mode === 'team' ? 4 : t.mode === 'duo' ? 2 : 1));
     const feePerPlayer = Number(detail.feePerPlayer ?? t.entryFee ?? 0);
     const teamTotal = Number(detail.entryChargeTotal ?? (custom || usesTeams ? feePerPlayer * ppt : feePerPlayer));
     const entryFeeDisplay =
@@ -674,9 +681,8 @@ const App = (() => {
           : `<div class="banner-fallback">${AdminUI.esc(t.bannerTitle || t.name || 'Match banner')}</div>`}
       </div>
       <div class="info-grid">
-        ${infoCell('Match type', AdminUI.esc(displayMatchType(detail)))}
-        ${infoCell(custom ? 'Format' : 'Mode', AdminUI.esc(custom ? format : modeLabel))}
-        ${infoCell(custom ? 'Team size' : 'Play style', AdminUI.esc(custom ? modeLabel : teamSetup))}
+        ${infoCell('Format', AdminUI.esc(format))}
+        ${infoCell('Mode', AdminUI.esc(displayMatchType(detail)))}
         ${infoCell('Map', AdminUI.esc((t.map || 'Bermuda').toString()))}
         ${infoCell('Game', AdminUI.esc(gameName))}
         ${infoCell('Game mode', AdminUI.esc(gameModeName))}
@@ -722,14 +728,14 @@ const App = (() => {
           <dt>Match ID</dt><dd>#${AdminUI.esc(t.matchNumber || t._id || '—')}</dd>
           <dt>Status</dt><dd>${badge(detail.status)}</dd>
           <dt>Match type</dt><dd>${AdminUI.esc(displayMatchType(detail))}</dd>
-          <dt>${custom ? 'Format' : 'Mode'}</dt><dd>${AdminUI.esc(custom ? format : modeLabel)}</dd>
+          <dt>Format</dt><dd>${AdminUI.esc(format)}</dd>
           <dt>Map</dt><dd>${AdminUI.esc(t.map || '—')}</dd>
           <dt>Game</dt><dd>${AdminUI.esc(gameName)}</dd>
           <dt>Game mode</dt><dd>${AdminUI.esc(gameModeName)}</dd>
           <dt>Banner title</dt><dd>${AdminUI.esc(t.bannerTitle || '—')}</dd>
-          <dt>Room ID</dt><dd>${AdminUI.esc(t.roomId || 'Not set')}</dd>
-          <dt>Room password</dt><dd>${t.roomPassword ? '••••••' : 'Not set'}</dd>
-          <dt>Room visible to players</dt><dd>${t.showRoomCredentials ? 'Yes' : 'No'}</dd>
+          <dt>Match ID (room)</dt><dd>${AdminUI.esc(t.roomId || 'Not set')}</dd>
+          <dt>Password</dt><dd>${t.roomPassword ? '••••••' : 'Not set'}</dd>
+          <dt>Credentials for joined players</dt><dd>${t.showRoomCredentials ? 'Forced visible' : 'Auto (2 min before start)'}</dd>
           <dt>Locked</dt><dd>${t.locked ? 'Yes' : 'No'}</dd>
           <dt>Results published</dt><dd>${detail.resultsPublished ? 'Yes' : 'No'}</dd>
         </dl>
@@ -799,12 +805,13 @@ const App = (() => {
 
     const roomHtml = `
       <div class="form-card" style="max-width:640px">
+        <p style="color:var(--text-2);font-size:13px;margin:0 0 12px">Match ID and Password are visible only to players who joined this match. Non-joined users never see them. Auto-unlock is 2 minutes before start unless you force-show below.</p>
         <div class="form-grid">
-          <div class="field"><label>Room ID</label><input id="room-id" value="${AdminUI.esc(t.roomId || '')}" /></div>
-          <div class="field"><label>Room password</label><input id="room-pw" value="${AdminUI.esc(t.roomPassword || '')}" /></div>
-          <div class="field full"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="room-show" ${t.showRoomCredentials ? 'checked' : ''} /> Show credentials to players</label></div>
+          <div class="field"><label>Match ID</label><input id="room-id" value="${AdminUI.esc(t.roomId || '')}" /></div>
+          <div class="field"><label>Password</label><input id="room-pw" value="${AdminUI.esc(t.roomPassword || '')}" /></div>
+          <div class="field full"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="room-show" ${t.showRoomCredentials ? 'checked' : ''} /> Show Match ID &amp; Password to joined players now</label></div>
         </div>
-        <button class="btn btn-primary" id="save-room" style="margin-top:12px">Save room details</button>
+        <button class="btn btn-primary" id="save-room" style="margin-top:12px">Save match credentials</button>
       </div>`;
 
     const resultsHtml = `<div class="panel" id="results-panel"><div class="loading">Loading results…</div></div>`;
@@ -1025,7 +1032,7 @@ const App = (() => {
       ${AdminUI.pageHead('Tournament history', 'Closed-loop view of collections, prizes and kill rewards.')}
       <div class="filters">
         <input id="h-search" placeholder="Search tournaments..." value="${AdminUI.esc(params.search || '')}" />
-        <select id="h-status"><option value="">All status</option><option value="upcoming">Upcoming</option><option value="live">Live</option><option value="completed">Completed</option></select>
+        <select id="h-status"><option value="">All status</option><option value="upcoming">Upcoming</option><option value="live">Ongoing</option><option value="completed">Completed</option></select>
         <button class="btn btn-primary" id="h-go">Search</button>
       </div>
       <div class="card">
@@ -1949,14 +1956,14 @@ const App = (() => {
           </div>
 
           <div class="form-section">
-            <h3>Room credentials</h3>
-            <p>Optional. Copied to each generated match; you can change that day’s room later.</p>
+            <h3>Match ID &amp; Password</h3>
+            <p>Optional. Copied to each generated match. Only <b>joined</b> players can see them on Match Details.</p>
           </div>
-          <div class="field"><label>Room ID</label><input name="roomId" value="${AdminUI.esc(t.roomId || '')}" /></div>
-          <div class="field"><label>Room password</label><input name="roomPassword" value="${AdminUI.esc(t.roomPassword || '')}" /></div>
+          <div class="field"><label>Match ID</label><input name="roomId" value="${AdminUI.esc(t.roomId || '')}" /></div>
+          <div class="field"><label>Password</label><input name="roomPassword" value="${AdminUI.esc(t.roomPassword || '')}" /></div>
           <div class="field full"><label style="display:flex;gap:8px;align-items:center;font-weight:600">
             <input type="checkbox" name="showRoomCredentials" ${t.showRoomCredentials ? 'checked' : ''} />
-            Show room ID and password to joined players
+            Show Match ID and Password to joined players
           </label></div>
           <div class="field full"><label style="display:flex;gap:8px;align-items:center;font-weight:600">
             <input type="checkbox" name="isActive" ${t.isActive !== false ? 'checked' : ''} />
@@ -1987,10 +1994,10 @@ const App = (() => {
       const selected = format.value || t.mode || 'solo';
       format.innerHTML = formatOptions(cat, selected);
       document.getElementById('kill-wrap').style.display = cat === 'battle_royale' ? '' : 'none';
-      document.getElementById('f-format-label').textContent = cat === 'custom' ? 'Format (team size)' : 'Mode';
+      document.getElementById('f-format-label').textContent = 'Format';
       document.getElementById('f-format-help').textContent = cat === 'custom'
-        ? 'Clash Squad is always Team A vs Team B. Choose 1v1, 2v2 or 4v4.'
-        : 'Battle Royale: Solo, Duo, or Squad.';
+        ? 'Shown on Match Details as Solo, Duo, Squad, or Team. Clash Squad is Team A vs Team B.'
+        : 'Shown on Match Details as Solo, Duo, Squad, or Team.';
     };
     fillModes();
     syncMatchType();

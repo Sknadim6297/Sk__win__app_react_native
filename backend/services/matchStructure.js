@@ -24,13 +24,17 @@ function isBattleRoyale(tournament) {
 
 function getPlayersPerTeam(mode) {
   const m = String(mode || 'solo').toLowerCase();
-  if (m === 'squad') return 4;
+  if (m === 'squad' || m === 'team') return 4;
   if (m === 'duo') return 2;
   return 1;
 }
 
 function formatModeLabel(mode) {
   const m = String(mode || 'solo').toLowerCase();
+  if (m === 'team') return 'Team';
+  if (m === 'duo') return 'Duo';
+  if (m === 'squad') return 'Squad';
+  if (m === 'solo') return 'Solo';
   return m.charAt(0).toUpperCase() + m.slice(1);
 }
 
@@ -46,14 +50,16 @@ function getMatchStructure(tournament) {
   const mode = String(tournament?.mode || 'solo').toLowerCase();
   const playersPerTeam = getPlayersPerTeam(mode);
   const custom = isCustomMatch(tournament);
+  const playerFormatLabel = formatModeLabel(mode);
 
   if (custom) {
     return {
       kind: 'team_vs_team',
       matchType: 'Clash Squad',
       formatLabel: customFormatLabel(playersPerTeam),
+      playerFormatLabel,
       mode,
-      modeLabel: formatModeLabel(mode),
+      modeLabel: playerFormatLabel,
       playersPerTeam,
       totalSlots: 2,
       slotUnit: 'teams',
@@ -70,8 +76,9 @@ function getMatchStructure(tournament) {
     kind: 'battle_royale',
     matchType: 'Battle Royale',
     formatLabel: 'Battle Royale',
+    playerFormatLabel,
     mode,
-    modeLabel: formatModeLabel(mode),
+    modeLabel: playerFormatLabel,
     playersPerTeam,
     totalSlots,
     slotUnit: 'slots',

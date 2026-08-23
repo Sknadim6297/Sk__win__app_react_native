@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { bannerOf, inr, modeName, prizePool, scheduleLine, statusBucket, statusLabel } from '../utils';
+import { bannerOf, formatName, inr, modeName, prizePool, scheduleLine, statusBucket, statusLabel } from '../utils';
 
 export default function TournamentCard({ t }) {
   const bucket = statusBucket(t);
@@ -15,7 +15,7 @@ export default function TournamentCard({ t }) {
           <span className={`badge ${badgeClass}`}>{statusLabel(t)}</span>
           <h3 style={{ margin: '10px 0 4px', fontSize: 18 }}>{t.name}</h3>
           <p className="dim" style={{ fontSize: 13 }}>
-            {modeName(t)} {t.formatLabel ? `· ${t.formatLabel}` : ''} {t.map ? `· ${t.map}` : ''}
+            {modeName(t)} · {formatName(t)} {t.map ? `· ${t.map}` : ''}
           </p>
           <div className="meta-row">
             <span className="prize">Prize ₹{inr(prizePool(t))}</span>

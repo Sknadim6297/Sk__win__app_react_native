@@ -36,13 +36,35 @@ async function notifyTournamentJoined(userId, tournament) {
 
 async function notifyRoomCredentialsAvailable(tournament) {
   const name = tournament.name || 'Tournament';
+  const roomId = String(tournament.roomId || '').trim();
+  const roomPassword = String(tournament.roomPassword || '').trim();
+
+  const lines = [`Room details for ${name}`];
+  if (roomId) lines.push(`ID: ${roomId}`);
+  if (roomPassword) lines.push(`Password: ${roomPassword}`);
+  if (!roomId && !roomPassword) {
+    lines.push('Room ID and password are now available. Open the app to view.');
+  }
+
   return notifyTournamentParticipants(tournament._id, {
-    title: 'Room Details Available 🔐',
-    message: `Room ID and password for ${name} are now available. Tap to view.`,
+    title: 'Match Room ID & Password 🔐',
+    message: lines.join('\n'),
     type: 'tournament_update',
-    eventKeyBase: buildEventKey(['room_credentials', tournament._id]),
+    // Re-notify if credentials change
+    eventKeyBase: buildEventKey([
+      'room_credentials',
+      tournament._id,
+      roomId || '-',
+      roomPassword || '-',
+    ]),
     deepLink: SCREENS.TOURNAMENT_DETAILS,
-    data: { screen: SCREENS.TOURNAMENT_DETAILS, tournamentId: String(tournament._id) },
+    data: {
+      screen: SCREENS.TOURNAMENT_DETAILS,
+      tournamentId: String(tournament._id),
+      roomId,
+      roomPassword,
+    },
+    sendPushNotification: true,
   });
 }
 
