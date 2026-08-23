@@ -192,6 +192,13 @@ const AdminAPI = (() => {
     createMap: (body) => request('/maps/admin/create', { method: 'POST', body: JSON.stringify(body) }),
     updateMap: (id, body) => request(`/maps/admin/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     deleteMap: (id) => request(`/maps/admin/${id}`, { method: 'DELETE' }),
+    matchTypes: () => request('/match-types/admin/all'),
+    matchTypesPublic: () => request('/match-types/list'),
+    createMatchType: (body) => request('/match-types/admin/create', { method: 'POST', body: JSON.stringify(body) }),
+    updateMatchType: (id, body) => request(`/match-types/admin/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    deleteMatchType: (id) => request(`/match-types/admin/${id}`, { method: 'DELETE' }),
+    setMatchTypeActive: (id, active) =>
+      request(`/match-types/admin/${id}/active`, { method: 'POST', body: JSON.stringify({ active: Boolean(active) }) }),
     tickets: () => request('/support/admin/tickets'),
     updateTicket: (id, body) => request(`/support/admin/tickets/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     announcements: () => request('/announcements/admin/list'),
@@ -220,5 +227,10 @@ const AdminAPI = (() => {
       request(`/daily-auto-matches/admin/${id}/generate-today`, { method: 'POST' }),
     dailyAutoMatchTournaments: (id) =>
       request(`/daily-auto-matches/admin/${id}/tournaments`),
+    seedDailyAutoSamples: (body = { generateToday: true }) =>
+      request('/daily-auto-matches/admin/seed-samples', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
   };
 })();

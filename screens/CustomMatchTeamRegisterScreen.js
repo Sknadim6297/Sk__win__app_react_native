@@ -77,14 +77,40 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
   const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
   const { showInsufficientBalance, InsufficientBalanceDialog } = useInsufficientBalance(navigation);
 
-  const playersPerTeam = useMemo(
-    () => getTeamSize(tournament?.mode || 'solo'),
-    [tournament?.mode]
-  );
-  const entryCharge = useMemo(
-    () => resolveEntryCharge(tournament || {}),
-    [tournament]
-  );
+  const playersPerTeam = useMemo(() => {
+    const fromApi = Number(tournament?.playersPerTeam || tournament?.playersCharged);
+    if (fromApi > 0) return fromApi;
+    return getTeamSize(tournament?.mode || 'solo');
+  }, [tournament?.playersPerTeam, tournament?.playersCharged, tournament?.mode]);
+
+  const entryCharge = useMemo(() => {
+    const fromRoute = route.params?.entryCharge;
+    const fee =
+      Number(
+        tournament?.entryFeePerPlayer ??
+          tournament?.feePerPlayer ??
+          fromRoute?.feePerPlayer ??
+          tournament?.entryFee
+      ) || 0;
+    const players =
+      Number(
+        tournament?.playersCharged ??
+          fromRoute?.playersCharged ??
+          tournament?.playersPerTeam ??
+          playersPerTeam
+      ) || 1;
+    const total =
+      Number(tournament?.totalAmount ?? fromRoute?.totalAmount ?? tournament?.entryCharge?.totalAmount);
+    if (Number.isFinite(total) && total >= 0) {
+      return {
+        feePerPlayer: fee,
+        playersCharged: players,
+        totalAmount: total,
+        matchTypeName: tournament?.matchTypeName || tournament?.matchType,
+      };
+    }
+    return resolveEntryCharge(tournament || {});
+  }, [tournament, playersPerTeam, route.params?.entryCharge]);
 
   useEffect(() => {
     (async () => {

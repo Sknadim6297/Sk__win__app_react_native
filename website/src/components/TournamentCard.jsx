@@ -4,8 +4,6 @@ import { bannerOf, formatName, inr, modeName, prizePool, scheduleLine, statusBuc
 export default function TournamentCard({ t }) {
   const bucket = statusBucket(t);
   const badgeClass = bucket === 'live' ? 'badge-live' : bucket === 'completed' ? 'badge-done' : 'badge-up';
-  const slots = t.totalSlots || t.maxParticipants || 0;
-  const joined = t.participantCount || t.currentParticipants || 0;
 
   return (
     <article className="card fade-up">
@@ -23,9 +21,6 @@ export default function TournamentCard({ t }) {
           </div>
           <div className="meta-row">
             <span>{scheduleLine(t.startDate)}</span>
-            <span>
-              {joined}/{slots} slots
-            </span>
           </div>
           <div style={{ marginTop: 14 }}>
             <span className="btn btn-ghost btn-sm">

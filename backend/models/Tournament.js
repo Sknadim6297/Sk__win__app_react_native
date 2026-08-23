@@ -30,6 +30,31 @@ const tournamentSchema = new mongoose.Schema({
     ref: 'GameMode',
     required: true,
   },
+  /** Admin-managed Match Type (Battle Royale / Clash Squad / Lone Wolf…). */
+  matchType: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MatchType',
+  },
+  /**
+   * How players participate: solo | duo | squad.
+   * Canonical field; `mode` is kept in sync for older code paths.
+   * Never expose a UI label named "Format" — use "Player Format" / Solo|Duo|Squad.
+   */
+  playerFormat: {
+    type: String,
+    enum: ['solo', 'duo', 'squad'],
+    default: 'solo',
+  },
+  /**
+   * Joining units: individual seats (Solo) or team slots (Duo/Squad).
+   * Named joiningSlots so it does not collide with the slot-booking array `slots`.
+   * Public APIs expose this as `slots`.
+   */
+  joiningSlots: {
+    type: Number,
+    default: 48,
+    min: 1,
+  },
   mode: {
     type: String,
     enum: ['solo', 'duo', 'squad'],

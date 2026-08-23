@@ -4,8 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS } from '../../styles/theme';
 import { PAGE } from '../../styles/pageTheme';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
-import { getMatchStructure, toPlayerMatchLabel } from '../../utils/tournamentHelpers';
-import { StatTriple, useTimeLeft } from './ContestShared';
+import { getMatchStructure, formatScheduleLine, getPlayerFormatLabel } from '../../utils/tournamentHelpers';
+import { StatTriple } from './ContestShared';
 
 const DEFAULT_BANNER = require('../../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
 
@@ -15,8 +15,18 @@ function getMatchNumber(item) {
   return 10000 + (parseInt(id.slice(-6), 16) % 80000);
 }
 
-function toPlayerMode(item, structure) {
-  return toPlayerMatchLabel(item.gameMode?.name || structure.matchType || 'Match').toUpperCase();
+function resolveMatchTypeLabel(item, structure) {
+  if (item?.matchTypeName && String(item.matchTypeName) !== 'undefined') {
+    return String(item.matchTypeName);
+  }
+  const mt = item?.matchType;
+  if (mt && typeof mt === 'object' && mt.name) return String(mt.name);
+  if (typeof mt === 'string' && mt && mt !== 'undefined' && !/^[a-f0-9]{24}$/i.test(mt)) {
+    return mt;
+  }
+  const fallback = structure?.matchTypeName || structure?.matchType;
+  if (fallback && String(fallback) !== 'undefined') return String(fallback);
+  return '—';
 }
 
 export default function MatchListCard({ item, gameModeImage, onPress }) {
@@ -24,20 +34,27 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
   const current = item.participantCount ?? item.currentParticipants ?? 0;
   const max = item.totalSlots || structure.totalSlots;
   const spotsLeft = Math.max(max - current, 0);
-  const progress = max > 0 ? Math.min(current / max, 1) : 0;
   const full = spotsLeft <= 0;
   const matchNo = getMatchNumber(item);
   const lifecycleStatus = item.lifecycleStatus || item.status;
   const isJoinOpen = lifecycleStatus === 'upcoming' || lifecycleStatus === 'incoming';
   const isJoined = Boolean(item.userJoined);
-  const timeLeft = useTimeLeft(item.startDate);
-  const paidFree = Number(item.entryFee) > 0 ? 'Paid' : 'Free';
-  /** Admin-created game mode name (e.g. LONE WOLF) — same as Mode on details */
-  const adminMatchType = toPlayerMode(item, structure);
-  const teamFormat = (structure.playerFormatLabel || structure.modeLabel || 'Solo').toUpperCase();
-  const mapName = (item.map || 'BERMUDA').toUpperCase();
-  const entryPerPlayer = item.entryFee ?? 0;
-  const hasPerKill = Boolean(structure.hasKillRewards) && Number(item.perKill) > 0;
+  const scheduleLine = formatScheduleLine(item.startDate);
+
+  const matchTypeName = resolveMatchTypeLabel(item, structure);
+  const playerFormatLabel =
+    item.playerFormatLabel || structure.playerFormatLabel || getPlayerFormatLabel(item);
+  const mapName = String(item.mapName || item.map || '—');
+  const entryPerPlayer = Number(
+    item.entryFeePerPlayer ?? item.feePerPlayer ?? item.entryFee ?? 0
+  );
+  const prizePool = Number(item.prizePool ?? 0);
+  const showPrizePool = item.showPrizePool != null ? Boolean(item.showPrizePool) : prizePool > 0;
+  const prizePerKill = Number(item.prizePerKill ?? item.perKill ?? 0);
+  const showPerKill =
+    item.showPrizePerKill != null
+      ? Boolean(item.showPrizePerKill)
+      : Boolean(structure.hasKillRewards) && prizePerKill > 0;
 
   const bannerUri = item.bannerImage
     ? resolveMediaUrl(item.bannerImage)
@@ -60,30 +77,32 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
 
   const ctaDisabled = isJoined || !isJoinOpen || full;
 
-  // Same fields as Match Details: Prize → Per Kill (if any) → Type → Team → Entry → Map → Match Type
-  const topStats = hasPerKill
-    ? [
-        { label: 'PRIZE POOL', value: item.prizePool ?? 0, coin: true },
-        { label: 'PER KILL', value: item.perKill ?? 0, coin: true },
-        { label: 'TYPE', value: adminMatchType },
-      ]
-    : [
-        { label: 'PRIZE POOL', value: item.prizePool ?? 0, coin: true },
-        { label: 'TYPE', value: adminMatchType },
-        { label: 'ENTRY / PLAYER', value: entryPerPlayer, coin: true },
-      ];
+  const topStats = [
+    showPrizePool ? { label: 'PRIZE POOL', value: prizePool, coin: true } : null,
+    showPerKill ? { label: 'PRIZE PER KILL', value: prizePerKill, coin: true } : null,
+    { label: 'MATCH TYPE', value: matchTypeName },
+  ].filter(Boolean);
 
-  const bottomStats = hasPerKill
-    ? [
-        { label: 'TEAM', value: teamFormat },
-        { label: 'ENTRY / PLAYER', value: entryPerPlayer, coin: true },
-        { label: 'MAP', value: mapName },
-      ]
-    : [
-        { label: 'TEAM', value: teamFormat },
-        { label: 'MATCH TYPE', value: paidFree.toUpperCase() },
-        { label: 'MAP', value: mapName },
-      ];
+  while (topStats.length < 3) {
+    if (!topStats.find((s) => s.label === 'ENTRY FEE / PLAYER')) {
+      topStats.push({ label: 'ENTRY FEE / PLAYER', value: entryPerPlayer, coin: true });
+    } else if (!topStats.find((s) => s.label === 'MAP')) {
+      topStats.push({ label: 'MAP', value: mapName });
+    } else if (!topStats.find((s) => s.label === 'PLAYER FORMAT')) {
+      topStats.push({ label: 'PLAYER FORMAT', value: playerFormatLabel });
+    } else break;
+  }
+
+  const usedLabels = new Set(topStats.map((s) => s.label));
+  const bottomStats = [
+    !usedLabels.has('ENTRY FEE / PLAYER')
+      ? { label: 'ENTRY FEE / PLAYER', value: entryPerPlayer, coin: true }
+      : null,
+    !usedLabels.has('MAP') ? { label: 'MAP', value: mapName } : null,
+    !usedLabels.has('PLAYER FORMAT')
+      ? { label: 'PLAYER FORMAT', value: playerFormatLabel }
+      : null,
+  ].filter(Boolean);
 
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.92} onPress={() => onPress(item)}>
@@ -96,37 +115,19 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
 
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>
-          {item.name || 'Tournament'} - ID#{matchNo}
+          {String(item.name || 'Tournament').toUpperCase()} - ID#{matchNo}
         </Text>
-        <Text style={styles.timeLine}>Time Left : {timeLeft}</Text>
+        <Text style={styles.timeLine}>
+          DATE & TIME : {String(scheduleLine || '').toUpperCase()}
+        </Text>
 
         <StatTriple items={topStats} />
-        <StatTriple items={bottomStats} />
-
-        <View style={styles.spotRow}>
-          <View style={styles.spotBlock}>
-            <View style={styles.progressTrack}>
-              <View
-                style={[
-                  styles.progressFill,
-                  full && styles.progressFull,
-                  { width: `${Math.max(progress * 100, 4)}%` },
-                ]}
-              />
-            </View>
-            <View style={styles.spotMeta}>
-              <Text style={[styles.spotsLeft, full && styles.spotsFull]}>
-                {full ? 'Only 0 Spot Left' : `Only ${spotsLeft} Spot${spotsLeft === 1 ? '' : 's'} Left`}
-              </Text>
-              <Text style={styles.spotCount}>
-                {current}/{max}
-              </Text>
-            </View>
-          </View>
-        </View>
+        {bottomStats.length ? <StatTriple items={bottomStats} /> : null}
 
         <View style={styles.ctaRow}>
-          <Text style={styles.matchType}>{paidFree.toUpperCase()}</Text>
+          <Text style={styles.matchType} numberOfLines={1}>
+            {String(matchTypeName || '').toUpperCase()} · {String(playerFormatLabel || '').toUpperCase()}
+          </Text>
           <TouchableOpacity
             style={[
               styles.joinBtn,
@@ -138,7 +139,7 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
             disabled={ctaDisabled && !isJoinOpen}
             onPress={() => onPress(item)}
           >
-            <Text style={styles.joinBtnText}>{ctaLabel}</Text>
+            <Text style={styles.joinBtnText}>{String(ctaLabel).toUpperCase()}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -176,40 +177,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: PAGE.muted,
   },
-  spotRow: { marginTop: 12 },
-  spotBlock: { flex: 1 },
-  progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: PAGE.cyan,
-    borderRadius: 3,
-  },
-  progressFull: {
-    backgroundColor: '#EF4444',
-  },
-  spotMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  spotsLeft: {
-    fontFamily: FONTS.bold,
-    fontSize: 12,
-    color: PAGE.cyan,
-  },
-  spotsFull: {
-    color: '#F87171',
-  },
-  spotCount: {
-    fontFamily: FONTS.bold,
-    fontSize: 12,
-    color: COLORS.white,
-  },
   ctaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -221,6 +188,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: PAGE.gold,
     letterSpacing: 0.4,
+    flex: 1,
+    marginRight: 8,
   },
   joinBtn: {
     backgroundColor: PAGE.green,

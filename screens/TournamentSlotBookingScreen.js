@@ -64,7 +64,8 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           tournamentService.getSlots(tournamentId),
         ]);
         setTournament(tData);
-        if (getMatchStructure(tData).usesTeamRegistration) {
+        // Clash Squad only uses team registration; BR Duo/Squad pick slots on the 48 grid
+        if (getMatchStructure(tData).kind === 'team_vs_team') {
           showToast('This match uses team registration. Captain pays once for the team.', 'warning');
           navigation.replace('CustomMatchTeamRegister', { tournamentId });
           return;
@@ -93,36 +94,70 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     }, [])
   );
 
+  const structure = getMatchStructure(tournament || {});
+  const slotsRequired = Math.max(
+    1,
+    Number(
+      tournament?.slotsRequiredToJoin ??
+        structure.slotsRequiredToJoin ??
+        structure.playersPerTeam ??
+        1
+    )
+  );
+  const formatLabel = tournament?.playerFormatLabel || structure.playerFormatLabel || 'Solo';
+
   const toggleSlot = (num) => {
     const slot = slots.find((s) => s.slotNumber === num);
     if (slot?.isBooked) return;
     if (selected.includes(num)) {
-      setSelected([]);
+      setSelected(selected.filter((n) => n !== num));
       return;
     }
-    setSelected([num]);
+    if (selected.length >= slotsRequired) {
+      showToast(
+        `${formatLabel} requires exactly ${slotsRequired} slot${slotsRequired > 1 ? 's' : ''}. Deselect one first.`,
+        'warning'
+      );
+      return;
+    }
+    setSelected([...selected, num].sort((a, b) => a - b));
   };
 
-  const entryFee = Number(tournament?.entryFee) || 0;
-  const split = getPaymentSplit(entryFee, bonusBalance);
+  const entryFeePerPlayer = Number(
+    tournament?.entryFeePerPlayer ??
+      tournament?.feePerPlayer ??
+      route.params?.entryCharge?.feePerPlayer ??
+      tournament?.entryFee ??
+      0
+  );
+  const payableTotal = Number(
+    tournament?.totalAmount ??
+      route.params?.entryCharge?.totalAmount ??
+      tournament?.entryCharge?.totalAmount ??
+      entryFeePerPlayer * slotsRequired
+  );
+  const split = getPaymentSplit(payableTotal, bonusBalance);
 
   const goConfirm = () => {
-    if (selected.length !== 1) {
-      showToast('Please select one match position.', 'warning');
+    if (selected.length !== slotsRequired) {
+      showToast(
+        `Please select ${slotsRequired} slot${slotsRequired > 1 ? 's' : ''} for ${formatLabel}.`,
+        'warning'
+      );
       return;
     }
     setStep('confirm');
   };
 
-  const bookOne = async (slotNumber) => {
+  const bookOne = async (slotNums) => {
     const res = await tournamentService.bookSlot(
       tournamentId,
-      slotNumber,
+      slotNums,
       gamingUsername.trim(),
       gamingUID.trim()
     );
     if (res.step === 'confirm_username_mismatch') {
-      return { mismatch: res, slotNumber };
+      return { mismatch: res, slotNumbers: slotNums };
     }
     if (!res.success) throw new Error(res.message || 'Booking failed');
     return { success: true };
@@ -143,44 +178,49 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     try {
       bookingLockRef.current = true;
       setBooking(true);
-      if (isPaymentEnabled() && Number(entryFee) > 0) {
+      if (isPaymentEnabled() && Number(payableTotal) > 0) {
         startTournamentZapUpiPayment(navigation, {
           tournamentId,
           tournamentName: tournament?.name,
-          amount: entryFee,
+          amount: payableTotal,
           joinKind: 'solo',
           gamingUsername: gamingUsername.trim(),
           gamingUID: gamingUID.trim(),
           slotNumber: selected[0],
+          slotNumbers: selected,
         });
         return;
       }
-      const walletCheck = await fetchWalletForEntry(entryFee);
+      const walletCheck = await fetchWalletForEntry(payableTotal);
       if (!walletCheck.sufficient) {
         showInsufficientBalance({
           tournamentId,
           returnScreen: 'TournamentSlotBooking',
           forTeam: false,
-          requiredAmount: entryFee,
+          requiredAmount: payableTotal,
           currentBalance: walletCheck.balance,
           remainingAmount: walletCheck.remaining,
           qrAmount: walletCheck.qrAmount,
           pendingJoin: {
             kind: 'solo',
             slotNumber: selected[0],
+            slotNumbers: selected,
             gamingUsername: gamingUsername.trim(),
             gamingUID: gamingUID.trim(),
           },
         });
         return;
       }
-      for (const slotNum of selected) {
-        const result = await bookOne(slotNum);
-        if (result.mismatch) {
-          setMismatchData({ ...result.mismatch, slotNumber: result.slotNumber, pendingSlots: selected });
-          setStep('mismatch');
-          return;
-        }
+      const result = await bookOne(selected);
+      if (result.mismatch) {
+        setMismatchData({
+          ...result.mismatch,
+          slotNumber: selected[0],
+          slotNumbers: selected,
+          pendingSlots: selected,
+        });
+        setStep('mismatch');
+        return;
       }
       goToJoinedDetails();
     } catch (e) {
@@ -210,10 +250,10 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     if (!walletRecharged || !tournament || !pendingJoin || autoJoinRef.current) return;
     if (pendingJoin.kind && pendingJoin.kind !== 'solo') return;
     autoJoinRef.current = true;
-    const slotNum = pendingJoin.slotNumber;
+    const slotNums = pendingJoin.slotNumbers || (pendingJoin.slotNumber ? [pendingJoin.slotNumber] : []);
     const name = pendingJoin.gamingUsername || '';
     const uid = pendingJoin.gamingUID || '';
-    setSelected(slotNum ? [slotNum] : []);
+    setSelected(slotNums);
     setGamingUsername(name);
     setGamingUID(uid);
     setStep('confirm');
@@ -221,14 +261,14 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
     (async () => {
       try {
         setBooking(true);
-        const walletCheck = await fetchWalletForEntry(Number(tournament.entryFee) || 0);
+        const walletCheck = await fetchWalletForEntry(payableTotal);
         if (!walletCheck.sufficient) {
           autoJoinRef.current = false;
           showInsufficientBalance({
             tournamentId,
             returnScreen: 'TournamentSlotBooking',
             forTeam: false,
-            requiredAmount: tournament.entryFee,
+            requiredAmount: payableTotal,
             currentBalance: walletCheck.balance,
             remainingAmount: walletCheck.remaining,
             qrAmount: walletCheck.qrAmount,
@@ -236,9 +276,14 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           });
           return;
         }
-        const res = await tournamentService.bookSlot(tournamentId, slotNum, name, uid);
+        const res = await tournamentService.bookSlot(tournamentId, slotNums, name, uid);
         if (res.step === 'confirm_username_mismatch') {
-          setMismatchData({ ...res, slotNumber: slotNum, pendingSlots: [slotNum] });
+          setMismatchData({
+            ...res,
+            slotNumber: slotNums[0],
+            slotNumbers: slotNums,
+            pendingSlots: slotNums,
+          });
           setStep('mismatch');
           return;
         }
@@ -260,10 +305,13 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
   const handleConfirmMismatch = async () => {
     try {
       setBooking(true);
-      const slotNum = mismatchData?.slotNumber ?? selected[0];
+      const slotNums =
+        mismatchData?.slotNumbers ||
+        mismatchData?.pendingSlots ||
+        selected;
       const res = await tournamentService.confirmSlotBooking(
         tournamentId,
-        slotNum,
+        slotNums,
         gamingUsername.trim(),
         gamingUID.trim()
       );
@@ -339,12 +387,12 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
           <CoinValue value={balance} size={16} color={PAGE.gold} />
         </View>
         <View style={styles.balanceLine}>
-          <Text style={styles.balanceLabel}>Entry Fee : </Text>
-          <CoinValue value={entryFee} size={16} color={PAGE.gold} />
+          <Text style={styles.balanceLabel}>Entry Fee / Player : </Text>
+          <CoinValue value={entryFeePerPlayer} size={16} color={PAGE.gold} />
         </View>
         <View style={styles.balanceLine}>
           <Text style={styles.balanceLabel}>Total Payable Amount : </Text>
-          <CoinValue value={split.totalPayable} size={16} color={PAGE.gold} />
+          <CoinValue value={payableTotal} size={16} color={PAGE.gold} />
         </View>
       </View>
     </View>
@@ -365,7 +413,12 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
       {step === 'slots' && (
         <>
           <View style={styles.selectBanner}>
-            <Text style={styles.selectBannerText}>Select Match Position</Text>
+            <Text style={styles.selectBannerText}>
+              Select {slotsRequired} Match Position{slotsRequired > 1 ? 's' : ''} ({formatLabel})
+            </Text>
+            <Text style={styles.selectBannerHint}>
+              {selected.length}/{slotsRequired} selected
+            </Text>
           </View>
           <View style={styles.colHead}>
             <Text style={styles.colHeadText}>Slot</Text>
@@ -508,6 +561,12 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     fontSize: 16,
     color: COLORS.white,
+  },
+  selectBannerHint: {
+    marginTop: 4,
+    fontFamily: FONTS.medium,
+    fontSize: 12,
+    color: PAGE.cyan,
   },
   colHead: {
     flexDirection: 'row',

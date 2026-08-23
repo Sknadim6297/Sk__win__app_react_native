@@ -218,6 +218,7 @@ app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/tournament-management', tournamentManagementRoutes);
 app.use('/api/games', gamesRoutes);
 app.use('/api/maps', require('./routes/maps'));
+app.use('/api/match-types', require('./routes/matchTypes'));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/tutorials', tutorialRoutes);
 app.use('/api/notifications', notificationRoutes);

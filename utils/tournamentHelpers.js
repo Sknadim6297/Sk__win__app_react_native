@@ -36,10 +36,11 @@ export function formatModeLabel(mode) {
   return m.charAt(0).toUpperCase() + m.slice(1);
 }
 
-/** Player-facing format: Solo / Duo / Squad / Team */
+/** Player Format label: Solo / Duo / Squad — never shown as a field named "Format". */
 export function getPlayerFormatLabel(modeOrTournament) {
   if (modeOrTournament && typeof modeOrTournament === 'object') {
-    return formatModeLabel(modeOrTournament.mode || 'solo');
+    if (modeOrTournament.playerFormatLabel) return modeOrTournament.playerFormatLabel;
+    return formatModeLabel(modeOrTournament.playerFormat || modeOrTournament.mode || 'solo');
   }
   return formatModeLabel(modeOrTournament);
 }
@@ -71,7 +72,7 @@ export function isBattleRoyaleMatch(tournamentOrMode) {
 
 /** Captain registers team: Custom Match (any size) or Battle Royale Duo/Squad. */
 export function isTeamEntryMode(modeOrTournament, tournament) {
-  if (tournament || (modeOrTournament && typeof modeOrTournament === 'object' && modeOrTournament.mode)) {
+  if (tournament || (modeOrTournament && typeof modeOrTournament === 'object' && (modeOrTournament.mode || modeOrTournament.playerFormat))) {
     const t = tournament || modeOrTournament;
     return getMatchStructure(t).usesTeamRegistration;
   }
@@ -79,22 +80,74 @@ export function isTeamEntryMode(modeOrTournament, tournament) {
 }
 
 export function getMatchStructure(tournament) {
-  const mode = String(tournament?.mode || 'solo').toLowerCase();
-  const playersPerTeam = getTeamSize(mode);
-  const custom = isCustomMatch(tournament);
+  // Prefer backend-resolved public fields when present
+  if (tournament?.playersPerTeam != null && tournament?.totalSlots != null && tournament?.matchTypeName) {
+    const playerFormat = String(tournament.playerFormat || tournament.mode || 'solo').toLowerCase();
+    const playersPerTeam = Number(tournament.playersPerTeam) || getTeamSize(playerFormat);
+    const custom = isCustomMatch(tournament) || tournament.matchKind === 'team_vs_team';
+    const slots = custom
+      ? Number(tournament.slots ?? tournament.totalSlots) || 2
+      : Number(tournament.totalSlots) || 48;
+    const playerFormatLabel =
+      tournament.playerFormatLabel || formatModeLabel(playerFormat);
+    const matchTypeName = String(tournament.matchTypeName || tournament.matchType || (custom ? 'Clash Squad' : 'Battle Royale'));
+    const usesTeamRegistration = custom;
+    return {
+      kind: custom ? 'team_vs_team' : 'battle_royale',
+      matchType: matchTypeName,
+      matchTypeName,
+      playerFormat,
+      playerFormatLabel,
+      formatLabel: custom
+        ? playersPerTeam === 4
+          ? '4v4'
+          : playersPerTeam === 2
+            ? '2v2'
+            : '1v1'
+        : matchTypeName,
+      mode: playerFormat,
+      modeLabel: playerFormatLabel,
+      playersPerTeam,
+      slotsRequiredToJoin: playersPerTeam,
+      slots,
+      totalSlots: slots,
+      totalPlayerCapacity: custom ? slots * playersPerTeam : 48,
+      slotUnit: custom ? 'teams' : 'slots',
+      entryUnit: 'player',
+      hasKillRewards:
+        tournament.hasKillRewards != null ? Boolean(tournament.hasKillRewards) : !custom,
+      usesTeamRegistration,
+      usesSlotGrid: !custom,
+      usesTeamSides: custom,
+    };
+  }
 
-  const playerFormatLabel = formatModeLabel(mode);
+  const playerFormat = String(tournament?.playerFormat || tournament?.mode || 'solo').toLowerCase();
+  const playersPerTeam = getTeamSize(playerFormat);
+  const custom = isCustomMatch(tournament);
+  const playerFormatLabel = formatModeLabel(playerFormat);
+  const mt =
+    (tournament?.matchType && typeof tournament.matchType === 'object' && tournament.matchType.name) ||
+    (typeof tournament?.matchType === 'string' && !/^[a-f0-9]{24}$/i.test(tournament.matchType)
+      ? tournament.matchType
+      : null) ||
+    tournament?.matchTypeName;
 
   if (custom) {
     return {
       kind: 'team_vs_team',
-      matchType: 'Clash Squad',
-      formatLabel: playersPerTeam === 4 ? '4v4' : playersPerTeam === 2 ? '2v2' : '1v1',
+      matchType: mt || 'Clash Squad',
+      matchTypeName: mt || 'Clash Squad',
+      playerFormat,
       playerFormatLabel,
-      mode,
+      formatLabel: playersPerTeam === 4 ? '4v4' : playersPerTeam === 2 ? '2v2' : '1v1',
+      mode: playerFormat,
       modeLabel: playerFormatLabel,
       playersPerTeam,
+      slotsRequiredToJoin: playersPerTeam,
+      slots: 2,
       totalSlots: 2,
+      totalPlayerCapacity: 2 * playersPerTeam,
       slotUnit: 'teams',
       entryUnit: 'player',
       hasKillRewards: false,
@@ -104,20 +157,24 @@ export function getMatchStructure(tournament) {
     };
   }
 
-  const totalSlots = mode === 'solo' ? 50 : Math.floor(50 / playersPerTeam);
   return {
     kind: 'battle_royale',
-    matchType: 'Battle Royale',
-    formatLabel: 'Battle Royale',
+    matchType: mt || 'Battle Royale',
+    matchTypeName: mt || 'Battle Royale',
+    playerFormat,
     playerFormatLabel,
-    mode,
+    formatLabel: mt || 'Battle Royale',
+    mode: playerFormat,
     modeLabel: playerFormatLabel,
     playersPerTeam,
-    totalSlots,
+    slotsRequiredToJoin: playersPerTeam,
+    slots: 48,
+    totalSlots: 48,
+    totalPlayerCapacity: 48,
     slotUnit: 'slots',
     entryUnit: 'player',
     hasKillRewards: true,
-    usesTeamRegistration: mode !== 'solo',
+    usesTeamRegistration: false,
     usesSlotGrid: true,
     usesTeamSides: false,
   };
@@ -125,14 +182,31 @@ export function getMatchStructure(tournament) {
 
 /**
  * entryFee on tournament = per player.
- * Duo/Squad/Clash: captain pays fee × playersPerTeam.
+ * Duo/Squad: captain pays fee × playersPerTeam (also when picking 2/4 slots).
  */
 export function resolveEntryCharge(tournament) {
-  const feePerPlayer = Math.max(0, Number(tournament?.entryFee) || 0);
+  const feePerPlayer = Math.max(
+    0,
+    Number(tournament?.entryFeePerPlayer ?? tournament?.feePerPlayer ?? tournament?.entryFee) || 0
+  );
+  const backendTotal = Number(
+    tournament?.totalAmount ?? tournament?.entryCharge?.totalAmount ?? NaN
+  );
+  if (Number.isFinite(backendTotal) && backendTotal >= 0) {
+    const playersCharged =
+      Number(tournament?.playersCharged ?? tournament?.entryCharge?.playersCharged) ||
+      (feePerPlayer > 0 ? Math.max(1, Math.round(backendTotal / feePerPlayer)) : 1);
+    return {
+      feePerPlayer,
+      playersCharged,
+      totalAmount: backendTotal,
+      entryUnit: 'player',
+      chargedPer: playersCharged > 1 ? 'team_total' : 'player',
+      usesTeamRegistration: false,
+    };
+  }
   const structure = getMatchStructure(tournament);
-  const playersCharged = structure.usesTeamRegistration
-    ? Math.max(1, Number(structure.playersPerTeam) || 1)
-    : 1;
+  const playersCharged = Math.max(1, Number(structure.playersPerTeam) || 1);
   const totalAmount = feePerPlayer * playersCharged;
   return {
     feePerPlayer,

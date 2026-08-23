@@ -47,40 +47,47 @@ export default function TournamentDetailsPage() {
                 </div>
               </div>
               <div className="stat-grid">
+                {t.gameName || t.game?.name ? (
+                  <div className="stat">
+                    <span>Game</span>
+                    <strong>{t.gameName || t.game?.name}</strong>
+                  </div>
+                ) : null}
                 <div className="stat">
-                  <span>Format</span>
+                  <span>Match Type</span>
+                  <strong>{modeName(t)}</strong>
+                </div>
+                <div className="stat">
+                  <span>Player Format</span>
                   <strong>{formatName(t)}</strong>
-                </div>
-                <div className="stat">
-                  <span>Prize pool</span>
-                  <strong className="prize">₹{inr(prizePool(t))}</strong>
-                </div>
-                <div className="stat">
-                  <span>Entry fee</span>
-                  <strong>₹{inr(t.entryFee)}</strong>
-                </div>
-                <div className="stat">
-                  <span>Schedule</span>
-                  <strong style={{ fontSize: 15 }}>{scheduleLine(t.startDate)}</strong>
                 </div>
                 <div className="stat">
                   <span>Map</span>
                   <strong>{t.map || '—'}</strong>
                 </div>
-              </div>
-              <p className="muted">
-                Slots {t.participantCount || t.currentParticipants || 0}/{t.totalSlots || t.maxParticipants || data?.slots?.totalSlots || '—'}
-              </p>
-
-              {t.description && (
-                <div className="card" style={{ padding: 20, marginTop: 20 }}>
-                  <h3>About this match</h3>
-                  <p className="muted" style={{ marginTop: 8 }}>{t.description}</p>
+                <div className="stat">
+                  <span>Entry Fee / Player</span>
+                  <strong>₹{inr(t.entryFeePerPlayer ?? t.entryFee)}</strong>
                 </div>
-              )}
+                {Number(t.prizePerKill ?? t.perKill) > 0 && t.showPrizePerKill !== false ? (
+                  <div className="stat">
+                    <span>Prize Per Kill</span>
+                    <strong className="prize">₹{inr(t.prizePerKill ?? t.perKill)}</strong>
+                  </div>
+                ) : null}
+                <div className="stat">
+                  <span>Prize Pool</span>
+                  <strong className="prize">₹{inr(prizePool(t))}</strong>
+                </div>
+                <div className="stat">
+                  <span>Schedule</span>
+                  <strong style={{ fontSize: 15 }}>{scheduleLine(t.startDate)}</strong>
+                </div>
+              </div>
 
-              <div className="card" style={{ padding: 20, marginTop: 18 }}>
-                <h3>Rules</h3>
+              <div className="card" style={{ padding: 20, marginTop: 20 }}>
+                <h3>About this match</h3>
+                <h4 style={{ marginTop: 12, marginBottom: 8 }}>Rules and Regulations</h4>
                 <ul className="rules">
                   {parseRules(t.rules).map((r) => (
                     <li key={r}>{r}</li>

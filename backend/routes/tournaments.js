@@ -4,6 +4,7 @@ const Tournament = require('../models/Tournament');
 require('../models/DailyAutoMatch');
 const Game = require('../models/Game');
 const GameMode = require('../models/GameMode');
+const MatchType = require('../models/MatchType');
 const TournamentParticipant = require('../models/TournamentParticipant');
 const TournamentResult = require('../models/TournamentResult');
 const BattleRoyaleResult = require('../models/BattleRoyaleResult');
@@ -21,8 +22,51 @@ const {
   notifyMatchLive,
   notifyMatchCompleted,
 } = require('../services/tournamentPushEvents');
+const {
+  ensureDefaultMatchTypes,
+  applyMatchTypeToTournamentFields,
+  normalizePlayerFormat,
+} = require('../services/matchTypeService');
+const { buildPublicMatchFields } = require('../services/matchStructure');
 const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
+
+async function resolveMatchTypeFromBody(body = {}, { allowInactive = false } = {}) {
+  await ensureDefaultMatchTypes();
+  const id = body.matchType || body.matchTypeId;
+  if (id) {
+    const doc = await MatchType.findById(id);
+    if (!doc) {
+      return { error: 'Match Type not found' };
+    }
+    if (!doc.active && !allowInactive) {
+      return { error: 'Match Type is inactive' };
+    }
+    return { matchType: doc };
+  }
+  // Legacy: map category only (Match Type ≠ Player Format)
+  const isCustom = body.category === 'custom' || body.category === 'custom_match';
+  const name = isCustom ? 'Clash Squad' : 'Battle Royale';
+  const doc =
+    (await MatchType.findOne({ name, active: true })) ||
+    (await MatchType.findOne({ name }));
+  if (!doc) {
+    return { error: 'No matching Match Type. Create one in Admin → Match Types.' };
+  }
+  return { matchType: doc };
+}
+
+function resolvePlayerFormatFromBody(body = {}, fallback = 'solo') {
+  return normalizePlayerFormat(
+    body.playerFormat || body.mode || fallback
+  );
+}
+
+function resolveJoiningSlotsFromBody(body = {}) {
+  const raw = body.joiningSlots != null ? body.joiningSlots : body.slots;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
 
 const MAX_BONUS_ENTRY_PERCENT = 0.2;
 
@@ -292,13 +336,18 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       game,
       gameMode,
       mode,
+      playerFormat,
       category,
+      matchType,
+      matchTypeId,
       map,
       rules,
       entryFee, 
       prizePool,
       perKill,
-      maxParticipants, 
+      maxParticipants,
+      slots,
+      joiningSlots,
       startDate, 
       endDate, 
       minimumBalance,
@@ -334,21 +383,29 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Game mode not found', gameModeId: gameMode });
     }
 
-    console.log('Found game and gameMode:', { 
-      game: gameExists.name, 
-      gameMode: gameModeExists.name 
+    const mtResolved = await resolveMatchTypeFromBody({
+      matchType,
+      matchTypeId,
+      mode,
+      category,
     });
-    console.log('Found game and gameMode:', { 
-      game: gameExists.name, 
-      gameMode: gameModeExists.name 
-    });
-
-    const matchCategory =
-      category === 'custom' || category === 'custom_match' ? 'custom' : 'battle_royale';
+    if (mtResolved.error) {
+      return res.status(400).json({ error: mtResolved.error });
+    }
+    const mt = mtResolved.matchType;
+    const resolvedPlayerFormat = resolvePlayerFormatFromBody(req.body, mode || 'solo');
+    const slotInput = resolveJoiningSlotsFromBody({ slots, joiningSlots });
+    const synced = applyMatchTypeToTournamentFields(mt, resolvedPlayerFormat, slotInput);
+    const matchCategory = synced.category;
 
     const capacity = lifecycle.resolveTournamentCapacity({
       category: matchCategory,
-      mode: mode || 'solo',
+      mode: synced.mode,
+      playerFormat: synced.playerFormat,
+      playersPerTeam: synced.playersPerTeam,
+      slots: synced.slots,
+      joiningSlots: synced.slots,
+      matchType: mt,
     });
     if (!capacity.ok) {
       return res.status(400).json({ error: capacity.error });
@@ -364,6 +421,9 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       bannerTitle: bannerTitle || '',
       game,
       gameMode,
+      matchType: mt._id,
+      playerFormat: resolvedMode,
+      joiningSlots: capacity.joiningSlots || capacity.slots,
       mode: resolvedMode,
       category: matchCategory,
       map: map || 'Bermuda',
@@ -373,7 +433,7 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
       })(),
       entryFee: entryFee || 0,
       prizePool: prizePool || 0,
-      perKill: matchCategory === 'custom' ? 0 : (perKill || 0),
+      perKill: matchCategory === 'custom' || !mt.hasKillRewards ? 0 : (perKill || 0),
       rewardType: matchCategory === 'custom' ? 'survival' : 'per_kill',
       maxParticipants: resolvedMaxParticipants,
       currentParticipants: 0,
@@ -437,7 +497,8 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
 
     const populatedTournament = await Tournament.findById(tournament._id)
       .populate('game', 'name')
-      .populate('gameMode', 'name');
+      .populate('gameMode', 'name')
+      .populate('matchType');
 
     console.log('Tournament populated successfully');
 
@@ -478,7 +539,7 @@ router.put('/admin/:id', authMiddleware, async (req, res) => {
     delete updateData.createdAt;
     delete updateData.createdBy;
     delete updateData.registeredPlayers;
-    delete updateData.slots;
+    delete updateData.slots; // booking array — never overwrite from body
     delete updateData.teamSize;
     delete updateData.killRewardEnabled;
     delete updateData.tournamentType;
@@ -506,27 +567,66 @@ router.put('/admin/:id', authMiddleware, async (req, res) => {
       tournament.statusOverride = statusOverrideInput;
     }
 
-    // Custom Match / BR: enforce capacity from type + mode
-    const matchCategory =
-      tournament.category === 'custom' || tournament.category === 'custom_match'
-        ? 'custom'
-        : 'battle_royale';
+    // Sync Match Type + Player Format + joining slots → capacity
+    const mtResolved = await resolveMatchTypeFromBody(
+      {
+        matchType: req.body.matchType || req.body.matchTypeId || tournament.matchType,
+        matchTypeId: req.body.matchTypeId,
+        mode: tournament.mode,
+        category: tournament.category,
+      },
+      { allowInactive: true }
+    );
+    if (mtResolved.error) {
+      return res.status(400).json({ error: mtResolved.error });
+    }
+    const mt = mtResolved.matchType;
+    const resolvedPlayerFormat = resolvePlayerFormatFromBody(
+      {
+        playerFormat: req.body.playerFormat ?? updateData.playerFormat,
+        mode: req.body.mode ?? tournament.mode ?? tournament.playerFormat,
+      },
+      tournament.playerFormat || tournament.mode || 'solo'
+    );
+    const slotInput = resolveJoiningSlotsFromBody({
+      slots: req.body.slots,
+      joiningSlots: req.body.joiningSlots ?? tournament.joiningSlots,
+    });
+    const synced = applyMatchTypeToTournamentFields(mt, resolvedPlayerFormat, slotInput);
+    tournament.matchType = mt._id;
+    tournament.playerFormat = synced.playerFormat;
+    tournament.mode = synced.mode;
+    tournament.category = synced.category;
+    tournament.joiningSlots = synced.slots;
+
     const capacity = lifecycle.resolveTournamentCapacity({
-      category: matchCategory,
-      mode: tournament.mode || 'solo',
+      category: synced.category,
+      mode: synced.mode,
+      playerFormat: synced.playerFormat,
+      playersPerTeam: synced.playersPerTeam,
+      slots: synced.slots,
+      joiningSlots: synced.slots,
+      matchType: mt,
     });
     if (!capacity.ok) {
       return res.status(400).json({ error: capacity.error });
     }
     tournament.mode = capacity.mode;
+    tournament.playerFormat = capacity.playerFormat;
+    tournament.joiningSlots = capacity.joiningSlots;
     tournament.maxTeams = capacity.maxTeams;
     tournament.maxParticipants = capacity.maxParticipants;
 
-    if (matchCategory === 'custom') {
+    const matchCategory = synced.category;
+
+    if (matchCategory === 'custom' || !mt.hasKillRewards) {
       const winnerPrize =
         Number(tournament.prizes?.first) || Number(tournament.prizePool) || 0;
-      tournament.prizes = { first: winnerPrize, second: 0, third: 0 };
-      tournament.perKill = 0;
+      if (matchCategory === 'custom') {
+        tournament.prizes = { first: winnerPrize, second: 0, third: 0 };
+      }
+      tournament.perKill = matchCategory === 'custom' ? 0 : tournament.perKill;
+      if (!mt.hasKillRewards) tournament.perKill = 0;
       await PrizeDistribution.findOneAndUpdate(
         { tournamentId: tournament._id },
         {
@@ -1220,6 +1320,7 @@ router.get('/list', async (req, res) => {
     })
       .populate('game', 'name image')
       .populate('gameMode', 'name image')
+      .populate('matchType')
       .sort({ startDate: -1 });
 
     const tournamentsWithCounts = await Promise.all(
@@ -1257,8 +1358,11 @@ router.get('/list', async (req, res) => {
         const doc = tournament.toObject();
         const publicStatus = toPublicStatus(tournament);
         const publicRules = parseRulesInput(doc.rules);
+        const charge = lifecycle.resolveEntryCharge(tournament);
+        const publicFields = buildPublicMatchFields(tournament, structure, charge);
         return {
           ...omitRoomSecrets(doc),
+          ...publicFields,
           rules: publicRules.length ? publicRules : DEFAULT_MATCH_RULES,
           matchNumber: resolveMatchNumber(doc),
           currentParticipants: joinStats.joinedCount,
@@ -1267,7 +1371,6 @@ router.get('/list', async (req, res) => {
           maxTeams: structure.totalSlots,
           totalSlots: structure.totalSlots,
           matchKind: structure.kind,
-          matchType: structure.matchType,
           formatLabel: structure.formatLabel,
           playerFormatLabel: structure.playerFormatLabel,
           modeLabel: structure.modeLabel,
@@ -1278,6 +1381,8 @@ router.get('/list', async (req, res) => {
           lifecycleStatus: effective,
           displayStatus: publicStatus === 'incoming' ? 'upcoming' : publicStatus,
           resultsPublished: lifecycle.areResultsPublished(tournament),
+          // Keep entryFee as per-player for display; totalAmount is authoritative for payment
+          entryFee: charge.feePerPlayer,
         };
       })
     );
@@ -1312,7 +1417,8 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
   try {
     const tournament = await Tournament.findById(req.params.id)
       .populate('game', 'name image')
-      .populate('gameMode', 'name image');
+      .populate('gameMode', 'name image')
+      .populate('matchType');
 
     if (!tournament) {
       return res.status(404).json({ error: 'Tournament not found' });
@@ -1377,11 +1483,14 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
       await tournament.save().catch(() => {});
     }
     const structure = lifecycle.getMatchStructure(tournament);
+    const charge = lifecycle.resolveEntryCharge(tournament);
+    const publicFields = buildPublicMatchFields(tournament, structure, charge);
     const joinCheck = await getJoinEligibility(tournament, joinStats.joinedCount);
     const startMs = new Date(tournament.startDate).getTime() - Date.now();
 
     res.json({
       ...omitRoomSecrets(doc),
+      ...publicFields,
       rules: publicRules.length ? publicRules : DEFAULT_MATCH_RULES,
       matchNumber: resolveMatchNumber(doc),
       status: calculatedStatus,
@@ -1389,7 +1498,6 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
       displayStatus: calculatedStatus === 'incoming' ? 'upcoming' : calculatedStatus,
       isCustomMatch: isCustom,
       matchKind: structure.kind,
-      matchType: structure.matchType,
       formatLabel: structure.formatLabel,
       playerFormatLabel: structure.playerFormatLabel,
       modeLabel: structure.modeLabel,
@@ -1405,6 +1513,7 @@ router.get('/:id/details', authMiddleware, async (req, res) => {
       joinBlockReason: joinCheck.reason,
       countdownMs: Math.max(startMs, 0),
       resultsPublished: !!tournament.resultsPublished,
+      entryFee: charge.feePerPlayer,
       teams,
       participants: structure.usesTeamRegistration
         ? []
@@ -1628,7 +1737,7 @@ router.get('/:id/canJoin', authMiddleware, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    const tournament = await Tournament.findById(req.params.id);
+    const tournament = await Tournament.findById(req.params.id).populate('matchType');
 
     if (!tournament) {
       return res.status(404).json({ error: 'Tournament not found' });
@@ -1686,6 +1795,7 @@ router.get('/:id/canJoin', authMiddleware, async (req, res) => {
       feePerPlayer: charge.feePerPlayer,
       playersCharged: charge.playersCharged,
       totalAmount: charge.totalAmount,
+      matchTypeName: charge.matchTypeName,
       realMoneyRequired,
     });
   } catch (error) {
@@ -1701,7 +1811,7 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    const tournament = await Tournament.findById(req.params.id);
+    const tournament = await Tournament.findById(req.params.id).populate('matchType');
 
     if (!tournament) {
       return res.status(404).json({ error: 'Tournament not found' });
@@ -1725,11 +1835,15 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Account is not active' });
     }
 
-    const { bonusUsed, realMoneyRequired } = getEntryPaymentSplit(user, tournament.entryFee);
+    const charge = lifecycle.resolveEntryCharge(tournament);
+    const { bonusUsed, realMoneyRequired } = getEntryPaymentSplit(user, charge.totalAmount);
 
     if (user.wallet.balance < realMoneyRequired) {
       return res.status(400).json({ 
-        error: `Insufficient real balance! You need ₹${realMoneyRequired} real money and can use ₹${bonusUsed} bonus. Current real balance: ₹${user.wallet.balance}.` 
+        error: `Insufficient real balance! You need ₹${realMoneyRequired} real money and can use ₹${bonusUsed} bonus. Current real balance: ₹${user.wallet.balance}.`,
+        feePerPlayer: charge.feePerPlayer,
+        playersCharged: charge.playersCharged,
+        totalAmount: charge.totalAmount,
       });
     }
 
@@ -1800,9 +1914,9 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
     const transaction = new WalletTransaction({
       userId: req.userId,
       type: 'tournament_entry',
-      amount: tournament.entryFee,
+      amount: charge.totalAmount,
       tournamentId: req.params.id,
-      description: `Entry fee for ${tournament.name} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired})`,
+      description: `Entry fee for ${tournament.name} — ₹${charge.feePerPlayer}/player × ${charge.playersCharged} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired})`,
       status: 'completed',
     });
     await transaction.save();
@@ -1819,6 +1933,9 @@ router.post('/:id/join', authMiddleware, async (req, res) => {
       walletBalance: user.wallet.balance,
       bonusUsed,
       realMoneyUsed: realMoneyRequired,
+      feePerPlayer: charge.feePerPlayer,
+      playersCharged: charge.playersCharged,
+      totalAmount: charge.totalAmount,
     });
   } catch (error) {
     console.error('Error joining tournament:', error);
@@ -2153,25 +2270,19 @@ router.get('/:id/slots', async (req, res) => {
   }
 });
 
-// Book a slot for tournament
+// Book slot(s) for tournament — Solo: 1, Duo: 2, Squad: 4 (charged once)
 router.post('/:id/book-slot', authMiddleware, async (req, res) => {
   try {
-    const { slotNumber, gamingID, gamingUID, gamingUsername } = req.body;
+    const { slotNumber, slotNumbers, gamingID, gamingUID, gamingUsername } = req.body;
     const gamingIdValue = String(gamingID || gamingUsername || '').trim();
     const gamingUidValue = String(gamingUID || '').trim();
 
-    if (!slotNumber || !gamingIdValue || !gamingUidValue) {
-      return res.status(400).json({ error: 'Slot number, Gaming ID, and UID are required' });
+    if (!gamingIdValue || !gamingUidValue) {
+      return res.status(400).json({ error: 'Gaming ID and UID are required' });
     }
-
-    if (slotNumber < 1 || slotNumber > 50) {
-      return res.status(400).json({ error: 'Invalid slot number. Must be between 1 and 50' });
-    }
-
     if (gamingIdValue.length < 3) {
       return res.status(400).json({ error: 'Gaming ID must be at least 3 characters' });
     }
-
     if (gamingUidValue.length < 3) {
       return res.status(400).json({ error: 'UID must be at least 3 characters' });
     }
@@ -2181,7 +2292,7 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const tournament = await Tournament.findById(req.params.id);
+    const tournament = await Tournament.findById(req.params.id).populate('matchType');
     if (!tournament) {
       return res.status(404).json({ error: 'Tournament not found' });
     }
@@ -2191,16 +2302,38 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
       return res.status(400).json({
         error: structure.kind === 'team_vs_team'
           ? 'This is a team-vs-team match. Use team registration (Team A / Team B).'
-          : 'This tournament uses team slot booking. Captain pays once — use Register Team.',
+          : 'This tournament uses team registration. Captain pays once — use Register Team.',
         code: 'TEAM_REGISTRATION_REQUIRED',
       });
     }
 
-    if (slotNumber < 1 || slotNumber > structure.totalSlots) {
-      return res.status(400).json({ error: `Invalid slot number. Must be between 1 and ${structure.totalSlots}` });
+    const required = Math.max(1, Number(structure.slotsRequiredToJoin || structure.playersPerTeam) || 1);
+    let nums = [];
+    if (Array.isArray(slotNumbers) && slotNumbers.length) {
+      nums = slotNumbers.map((n) => Number(n)).filter((n) => Number.isFinite(n));
+    } else if (slotNumber != null) {
+      nums = [Number(slotNumber)];
+    }
+    nums = [...new Set(nums)].sort((a, b) => a - b);
+
+    if (nums.length !== required) {
+      const label = structure.playerFormatLabel || structure.playerFormat || 'this format';
+      return res.status(400).json({
+        error: `${label} requires selecting exactly ${required} slot${required > 1 ? 's' : ''}. You selected ${nums.length}.`,
+        code: 'SLOT_COUNT_MISMATCH',
+        slotsRequired: required,
+        selectedCount: nums.length,
+      });
     }
 
-    // Initialize slots if not already created
+    for (const n of nums) {
+      if (n < 1 || n > structure.totalSlots) {
+        return res.status(400).json({
+          error: `Invalid slot number ${n}. Must be between 1 and ${structure.totalSlots}`,
+        });
+      }
+    }
+
     if (!tournament.slots || tournament.slots.length === 0) {
       const newSlots = [];
       for (let i = 1; i <= structure.totalSlots; i++) {
@@ -2208,6 +2341,7 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
           slotNumber: i,
           userId: null,
           gamingUsername: null,
+          gamingUID: null,
           bookedAt: null,
           isBooked: false,
         });
@@ -2216,58 +2350,66 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
       await tournament.save();
     }
 
-    const participantCount = await TournamentParticipant.countDocuments({
-      tournamentId: req.params.id,
-    });
-    const joinCheck = await getJoinEligibility(tournament, participantCount);
+    const bookedCount = tournament.slots.filter((s) => s.isBooked).length;
+    const joinCheck = await getJoinEligibility(tournament, bookedCount);
     if (!joinCheck.canJoin) {
       return res.status(400).json({ error: joinCheck.reason, success: false });
     }
+    if (bookedCount + required > structure.totalSlots) {
+      return res.status(400).json({ error: 'Not enough free slots left for this entry', success: false });
+    }
 
-    // Check 1: Does user already have a slot in this tournament? (Check slots array)
-    const existingSlot = tournament.slots.find(s => s.userId && s.userId.toString() === req.userId);
+    const existingSlot = tournament.slots.find(
+      (s) => s.userId && s.userId.toString() === req.userId
+    );
     if (existingSlot) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'You have already booked a slot in this tournament',
-        existingSlotNumber: existingSlot.slotNumber 
+        existingSlotNumber: existingSlot.slotNumber,
       });
     }
 
-    // Check 2: Does user already have a participant record? (Double check)
     const existingParticipant = await TournamentParticipant.findOne({
       tournamentId: req.params.id,
       userId: req.userId,
     });
     if (existingParticipant) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'You have already joined this tournament',
-        existingSlotNumber: existingParticipant.slotNumber 
+        existingSlotNumber: existingParticipant.slotNumber,
       });
     }
 
-    // Check 3: Find the requested slot
-    const slot = tournament.slots.find(s => s.slotNumber === slotNumber);
-    if (!slot) {
-      return res.status(404).json({ error: 'Slot not found' });
+    const targetSlots = [];
+    for (const n of nums) {
+      const slot = tournament.slots.find((s) => s.slotNumber === n);
+      if (!slot) {
+        return res.status(404).json({ error: `Slot ${n} not found` });
+      }
+      if (slot.isBooked) {
+        return res.status(400).json({
+          error: `Slot ${n} is already booked by another player`,
+          slotNumber: n,
+        });
+      }
+      targetSlots.push(slot);
     }
 
-    // Check 4: Is THIS specific slot already booked by someone else?
-    if (slot.isBooked) {
-      return res.status(400).json({ 
-        error: 'This slot is already booked by another player',
-        slotNumber: slotNumber 
-      });
-    }
+    const charge = lifecycle.resolveEntryCharge(tournament);
+    const { bonusUsed, realMoneyRequired, maxBonusAllowed } = getEntryPaymentSplit(
+      user,
+      charge.totalAmount
+    );
 
-    const { bonusUsed, realMoneyRequired, maxBonusAllowed } = getEntryPaymentSplit(user, tournament.entryFee);
-
-    // Step 1: Check real wallet balance after bonus cap
     if (user.wallet.balance < realMoneyRequired) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         error: 'Insufficient balance',
-        message: `❌ Insufficient real balance. For entry fee ₹${tournament.entryFee}, you can use up to ₹${maxBonusAllowed} bonus. Required real money: ₹${realMoneyRequired}, current real balance: ₹${user.wallet.balance}.`,
-        requiredAmount: tournament.entryFee,
+        message: `❌ Insufficient real balance. For ₹${charge.feePerPlayer}/player × ${charge.playersCharged} = ₹${charge.totalAmount}, you can use up to ₹${maxBonusAllowed} bonus. Required real money: ₹${realMoneyRequired}, current real balance: ₹${user.wallet.balance}.`,
+        requiredAmount: charge.totalAmount,
+        feePerPlayer: charge.feePerPlayer,
+        playersCharged: charge.playersCharged,
+        totalAmount: charge.totalAmount,
         currentBalance: user.wallet.balance,
       });
     }
@@ -2284,45 +2426,45 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
         enteredUsername: gamingIdValue,
         warning: 'You can continue, but no refund will be given if details are wrong.',
         requiresConfirmation: true,
+        slotNumbers: nums,
       });
     }
 
-    slot.userId = req.userId;
-    slot.gamingUsername = gamingIdValue;
-    slot.gamingUID = gamingUidValue;
-    slot.bookedAt = new Date();
-    slot.isBooked = true;
+    const now = new Date();
+    for (const slot of targetSlots) {
+      slot.userId = req.userId;
+      slot.gamingUsername = gamingIdValue;
+      slot.gamingUID = gamingUidValue;
+      slot.bookedAt = now;
+      slot.isBooked = true;
+    }
 
-    // Deduct entry fee from wallet with bonus cap
     user.wallet.balance -= realMoneyRequired;
     user.wallet.bonusBalance = Math.max((user.wallet.bonusBalance || 0) - bonusUsed, 0);
     user.wallet.bonusUsed = (user.wallet.bonusUsed || 0) + bonusUsed;
-    user.wallet.totalDeposited = (user.wallet.totalDeposited || 0);
-    
-    // Create transaction record
+
+    const primarySlot = nums[0];
     const transaction = new WalletTransaction({
       userId: req.userId,
       type: 'tournament_entry',
-      amount: tournament.entryFee,
+      amount: charge.totalAmount,
       tournamentId: req.params.id,
-      description: `Entry fee for ${tournament.name} - Slot ${slotNumber} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired})`,
+      description: `Entry fee for ${tournament.name} - Slots ${nums.join(', ')} — ₹${charge.feePerPlayer}/player × ${charge.playersCharged} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired})`,
       status: 'completed',
     });
 
-    // Save all changes atomically
     await tournament.save();
     await user.save();
     await transaction.save();
 
-    // Create tournament participant record
     const participant = new TournamentParticipant({
       tournamentId: req.params.id,
       userId: req.userId,
-      slotNumber: slotNumber,
+      slotNumber: primarySlot,
       gamingUsername: gamingIdValue,
       gamingUID: gamingUidValue,
       status: 'joined',
-      joinedAt: new Date(),
+      joinedAt: now,
     });
     await participant.save();
 
@@ -2330,9 +2472,13 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
+      feePerPlayer: charge.feePerPlayer,
+      playersCharged: charge.playersCharged,
+      totalAmount: charge.totalAmount,
       message: '✅ Joined successfully!',
       booking: {
-        slotNumber: slotNumber,
+        slotNumber: primarySlot,
+        slotNumbers: nums,
         gamingID: gamingIdValue,
         gamingUID: gamingUidValue,
         gamingUsername: gamingIdValue,
@@ -2349,15 +2495,15 @@ router.post('/:id/book-slot', authMiddleware, async (req, res) => {
   }
 });
 
-// Confirm username mismatch and proceed with booking
+// Confirm username mismatch and proceed with booking (multi-slot aware)
 router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
   try {
-    const { slotNumber, gamingID, gamingUID, gamingUsername } = req.body;
+    const { slotNumber, slotNumbers, gamingID, gamingUID, gamingUsername } = req.body;
     const gamingIdValue = String(gamingID || gamingUsername || '').trim();
     const gamingUidValue = String(gamingUID || '').trim();
 
-    if (!slotNumber || !gamingIdValue || !gamingUidValue) {
-      return res.status(400).json({ error: 'Slot number, Gaming ID, and UID are required' });
+    if (!gamingIdValue || !gamingUidValue) {
+      return res.status(400).json({ error: 'Gaming ID and UID are required' });
     }
 
     const user = await User.findById(req.userId);
@@ -2365,7 +2511,7 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const tournament = await Tournament.findById(req.params.id);
+    const tournament = await Tournament.findById(req.params.id).populate('matchType');
     if (!tournament) {
       return res.status(404).json({ error: 'Tournament not found' });
     }
@@ -2377,28 +2523,58 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
       });
     }
 
-    // Find the slot
-    const slot = tournament.slots.find(s => s.slotNumber === slotNumber);
-    if (!slot) {
-      return res.status(404).json({ error: 'Slot not found' });
+    const structure = lifecycle.getMatchStructure(tournament);
+    const required = Math.max(1, Number(structure.slotsRequiredToJoin || structure.playersPerTeam) || 1);
+    let nums = [];
+    if (Array.isArray(slotNumbers) && slotNumbers.length) {
+      nums = slotNumbers.map((n) => Number(n)).filter((n) => Number.isFinite(n));
+    } else if (slotNumber != null) {
+      nums = [Number(slotNumber)];
+    }
+    nums = [...new Set(nums)].sort((a, b) => a - b);
+
+    if (nums.length !== required) {
+      return res.status(400).json({
+        error: `Select exactly ${required} slot${required > 1 ? 's' : ''} for ${structure.playerFormatLabel || 'this match'}.`,
+        slotsRequired: required,
+        selectedCount: nums.length,
+      });
     }
 
-    if (slot.isBooked) {
-      return res.status(400).json({ error: 'This slot is already booked' });
+    if (!tournament.slots || !tournament.slots.length) {
+      return res.status(400).json({ error: 'Slots are not initialized' });
     }
 
-    const { bonusUsed, realMoneyRequired } = getEntryPaymentSplit(user, tournament.entryFee);
+    const existingSlot = tournament.slots.find(
+      (s) => s.userId && s.userId.toString() === req.userId
+    );
+    if (existingSlot) {
+      return res.status(400).json({ error: 'You have already booked a slot in this tournament' });
+    }
 
-    // Final wallet check
+    const targetSlots = [];
+    for (const n of nums) {
+      const slot = tournament.slots.find((s) => s.slotNumber === n);
+      if (!slot) return res.status(404).json({ error: `Slot ${n} not found` });
+      if (slot.isBooked) return res.status(400).json({ error: `Slot ${n} is already booked` });
+      targetSlots.push(slot);
+    }
+
+    const charge = lifecycle.resolveEntryCharge(tournament);
+    const { bonusUsed, realMoneyRequired } = getEntryPaymentSplit(user, charge.totalAmount);
+
     if (user.wallet.balance < realMoneyRequired) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
-    slot.userId = req.userId;
-    slot.gamingUsername = gamingIdValue;
-    slot.gamingUID = gamingUidValue;
-    slot.bookedAt = new Date();
-    slot.isBooked = true;
+    const now = new Date();
+    for (const slot of targetSlots) {
+      slot.userId = req.userId;
+      slot.gamingUsername = gamingIdValue;
+      slot.gamingUID = gamingUidValue;
+      slot.bookedAt = now;
+      slot.isBooked = true;
+    }
 
     user.wallet.balance -= realMoneyRequired;
     user.wallet.bonusBalance = Math.max((user.wallet.bonusBalance || 0) - bonusUsed, 0);
@@ -2407,9 +2583,9 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
     const transaction = new WalletTransaction({
       userId: req.userId,
       type: 'tournament_entry',
-      amount: tournament.entryFee,
+      amount: charge.totalAmount,
       tournamentId: req.params.id,
-      description: `Entry fee for ${tournament.name} - Slot ${slotNumber} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired})`,
+      description: `Entry fee for ${tournament.name} - Slots ${nums.join(', ')} — ₹${charge.feePerPlayer}/player × ${charge.playersCharged} (bonus ₹${bonusUsed}, real ₹${realMoneyRequired})`,
       status: 'completed',
     });
 
@@ -2420,11 +2596,11 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
     const participant = new TournamentParticipant({
       tournamentId: req.params.id,
       userId: req.userId,
-      slotNumber: slotNumber,
+      slotNumber: nums[0],
       gamingUsername: gamingIdValue,
       gamingUID: gamingUidValue,
       status: 'joined',
-      joinedAt: new Date(),
+      joinedAt: now,
     });
     await participant.save();
 
@@ -2434,7 +2610,8 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
       success: true,
       message: '✅ Joined successfully!',
       booking: {
-        slotNumber: slotNumber,
+        slotNumber: nums[0],
+        slotNumbers: nums,
         gamingID: gamingIdValue,
         gamingUID: gamingUidValue,
         gamingUsername: gamingIdValue,
@@ -2451,13 +2628,15 @@ router.post('/:id/confirm-slot-booking', authMiddleware, async (req, res) => {
   }
 });
 
+
 // ===== GENERIC ROUTE - MUST BE LAST =====
 // Get tournament by ID (generic - must be after all specific routes)
 router.get('/:id', async (req, res) => {
   try {
     const tournament = await Tournament.findById(req.params.id)
       .populate('game', 'name image')
-      .populate('gameMode', 'name image');
+      .populate('gameMode', 'name image')
+      .populate('matchType');
 
     if (!tournament) {
       return res.status(404).json({ error: 'Tournament not found' });

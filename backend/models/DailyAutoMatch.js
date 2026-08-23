@@ -41,6 +41,21 @@ const dailyAutoMatchSchema = new mongoose.Schema(
       ref: 'GameMode',
       required: true,
     },
+    matchType: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MatchType',
+    },
+    playerFormat: {
+      type: String,
+      enum: ['solo', 'duo', 'squad'],
+      default: 'solo',
+    },
+    /** Joining units (players for Solo, teams for Duo/Squad). Exposed as `slots` in APIs. */
+    joiningSlots: {
+      type: Number,
+      default: 48,
+      min: 1,
+    },
     mode: {
       type: String,
       enum: ['solo', 'duo', 'squad'],

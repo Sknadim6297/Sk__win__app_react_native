@@ -5,6 +5,12 @@ import { PAGE } from '../../styles/pageTheme';
 import BrandCoin from '../ui/BrandCoin';
 import { formatTimeLeft } from '../../utils/tournamentHelpers';
 
+function toCaps(value) {
+  if (value == null) return value;
+  if (typeof value === 'number') return value;
+  return String(value).toUpperCase();
+}
+
 export function useTimeLeft(targetDate) {
   const [label, setLabel] = useState(() => formatTimeLeft(targetDate));
   useEffect(() => {
@@ -24,42 +30,51 @@ export function CoinValue({ value, size = 16, color = COLORS.white, textStyle })
   );
 }
 
+/** Entry fee / prize amounts shown as ₹ (not wallet coin icon). */
+export function RupeeValue({ value, color = PAGE.gold, textStyle }) {
+  const n = Number(value);
+  const amount = Number.isFinite(n) ? n : 0;
+  return (
+    <Text style={[styles.coinText, { color }, textStyle]}>
+      ₹{amount}
+    </Text>
+  );
+}
+
 export function TimeLeftBar({ startDate }) {
   const left = useTimeLeft(startDate);
   return (
     <View style={styles.timeBar}>
       <View style={styles.timeInner}>
-        <Text style={styles.timeText}>Time Left: {left}</Text>
+        <Text style={styles.timeText}>TIME LEFT: {String(left || '').toUpperCase()}</Text>
       </View>
     </View>
   );
 }
 
-export function InfoCell({ label, value, coin, flex, inline }) {
+export function InfoCell({ label, value, coin, rupee, flex, inline }) {
+  const labelText = toCaps(label);
+  const renderValue = () => {
+    if (rupee) return <RupeeValue value={value} color={PAGE.gold} />;
+    if (coin) return <CoinValue value={value} size={16} color={PAGE.gold} />;
+    return (
+      <Text style={inline ? styles.infoValueInline : styles.infoValue} numberOfLines={2}>
+        {toCaps(value)}
+      </Text>
+    );
+  };
   if (inline) {
     return (
       <View style={[styles.infoCell, styles.infoCellInline, flex != null && { flex }]}>
-        <Text style={styles.infoLabelInline}>{label}: </Text>
-        {coin ? (
-          <CoinValue value={value} size={16} color={PAGE.gold} />
-        ) : (
-          <Text style={styles.infoValueInline} numberOfLines={2}>
-            {value}
-          </Text>
-        )}
+        <Text style={styles.infoLabelInline}>{labelText}: </Text>
+        {renderValue()}
       </View>
     );
   }
   return (
     <View style={[styles.infoCell, flex != null && { flex }]}>
-      <Text style={styles.infoLabel}>{label}:</Text>
-      {coin ? (
-        <CoinValue value={value} size={16} color={PAGE.gold} />
-      ) : (
-        <Text style={styles.infoValue} numberOfLines={2}>
-          {value}
-        </Text>
-      )}
+      <Text style={styles.infoLabel}>{labelText}:</Text>
+      {renderValue()}
     </View>
   );
 }
@@ -71,12 +86,14 @@ export function StatTriple({ items }) {
     <View style={styles.triple}>
       {list.map((item, i) => (
         <View key={`${item.label}-${i}`} style={styles.tripleCol}>
-          <Text style={styles.tripleLabel}>{item.label}</Text>
-          {item.coin ? (
+          <Text style={styles.tripleLabel}>{toCaps(item.label)}</Text>
+          {item.rupee ? (
+            <RupeeValue value={item.value} color={PAGE.gold} />
+          ) : item.coin ? (
             <CoinValue value={item.value} size={16} color={PAGE.gold} />
           ) : (
             <Text style={styles.tripleValue} numberOfLines={2}>
-              {item.value}
+              {toCaps(item.value)}
             </Text>
           )}
           {i < list.length - 1 ? <View style={styles.tripleRule} /> : null}

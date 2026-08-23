@@ -52,21 +52,32 @@ function formatListItem(tournament, joinStats) {
   const status = lifecycle.getEffectiveStatus(tournament);
   const type = lifecycle.getTournamentType(tournament);
   const structure = lifecycle.getMatchStructure(tournament);
+  const charge = lifecycle.resolveEntryCharge(tournament);
   const { joinedCount, capacity, unit, isFull, usesTeams } = joinStats;
+  const prizePool = Math.max(0, Number(tournament.prizePool) || 0);
+  const perKillRaw = Math.max(0, Number(tournament.perKill) || 0);
+  const showPerKill = Boolean(structure.hasKillRewards) && perKillRaw > 0;
   return {
     _id: tournament._id,
     name: tournament.name,
     tournamentType: type,
     category: tournament.category,
     matchKind: structure.kind,
-    matchType: structure.matchType,
+    matchType: structure.matchTypeName || structure.matchType,
+    matchTypeName: structure.matchTypeName || structure.matchType,
     formatLabel: structure.formatLabel,
     playerFormatLabel: structure.playerFormatLabel,
     mode: structure.mode,
     modeLabel: structure.modeLabel,
     hasKillRewards: structure.hasKillRewards,
-    entryFee: tournament.entryFee,
-    perKill: structure.hasKillRewards ? tournament.perKill || 0 : 0,
+    entryFee: charge.feePerPlayer,
+    entryFeePerPlayer: charge.feePerPlayer,
+    feePerPlayer: charge.feePerPlayer,
+    playersCharged: charge.playersCharged,
+    totalAmount: charge.totalAmount,
+    perKill: showPerKill ? perKillRaw : 0,
+    showPrizePerKill: showPerKill,
+    showPrizePool: prizePool > 0,
     joinedCount,
     capacity,
     joinUnit: unit,
@@ -79,10 +90,12 @@ function formatListItem(tournament, joinStats) {
     matchDate: tournament.startDate,
     startDate: tournament.startDate,
     gameMode: tournament.gameMode,
+    gameName: tournament.game?.name || null,
     maxParticipants: tournament.maxParticipants,
     maxTeams: tournament.maxTeams,
-    prizePool: tournament.prizePool,
+    prizePool,
     map: tournament.map || '',
+    mapName: tournament.map || '',
     bannerImage: tournament.bannerImage || '',
     locked: Boolean(tournament.locked),
     resultsPublished: lifecycle.areResultsPublished(tournament),
@@ -148,7 +161,9 @@ router.get('/admin/list', authMiddleware, async (req, res) => {
     }
 
     let find = Tournament.find(filter)
+      .populate('game', 'name')
       .populate('gameMode', 'name')
+      .populate('matchType')
       .populate('autoMatchId', 'name displayId autoMatchNumber')
       .sort({ createdAt: -1 });
     let total = 0;
@@ -217,6 +232,7 @@ router.get('/admin/:id', authMiddleware, async (req, res) => {
     const tournament = await Tournament.findById(req.params.id)
       .populate('game', 'name image')
       .populate('gameMode', 'name image')
+      .populate('matchType')
       .populate('autoMatchId', 'name displayId autoMatchNumber isActive');
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
 
@@ -1171,7 +1187,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Account is not active' });
     }
 
-    const tournament = await Tournament.findById(req.params.id);
+    const tournament = await Tournament.findById(req.params.id).populate('matchType');
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
 
     if (!lifecycle.isCustomMatch(tournament) && !lifecycle.usesTeamRegistration(tournament)) {

@@ -76,19 +76,26 @@ export function bannerOf(t) {
 }
 
 export function modeName(t) {
-  return matchLabel(t?.matchType || t?.gameMode?.name || t?.modeLabel || t?.mode || 'Match');
+  if (t?.matchTypeName) return matchLabel(t.matchTypeName);
+  if (t?.matchType && typeof t.matchType === 'object' && t.matchType.name) {
+    return matchLabel(t.matchType.name);
+  }
+  if (typeof t?.matchType === 'string' && t.matchType && !/^[a-f0-9]{24}$/i.test(t.matchType)) {
+    return matchLabel(t.matchType);
+  }
+  return matchLabel(t?.gameMode?.name || 'Match');
 }
 
-/** Player-facing format: Solo / Duo / Squad / Team */
+/** Player Format: Solo / Duo / Squad — never labeled "Format" alone in UI. */
 export function formatName(t) {
   if (t?.playerFormatLabel) return t.playerFormatLabel;
   if (t?.modeLabel && /^(Solo|Duo|Squad|Team)$/i.test(String(t.modeLabel))) return t.modeLabel;
-  const mode = String(t?.mode || '').toLowerCase();
+  const mode = String(t?.playerFormat || t?.mode || '').toLowerCase();
   if (mode === 'solo') return 'Solo';
   if (mode === 'duo') return 'Duo';
   if (mode === 'squad') return 'Squad';
   if (mode === 'team') return 'Team';
-  return t?.formatLabel || modeName(t);
+  return t?.formatLabel || 'Solo';
 }
 
 export function brandLogoUrl() {

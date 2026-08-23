@@ -6,6 +6,10 @@ const PrizeDistribution = require('../models/PrizeDistribution');
 const BattleRoyaleResult = require('../models/BattleRoyaleResult');
 const CustomMatchResult = require('../models/CustomMatchResult');
 const matchStructure = require('./matchStructure');
+const {
+  resolveCapacityFromSelection,
+  normalizePlayerFormat,
+} = require('./matchTypeService');
 
 const LIFECYCLE = ['draft', 'upcoming', 'ongoing', 'completed', 'cancelled'];
 
@@ -202,58 +206,74 @@ async function getTeamCount(tournamentId) {
   return Team.countDocuments({ tournamentId, status: 'registered' });
 }
 
-/** Custom Match or BR Duo/Squad/Team — captain registers a full roster (pays fee × players). */
+/** Custom Match or BR Duo/Squad — captain registers a full roster (pays fee × players). */
 function usesTeamRegistration(tournament) {
-  if (isCustomMatch(tournament)) return true;
-  const m = String(tournament.mode || 'solo').toLowerCase();
-  return m === 'duo' || m === 'squad' || m === 'team';
+  return getMatchStructure(tournament).usesTeamRegistration;
 }
 
-function getPlayersPerTeam(mode) {
-  const m = String(mode || 'solo').toLowerCase();
-  if (m === 'squad' || m === 'team') return 4;
-  if (m === 'duo') return 2;
-  return 1;
+function getPlayersPerTeam(modeOrTournament) {
+  return matchStructure.getPlayersPerTeam(modeOrTournament);
 }
 
-/** BR fixed player capacity; Custom Match = 2 teams × players/team. */
-const BR_MAX_PLAYERS = 50;
+/** Default BR player capacity used only when no joiningSlots are provided. */
+const BR_MAX_PLAYERS = matchStructure.BR_MAX_PLAYERS;
 
-function resolveTournamentCapacity({ category, mode, maxParticipants, maxTeams }) {
+/**
+ * Capacity from Match Type + Player Format + joining slots.
+ * Prefer resolveCapacityFromSelection when matchType doc is available.
+ */
+function resolveTournamentCapacity({
+  category,
+  mode,
+  playerFormat,
+  maxParticipants,
+  maxTeams,
+  playersPerTeam: pptIn,
+  slots,
+  joiningSlots,
+  matchType,
+}) {
   const isCustom = category === 'custom' || category === 'custom_match';
-  const modeNorm = String(mode || 'solo').toLowerCase();
-  const perTeam = getPlayersPerTeam(modeNorm);
+  const format = normalizePlayerFormat(playerFormat || mode || 'solo');
+  const mt = matchType || { isTeamVsTeam: isCustom, hasKillRewards: !isCustom };
+  const slotHint =
+    joiningSlots != null && Number(joiningSlots) > 0
+      ? Number(joiningSlots)
+      : slots != null && Number(slots) > 0
+        ? Number(slots)
+        : maxTeams != null && Number(maxTeams) > 0 && format !== 'solo'
+          ? Number(maxTeams)
+          : maxParticipants != null && Number(maxParticipants) > 0 && format === 'solo'
+            ? Number(maxParticipants)
+            : undefined;
 
-  if (isCustom) {
-    if (!['solo', 'duo', 'squad', 'team'].includes(modeNorm)) {
-      return { ok: false, error: 'Clash Squad supports Solo, Duo, Squad, or Team only' };
-    }
-    return {
-      ok: true,
-      mode: modeNorm,
-      maxTeams: 2,
-      maxParticipants: perTeam * 2,
-      playersPerTeam: perTeam,
-      category: 'custom',
-    };
+  const capacity = resolveCapacityFromSelection({
+    matchType: mt,
+    playerFormat: format,
+    slots: slotHint,
+  });
+
+  // Preserve explicit ppt override if caller passed one (rare)
+  if (pptIn != null && Number(pptIn) > 0) {
+    capacity.playersPerTeam = Math.max(1, Number(pptIn));
+    capacity.totalPlayerCapacity = capacity.slots * capacity.playersPerTeam;
+    capacity.maxParticipants = capacity.totalPlayerCapacity;
   }
 
-  // Battle Royale
-  if (!['solo', 'duo', 'squad', 'team'].includes(modeNorm)) {
-    return { ok: false, error: 'Battle Royale supports Solo, Duo, Squad, or Team only' };
-  }
-  const players = BR_MAX_PLAYERS;
-  const teams =
-    modeNorm === 'solo' ? players : Math.floor(players / perTeam);
   return {
     ok: true,
-    mode: modeNorm,
-    maxTeams: teams,
-    maxParticipants: players,
-    playersPerTeam: perTeam,
-    category: 'battle_royale',
-    // leftover slots when squad: 50 % 4 = 2 (informational)
-    leftoverPlayerSlots: modeNorm === 'solo' ? 0 : players - teams * perTeam,
+    mode: capacity.mode,
+    playerFormat: capacity.playerFormat,
+    maxTeams: capacity.maxTeams,
+    maxParticipants: capacity.maxParticipants,
+    playersPerTeam: capacity.playersPerTeam,
+    category: capacity.category,
+    slots: capacity.slots,
+    joiningSlots: capacity.slots,
+    totalPlayerCapacity: capacity.totalPlayerCapacity,
+    usesTeamRegistration: capacity.usesTeamRegistration,
+    isTeamVsTeam: capacity.isTeamVsTeam,
+    hasKillRewards: capacity.hasKillRewards,
   };
 }
 
@@ -293,20 +313,29 @@ async function getJoinStats(tournamentId, tournament) {
       formatLabel: structure.formatLabel,
       playerFormatLabel: structure.playerFormatLabel,
       modeLabel: structure.modeLabel,
+      slotsRequiredToJoin: structure.slotsRequiredToJoin,
     };
   }
 
-  const joinedCount = await getParticipantCount(tournamentId);
+  // BR 48-slot grid: occupancy = booked seats
+  let bookedSlots = 0;
+  if (Array.isArray(tournament?.slots) && tournament.slots.length) {
+    bookedSlots = tournament.slots.filter((s) => s.isBooked).length;
+  } else {
+    bookedSlots = await getParticipantCount(tournamentId);
+  }
+  const needed = Math.max(1, Number(structure.slotsRequiredToJoin) || 1);
   return {
-    joinedCount,
+    joinedCount: bookedSlots,
     capacity: structure.totalSlots,
     unit: structure.slotUnit,
-    isFull: joinedCount >= structure.totalSlots,
+    isFull: bookedSlots + needed > structure.totalSlots,
     usesTeams: false,
     matchKind: structure.kind,
     formatLabel: structure.formatLabel,
     playerFormatLabel: structure.playerFormatLabel,
     modeLabel: structure.modeLabel,
+    slotsRequiredToJoin: structure.slotsRequiredToJoin,
   };
 }
 

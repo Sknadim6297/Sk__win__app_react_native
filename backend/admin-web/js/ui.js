@@ -297,6 +297,7 @@ const AdminUI = (() => {
             <div class="nav-group">SETTINGS</div>
             <button class="nav-sub ${navActive(active, 'games')}" data-nav="#/games">${icon.settings}Games & Modes</button>
             <button class="nav-sub ${navActive(active, 'maps')}" data-nav="#/maps">Maps</button>
+            <button class="nav-sub ${navActive(active, 'match-types')}" data-nav="#/match-types">Match Types</button>
             <button class="nav-sub ${navActive(active, 'sliders')}" data-nav="#/sliders">Home banners</button>
             <button class="nav-sub ${navActive(active, 'support')}" data-nav="#/support">Support</button>
             <button class="nav-sub ${navActive(active, 'announcements')}" data-nav="#/announcements">Announcements</button>

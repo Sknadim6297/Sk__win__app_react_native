@@ -394,16 +394,26 @@ export const tournamentService = {
   getResults: (id) => apiCall(`/tournaments/${id}/results`),
   getHistory: () => apiCall('/tournaments/user/history'),
   getSlots: (id) => apiCall(`/tournaments/${id}/slots`),
-  bookSlot: (id, slotNumber, gamingID, gamingUID) =>
-    apiCall(`/tournaments/${id}/book-slot`, {
+  bookSlot: (id, slotNumberOrNumbers, gamingID, gamingUID) => {
+    const body =
+      Array.isArray(slotNumberOrNumbers)
+        ? { slotNumbers: slotNumberOrNumbers, gamingID, gamingUID }
+        : { slotNumber: slotNumberOrNumbers, slotNumbers: [slotNumberOrNumbers], gamingID, gamingUID };
+    return apiCall(`/tournaments/${id}/book-slot`, {
       method: 'POST',
-      body: JSON.stringify({ slotNumber, gamingID, gamingUID }),
-    }),
-  confirmSlotBooking: (id, slotNumber, gamingID, gamingUID) =>
-    apiCall(`/tournaments/${id}/confirm-slot-booking`, {
+      body: JSON.stringify(body),
+    });
+  },
+  confirmSlotBooking: (id, slotNumberOrNumbers, gamingID, gamingUID) => {
+    const body =
+      Array.isArray(slotNumberOrNumbers)
+        ? { slotNumbers: slotNumberOrNumbers, gamingID, gamingUID }
+        : { slotNumber: slotNumberOrNumbers, slotNumbers: [slotNumberOrNumbers], gamingID, gamingUID };
+    return apiCall(`/tournaments/${id}/confirm-slot-booking`, {
       method: 'POST',
-      body: JSON.stringify({ slotNumber, gamingID, gamingUID }),
-    }),
+      body: JSON.stringify(body),
+    });
+  },
   createTournament: (data) =>
     apiCall('/tournaments/admin/create', { method: 'POST', body: JSON.stringify(data) }),
   updateTournament: (id, data) =>

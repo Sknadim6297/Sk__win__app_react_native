@@ -24,6 +24,19 @@ function sendError(res, error) {
   res.status(status).json({ error: error.message || 'Request failed' });
 }
 
+router.post('/admin/seed-samples', authMiddleware, async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    const generateTodayFlag = req.body?.generateToday !== false;
+    const result = await service.seedSampleDailyAutoMatches(req.userId, {
+      generateToday: generateTodayFlag,
+    });
+    res.status(201).json(result);
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
 router.get('/admin/list', authMiddleware, async (req, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
