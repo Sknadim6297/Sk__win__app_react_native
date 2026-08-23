@@ -126,11 +126,19 @@ async function sendSmsFast2Sms(phone, otp) {
   }
 }
 
+function emailSmtpConfig() {
+  const host = process.env.SMTP_HOST || process.env.MAIL_HOST;
+  const user = process.env.SMTP_USER || process.env.MAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.MAIL_PASSWORD || process.env.MAIL_PASS;
+  const from = process.env.SMTP_FROM || process.env.MAIL_FROM || user || 'WAREZONE <noreply@warezone.app>';
+  const port = Number(process.env.SMTP_PORT || process.env.MAIL_PORT || 587);
+  const secure =
+    String(process.env.SMTP_SECURE || process.env.MAIL_SECURE || '').toLowerCase() === 'true';
+  return { host, user, pass, from, port, secure };
+}
+
 async function sendEmailOtp(email, otp) {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const from = process.env.SMTP_FROM || user || 'noreply@warezone.app';
+  const { host, user, pass, from, port, secure } = emailSmtpConfig();
   if (!host || !user || !pass || !email) return { sent: false, skipped: true, channel: 'email' };
 
   try {
@@ -138,8 +146,8 @@ async function sendEmailOtp(email, otp) {
     const nodemailer = require('nodemailer');
     const transporter = nodemailer.createTransport({
       host,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: String(process.env.SMTP_SECURE || '').toLowerCase() === 'true',
+      port,
+      secure,
       auth: { user, pass },
     });
     await transporter.sendMail({
@@ -170,7 +178,8 @@ function whatsappConfigured() {
 }
 
 function emailConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  const { host, user, pass } = emailSmtpConfig();
+  return Boolean(host && user && pass);
 }
 
 async function deliverOtp({ email, phone, otp, channel = 'auto' }) {

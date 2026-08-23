@@ -463,10 +463,26 @@ router.post('/forgot-password', async (req, res) => {
     const phone = user.phone || user.phoneNumber || (!isEmail ? phoneDigits : '');
     const emailRaw = String(user.email || '').toLowerCase();
 
+    if (channel === 'whatsapp' && !otpDelivery.whatsappConfigured()) {
+      return res.status(503).json({
+        error: 'WhatsApp OTP is coming soon. Please use Email.',
+        code: 'CHANNEL_COMING_SOON',
+      });
+    }
+    if (channel === 'sms' && !otpDelivery.smsConfigured()) {
+      return res.status(503).json({
+        error: 'SMS OTP is coming soon. Please use Email.',
+        code: 'CHANNEL_COMING_SOON',
+      });
+    }
     if ((channel === 'sms' || channel === 'whatsapp') && !phone) {
       return res.status(400).json({
         error: 'No mobile number on this account. Use email, or add a phone in Edit Profile.',
       });
+    }
+    if (channel === 'email' && !otpDelivery.emailConfigured()) {
+      // Still create OTP for local/dev (debugOtp / server logs), but warn clearly
+      console.warn('[forgot-password] SMTP not configured — OTP will only appear in logs/debugOtp');
     }
 
     const otp = adminReset.generateOtp();

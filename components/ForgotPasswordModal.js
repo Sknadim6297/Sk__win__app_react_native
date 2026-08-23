@@ -3,10 +3,12 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   TextInput,
   ActivityIndicator,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import CenterDialog from './CenterDialog';
@@ -14,55 +16,102 @@ import { authService } from '../services/api';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE } from '../styles/pageTheme';
 
+const OTP_LEN = 6;
+
+/** Email is live. WhatsApp / SMS stay Coming Soon until providers are configured. */
 const CHANNELS = [
-  { id: 'whatsapp', label: 'WhatsApp', icon: 'whatsapp', color: '#25D366' },
-  { id: 'sms', label: 'SMS', icon: 'message-text', color: '#38BDF8' },
-  { id: 'email', label: 'Email', icon: 'email-outline', color: '#A78BFA' },
+  {
+    id: 'email',
+    label: 'Email',
+    icon: 'email-outline',
+    color: '#00B368',
+    available: true,
+    hint: 'OTP to your registered email',
+  },
+  {
+    id: 'whatsapp',
+    label: 'WhatsApp',
+    icon: 'whatsapp',
+    color: '#25D366',
+    available: false,
+    hint: 'Coming soon',
+  },
+  {
+    id: 'sms',
+    label: 'SMS',
+    icon: 'message-text',
+    color: '#38BDF8',
+    available: false,
+    hint: 'Coming soon',
+  },
 ];
 
+/**
+ * One hidden TextInput + 6 fixed visual cells.
+ * Avoids multi-input flex collapse on web while typing.
+ */
 function OtpBoxes({ value, onChange, disabled }) {
-  const refs = useRef([]);
-  const digits = String(value || '').replace(/\D/g, '').slice(0, 6).split('');
+  const inputRef = useRef(null);
+  const digits = String(value || '').replace(/\D/g, '').slice(0, OTP_LEN);
+  const activeIndex = Math.min(digits.length, OTP_LEN - 1);
 
-  const setAt = (index, char) => {
-    const next = [...Array(6)].map((_, i) => (i === index ? char : digits[i] || ''));
-    const joined = next.join('').replace(/\D/g, '').slice(0, 6);
-    onChange(joined);
-    if (char && index < 5) refs.current[index + 1]?.focus();
-  };
+  useEffect(() => {
+    if (!disabled) {
+      const t = setTimeout(() => inputRef.current?.focus(), 80);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [disabled]);
 
   return (
-    <View style={styles.otpRow}>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <TextInput
-          key={i}
-          ref={(el) => {
-            refs.current[i] = el;
-          }}
-          style={[styles.otpBox, digits[i] ? styles.otpBoxFilled : null]}
-          value={digits[i] || ''}
-          onChangeText={(t) => {
-            const last = t.replace(/\D/g, '').slice(-1);
-            setAt(i, last);
-          }}
-          onKeyPress={({ nativeEvent }) => {
-            if (nativeEvent.key === 'Backspace' && !digits[i] && i > 0) {
-              refs.current[i - 1]?.focus();
-            }
-          }}
-          keyboardType="number-pad"
-          maxLength={1}
-          editable={!disabled}
-          selectTextOnFocus
-        />
-      ))}
-    </View>
+    <Pressable
+      style={styles.otpRow}
+      onPress={() => !disabled && inputRef.current?.focus()}
+      accessibilityRole="none"
+    >
+      {Array.from({ length: OTP_LEN }).map((_, i) => {
+        const d = digits[i] || '';
+        const isActive = !disabled && i === activeIndex && digits.length < OTP_LEN;
+        const isComplete = digits.length === OTP_LEN;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.otpBox,
+              d ? styles.otpBoxFilled : null,
+              (isActive || (isComplete && i === OTP_LEN - 1)) && styles.otpBoxActive,
+            ]}
+          >
+            <Text style={styles.otpDigit}>{d}</Text>
+          </View>
+        );
+      })}
+      <TextInput
+        ref={inputRef}
+        value={digits}
+        onChangeText={(t) => onChange(String(t || '').replace(/\D/g, '').slice(0, OTP_LEN))}
+        keyboardType="number-pad"
+        maxLength={OTP_LEN}
+        editable={!disabled}
+        autoFocus
+        caretHidden
+        contextMenuHidden={false}
+        textContentType="oneTimeCode"
+        autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
+        importantForAutofill="yes"
+        style={styles.otpHiddenInput}
+        accessibilityLabel="Enter 6-digit OTP"
+      />
+    </Pressable>
   );
 }
 
+/**
+ * Shared forgot-password for users + admins: Email OTP (live), WhatsApp/SMS Coming Soon.
+ */
 export default function ForgotPasswordModal({ visible, onClose, initialEmail = '' }) {
   const [step, setStep] = useState('identify');
-  const [channel, setChannel] = useState('whatsapp');
+  const [channel, setChannel] = useState('email');
   const [identifier, setIdentifier] = useState(initialEmail);
   const [accountEmail, setAccountEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -78,7 +127,7 @@ export default function ForgotPasswordModal({ visible, onClose, initialEmail = '
   useEffect(() => {
     if (visible) {
       setStep('identify');
-      setChannel('whatsapp');
+      setChannel('email');
       setIdentifier(String(initialEmail || '').trim());
       setAccountEmail('');
       setOtp('');
@@ -104,12 +153,17 @@ export default function ForgotPasswordModal({ visible, onClose, initialEmail = '
       setError('Enter your email or mobile number');
       return;
     }
+    if (channel !== 'email') {
+      setError('WhatsApp and SMS OTP are coming soon. Please use Email.');
+      setChannel('email');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const data = await authService.forgotPassword(trimmed, channel);
+      const data = await authService.forgotPassword(trimmed, 'email');
       setAccountEmail(data.email || (trimmed.includes('@') ? trimmed.toLowerCase() : ''));
-      setHint(data.message || 'OTP sent. Check WhatsApp, SMS, or email.');
+      setHint(data.message || 'OTP sent to your email. Enter the 6-digit code.');
       if (data.debugOtp) setDebugOtp(String(data.debugOtp));
       setStep('otp');
     } catch (err) {
@@ -122,6 +176,11 @@ export default function ForgotPasswordModal({ visible, onClose, initialEmail = '
   const verifyOtp = async () => {
     if (otp.trim().length !== 6) {
       setError('Enter the 6-digit OTP');
+      return;
+    }
+    if (!accountEmail) {
+      setError('Missing account email. Request OTP again.');
+      setStep('identify');
       return;
     }
     setLoading(true);
@@ -180,8 +239,8 @@ export default function ForgotPasswordModal({ visible, onClose, initialEmail = '
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={[styles.iconWrap, step === 'done' && styles.iconWrapDone]}>
           <MaterialCommunityIcons
-            name={step === 'done' ? 'check-bold' : step === 'otp' ? channelMeta.icon : 'lock-reset'}
-            size={32}
+            name={step === 'done' ? 'check-bold' : step === 'otp' ? 'email-outline' : 'lock-reset'}
+            size={30}
             color={step === 'done' ? '#34D399' : channelMeta.color}
           />
         </View>
@@ -190,7 +249,8 @@ export default function ForgotPasswordModal({ visible, onClose, initialEmail = '
         {step === 'identify' && (
           <>
             <Text style={styles.message}>
-              Enter your email or mobile. We will send a 6-digit OTP on WhatsApp, SMS, or email.
+              Works for players and admin. Enter your account email (or mobile). We send a 6-digit
+              OTP by email.
             </Text>
             <TextInput
               style={styles.input}
@@ -202,28 +262,53 @@ export default function ForgotPasswordModal({ visible, onClose, initialEmail = '
               keyboardType="email-address"
               editable={!loading}
             />
+
             <Text style={styles.channelLabel}>Send OTP via</Text>
             <View style={styles.channelRow}>
               {CHANNELS.map((item) => {
                 const active = channel === item.id;
+                const locked = !item.available;
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    style={[styles.channelChip, active && styles.channelChipActive]}
-                    onPress={() => setChannel(item.id)}
+                    style={[
+                      styles.channelChip,
+                      active && !locked && styles.channelChipActive,
+                      locked && styles.channelChipLocked,
+                    ]}
+                    onPress={() => {
+                      if (locked) {
+                        setError(`${item.label} OTP is coming soon. Use Email for now.`);
+                        setChannel('email');
+                        return;
+                      }
+                      setError('');
+                      setChannel(item.id);
+                    }}
                     activeOpacity={0.85}
                     disabled={loading}
                   >
                     <MaterialCommunityIcons
                       name={item.icon}
                       size={20}
-                      color={active ? item.color : PAGE.muted}
+                      color={locked ? PAGE.mutedDim : active ? item.color : PAGE.muted}
                     />
-                    <Text style={[styles.channelText, active && styles.channelTextActive]}>{item.label}</Text>
+                    <Text
+                      style={[
+                        styles.channelText,
+                        active && !locked && styles.channelTextActive,
+                        locked && styles.channelTextLocked,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                    {locked ? <Text style={styles.soonBadge}>SOON</Text> : null}
                   </TouchableOpacity>
                 );
               })}
             </View>
+            <Text style={styles.channelHint}>Email OTP is live. WhatsApp & SMS coming soon.</Text>
+
             {!!error && <Text style={styles.error}>{error}</Text>}
             <TouchableOpacity
               style={[styles.primaryBtn, loading && styles.btnDisabled]}
@@ -234,7 +319,7 @@ export default function ForgotPasswordModal({ visible, onClose, initialEmail = '
               {loading ? (
                 <ActivityIndicator color={COLORS.white} />
               ) : (
-                <Text style={styles.primaryText}>Send OTP</Text>
+                <Text style={styles.primaryText}>Send email OTP</Text>
               )}
             </TouchableOpacity>
           </>
@@ -242,14 +327,26 @@ export default function ForgotPasswordModal({ visible, onClose, initialEmail = '
 
         {step === 'otp' && (
           <>
-            <Text style={styles.message}>{hint || 'Enter the 6-digit code we sent you.'}</Text>
+            <Text style={styles.message}>{hint || 'Enter the 6-digit code from your email.'}</Text>
+            {!!accountEmail && (
+              <Text style={styles.otpTarget}>
+                Code sent to{' '}
+                <Text style={styles.otpTargetEmail}>{accountEmail}</Text>
+              </Text>
+            )}
             {!!debugOtp && <Text style={styles.debugHint}>Dev OTP: {debugOtp}</Text>}
             <OtpBoxes value={otp} onChange={setOtp} disabled={loading} />
+            <Text style={styles.otpProgress}>
+              {String(otp || '').replace(/\D/g, '').length}/{OTP_LEN}
+            </Text>
             {!!error && <Text style={styles.error}>{error}</Text>}
             <TouchableOpacity
-              style={[styles.primaryBtn, loading && styles.btnDisabled]}
+              style={[
+                styles.primaryBtn,
+                (loading || String(otp || '').replace(/\D/g, '').length !== OTP_LEN) && styles.btnDisabled,
+              ]}
               onPress={verifyOtp}
-              disabled={loading}
+              disabled={loading || String(otp || '').replace(/\D/g, '').length !== OTP_LEN}
               activeOpacity={0.88}
             >
               {loading ? (
@@ -267,27 +364,35 @@ export default function ForgotPasswordModal({ visible, onClose, initialEmail = '
         {step === 'password' && (
           <>
             <Text style={styles.message}>{hint || 'Choose a new password for this account.'}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="New password"
-              placeholderTextColor={COLORS.grayDim}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              editable={!loading}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm password"
-              placeholderTextColor={COLORS.grayDim}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showPassword}
-              editable={!loading}
-            />
-            <TouchableOpacity style={styles.linkBtn} onPress={() => setShowPassword((v) => !v)}>
-              <Text style={styles.linkText}>{showPassword ? 'Hide password' : 'Show password'}</Text>
-            </TouchableOpacity>
+            <View style={styles.inputWrap}>
+              <TextInput
+                style={styles.inputInner}
+                placeholder="New password"
+                placeholderTextColor={COLORS.grayDim}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                editable={!loading}
+              />
+              <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
+                <MaterialCommunityIcons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={20}
+                  color={PAGE.muted}
+                />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.inputWrap}>
+              <TextInput
+                style={styles.inputInner}
+                placeholder="Confirm password"
+                placeholderTextColor={COLORS.grayDim}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showPassword}
+                editable={!loading}
+              />
+            </View>
             {!!error && <Text style={styles.error}>{error}</Text>}
             <TouchableOpacity
               style={[styles.primaryBtn, loading && styles.btnDisabled]}
@@ -306,7 +411,9 @@ export default function ForgotPasswordModal({ visible, onClose, initialEmail = '
 
         {step === 'done' && (
           <>
-            <Text style={styles.message}>Password updated. You can login with your new password now.</Text>
+            <Text style={styles.message}>
+              Password updated successfully. You can login with your new password now.
+            </Text>
             <TouchableOpacity style={styles.primaryBtn} onPress={close} activeOpacity={0.88}>
               <Text style={styles.primaryText}>Back to Login</Text>
             </TouchableOpacity>
@@ -329,9 +436,9 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: PAGE.cardAlt,
+    backgroundColor: 'rgba(0, 179, 104, 0.12)',
     borderWidth: 1,
-    borderColor: PAGE.borderAccent,
+    borderColor: 'rgba(0, 179, 104, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -351,8 +458,9 @@ const styles = StyleSheet.create({
     ...TEXT.body,
     color: COLORS.gray,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 21,
     marginBottom: 14,
+    fontSize: 13,
   },
   input: {
     backgroundColor: PAGE.cardAlt,
@@ -362,9 +470,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 13,
     color: COLORS.white,
-    fontFamily: FONTS.bold,
+    fontFamily: FONTS.semiBold,
     fontSize: 15,
     marginBottom: 10,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PAGE.cardAlt,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    minHeight: 52,
+  },
+  inputInner: {
+    flex: 1,
+    color: COLORS.white,
+    fontFamily: FONTS.semiBold,
+    fontSize: 15,
+    paddingVertical: 12,
   },
   channelLabel: {
     ...TEXT.label,
@@ -375,11 +501,11 @@ const styles = StyleSheet.create({
   channelRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 8,
   },
   channelChip: {
     flex: 1,
-    minHeight: 56,
+    minHeight: 72,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: PAGE.border,
@@ -388,41 +514,103 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     paddingHorizontal: 4,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   channelChipActive: {
-    borderColor: PAGE.borderAccent,
-    backgroundColor: 'rgba(91, 57, 168, 0.28)',
+    borderColor: 'rgba(0, 179, 104, 0.7)',
+    backgroundColor: 'rgba(0, 179, 104, 0.16)',
+  },
+  channelChipLocked: {
+    opacity: 0.72,
   },
   channelText: {
     ...TEXT.labelSm,
     fontFamily: FONTS.bold,
     color: PAGE.muted,
+    fontSize: 11,
   },
   channelTextActive: {
     color: COLORS.white,
   },
+  channelTextLocked: {
+    color: PAGE.mutedDim,
+  },
+  soonBadge: {
+    marginTop: 2,
+    fontSize: 9,
+    fontFamily: FONTS.bold,
+    color: PAGE.gold,
+    letterSpacing: 0.6,
+  },
+  channelHint: {
+    ...TEXT.caption,
+    color: PAGE.mutedDim,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  otpTarget: {
+    ...TEXT.caption,
+    color: PAGE.muted,
+    textAlign: 'center',
+    marginBottom: 12,
+    marginTop: -4,
+  },
+  otpTargetEmail: {
+    color: PAGE.cyan,
+    fontFamily: FONTS.semiBold,
+  },
   otpRow: {
+    position: 'relative',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 8,
+    minHeight: 54,
   },
   otpBox: {
-    flex: 1,
+    width: 44,
     height: 52,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 12,
+    borderWidth: 1.5,
     borderColor: PAGE.border,
     backgroundColor: PAGE.cardAlt,
-    color: COLORS.white,
-    fontFamily: FONTS.bold,
-    fontSize: 22,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   otpBoxFilled: {
-    borderColor: PAGE.accent,
-    backgroundColor: 'rgba(123, 97, 255, 0.16)',
+    borderColor: 'rgba(0, 179, 104, 0.55)',
+    backgroundColor: 'rgba(0, 179, 104, 0.14)',
+  },
+  otpBoxActive: {
+    borderColor: PAGE.cyan,
+    backgroundColor: 'rgba(79, 209, 197, 0.12)',
+  },
+  otpDigit: {
+    fontFamily: FONTS.bold,
+    fontSize: 22,
+    color: COLORS.white,
+    textAlign: 'center',
+    includeFontPadding: false,
+    lineHeight: 28,
+  },
+  otpHiddenInput: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.02,
+    color: 'transparent',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    fontSize: 16,
+    zIndex: 2,
+  },
+  otpProgress: {
+    ...TEXT.caption,
+    color: PAGE.mutedDim,
+    textAlign: 'center',
+    marginBottom: 10,
+    fontFamily: FONTS.semiBold,
+    letterSpacing: 1,
   },
   error: {
     ...TEXT.label,

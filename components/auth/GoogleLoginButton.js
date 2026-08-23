@@ -32,7 +32,7 @@ export default function GoogleLoginButton({
   return (
     <AnimatedPressable
       onPress={onPress}
-      disabled={disabled || loading}
+      disabled={disabled || loading || comingSoon}
       onPressIn={() => {
         if (inactive && !comingSoon) return;
         scale.value = withSpring(0.98, { damping: 14, stiffness: 300 });

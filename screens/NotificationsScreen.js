@@ -138,10 +138,10 @@ export default function NotificationsScreen({ navigation }) {
         <AppIcon name={typeIcon(item.type)} size={22} light />
       </View>
       <View style={styles.cardBody}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={styles.title} numberOfLines={2}>
           {item.title}
         </Text>
-        <Text style={styles.message} numberOfLines={2}>
+        <Text style={styles.message} numberOfLines={3}>
           {item.message}
         </Text>
         <View style={styles.metaRow}>
@@ -150,28 +150,23 @@ export default function NotificationsScreen({ navigation }) {
           <Text style={styles.timestamp}>{formatTime(item.createdAt)}</Text>
         </View>
       </View>
-      {!item.isRead ? <View style={styles.unreadDot} /> : <AppIcon name="chevron-right" size={18} light />}
+      <View style={styles.trailing}>
+        {!item.isRead ? (
+          <View style={styles.unreadDot} />
+        ) : (
+          <AppIcon name="chevron-right" size={18} light color={PAGE.mutedDim} />
+        )}
+      </View>
     </TouchableOpacity>
   );
 
-  return (
-    <SafeAreaView style={pageStyles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
-      <ScreenHeader
-        title="Notifications"
-        onBack={() => navigation.goBack()}
-        right={
-          <TouchableOpacity onPress={markAllRead} hitSlop={10} activeOpacity={0.75}>
-            <Text style={styles.markAll}>Read all</Text>
-          </TouchableOpacity>
-        }
-      />
-
+  const listHeader = (
+    <View style={styles.filterWrap}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
-        style={styles.filterScroll}
+        bounces={false}
       >
         {FILTERS.map((item) => {
           const active = filter === item.id;
@@ -187,10 +182,28 @@ export default function NotificationsScreen({ navigation }) {
           );
         })}
       </ScrollView>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={pageStyles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
+      <ScreenHeader
+        title="Notifications"
+        onBack={() => navigation.goBack()}
+        right={
+          <TouchableOpacity onPress={markAllRead} hitSlop={10} activeOpacity={0.75}>
+            <Text style={styles.markAll}>Read all</Text>
+          </TouchableOpacity>
+        }
+      />
 
       {loading ? (
-        <View style={pageStyles.centered}>
-          <ActivityIndicator size="large" color={PAGE.accent} />
+        <View style={styles.body}>
+          {listHeader}
+          <View style={pageStyles.centered}>
+            <ActivityIndicator size="large" color={PAGE.accent} />
+          </View>
         </View>
       ) : (
         <FlatList
@@ -198,6 +211,7 @@ export default function NotificationsScreen({ navigation }) {
           data={notifications}
           renderItem={renderNotification}
           keyExtractor={(item) => String(item._id)}
+          ListHeaderComponent={listHeader}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -218,51 +232,59 @@ export default function NotificationsScreen({ navigation }) {
 const styles = StyleSheet.create({
   markAll: {
     fontFamily: FONTS.semiBold,
-    fontSize: 12,
+    fontSize: 13,
     color: PAGE.cyan,
   },
-  filterScroll: {
-    flexGrow: 0,
-    maxHeight: 52,
+  body: {
+    flex: 1,
+  },
+  filterWrap: {
+    paddingTop: 4,
+    paddingBottom: 12,
+    marginBottom: 4,
   },
   filterRow: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
     gap: 8,
     alignItems: 'center',
+    flexDirection: 'row',
   },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    minHeight: 40,
+    borderRadius: 20,
     backgroundColor: PAGE.card,
     borderWidth: 1,
     borderColor: PAGE.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chipActive: {
-    backgroundColor: 'rgba(91, 57, 168, 0.35)',
-    borderColor: PAGE.borderAccent,
+    backgroundColor: 'rgba(91, 57, 168, 0.45)',
+    borderColor: 'rgba(123, 97, 255, 0.65)',
   },
   chipText: {
     fontFamily: FONTS.semiBold,
-    fontSize: 12,
+    fontSize: 13,
     color: PAGE.muted,
+    lineHeight: 18,
   },
   chipTextActive: {
     color: COLORS.white,
   },
   list: {
     paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 28,
+    paddingBottom: 32,
     flexGrow: 1,
   },
   card: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: PAGE.cardAlt,
     borderRadius: 16,
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: PAGE.border,
@@ -279,6 +301,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    marginTop: 2,
   },
   iconCircleUnread: {
     backgroundColor: 'rgba(123, 97, 255, 0.55)',
@@ -289,12 +312,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.white,
     marginBottom: 4,
+    lineHeight: 20,
   },
   message: {
     ...TEXT.caption,
     color: PAGE.muted,
-    marginBottom: 6,
-    lineHeight: 17,
+    marginBottom: 8,
+    lineHeight: 18,
   },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
   category: {
@@ -305,6 +329,12 @@ const styles = StyleSheet.create({
   },
   dot: { color: PAGE.mutedDim, marginHorizontal: 6 },
   timestamp: { ...TEXT.caption, color: PAGE.mutedDim },
+  trailing: {
+    minWidth: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 12,
+  },
   unreadDot: {
     width: 8,
     height: 8,
