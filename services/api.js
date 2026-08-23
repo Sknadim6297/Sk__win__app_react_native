@@ -665,7 +665,13 @@ export const dailyAutoMatchService = {
 /** Public APK release + soft update check */
 export const downloadService = {
   getRelease: () => apiCall('/download/release'),
-  checkUpdate: (currentVersion) =>
-    apiCall(`/download/check?current=${encodeURIComponent(currentVersion || '0.0.0')}`),
+  checkUpdate: (currentVersion, versionCode) => {
+    const q = new URLSearchParams();
+    q.set('current', String(currentVersion || '0.0.0'));
+    if (versionCode != null && versionCode !== '') {
+      q.set('versionCode', String(versionCode));
+    }
+    return apiCall(`/download/check?${q.toString()}`);
+  },
 };
 

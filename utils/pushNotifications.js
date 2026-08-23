@@ -7,6 +7,7 @@ import { handleNotificationNavigation } from './navigationRef';
 import { isExpoGo } from './googleEnvironment';
 
 const TOKEN_CACHE_KEY = '@skwin_push_token';
+const HANDLED_RESPONSE_KEY = '@warezone/push_handled_response';
 const PUSH_SUPPORTED = Platform.OS !== 'web' && !isExpoGo();
 
 function getNotifications() {
@@ -31,6 +32,8 @@ if (Notifications) {
 
 let responseSub = null;
 let receiveSub = null;
+/** Ignore response listener until cold-start handling finishes (Android re-fires stale taps). */
+let acceptResponseListener = false;
 
 function getProjectId() {
   return (
@@ -139,19 +142,8 @@ async function clearLastNotificationResponse() {
 /** Call on login/register so a stale push tap does not open Notifications. */
 export async function dismissPendingNotificationNavigation() {
   initialNotificationHandled = true;
+  acceptResponseListener = true;
   await clearLastNotificationResponse();
-}
-
-function notificationHasNavIntent(data) {
-  if (!data || typeof data !== 'object') return false;
-  return Boolean(
-    data.screen ||
-      data.deepLink ||
-      data.tournamentId ||
-      data.type ||
-      data.resultId ||
-      data.matchId
-  );
 }
 
 function notificationAgeMs(response) {
@@ -159,6 +151,36 @@ function notificationAgeMs(response) {
   if (raw == null) return null;
   const ts = typeof raw === 'number' ? (raw < 1e12 ? raw * 1000 : raw) : Date.parse(raw);
   return Number.isFinite(ts) ? Date.now() - ts : null;
+}
+
+function responseIdentity(response) {
+  const id = response?.notification?.request?.identifier;
+  const date = response?.notification?.date;
+  return `${id || 'unknown'}:${date ?? ''}`;
+}
+
+/** Cold-start / stale-tap: only real deep links — never the Notifications inbox. */
+function isActionableColdStartDeepLink(data) {
+  if (!data || typeof data !== 'object') return false;
+  const screen = String(data.screen || data.deepLink || '');
+  if (screen === 'TournamentDetails' || screen === 'TournamentResults') {
+    return Boolean(data.tournamentId);
+  }
+  if (
+    screen === 'MyWallet' ||
+    screen === 'Wallet' ||
+    screen === 'ImportantUpdates' ||
+    screen === 'AnnouncementDetail' ||
+    screen === 'History' ||
+    screen === 'MainApp'
+  ) {
+    return true;
+  }
+  if (data.tournamentId && (data.type === 'result' || data.type === 'tournament_reminder')) {
+    return true;
+  }
+  if (data.type === 'wallet' || data.type === 'announcement') return true;
+  return false;
 }
 
 export function setupNotificationListeners() {
@@ -172,8 +194,9 @@ export function setupNotificationListeners() {
   });
 
   responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+    if (!acceptResponseListener) return;
     const data = response?.notification?.request?.content?.data || {};
-    handleNotificationNavigation(data);
+    handleNotificationNavigation(data, { inboxFallback: true });
     clearLastNotificationResponse();
   });
 
@@ -186,27 +209,45 @@ export function setupNotificationListeners() {
 }
 
 /**
- * Only when the app was opened by tapping a recent notification.
- * Stale getLastNotificationResponseAsync() must not hijack register/login → Home.
+ * Only when the app was opened by tapping a recent deep-link notification.
+ * Stale Android last-response must not open Notifications on every launch.
  */
 export async function handleInitialNotificationResponse() {
-  if (!Notifications || initialNotificationHandled) return;
-  initialNotificationHandled = true;
-
-  const response = await Notifications.getLastNotificationResponseAsync();
-  if (!response) return;
-
-  const data = response?.notification?.request?.content?.data;
-  const ageMs = notificationAgeMs(response);
-  const freshEnough = ageMs != null && ageMs <= 45_000;
-
-  if (!freshEnough || !notificationHasNavIntent(data)) {
-    await clearLastNotificationResponse();
+  if (!Notifications || initialNotificationHandled) {
+    acceptResponseListener = true;
     return;
   }
+  initialNotificationHandled = true;
 
-  setTimeout(() => {
-    handleNotificationNavigation(data);
-    clearLastNotificationResponse();
-  }, 600);
+  try {
+    const response = await Notifications.getLastNotificationResponseAsync();
+    if (!response) return;
+
+    const identity = responseIdentity(response);
+    const prev = await AsyncStorage.getItem(HANDLED_RESPONSE_KEY);
+    if (prev && prev === identity) {
+      await clearLastNotificationResponse();
+      return;
+    }
+
+    const data = response?.notification?.request?.content?.data || {};
+    const ageMs = notificationAgeMs(response);
+    // Reject missing/negative age (Android clock quirks) and anything older than 30s
+    const freshEnough = ageMs != null && ageMs >= 0 && ageMs <= 30_000;
+
+    if (!freshEnough || !isActionableColdStartDeepLink(data)) {
+      await clearLastNotificationResponse();
+      return;
+    }
+
+    await AsyncStorage.setItem(HANDLED_RESPONSE_KEY, identity);
+
+    await new Promise((r) => setTimeout(r, 700));
+    handleNotificationNavigation(data, { inboxFallback: false });
+    await clearLastNotificationResponse();
+  } catch {
+    await clearLastNotificationResponse();
+  } finally {
+    acceptResponseListener = true;
+  }
 }

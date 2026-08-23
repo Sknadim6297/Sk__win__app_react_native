@@ -2,7 +2,7 @@
   "expo": {
     "name": "WAREZONE",
     "slug": "sk-win",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/logo/WAREZONE_LOGO.png",
     "userInterfaceStyle": "dark",
@@ -21,7 +21,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.skwin.tournament",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -32,7 +32,7 @@
         "backgroundColor": "#0a0e1a"
       },
       "package": "com.skwin.tournament",
-      "versionCode": 3,
+      "versionCode": 4,
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {

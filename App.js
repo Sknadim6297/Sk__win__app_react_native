@@ -132,10 +132,23 @@ function AppNavigator() {
 
   useEffect(() => {
     if (!isAuthenticated || isAdmin()) return undefined;
-    const cleanup = setupNotificationListeners();
-    syncPushTokenWithBackend().catch(() => {});
-    handleInitialNotificationResponse().catch(() => {});
-    return cleanup;
+
+    let cleanup = () => {};
+    let cancelled = false;
+
+    (async () => {
+      // Handle cold-start deep link first, then subscribe — otherwise Android
+      // re-delivers a stale last-response into the listener and opens Notifications.
+      await handleInitialNotificationResponse().catch(() => {});
+      if (cancelled) return;
+      cleanup = setupNotificationListeners();
+      syncPushTokenWithBackend().catch(() => {});
+    })();
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
   }, [isAuthenticated]);
 
   if (isLoading) {

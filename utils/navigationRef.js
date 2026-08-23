@@ -10,21 +10,24 @@ export function navigate(name, params) {
 
 /**
  * Handle notification deep-link payload (no secrets — only screen + ids).
+ * @param {object} data
+ * @param {{ inboxFallback?: boolean }} [options] — cold start should pass inboxFallback: false
  */
-export function handleNotificationNavigation(data = {}) {
+export function handleNotificationNavigation(data = {}, options = {}) {
   if (!navigationRef.isReady()) return;
 
+  const inboxFallback = options.inboxFallback !== false;
   const screen = data.screen || data.deepLink || '';
   const tournamentId = data.tournamentId;
 
   switch (screen) {
     case 'TournamentDetails':
       if (tournamentId) navigate('TournamentDetails', { tournamentId });
-      else navigate('Notifications');
+      else if (inboxFallback) navigate('Notifications');
       break;
     case 'TournamentResults':
       if (tournamentId) navigate('TournamentResults', { tournamentId });
-      else navigate('Notifications');
+      else if (inboxFallback) navigate('Notifications');
       break;
     case 'MyWallet':
     case 'Wallet':
@@ -40,6 +43,9 @@ export function handleNotificationNavigation(data = {}) {
     case 'MainApp':
       navigate('MainApp', { screen: data.tab || 'HomeTab' });
       break;
+    case 'Notifications':
+      if (inboxFallback) navigate('Notifications');
+      break;
     default:
       if (tournamentId && (data.type === 'result' || data.type === 'tournament_reminder')) {
         navigate(
@@ -50,7 +56,7 @@ export function handleNotificationNavigation(data = {}) {
         navigate('MyWallet');
       } else if (data.type === 'announcement') {
         navigate('ImportantUpdates');
-      } else {
+      } else if (inboxFallback) {
         navigate('Notifications');
       }
   }

@@ -21,6 +21,7 @@ const RELEASE = require('../../release.config.cjs');
 
 const DEFAULT_RELEASE = {
   version: RELEASE.version,
+  versionCode: Number(RELEASE.versionCode) || 1,
   fileName: RELEASE.fileName,
   title: RELEASE.title,
   androidMin: RELEASE.androidMin,
@@ -180,6 +181,7 @@ function buildReleasePayload(req, release, stats) {
   return {
     title: release.title || DEFAULT_RELEASE.title,
     version,
+    versionCode: Number(DEFAULT_RELEASE.versionCode) || 1,
     fileName,
     androidMin: release.androidMin || DEFAULT_RELEASE.androidMin,
     releaseNotes: release.releaseNotes || DEFAULT_RELEASE.releaseNotes,
@@ -221,22 +223,42 @@ router.get('/release', async (req, res) => {
 });
 
 /**
- * GET /api/download/check?current=1.0.2
+ * GET /api/download/check?current=1.0.0&versionCode=1
  * Soft update check for app / PWA — never force-blocks; client may dismiss.
  */
 router.get('/check', async (req, res) => {
   try {
     const currentVersion = String(req.query.current || req.query.version || '').trim() || '0.0.0';
+    const currentCodeRaw = req.query.versionCode ?? req.query.build;
+    const currentCode =
+      currentCodeRaw != null && String(currentCodeRaw).trim() !== ''
+        ? parseInt(String(currentCodeRaw), 10)
+        : null;
+
     const release = await getOrCreateLatestRelease();
     const stats = getApkStats(release.fileName);
     const latest = buildReleasePayload(req, release, stats);
-    const updateAvailable = isVersionNewer(latest.version, currentVersion);
+    const latestCode = Number(latest.versionCode) || 1;
+
+    const newerSemver = isVersionNewer(latest.version, currentVersion);
+    const newerCode =
+      currentCode != null && Number.isFinite(currentCode) ? latestCode > currentCode : false;
+    // Semver equal but missing/older build number → still offer update (common on Android)
+    const sameSemverOlderBuild =
+      !newerSemver &&
+      !isVersionNewer(currentVersion, latest.version) &&
+      currentCode != null &&
+      Number.isFinite(currentCode) &&
+      latestCode > currentCode;
+
+    const updateAvailable = newerSemver || newerCode || sameSemverOlderBuild;
 
     res.json({
       success: true,
       updateAvailable,
       forceUpdate: false,
       currentVersion,
+      currentVersionCode: currentCode,
       latest,
     });
   } catch (error) {

@@ -64,43 +64,43 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
   const bannerSource = bannerUri ? { uri: bannerUri } : DEFAULT_BANNER;
 
   const ctaLabel = isJoined
-    ? 'JOINED'
+    ? 'Joined'
     : !isJoinOpen
       ? lifecycleStatus === 'ongoing' || lifecycleStatus === 'live'
-        ? 'ONGOING'
+        ? 'Ongoing'
         : lifecycleStatus === 'completed' || lifecycleStatus === 'result_published'
-          ? 'COMPLETED'
-          : String(lifecycleStatus || 'CLOSED').toUpperCase()
+          ? 'Completed'
+          : String(lifecycleStatus || 'Closed')
       : full
-        ? 'Joining Full'
-        : 'Join Match';
+        ? 'Joining full'
+        : 'Join match';
 
   const ctaDisabled = isJoined || !isJoinOpen || full;
 
   const topStats = [
-    showPrizePool ? { label: 'PRIZE POOL', value: prizePool, coin: true } : null,
-    showPerKill ? { label: 'PRIZE PER KILL', value: prizePerKill, coin: true } : null,
-    { label: 'MATCH TYPE', value: matchTypeName },
+    showPrizePool ? { label: 'Prize pool', value: prizePool, coin: true } : null,
+    showPerKill ? { label: 'Prize per kill', value: prizePerKill, coin: true } : null,
+    { label: 'Match type', value: matchTypeName },
   ].filter(Boolean);
 
   while (topStats.length < 3) {
-    if (!topStats.find((s) => s.label === 'ENTRY FEE / PLAYER')) {
-      topStats.push({ label: 'ENTRY FEE / PLAYER', value: entryPerPlayer, coin: true });
-    } else if (!topStats.find((s) => s.label === 'MAP')) {
-      topStats.push({ label: 'MAP', value: mapName });
-    } else if (!topStats.find((s) => s.label === 'PLAYER FORMAT')) {
-      topStats.push({ label: 'PLAYER FORMAT', value: playerFormatLabel });
+    if (!topStats.find((s) => s.label === 'Entry / player')) {
+      topStats.push({ label: 'Entry / player', value: entryPerPlayer, coin: true });
+    } else if (!topStats.find((s) => s.label === 'Map')) {
+      topStats.push({ label: 'Map', value: mapName });
+    } else if (!topStats.find((s) => s.label === 'Player format')) {
+      topStats.push({ label: 'Player format', value: playerFormatLabel });
     } else break;
   }
 
   const usedLabels = new Set(topStats.map((s) => s.label));
   const bottomStats = [
-    !usedLabels.has('ENTRY FEE / PLAYER')
-      ? { label: 'ENTRY FEE / PLAYER', value: entryPerPlayer, coin: true }
+    !usedLabels.has('Entry / player')
+      ? { label: 'Entry / player', value: entryPerPlayer, coin: true }
       : null,
-    !usedLabels.has('MAP') ? { label: 'MAP', value: mapName } : null,
-    !usedLabels.has('PLAYER FORMAT')
-      ? { label: 'PLAYER FORMAT', value: playerFormatLabel }
+    !usedLabels.has('Map') ? { label: 'Map', value: mapName } : null,
+    !usedLabels.has('Player format')
+      ? { label: 'Player format', value: playerFormatLabel }
       : null,
   ].filter(Boolean);
 
@@ -115,10 +115,10 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
 
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>
-          {String(item.name || 'Tournament').toUpperCase()} - ID#{matchNo}
+          {String(item.name || 'Tournament')} - ID#{matchNo}
         </Text>
         <Text style={styles.timeLine}>
-          DATE & TIME : {String(scheduleLine || '').toUpperCase()}
+          Date & time: {String(scheduleLine || '')}
         </Text>
 
         <StatTriple items={topStats} />
@@ -126,7 +126,7 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
 
         <View style={styles.ctaRow}>
           <Text style={styles.matchType} numberOfLines={1}>
-            {String(matchTypeName || '').toUpperCase()} · {String(playerFormatLabel || '').toUpperCase()}
+            {String(matchTypeName || '')} · {String(playerFormatLabel || '')}
           </Text>
           <TouchableOpacity
             style={[
@@ -139,7 +139,7 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
             disabled={ctaDisabled && !isJoinOpen}
             onPress={() => onPress(item)}
           >
-            <Text style={styles.joinBtnText}>{String(ctaLabel).toUpperCase()}</Text>
+            <Text style={styles.joinBtnText}>{String(ctaLabel)}</Text>
           </TouchableOpacity>
         </View>
       </View>

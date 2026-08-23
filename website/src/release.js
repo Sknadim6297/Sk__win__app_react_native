@@ -1,7 +1,7 @@
 /** Keep in sync with /release.config.cjs */
 export const APP_RELEASE = {
-  version: '1.0.2',
-  fileName: 'WAREZONE-v1.0.2.apk',
+  version: '1.0.3',
+  fileName: 'WAREZONE-v1.0.3.apk',
 };
 
 /** Expo Web PWA (same app screens). Override with VITE_PWA_URL on sk-win-web. */
