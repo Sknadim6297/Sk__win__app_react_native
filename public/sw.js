@@ -1,5 +1,5 @@
 /* WAREZONE PWA — cache the app shell only. Never cache API or uploads. */
-const SHELL = 'warezone-shell-v1.0.3';
+const SHELL = 'warezone-shell-v1.0.4';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

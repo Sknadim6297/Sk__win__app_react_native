@@ -5,10 +5,10 @@ import { PAGE } from '../../styles/pageTheme';
 import BrandCoin from '../ui/BrandCoin';
 import { formatTimeLeft } from '../../utils/tournamentHelpers';
 
-function asText(value) {
+function toCaps(value) {
   if (value == null) return '';
   if (typeof value === 'number') return String(value);
-  return String(value);
+  return String(value).toUpperCase();
 }
 
 export function useTimeLeft(targetDate) {
@@ -49,7 +49,7 @@ export function TimeLeftBar({ startDate }) {
     <View style={styles.timeBar}>
       <View style={styles.timeInner}>
         <Text style={styles.timeText} numberOfLines={1}>
-          Time left: {String(left || '')}
+          TIME LEFT: {toCaps(left || '')}
         </Text>
       </View>
     </View>
@@ -57,8 +57,8 @@ export function TimeLeftBar({ startDate }) {
 }
 
 export function InfoCell({ label, value, coin, rupee, flex, inline }) {
-  const labelText = asText(label);
-  const valueText = asText(value);
+  const labelText = toCaps(label);
+  const valueText = toCaps(value);
   const forceInline = Boolean(inline || coin || rupee);
 
   const renderValue = () => {
@@ -98,7 +98,7 @@ export function StatTriple({ items }) {
       {list.map((item, i) => (
         <View key={`${item.label}-${i}`} style={styles.tripleCol}>
           <Text style={styles.tripleLabel} numberOfLines={1}>
-            {asText(item.label)}
+            {toCaps(item.label)}
           </Text>
           {item.rupee ? (
             <RupeeValue value={item.value} color={PAGE.gold} />
@@ -106,7 +106,7 @@ export function StatTriple({ items }) {
             <CoinValue value={item.value} size={16} color={PAGE.gold} />
           ) : (
             <Text style={styles.tripleValue} numberOfLines={2}>
-              {asText(item.value)}
+              {toCaps(item.value)}
             </Text>
           )}
           {i < list.length - 1 ? <View style={styles.tripleRule} /> : null}

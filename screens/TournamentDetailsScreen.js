@@ -350,19 +350,19 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
   // Third cell on row 2: prefer Prize Per Kill, then Prize Pool, then Team Total
   const secondaryStat = showPerKill
-    ? { label: 'Prize / kill', value: prizePerKill, coin: true }
+    ? { label: 'Prize / Kill', value: prizePerKill, coin: true }
     : showPrizePool
-      ? { label: 'Prize pool', value: totalPrize, coin: true }
+      ? { label: 'Prize Pool', value: totalPrize, coin: true }
       : entryCharge.playersCharged > 1
-        ? { label: 'Team total', value: entryCharge.totalAmount, coin: true }
+        ? { label: 'Team Total', value: entryCharge.totalAmount, coin: true }
         : null;
 
   const extraStats = [];
   if (showPerKill && showPrizePool) {
-    extraStats.push({ label: 'Prize pool', value: totalPrize, coin: true });
+    extraStats.push({ label: 'Prize Pool', value: totalPrize, coin: true });
   }
   if (entryCharge.playersCharged > 1 && (showPerKill || showPrizePool)) {
-    extraStats.push({ label: 'Team total', value: entryCharge.totalAmount, coin: true });
+    extraStats.push({ label: 'Team Total', value: entryCharge.totalAmount, coin: true });
   }
 
   return (
@@ -388,22 +388,22 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
         <TimeLeftBar startDate={tournament.startDate} />
         <Text style={styles.scheduleUnderTimer}>
-          Date & time: {String(formatScheduleLine(tournament.startDate) || '')}
+          DATE & TIME : {String(formatScheduleLine(tournament.startDate) || '').toUpperCase()}
         </Text>
 
         <Text style={styles.matchTitle}>
-          {String(tournament.name || 'Tournament')} - ID#{matchNo}
+          {String(tournament.name || 'Tournament').toUpperCase()} - ID#{matchNo}
         </Text>
 
         <View style={styles.metaBlock}>
           <View style={styles.grid3}>
             {gameName ? <InfoCell label="Game" value={gameName} flex={1} inline /> : null}
-            <InfoCell label="Match type" value={matchTypeName} flex={1} inline />
+            <InfoCell label="Match Type" value={matchTypeName} flex={1} inline />
             <InfoCell label="Map" value={mapName} flex={1} inline />
           </View>
           <View style={styles.grid3}>
-            <InfoCell label="Player format" value={playerFormatLabel} flex={1} inline />
-            <InfoCell label="Entry / player" value={entryFee} coin flex={1} inline />
+            <InfoCell label="Player Format" value={playerFormatLabel} flex={1} inline />
+            <InfoCell label="Entry / Player" value={entryFee} coin flex={1} inline />
             {secondaryStat ? (
               <InfoCell
                 label={secondaryStat.label}
@@ -428,51 +428,51 @@ export default function TournamentDetailsScreen({ navigation, route }) {
               ))}
             </View>
           ) : null}
-          <InfoCell label="Match schedule" value={scheduleLabel} inline />
+          <InfoCell label="Match Schedule" value={scheduleLabel} inline />
         </View>
 
-        <Text style={styles.sectionHead}>Prize details</Text>
+        <Text style={styles.sectionHead}>PRIZE DETAILS</Text>
         <View style={styles.prizeCard}>
           {showPrizePool ? (
             <View style={styles.prizeLine}>
-              <Text style={styles.prizeLabel}>Prize pool</Text>
+              <Text style={styles.prizeLabel}>PRIZE POOL</Text>
               <CoinValue value={totalPrize} color={PAGE.gold} />
             </View>
           ) : null}
           {showPerKill ? (
             <View style={styles.prizeLine}>
-              <Text style={styles.prizeLabel}>Prize per kill</Text>
+              <Text style={styles.prizeLabel}>PRIZE PER KILL</Text>
               <CoinValue value={prizePerKill} color={PAGE.gold} />
             </View>
           ) : null}
           {places.first > 0 ? (
             <View style={styles.prizeLine}>
-              <Text style={styles.prizeLabel}>{custom ? 'Winner' : '1st place'}</Text>
+              <Text style={styles.prizeLabel}>{custom ? 'WINNER' : '1ST PLACE'}</Text>
               <CoinValue value={places.first} color={PAGE.gold} />
             </View>
           ) : null}
           {places.second > 0 ? (
             <View style={styles.prizeLine}>
-              <Text style={styles.prizeLabel}>2nd place</Text>
+              <Text style={styles.prizeLabel}>2ND PLACE</Text>
               <CoinValue value={places.second} color={PAGE.gold} />
             </View>
           ) : null}
           {places.third > 0 ? (
             <View style={[styles.prizeLine, styles.prizeLineLast]}>
-              <Text style={styles.prizeLabel}>3rd place</Text>
+              <Text style={styles.prizeLabel}>3RD PLACE</Text>
               <CoinValue value={places.third} color={PAGE.gold} />
             </View>
           ) : null}
           {!showPrizePool && !showPerKill && !places.first && !places.second && !places.third ? (
             <View style={[styles.prizeLine, styles.prizeLineLast]}>
-              <Text style={styles.prizeLabel}>No prize details yet</Text>
+              <Text style={styles.prizeLabel}>NO PRIZE DETAILS YET</Text>
             </View>
           ) : null}
         </View>
 
         {showRoom ? (
           <View style={styles.roomBox}>
-            <Text style={styles.roomTitle}>Match ID & password</Text>
+            <Text style={styles.roomTitle}>MATCH ID & PASSWORD</Text>
             <Text style={styles.roomHint}>
               Only visible because you joined this match. Copy into Free Fire before start.
             </Text>
@@ -498,13 +498,13 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           </View>
         ) : null}
 
-        <Text style={styles.sectionHead}>About this match</Text>
+        <Text style={styles.sectionHead}>ABOUT THIS MATCH</Text>
         <View style={styles.aboutCard}>
-          <Text style={styles.rulesCardTitle}>Rules and regulations</Text>
+          <Text style={styles.rulesCardTitle}>RULES AND REGULATIONS</Text>
           <View style={styles.rulesTitleRule} />
           {rules.map((rule, idx) => (
             <Text key={`rule-${idx}`} style={styles.ruleLine}>
-              • {String(rule || '')}
+              • {String(rule || '').toUpperCase()}
             </Text>
           ))}
         </View>
@@ -558,7 +558,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           activeOpacity={0.88}
         >
           <Text style={styles.viewJoiningsText}>
-            {showJoinings ? 'Hide players' : 'View players'}
+            {showJoinings ? 'HIDE PLAYERS' : 'VIEW PLAYERS'}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -570,7 +570,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           {joining ? (
             <ActivityIndicator color={COLORS.white} />
           ) : (
-            <Text style={styles.joinMatchText}>{String(joinButtonLabel || '')}</Text>
+            <Text style={styles.joinMatchText}>{String(joinButtonLabel || '').toUpperCase()}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -655,9 +655,9 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
   ruleLine: {
-    fontFamily: FONTS.semiBold,
+    fontFamily: FONTS.bold,
     fontSize: 13,
-    color: COLORS.gray,
+    color: COLORS.white,
     lineHeight: 22,
     marginBottom: 4,
   },
