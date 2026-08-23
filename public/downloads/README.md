@@ -4,27 +4,26 @@
 
 | What | URL |
 |------|-----|
-| **Download page (share this)** | Your Render frontend root URL |
-| Direct APK | `/downloads/WAREZONE-v1.0.0.apk` |
+| **Download page (share this)** | Your Render frontend `/download` |
+| Direct APK | `/downloads/WAREZONE-v1.0.3.apk` |
 
 ## File required
 
-Place the optimized EAS APK here (exact name):
+Place the EAS production APK here (exact name from `release.config.cjs`):
 
 ```
-public/downloads/WAREZONE-v1.0.0.apk
+public/downloads/WAREZONE-v1.0.3.apk
 ```
 
-Current optimized build (arm64-v8a, Hermes, R8): **~16.3 MB**
+Current release: **v1.0.3** (~19 MB)
 
 Steps:
 1. Download APK from Expo build page (or use `eas build`)
-2. Rename/copy to `WAREZONE-v1.0.0.apk`
-3. Copy into `public/downloads/`
-4. Redeploy Render frontend (`npm run build:render-web`)
+2. Run `node scripts/sync-latest-apk.js path\to\app.apk`
+3. Commit `public/downloads/` and push so Render serves the new file
 
 ## Rebuild
 
 ```bash
-npm run build:android:size
+npm run build:android
 ```
