@@ -45,18 +45,6 @@ function ensureIndexMeta() {
         window.addEventListener('load', function () {
           navigator.serviceWorker.register('/sw.js').then(function (reg) {
             try { reg.update(); } catch (e) {}
-            if (reg.waiting) {
-              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-            }
-            reg.addEventListener('updatefound', function () {
-              var w = reg.installing;
-              if (!w) return;
-              w.addEventListener('statechange', function () {
-                if (w.state === 'installed' && navigator.serviceWorker.controller) {
-                  w.postMessage({ type: 'SKIP_WAITING' });
-                }
-              });
-            });
           }).catch(function () {});
         });
       }

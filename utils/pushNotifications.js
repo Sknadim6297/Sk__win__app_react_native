@@ -8,11 +8,24 @@ import { isExpoGo } from './googleEnvironment';
 
 const TOKEN_CACHE_KEY = '@skwin_push_token';
 const HANDLED_RESPONSE_KEY = '@warezone/push_handled_response';
-const PUSH_SUPPORTED = Platform.OS !== 'web' && !isExpoGo();
+/** Native + HTTPS PWA (system notifications when app is closed / backgrounded). */
+const PUSH_SUPPORTED =
+  !isExpoGo() &&
+  (Platform.OS === 'ios' ||
+    Platform.OS === 'android' ||
+    (Platform.OS === 'web' &&
+      typeof window !== 'undefined' &&
+      typeof navigator !== 'undefined' &&
+      'serviceWorker' in navigator &&
+      'Notification' in window));
 
 function getNotifications() {
   if (!PUSH_SUPPORTED) return null;
-  return require('expo-notifications');
+  try {
+    return require('expo-notifications');
+  } catch {
+    return null;
+  }
 }
 
 const Notifications = getNotifications();
@@ -64,9 +77,19 @@ export async function registerForPushNotificationsAsync() {
   try {
     await ensureAndroidChannel();
 
-    if (!Device.isDevice) {
+    // Web PWA runs in browser — still allow push when Notification API exists.
+    if (Platform.OS !== 'web' && !Device.isDevice) {
       console.warn('[Push] Physical device required for push notifications');
       return null;
+    }
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      // Ensure our SW is ready before Expo/token registration
+      try {
+        await navigator.serviceWorker.ready;
+      } catch {
+        /* ignore */
+      }
     }
 
     const { status: existing } = await Notifications.getPermissionsAsync();

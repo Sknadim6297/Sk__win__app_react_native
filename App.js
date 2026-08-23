@@ -110,7 +110,7 @@ export default function App() {
           ) : (
             <AuthProvider>
               <AppNavigator />
-              <UpdateAvailableGate />
+              {!IS_WEB ? <UpdateAvailableGate /> : null}
             </AuthProvider>
           )}
           {IS_WEB ? <PwaChrome /> : null}

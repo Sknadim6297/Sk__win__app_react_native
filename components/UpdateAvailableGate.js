@@ -12,17 +12,18 @@ function dismissKey(version) {
 }
 
 /**
- * Native Android only — PWA/web auto-updates via service worker reload (see PwaChrome).
+ * Native Android APK update modal ONLY.
+ * Web/PWA uses PwaChrome progress badge + Update & Open (service worker).
  */
 export default function UpdateAvailableGate() {
+  const isAndroidNative = Platform.OS === 'android';
   const [visible, setVisible] = useState(false);
   const [payload, setPayload] = useState(null);
   const currentVersion = getAppVersion();
   const currentBuild = getAppBuildNumber();
 
   useEffect(() => {
-    // Web/PWA must not show APK download modal — it refreshes itself after deploy.
-    if (Platform.OS === 'web' || Platform.OS === 'ios') return undefined;
+    if (!isAndroidNative) return undefined;
 
     let cancelled = false;
 
@@ -52,7 +53,7 @@ export default function UpdateAvailableGate() {
     return () => {
       cancelled = true;
     };
-  }, [currentVersion, currentBuild]);
+  }, [isAndroidNative, currentVersion, currentBuild]);
 
   const dismiss = useCallback(async () => {
     setVisible(false);
@@ -82,7 +83,7 @@ export default function UpdateAvailableGate() {
     await dismiss();
   }, [payload, dismiss]);
 
-  if (Platform.OS === 'web' || Platform.OS === 'ios' || !payload) return null;
+  if (!isAndroidNative || !payload) return null;
 
   return (
     <UpdateAvailableModal
