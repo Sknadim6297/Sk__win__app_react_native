@@ -1,26 +1,21 @@
 # Android APK downloads
 
-## Share with users
+## Current release
 
-| What | URL |
-|------|-----|
-| **Download page (share this)** | Your Render frontend `/download` |
-| Direct APK | `/downloads/WAREZONE-v1.0.3.apk` |
+**WAREZONE v1.0.4** — download via the website `/download` page (API may use the Expo artifact URL when the APK is not in this folder).
 
-## File required
-
-Place the EAS production APK here (exact name from `release.config.cjs`):
+## Local file (optional)
 
 ```
-public/downloads/WAREZONE-v1.0.3.apk
+public/downloads/WAREZONE-v1.0.4.apk
 ```
 
-Current release: **v1.0.3** (~19 MB)
+If GitHub rejects the large binary push, set `externalDownloadUrl` in `release.config.cjs` to the EAS artifact link, then later run:
 
-Steps:
-1. Download APK from Expo build page (or use `eas build`)
-2. Run `node scripts/sync-latest-apk.js path\to\app.apk`
-3. Commit `public/downloads/` and push so Render serves the new file
+```bash
+node scripts/sync-latest-apk.js path\to\WAREZONE-v1.0.4.apk
+git add public/downloads && git push
+```
 
 ## Rebuild
 

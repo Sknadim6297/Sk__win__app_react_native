@@ -26,6 +26,7 @@ const DEFAULT_RELEASE = {
   title: RELEASE.title,
   androidMin: RELEASE.androidMin,
   releaseNotes: RELEASE.releaseNotes,
+  externalDownloadUrl: RELEASE.externalDownloadUrl || '',
   isLatest: true,
   publishedAt: new Date(),
 };
@@ -171,12 +172,22 @@ function websiteDownloadPageUrl(req) {
 }
 
 function buildReleasePayload(req, release, stats) {
-  const fileName = stats.fileName || release.fileName;
+  const fileName = stats.fileName || release.fileName || DEFAULT_RELEASE.fileName;
   const version = release.version || DEFAULT_RELEASE.version;
   const updated = stats.mtime || release.publishedAt || release.updatedAt;
   const relativePath = `/downloads/${encodeURIComponent(fileName)}`;
   const origin = requestOrigin(req);
-  const absoluteUrl = origin ? `${origin}${relativePath}` : relativePath;
+  const localAbsolute = origin ? `${origin}${relativePath}` : relativePath;
+  const external = String(
+    DEFAULT_RELEASE.externalDownloadUrl || RELEASE.externalDownloadUrl || ''
+  ).trim();
+  const downloadUrl =
+    external && /^https?:\/\//i.test(external)
+      ? external
+      : stats.exists
+        ? localAbsolute
+        : localAbsolute;
+  const apkExists = Boolean(stats.exists || (external && /^https?:\/\//i.test(external)));
 
   return {
     title: release.title || DEFAULT_RELEASE.title,
@@ -186,8 +197,8 @@ function buildReleasePayload(req, release, stats) {
     androidMin: release.androidMin || DEFAULT_RELEASE.androidMin,
     releaseNotes: release.releaseNotes || DEFAULT_RELEASE.releaseNotes,
     downloadCount: release.downloadCount || 0,
-    apkExists: stats.exists,
-    sizeLabel: stats.sizeLabel,
+    apkExists,
+    sizeLabel: stats.exists ? stats.sizeLabel : external ? 'APK' : stats.sizeLabel,
     sizeBytes: stats.sizeBytes,
     lastUpdated: updated,
     lastUpdatedLabel: updated
@@ -197,7 +208,7 @@ function buildReleasePayload(req, release, stats) {
           year: 'numeric',
         })
       : '—',
-    downloadUrl: absoluteUrl,
+    downloadUrl,
     downloadPath: relativePath,
     websiteDownloadUrl: websiteDownloadPageUrl(req),
     downloadLabel: `Download WAREZONE v${version}`,
