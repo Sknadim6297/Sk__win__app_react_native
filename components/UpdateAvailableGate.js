@@ -12,7 +12,7 @@ function dismissKey(version) {
 }
 
 /**
- * On app / PWA open: if a newer release exists and user hasn’t dismissed it, show soft update modal.
+ * Native Android only — PWA/web auto-updates via service worker reload (see PwaChrome).
  */
 export default function UpdateAvailableGate() {
   const [visible, setVisible] = useState(false);
@@ -21,10 +21,12 @@ export default function UpdateAvailableGate() {
   const currentBuild = getAppBuildNumber();
 
   useEffect(() => {
+    // Web/PWA must not show APK download modal — it refreshes itself after deploy.
+    if (Platform.OS === 'web' || Platform.OS === 'ios') return undefined;
+
     let cancelled = false;
 
     (async () => {
-      // Let home/auth settle so the modal isn’t buried under splash on Android
       await new Promise((r) => setTimeout(r, 1200));
       if (cancelled) return;
 
@@ -67,11 +69,7 @@ export default function UpdateAvailableGate() {
     const latest = payload?.latest;
     if (!latest) return;
 
-    const isIos = Platform.OS === 'ios';
-    const candidates = isIos
-      ? [latest.websiteDownloadUrl, latest.downloadUrl]
-      : [latest.downloadUrl, latest.websiteDownloadUrl];
-
+    const candidates = [latest.downloadUrl, latest.websiteDownloadUrl];
     const url = candidates.find((u) => typeof u === 'string' && /^https?:\/\//i.test(u));
     if (url) {
       try {
@@ -84,7 +82,7 @@ export default function UpdateAvailableGate() {
     await dismiss();
   }, [payload, dismiss]);
 
-  if (!payload) return null;
+  if (Platform.OS === 'web' || Platform.OS === 'ios' || !payload) return null;
 
   return (
     <UpdateAvailableModal

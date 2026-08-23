@@ -1,20 +1,29 @@
 /* WAREZONE PWA — cache the app shell only. Never cache API or uploads. */
-const SHELL = 'warezone-shell-v2';
+const SHELL = 'warezone-shell-v1.0.3';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(SHELL).then((cache) => cache.addAll(['/', '/index.html', '/manifest.webmanifest']).catch(() => {}))
+    caches
+      .open(SHELL)
+      .then((cache) => cache.addAll(['/', '/index.html', '/manifest.webmanifest']).catch(() => {}))
   );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== SHELL).map((k) => caches.delete(k)))
-    )
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== SHELL).map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })()
   );
-  self.clients.claim();
+});
+
+self.addEventListener('message', (event) => {
+  if (event?.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 function isApiRequest(url) {

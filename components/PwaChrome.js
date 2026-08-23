@@ -41,10 +41,50 @@ export default function PwaChrome() {
       setShowIosHint(true);
     }
 
+    // Auto-apply new PWA deploys: when a new service worker takes control, reload once.
+    let refreshing = false;
+    const onControllerChange = () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    };
+    let updateTimer = null;
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+      navigator.serviceWorker.getRegistration().then((reg) => {
+        if (!reg) return;
+        const askUpdate = () => {
+          try {
+            reg.update();
+          } catch {
+            /* ignore */
+          }
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        };
+        askUpdate();
+        reg.addEventListener('updatefound', () => {
+          const worker = reg.installing;
+          if (!worker) return;
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+              worker.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+        updateTimer = setInterval(askUpdate, 60_000);
+      });
+    }
+
     return () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
       window.removeEventListener('beforeinstallprompt', onInstall);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      }
+      if (updateTimer) clearInterval(updateTimer);
     };
   }, []);
 
