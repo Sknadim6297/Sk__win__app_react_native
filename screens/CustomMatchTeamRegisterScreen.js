@@ -368,34 +368,34 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
 
             {isCustom ? (
               <View style={styles.sidePickRow}>
-                {['A', 'B'].map((side) => {
-                  const taken = takenSides.has(side);
+                      {['A', 'B'].map((side) => {
+                        const taken = takenSides.has(side);
                   const selected = teamSide === side;
-                  return (
-                    <TouchableOpacity
-                      key={side}
-                      disabled={taken}
-                      style={[
+                        return (
+                          <TouchableOpacity
+                            key={side}
+                            disabled={taken}
+                            style={[
                         styles.sidePickBtn,
                         selected && styles.sidePickBtnActive,
                         taken && styles.sidePickBtnTaken,
                       ]}
                       onPress={() => setTeamSide(side)}
-                    >
-                      <Text
-                        style={[
+                          >
+                            <Text
+                              style={[
                           styles.sidePickText,
                           selected && styles.sidePickTextActive,
                           taken && styles.sidePickTextTaken,
                         ]}
                       >
                         {taken ? `TEAM ${side} FULL` : `TEAM ${side}`}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ) : null}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                ) : null}
 
             <View style={styles.positionCard}>
               <Text style={styles.positionTitle}>SELECTED POSITION</Text>
@@ -406,7 +406,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
               </View>
               {players.map((player, index) => {
                 const complete = isPlayerComplete(player);
-                return (
+                        return (
                   <View key={`p-${index}`} style={styles.posDataRow}>
                     <Text style={styles.posCol}>
                       {isCustom ? `TEAM ${teamSide} P${index + 1}` : `P${index + 1}`}
@@ -417,8 +417,8 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
                         <TouchableOpacity onPress={() => openPlayerDetails(index)}>
                           <Text style={styles.inGameName} numberOfLines={1}>
                             {String(player.name).toUpperCase()}
-                          </Text>
-                        </TouchableOpacity>
+                            </Text>
+                          </TouchableOpacity>
                       ) : (
                         <TouchableOpacity
                           style={styles.addInfoBtn}
@@ -429,13 +429,13 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
                       )}
                     </View>
                   </View>
-                );
-              })}
-            </View>
+                        );
+                      })}
+                    </View>
             <Text style={styles.note}>
               NOTE – PLEASE ENTER GAME NAME & UID FOR ALL {playersPerTeam}{' '}
               {playersPerTeam === 1 ? 'PLAYER' : 'PLAYERS'}
-            </Text>
+                </Text>
           </ScrollView>
 
           <View style={[styles.pairFooter, { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -469,31 +469,31 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
           <ScrollView contentContainerStyle={styles.confirmScroll} keyboardShouldPersistTaps="handled">
             <BalanceBlock />
             <View style={styles.detailsCard}>
-              <View style={styles.detailsHead}>
-                <Text style={styles.detailsHeadText}>
+                    <View style={styles.detailsHead}>
+                      <Text style={styles.detailsHeadText}>
                   PLAYER {editingIndex + 1}
                   {editingIndex === 0 ? ' (CAPTAIN)' : ''} · GAME DETAILS
-                </Text>
-              </View>
+                      </Text>
+                    </View>
               <View style={styles.detailsBody}>
                 <Text style={styles.fieldLabel}>GAME NAME</Text>
-                <TextInput
-                  style={styles.underlineInput}
+                      <TextInput
+                        style={styles.underlineInput}
                   value={draftName}
                   onChangeText={setDraftName}
                   placeholder="Enter game name"
-                  placeholderTextColor={PAGE.muted}
-                  autoCapitalize="none"
-                />
+                        placeholderTextColor={PAGE.muted}
+                        autoCapitalize="none"
+                      />
                 <Text style={styles.fieldLabel}>GAME UID</Text>
-                <TextInput
-                  style={styles.underlineInput}
+                      <TextInput
+                        style={styles.underlineInput}
                   value={draftUID}
                   onChangeText={setDraftUID}
                   placeholder="Enter game UID"
-                  placeholderTextColor={PAGE.muted}
-                  autoCapitalize="none"
-                />
+                        placeholderTextColor={PAGE.muted}
+                        autoCapitalize="none"
+                      />
                 <Text style={styles.helper}>
                   MAKE SURE YOU ENTERED CORRECT GAME NAME & GAME UID
                 </Text>
@@ -504,11 +504,11 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
                   <TouchableOpacity style={styles.saveBtn} onPress={savePlayerDetails}>
                     <Text style={styles.pairBtnText}>SAVE</Text>
                   </TouchableOpacity>
-                </View>
-              </View>
+                    </View>
+                  </View>
             </View>
           </ScrollView>
-        </View>
+          </View>
       )}
 
       <Toast visible={toast.visible} message={toast.message} type={toast.type} onHide={hideToast} />

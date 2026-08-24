@@ -47,7 +47,7 @@ const AppLoadingScreen = ({ subtitle = 'Loading battleground...' }) => {
       <StatusBar barStyle="light-content" backgroundColor={WELCOME_BG} />
 
       <View style={styles.logoCenter}>
-        <WarezoneLogo size={LOGO_SIZE} rounded />
+        <WarezoneLogo size={LOGO_SIZE} shape="squircle" backgroundColor="#050014" />
       </View>
 
       <View

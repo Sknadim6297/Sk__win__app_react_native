@@ -6,13 +6,20 @@ import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 /** Official WAREZONE mark — used app-wide (splash, landing, headers, etc.) */
 const APP_LOGO = require('../assets/logo/WAREZONE_LOGO.png');
 
-/** Horizontal wordmark aspect when not using circular badge mode */
+/** Horizontal wordmark aspect when not using badge / app-icon mode */
 const LOGO_ASPECT = 0.55;
+
+/**
+ * iOS-style app-icon corner (~22.37% of side).
+ * Matches the rounded-square look of the reference game icon.
+ */
+export const APP_ICON_RADIUS_RATIO = 0.2237;
 
 /**
  * Renders the WAREZONE logo.
  * - Pass `width` / `height` (or `size` as width) for the wordmark.
- * - Pass `rounded` for a circular badge clip (loading / welcome).
+ * - Pass `rounded` or `shape="circle"` for a circular badge.
+ * - Pass `shape="squircle"` (or `rounded="squircle"`) for app-icon corners.
  */
 const WarezoneLogo = ({
   size,
@@ -21,29 +28,46 @@ const WarezoneLogo = ({
   style,
   logoUrl,
   rounded = false,
+  shape,
   backgroundColor = 'transparent',
 }) => {
+  const resolvedShape =
+    shape ||
+    (rounded === true || rounded === 'circle'
+      ? 'circle'
+      : rounded === 'squircle' || rounded === 'appIcon'
+        ? 'squircle'
+        : 'wordmark');
+
   const baseW = width ?? size ?? 200;
-  // Circular badge: force a square so borderRadius = half makes a true circle
+  const isSquare = resolvedShape === 'circle' || resolvedShape === 'squircle';
   const imgW = baseW;
-  const imgH = rounded ? baseW : height ?? Math.round(baseW * LOGO_ASPECT);
-  const radius = rounded ? imgW / 2 : 8;
+  const imgH = isSquare ? baseW : height ?? Math.round(baseW * LOGO_ASPECT);
+  const radius =
+    resolvedShape === 'circle'
+      ? imgW / 2
+      : resolvedShape === 'squircle'
+        ? Math.round(imgW * APP_ICON_RADIUS_RATIO)
+        : 8;
   const remote = logoUrl ? resolveMediaUrl(logoUrl) : '';
 
   return (
     <View
       style={[
-        styles.logoContainer(imgW, imgH, backgroundColor, radius),
+        resolvedShape === 'squircle' && styles.squircleShadow,
+        resolvedShape === 'squircle' && { borderRadius: radius },
         style,
       ]}
     >
-      <Image
-        source={remote ? { uri: remote } : APP_LOGO}
-        style={styles.logoImage(imgW, imgH, radius)}
-        resizeMode={rounded ? 'cover' : 'contain'}
-        fadeDuration={0}
-        accessibilityLabel="WAREZONE logo"
-      />
+      <View style={styles.logoContainer(imgW, imgH, backgroundColor, radius)}>
+        <Image
+          source={remote ? { uri: remote } : APP_LOGO}
+          style={styles.logoImage(imgW, imgH, radius)}
+          resizeMode={isSquare ? 'cover' : 'contain'}
+          fadeDuration={0}
+          accessibilityLabel="WAREZONE logo"
+        />
+      </View>
     </View>
   );
 };
@@ -64,6 +88,25 @@ const styles = StyleSheet.create({
         }
       : null),
   }),
+  squircleShadow: {
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.35,
+        shadowRadius: 14,
+      },
+      android: {
+        elevation: 10,
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.35,
+        shadowRadius: 14,
+      },
+    }),
+  },
   logoImage: (width, height, borderRadius) => ({
     width,
     height,
