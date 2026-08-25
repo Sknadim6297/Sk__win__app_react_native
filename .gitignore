@@ -3,20 +3,33 @@
 # dependencies
 node_modules/
 
+# Local toolchains (JDK etc.)
+.tools/
+
 # Expo
 .expo/
+.expo-safe-check/
+.expo-web-check/
 dist/
 web-build/
 expo-env.d.ts
 
 # Native
 .kotlin/
+android/
+ios/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+
+# Local EAS / Android signing credentials (never commit)
+credentials.json
+credentials/
+android/keystore.properties
 
 # Metro
 .metro-health-check*

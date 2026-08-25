@@ -2,6 +2,10 @@
 export const APP_RELEASE = {
   version: '1.0.4',
   fileName: 'WAREZONE-v1.0.4.apk',
+  title: 'WAREZONE Tournament',
+  androidMin: 'Android 8.0 (API 26)+',
+  releaseNotes:
+    'WAREZONE v1.0.4 — contest list/details ALL CAPS to match live, PWA auto-refresh, Android update prompts.',
 };
 
 /** Expo Web PWA (same app screens). Override with VITE_PWA_URL on sk-win-web. */

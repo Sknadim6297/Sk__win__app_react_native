@@ -2,7 +2,6 @@ import React, { useContext, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
-  Image,
   Pressable,
   StyleSheet,
   StatusBar,
@@ -17,41 +16,19 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { COLORS, FONTS, TYPO } from '../styles/theme';
 import { ONBOARDING } from '../styles/onboardingTheme';
 import { BRAND } from '../constants/branding';
-import {
-  LANDING_COIN,
-  LANDING_SHIELD,
-  LANDING_TROPHY,
-} from '../constants/brandAssets';
 import WarezoneLogo from '../components/WarezoneLogo';
 import BackgroundLayer from '../components/onboarding/BackgroundLayer';
 import PrimaryButton from '../components/auth/PrimaryButton';
 
 const FEATURES = [
-  {
-    id: 'tournaments',
-    label: 'Live Tournaments',
-    hint: 'Join daily Free Fire matches',
-    image: LANDING_TROPHY,
-    glow: 'rgba(255, 176, 32, 0.28)',
-  },
-  {
-    id: 'prizes',
-    label: 'Real Prizes',
-    hint: 'Win coins & cash rewards',
-    image: LANDING_COIN,
-    glow: 'rgba(251, 191, 36, 0.32)',
-  },
-  {
-    id: 'secure',
-    label: 'Secure Play',
-    hint: 'Safe wallet & fair matches',
-    image: LANDING_SHIELD,
-    glow: 'rgba(96, 165, 250, 0.28)',
-  },
+  { id: 'tournaments', icon: 'trophy-variant', label: 'Live Tournaments', color: COLORS.primary },
+  { id: 'prizes', icon: 'cash-multiple', label: 'Real Prizes', color: COLORS.success },
+  { id: 'secure', icon: 'shield-check', label: 'Secure Play', color: COLORS.purple },
 ];
 
 function clamp(n, min, max) {
@@ -74,16 +51,15 @@ const LandingScreen = ({ navigation }) => {
     const narrow = width < 380;
     const padX = clamp(width * 0.055, 14, 26);
     const logoSize = clamp(width * (narrow ? 0.42 : 0.38), 132, 196);
-    const artSize = narrow ? 56 : short ? 60 : 68;
     return {
       short,
       veryShort,
       narrow,
       padX,
       logoSize,
-      artSize,
       heroTop: short ? 4 : 10,
       sectionGap: veryShort ? 12 : short ? 16 : 22,
+      featurePadV: short ? 10 : 14,
       taglineSize: short ? 13 : 15,
     };
   }, [width, height]);
@@ -140,11 +116,7 @@ const LandingScreen = ({ navigation }) => {
         <View style={styles.mainColumn}>
           <Animated.View style={[styles.heroSection, { paddingTop: layout.heroTop }, fadeStyle]}>
             <Animated.View style={[styles.logoWrap, logoStyle]}>
-              <WarezoneLogo
-                size={layout.logoSize}
-                shape="squircle"
-                backgroundColor="#050014"
-              />
+              <WarezoneLogo size={layout.logoSize} shape="squircle" backgroundColor="#050014" />
             </Animated.View>
 
             <Animated.View style={[styles.brandBlock, contentStyle]}>
@@ -166,39 +138,18 @@ const LandingScreen = ({ navigation }) => {
                 style={[
                   styles.featureCard,
                   layout.narrow ? styles.featureCardStack : styles.featureCardRow,
+                  { paddingVertical: layout.featurePadV },
                 ]}
               >
-                <View
-                  style={[
-                    styles.featureArtWrap,
-                    {
-                      width: layout.artSize,
-                      height: layout.artSize,
-                      shadowColor: feature.glow,
-                    },
-                  ]}
+                <View style={[styles.featureIconWrap, { backgroundColor: `${feature.color}22` }]}>
+                  <MaterialCommunityIcons name={feature.icon} size={22} color={feature.color} />
+                </View>
+                <Text
+                  style={[styles.featureLabel, layout.narrow && styles.featureLabelStack]}
+                  numberOfLines={2}
                 >
-                  <View style={[styles.featureGlow, { backgroundColor: feature.glow }]} />
-                  <Image
-                    source={feature.image}
-                    style={{ width: layout.artSize * 0.88, height: layout.artSize * 0.88 }}
-                    resizeMode="contain"
-                  />
-                </View>
-                <View style={[styles.featureCopy, layout.narrow && styles.featureCopyStack]}>
-                  <Text
-                    style={[styles.featureLabel, layout.narrow && styles.featureLabelStack]}
-                    numberOfLines={1}
-                  >
-                    {feature.label}
-                  </Text>
-                  <Text
-                    style={[styles.featureHint, layout.narrow && styles.featureHintStack]}
-                    numberOfLines={2}
-                  >
-                    {feature.hint}
-                  </Text>
-                </View>
+                  {feature.label}
+                </Text>
               </View>
             ))}
           </Animated.View>
@@ -259,7 +210,7 @@ const styles = StyleSheet.create({
   logoWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   brandBlock: {
     alignItems: 'center',
@@ -275,77 +226,54 @@ const styles = StyleSheet.create({
   },
   featuresSection: {
     width: '100%',
-    maxWidth: 560,
+    maxWidth: 520,
     alignSelf: 'center',
   },
   featuresRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   featuresStack: {
     flexDirection: 'column',
-    gap: 10,
+    gap: 8,
   },
   featureCard: {
-    backgroundColor: 'rgba(15, 20, 40, 0.92)',
-    borderRadius: 16,
+    backgroundColor: ONBOARDING.colors.surface,
+    borderRadius: 14,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 12,
+    borderColor: COLORS.borderDark,
+    gap: 10,
   },
   featureCardRow: {
     flex: 1,
     minWidth: 0,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   featureCardStack: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
   },
-  featureArtWrap: {
+  featureIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
-  },
-  featureGlow: {
-    position: 'absolute',
-    width: '78%',
-    height: '78%',
-    borderRadius: 999,
-    opacity: 0.9,
-  },
-  featureCopy: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  featureCopyStack: {
-    flex: 1,
-    alignItems: 'flex-start',
   },
   featureLabel: {
-    fontFamily: FONTS.bold,
-    color: COLORS.white,
-    fontSize: 12,
+    ...TYPO.label,
+    fontFamily: FONTS.semiBold,
+    color: ONBOARDING.colors.textPrimary,
     textAlign: 'center',
-    marginTop: 4,
+    fontSize: 12,
+    lineHeight: 16,
   },
   featureLabelStack: {
+    flex: 1,
     textAlign: 'left',
-    fontSize: 15,
-    marginTop: 0,
-  },
-  featureHint: {
-    ...TYPO.caption,
-    color: ONBOARDING.colors.textMuted,
-    textAlign: 'center',
-    marginTop: 4,
-    fontSize: 11,
-    lineHeight: 15,
-  },
-  featureHintStack: {
-    textAlign: 'left',
-    fontSize: 12,
+    fontSize: 14,
   },
   ctaSection: {
     marginBottom: 8,

@@ -17,7 +17,7 @@ export const LINE_HEIGHT = {
 };
 
 /**
- * DM Sans — bold UI font on every screen.
+ * DM Sans — single weight for smaller APK (one .ttf instead of two).
  * Use named families instead of fontWeight on Android custom fonts.
  */
 export const FONT_FAMILY = 'DMSans_700Bold';
@@ -25,11 +25,11 @@ export const FONT_FAMILY = 'DMSans_700Bold';
 export const FONTS = {
   regular: 'DMSans_700Bold',
   medium: 'DMSans_700Bold',
-  semiBold: 'DMSans_800ExtraBold',
-  bold: 'DMSans_800ExtraBold',
-  display: 'DMSans_800ExtraBold',
+  semiBold: 'DMSans_700Bold',
+  bold: 'DMSans_700Bold',
+  display: 'DMSans_700Bold',
   displayMedium: 'DMSans_700Bold',
-  displaySemiBold: 'DMSans_800ExtraBold',
+  displaySemiBold: 'DMSans_700Bold',
 };
 
 /** Icons8 display sizes — 24px default, 28px for important actions */

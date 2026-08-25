@@ -2,8 +2,8 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ONBOARDING } from '../../styles/onboardingTheme';
-import ParticleField from './ParticleField';
 
+/** Lightweight gradient background — no particle images. */
 export default function BackgroundLayer() {
   return (
     <View style={styles.container}>
@@ -12,12 +12,8 @@ export default function BackgroundLayer() {
         locations={[0, 0.35, 0.7, 1]}
         style={StyleSheet.absoluteFill}
       />
-
       <View style={[styles.glow, styles.glowPurple]} />
       <View style={[styles.glow, styles.glowBlue]} />
-      <View style={[styles.glow, styles.glowOrange]} />
-
-      <ParticleField />
     </View>
   );
 }
@@ -32,24 +28,17 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   glowPurple: {
-    width: ONBOARDING.layout.width * 0.7,
-    height: ONBOARDING.layout.width * 0.7,
-    top: -ONBOARDING.layout.width * 0.2,
+    width: '70%',
+    aspectRatio: 1,
+    top: '-18%',
     alignSelf: 'center',
     backgroundColor: ONBOARDING.colors.purpleGlow,
   },
   glowBlue: {
-    width: ONBOARDING.layout.width * 0.5,
-    height: ONBOARDING.layout.width * 0.5,
-    bottom: ONBOARDING.layout.height * 0.12,
-    right: -ONBOARDING.layout.width * 0.15,
+    width: '50%',
+    aspectRatio: 1,
+    bottom: '12%',
+    right: '-15%',
     backgroundColor: 'rgba(56, 89, 248, 0.12)',
-  },
-  glowOrange: {
-    width: ONBOARDING.layout.width * 0.35,
-    height: ONBOARDING.layout.width * 0.35,
-    top: '42%',
-    left: -ONBOARDING.layout.width * 0.12,
-    backgroundColor: 'rgba(255, 107, 0, 0.08)',
   },
 });

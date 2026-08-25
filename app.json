@@ -2,7 +2,7 @@
   "expo": {
     "name": "WAREZONE",
     "slug": "sk-win",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/logo/WAREZONE_LOGO.png",
     "userInterfaceStyle": "dark",
@@ -32,7 +32,7 @@
         "backgroundColor": "#0a0e1a"
       },
       "package": "com.skwin.tournament",
-      "versionCode": 5,
+      "versionCode": 6,
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
@@ -71,8 +71,7 @@
         "expo-font",
         {
           "fonts": [
-            "./node_modules/@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf",
-            "./node_modules/@expo-google-fonts/dm-sans/800ExtraBold/DMSans_800ExtraBold.ttf"
+            "./node_modules/@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf"
           ]
         }
       ],

@@ -1,24 +1,22 @@
 # Android APK downloads
 
-## Current release
+## Current public download
 
-**WAREZONE v1.0.4** — download via the website `/download` page (API may use the Expo artifact URL when the APK is not in this folder).
+**WAREZONE v1.0.4** — website `/download` (local file or Expo artifact URL).
 
-## Local file (optional)
+## Next release (prepared in app)
 
-```
-public/downloads/WAREZONE-v1.0.4.apk
-```
+`app.json` is already bumped to **1.0.5** (versionCode 6) with latest features.
+EAS Free Android builds for `@nadim123456` are exhausted until **Tue Sep 01 2026**.
 
-If GitHub rejects the large binary push, set `externalDownloadUrl` in `release.config.cjs` to the EAS artifact link, then later run:
-
-```bash
-node scripts/sync-latest-apk.js path\to\WAREZONE-v1.0.4.apk
-git add public/downloads && git push
-```
-
-## Rebuild
+When quota resets (or after upgrading Expo):
 
 ```bash
-npm run build:android
+eas build --platform android --profile production --non-interactive
+# then update release.config.cjs version/fileName/externalDownloadUrl to 1.0.5
+node scripts/sync-latest-apk.js path\to\WAREZONE-v1.0.5.apk
+npm run website:build
+git add release.config.cjs website/src/release.js public/downloads app.json
+git commit -m "Release WAREZONE v1.0.5 APK for website download"
+git push
 ```

@@ -27,7 +27,6 @@ import { useFonts } from 'expo-font';
 import { createAppLinking } from './utils/webLinking';
 import {
   DMSans_700Bold,
-  DMSans_800ExtraBold,
 } from '@expo-google-fonts/dm-sans';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { logApiConfig } from './utils/apiConfig';
@@ -81,7 +80,6 @@ export default function App() {
   }, []);
   const [fontsLoaded] = useFonts({
     DMSans_700Bold,
-    DMSans_800ExtraBold,
   });
 
   useEffect(() => {

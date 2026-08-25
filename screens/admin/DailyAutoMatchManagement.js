@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import RNPickerSelect from 'react-native-picker-select';
+import SimpleSelect from '../../components/SimpleSelect';
 import { COLORS } from '../../styles/theme';
 import { dailyAutoMatchService, gameService, mapService } from '../../services/api';
 import { toPlayerMatchLabel } from '../../utils/tournamentHelpers';
@@ -308,7 +308,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
             <Label>Tournament name</Label>
             <TextInput style={styles.input} value={form.name} onChangeText={(name) => setForm((p) => ({ ...p, name }))} placeholder="Daily Solo" placeholderTextColor="#6B7280" />
             <Label>Game</Label>
-            <RNPickerSelect
+            <SimpleSelect
               value={form.game}
               onValueChange={(game) => setForm((p) => ({ ...p, game, gameMode: '' }))}
               items={games.map((g) => ({ label: g.name, value: g._id }))}
@@ -316,7 +316,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
               placeholder={{ label: 'Select game', value: '' }}
             />
             <Label>Game mode</Label>
-            <RNPickerSelect
+            <SimpleSelect
               value={form.gameMode}
               onValueChange={(gameMode) => setForm((p) => ({ ...p, gameMode }))}
               items={gameModes.map((m) => ({ label: toPlayerMatchLabel(m.name), value: m._id }))}
@@ -324,7 +324,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
               placeholder={{ label: 'Select mode', value: '' }}
             />
             <Label>Match type</Label>
-            <RNPickerSelect
+            <SimpleSelect
               value={form.category}
               onValueChange={(category) => setForm((p) => ({ ...p, category }))}
               items={[
@@ -334,7 +334,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
               style={pickerStyle}
             />
             <Label>Mode</Label>
-            <RNPickerSelect
+            <SimpleSelect
               value={form.mode}
               onValueChange={(mode) => setForm((p) => ({ ...p, mode }))}
               items={
@@ -353,7 +353,7 @@ export default function DailyAutoMatchManagement({ navigation }) {
               style={pickerStyle}
             />
             <Label>Map</Label>
-            <RNPickerSelect
+            <SimpleSelect
               value={form.map}
               onValueChange={(map) => setForm((p) => ({ ...p, map }))}
               items={maps}

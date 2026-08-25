@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import RNPickerSelect from 'react-native-picker-select';
+import SimpleSelect from '../../components/SimpleSelect';
 import { COLORS } from '../../styles/theme';
 import { tournamentService, tournamentManagementService, gameService, uploadImageFile, mapService } from '../../services/api';
 import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
@@ -1562,7 +1562,7 @@ const TournamentManagement = ({ navigation }) => {
                     ))}
                   </View>
                   {availableMaps.length > 4 ? (
-                    <RNPickerSelect
+                    <SimpleSelect
                       onValueChange={(value) => value && setForm((prev) => ({ ...prev, map: value }))}
                       items={availableMaps}
                       value={form.map}
@@ -1896,7 +1896,7 @@ const TournamentManagement = ({ navigation }) => {
               <View style={styles.formGroup}>
                 <Text style={styles.label}>🥇 1st Place (Required) *</Text>
                 <View style={styles.pickerContainer}>
-                  <RNPickerSelect
+                  <SimpleSelect
                     onValueChange={(itemValue) => setWinnersForm(prev => ({ ...prev, firstPlace: itemValue }))}
                     items={[
                       ...(Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0
@@ -1924,7 +1924,7 @@ const TournamentManagement = ({ navigation }) => {
               <View style={styles.formGroup}>
                 <Text style={styles.label}>🥈 2nd Place (Optional)</Text>
                 <View style={styles.pickerContainer}>
-                  <RNPickerSelect
+                  <SimpleSelect
                     onValueChange={(itemValue) => setWinnersForm(prev => ({ ...prev, secondPlace: itemValue }))}
                     items={[
                       ...(Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0
@@ -1952,7 +1952,7 @@ const TournamentManagement = ({ navigation }) => {
               <View style={styles.formGroup}>
                 <Text style={styles.label}>🥉 3rd Place (Optional)</Text>
                 <View style={styles.pickerContainer}>
-                  <RNPickerSelect
+                  <SimpleSelect
                     onValueChange={(itemValue) => setWinnersForm(prev => ({ ...prev, thirdPlace: itemValue }))}
                     items={[
                       ...(Array.isArray(tournamentParticipants) && tournamentParticipants.length > 0

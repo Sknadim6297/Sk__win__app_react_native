@@ -15,7 +15,6 @@ const DOWNLOAD_DIRS = [
 
 const PUBLIC_ROOT = fs.existsSync(REPO_PUBLIC) ? REPO_PUBLIC : BACKEND_PUBLIC;
 const DOWNLOADS_DIR = DOWNLOAD_DIRS.find((dir) => fs.existsSync(dir)) || path.join(REPO_PUBLIC, 'downloads');
-const PAGE_PATH = path.join(PUBLIC_ROOT, 'download', 'index.html');
 
 const RELEASE = require('../../release.config.cjs');
 
@@ -282,7 +281,6 @@ module.exports = {
   router,
   PUBLIC_ROOT,
   DOWNLOADS_DIR,
-  PAGE_PATH,
   getOrCreateLatestRelease,
   getApkStats,
   formatBytes,

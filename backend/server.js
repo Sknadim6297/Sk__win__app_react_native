@@ -26,7 +26,6 @@ const announcementRoutes = require('./routes/announcements');
 const {
   router: downloadApiRouter,
   PUBLIC_ROOT,
-  PAGE_PATH,
   getApkStats,
 } = require('./routes/download');
 const AppRelease = require('./models/AppRelease');
@@ -91,11 +90,7 @@ const isWebsiteReady = () => SERVE_WEBSITE && fs.existsSync(WEBSITE_INDEX);
 const frontendUrl = () =>
   String(process.env.FRONTEND_URL || process.env.WEBSITE_URL || '').replace(/\/$/, '');
 
-if (!isWebsiteReady()) {
-  app.use('/download', express.static(path.join(PUBLIC_ROOT, 'download')));
-}
-
-// Single brand logo (no copies) — used by download page favicon/OG/hero
+// Single brand logo (API + website OG)
 const BRAND_LOGO_PATH = path.join(__dirname, '..', 'assets', 'logo', 'WAREZONE_LOGO.png');
 app.get(['/brand/logo.png', '/download/logo.png'], (req, res) => {
   res.sendFile(BRAND_LOGO_PATH, (err) => {
@@ -108,27 +103,28 @@ app.get(['/brand/logo.png', '/download/logo.png'], (req, res) => {
 
 const isDbReady = () => mongoose.connection.readyState === 1;
 
-/** Homepage → marketing website when SERVE_WEBSITE=true; else redirect to frontend static site */
+/** Homepage → marketing website (never the old APK landing HTML) */
 app.get('/', (req, res, next) => {
   if (isWebsiteReady()) return next();
   const site = frontendUrl();
   if (site) return res.redirect(302, site);
-  res.redirect(302, '/download');
+  return res.status(200).json({
+    ok: true,
+    service: 'WAREZONE API',
+    website: 'Set FRONTEND_URL to your marketing site (sk-win-web).',
+    health: '/api/health',
+  });
 });
 
-/** Legacy APK landing — redirects to frontend /download when FRONTEND_URL is set */
+/** /download on API always goes to the website download page */
 app.get(['/download', '/download/'], (req, res, next) => {
   if (isWebsiteReady()) return next();
   const site = frontendUrl();
   if (site) return res.redirect(302, `${site}/download`);
-  res.sendFile(PAGE_PATH, (err) => {
-    if (err) {
-      console.error('[download] page missing:', PAGE_PATH, err.message);
-      res.status(500).send('Download page is not available.');
-    }
+  return res.status(404).json({
+    error: 'Download page moved to the website. Set FRONTEND_URL (e.g. https://your-web.onrender.com).',
   });
 });
-
 /**
  * Serve APK and increment download counter first.
  * GET /downloads/WAREZONE-v1.0.0.apk
@@ -382,7 +378,11 @@ async function startServer() {
             ? `WAREZONE website (frontend): ${site}`
             : 'WAREZONE website: deploy website/ to sk-win-web (or set FRONTEND_URL + SERVE_WEBSITE=true)'
       );
-      console.log(`APK download page: http://localhost:${PORT}/download`);
+      console.log(
+        site
+          ? `APK download (website): ${site}/download`
+          : 'APK download: set FRONTEND_URL so /download redirects to the website'
+      );
       if (process.env.PUBLIC_BASE_URL) {
         console.log(`Public base URL (for uploads/images): ${process.env.PUBLIC_BASE_URL}`);
       } else {

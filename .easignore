@@ -5,12 +5,16 @@ web-build/
 .expo/
 .expo-web-check/
 .expo-safe-check/
-*.original.*
-public/downloads/*.apk
-node_modules/
+.tools/
+android/
+ios/
+website/
 backend/
 docs/
 download-site/
+*.original.*
+public/downloads/*.apk
+node_modules/
 **/*.md
 !README.md
 **/*.backup.js
@@ -18,3 +22,5 @@ download-site/
 screens/HomeScreenOld.js
 .git/
 *.apk
+*.zip
+*.msi
