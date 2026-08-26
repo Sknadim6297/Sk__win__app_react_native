@@ -412,6 +412,22 @@ router.post('/admin/:id/complete-match', authMiddleware, async (req, res) => {
   }
 });
 
+// ——— Result note (shown on the published Match Result screen) ———
+router.put('/admin/:id/result-note', authMiddleware, async (req, res) => {
+  try {
+    if (!(await requireAdmin(req, res))) return;
+    const tournament = await Tournament.findById(req.params.id);
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+
+    tournament.resultNote = String(req.body?.resultNote || '').trim();
+    await tournament.save();
+
+    res.json({ message: 'Result note saved', resultNote: tournament.resultNote });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to save result note' });
+  }
+});
+
 router.post('/admin/:id/publish-results', authMiddleware, async (req, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;

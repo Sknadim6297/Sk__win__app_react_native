@@ -47,6 +47,8 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
   const [payoutBusyId, setPayoutBusyId] = useState(null);
   const [autoPaymentBusy, setAutoPaymentBusy] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
+  const [resultNote, setResultNote] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
 
   const calcBrPrize = (position, kills) => {
     const pos = Number(position) || 0;
@@ -77,6 +79,7 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
       setLoading(true);
       const detail = await tournamentManagementService.getAdminDetail(tournamentId);
       setMeta(detail);
+      setResultNote(detail.tournament?.resultNote || '');
 
       const category = detail.tournament?.category || detail.tournament?.tournamentType;
       const isCustom =
@@ -226,6 +229,18 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
       }
       return next;
     });
+  };
+
+  const saveResultNote = async () => {
+    setSavingNote(true);
+    try {
+      await tournamentManagementService.saveResultNote(tournamentId, resultNote.trim());
+      Alert.alert('Saved', 'Result note saved. It will show on the Match Result screen.');
+    } catch (e) {
+      Alert.alert('Error', e.message || 'Failed to save result note');
+    } finally {
+      setSavingNote(false);
+    }
   };
 
   const publishResults = async () => {
@@ -470,6 +485,29 @@ export default function TournamentResultEntryScreen({ navigation, route }) {
       ) : null}
 
       <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.noteBox}>
+          <Text style={styles.sectionTitle}>Result Note</Text>
+          <Text style={styles.helper}>
+            Optional message shown to players on the Match Result screen (e.g. proof / POV submission instructions).
+          </Text>
+          <TextInput
+            style={styles.noteInput}
+            value={resultNote}
+            onChangeText={setResultNote}
+            placeholder="e.g. Send HUD POV on CC under 1 hour"
+            placeholderTextColor={COLORS.gray}
+            multiline
+            numberOfLines={3}
+          />
+          <TouchableOpacity
+            style={[styles.autofillBtn, savingNote && styles.disabledBtn]}
+            onPress={saveResultNote}
+            disabled={savingNote}
+          >
+            <Text style={styles.autofillText}>{savingNote ? 'Saving…' : 'Save Result Note'}</Text>
+          </TouchableOpacity>
+        </View>
+
         {resultsPublished ? (
           <View style={styles.payoutPanel}>
             <Text style={styles.sectionTitle}>Payment Control</Text>
@@ -843,6 +881,24 @@ const styles = StyleSheet.create({
   blockedTitle: { color: '#F59E0B', fontWeight: '700', marginBottom: 4 },
   blockedText: { color: COLORS.gray, fontSize: 13, lineHeight: 18 },
   scroll: { padding: 16, paddingBottom: 40 },
+  noteBox: {
+    marginBottom: 20,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(251,191,36,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.3)',
+  },
+  noteInput: {
+    backgroundColor: '#1e293b',
+    color: COLORS.white,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 72,
+    textAlignVertical: 'top',
+    marginBottom: 10,
+  },
   sectionTitle: { color: COLORS.white, fontWeight: '700', fontSize: 16, marginBottom: 10 },
   payoutPanel: {
     marginBottom: 20,

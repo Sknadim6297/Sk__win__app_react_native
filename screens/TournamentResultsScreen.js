@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,8 +15,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AppIcon from '../components/ui/AppIcon';
 import ConfettiBurst from '../components/ConfettiBurst';
 import { COLORS, FONTS } from '../styles/theme';
+import { PAGE } from '../styles/pageTheme';
 import { tournamentService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
+import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import { formatScheduleLine } from '../utils/tournamentHelpers';
+
+const DEFAULT_BANNER = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
 
 const CYAN = '#00E5FF';
 const GOLD = '#FBBF24';
@@ -25,6 +31,12 @@ const MEDAL = { 1: GOLD, 2: SILVER, 3: BRONZE };
 
 function sameId(a, b) {
   return a != null && b != null && String(a) === String(b);
+}
+
+function getMatchNumber(tournament) {
+  if (tournament?.matchNumber) return tournament.matchNumber;
+  const id = String(tournament?._id || '');
+  return 10000 + (parseInt(id.slice(-6), 16) % 80000 || 0);
 }
 
 function resolveMyResult(data, user) {
@@ -75,6 +87,168 @@ function ResultHeader({ title, onBack }) {
         {title}
       </Text>
       <View style={{ width: 40 }} />
+    </View>
+  );
+}
+
+function MatchSummary({ tournament, entryFee, prizePool, perKill, showPerKill }) {
+  const matchNo = getMatchNumber(tournament);
+  const bannerUri = tournament?.bannerImage ? resolveMediaUrl(tournament.bannerImage) : null;
+  const bannerSource = bannerUri ? { uri: bannerUri } : DEFAULT_BANNER;
+  const organizedLine = tournament?.startDate ? formatScheduleLine(tournament.startDate) : null;
+
+  return (
+    <View style={styles.summaryWrap}>
+      <ImageBackground source={bannerSource} style={styles.banner} imageStyle={styles.bannerImg} resizeMode="cover">
+        <LinearGradient
+          colors={['rgba(11,14,30,0.05)', 'rgba(11,14,30,0.55)']}
+          style={StyleSheet.absoluteFill}
+        />
+      </ImageBackground>
+
+      <Text style={styles.matchTitle}>
+        {String(tournament?.name || 'Tournament').toUpperCase()} - ID#{matchNo}
+      </Text>
+
+      {organizedLine ? (
+        <View style={styles.pillCenterRow}>
+          <View style={styles.pill}>
+            <Text style={styles.pillText}>Organized on {organizedLine}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.pillRow}>
+        <View style={[styles.pill, styles.pillFlex]}>
+          <Text style={styles.pillLabel}>Prize Pool</Text>
+          <Text style={styles.pillValue}>₹{Number(prizePool || 0).toLocaleString('en-IN')}</Text>
+        </View>
+        {showPerKill ? (
+          <View style={[styles.pill, styles.pillFlex]}>
+            <Text style={styles.pillLabel}>Per Kill</Text>
+            <Text style={styles.pillValue}>₹{Number(perKill || 0).toLocaleString('en-IN')}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.pillCenterRow}>
+        <View style={styles.pill}>
+          <Text style={styles.pillLabel}>Entry Fee</Text>
+          <Text style={styles.pillValue}>₹{Number(entryFee || 0).toLocaleString('en-IN')}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ResultNoteBox({ note }) {
+  if (!note) return null;
+  return (
+    <View style={styles.noteSection}>
+      <Text style={styles.sectionTitleGold}>Result Note</Text>
+      <View style={styles.noteBox}>
+        <Text style={styles.noteText}>{note}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ResultTable({ rows, viewerId }) {
+  return (
+    <View style={styles.tableSection}>
+      <Text style={styles.sectionTitleGold}>Result</Text>
+      <View style={styles.tableCard}>
+        <View style={styles.tableHeadRow}>
+          <Text style={[styles.tableHeadText, styles.colRank]}>#</Text>
+          <Text style={[styles.tableHeadText, styles.colName]}>Player Name</Text>
+          <Text style={[styles.tableHeadText, styles.colKills]}>Kills</Text>
+          <Text style={[styles.tableHeadText, styles.colPrize]}>Prize</Text>
+        </View>
+        {rows.map((player, idx) => {
+          const isYou = sameId(player.userId, viewerId);
+          return (
+            <View
+              key={`${player.userId || player.gamingID}-${idx}`}
+              style={[
+                styles.tableRow,
+                idx % 2 === 1 && styles.tableRowAlt,
+                isYou && styles.tableRowYou,
+              ]}
+            >
+              <Text style={[styles.tableCellRank, styles.colRank, { color: MEDAL[player.rank] || COLORS.white }]}>
+                {player.rank || idx + 1}
+              </Text>
+              <View style={styles.colName}>
+                <Text style={styles.tableCellName} numberOfLines={1}>
+                  {player.gamingID || player.username || 'Player'}
+                  {isYou ? '  ·  YOU' : ''}
+                </Text>
+              </View>
+              <Text style={[styles.tableCellText, styles.colKills]}>{player.kills ?? 0}</Text>
+              <Text style={[styles.tableCellPrize, styles.colPrize]}>
+                ₹{Number(player.totalReward ?? player.prize ?? 0).toLocaleString('en-IN')}
+              </Text>
+            </View>
+          );
+        })}
+        {!rows.length ? <Text style={styles.emptyRowsText}>No results entered yet.</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+function TeamResultTable({ teams, viewerId, winnerPrize }) {
+  const rows = teams.flatMap((team) =>
+    (team.members || []).map((m) => ({ ...m, teamName: team.name, isWinner: Boolean(team.isWinner) }))
+  );
+
+  return (
+    <View style={styles.tableSection}>
+      <Text style={styles.sectionTitleGold}>Result</Text>
+      <View style={styles.tableCard}>
+        <View style={styles.tableHeadRow}>
+          <Text style={[styles.tableHeadText, styles.colName]}>Player Name</Text>
+          <Text style={[styles.tableHeadText, styles.colTeam]}>Team</Text>
+          <Text style={[styles.tableHeadText, styles.colResult]}>Result</Text>
+          <Text style={[styles.tableHeadText, styles.colPrize]}>Prize</Text>
+        </View>
+        {rows.map((player, idx) => {
+          const isYou = sameId(player.userId, viewerId);
+          return (
+            <View
+              key={`${player.userId || player.gamingUsername}-${idx}`}
+              style={[
+                styles.tableRow,
+                idx % 2 === 1 && styles.tableRowAlt,
+                isYou && styles.tableRowYou,
+              ]}
+            >
+              <View style={styles.colName}>
+                <Text style={styles.tableCellName} numberOfLines={1}>
+                  {player.gamingUsername || player.username || 'Player'}
+                  {isYou ? '  ·  YOU' : ''}
+                </Text>
+              </View>
+              <Text style={[styles.tableCellText, styles.colTeam]} numberOfLines={1}>
+                {player.teamName || '—'}
+              </Text>
+              <Text
+                style={[
+                  styles.tableCellResult,
+                  styles.colResult,
+                  { color: player.isWinner ? GOLD : COLORS.gray },
+                ]}
+              >
+                {player.isWinner ? 'WINNER' : 'LOSER'}
+              </Text>
+              <Text style={[styles.tableCellPrize, styles.colPrize]}>
+                ₹{Number(player.isWinner ? winnerPrize || 0 : 0).toLocaleString('en-IN')}
+              </Text>
+            </View>
+          );
+        })}
+        {!rows.length ? <Text style={styles.emptyRowsText}>No results entered yet.</Text> : null}
+      </View>
     </View>
   );
 }
@@ -140,47 +314,6 @@ function PersonalHero({ mine }) {
         </View>
       </LinearGradient>
     </Animated.View>
-  );
-}
-
-function TeamCard({ team, viewerId, prize }) {
-  const won = Boolean(team?.isWinner);
-  const members = team?.members || [];
-  return (
-    <View style={[styles.teamCard, won ? styles.teamCardWin : styles.teamCardLoss]}>
-      <View style={styles.teamHead}>
-        <View style={[styles.teamBadge, won ? styles.teamBadgeWin : styles.teamBadgeLoss]}>
-          <Text style={[styles.teamBadgeText, !won && { color: '#FECACA' }]}>
-            {won ? 'WINNER' : 'LOSER'}
-          </Text>
-        </View>
-        {won ? (
-          <Text style={styles.teamPrize}>₹{Number(prize || 0).toLocaleString('en-IN')}</Text>
-        ) : (
-          <Text style={styles.teamPrizeMuted}>₹0</Text>
-        )}
-      </View>
-      <Text style={styles.teamName}>{team?.name || 'Team'}</Text>
-      {members.length ? (
-        members.map((m) => {
-          const isYou = sameId(m.userId, viewerId);
-          return (
-            <View key={String(m.userId || m.gamingUsername)} style={[styles.memberRow, isYou && styles.memberYou]}>
-              <Text style={styles.memberName}>
-                {m.gamingUsername || m.username || 'Player'}
-                {isYou ? '  ·  YOU' : ''}
-              </Text>
-              <Text style={styles.memberMeta}>
-                {m.role === 'captain' ? 'Captain' : 'Player'}
-                {m.gamingUID ? ` · ${m.gamingUID}` : ''}
-              </Text>
-            </View>
-          );
-        })
-      ) : (
-        <Text style={styles.memberMeta}>No players listed</Text>
-      )}
-    </View>
   );
 }
 
@@ -282,7 +415,7 @@ export default function TournamentResultsScreen({ navigation, route }) {
   if (data.resultPending) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <ResultHeader title={data.tournament?.name || 'Results'} onBack={() => navigation.goBack()} />
+        <ResultHeader title="Match Result" onBack={() => navigation.goBack()} />
         <View style={styles.pendingWrap}>
           <MaterialCommunityIcons name="timer-sand" size={40} color="#F59E0B" />
           <Text style={styles.pendingTitle}>Result Not Published Yet</Text>
@@ -300,78 +433,67 @@ export default function TournamentResultsScreen({ navigation, route }) {
   if (tournamentType === 'custom_match' && customMatch) {
     const winnerName = customMatch.winnerTeam?.name || 'Winner';
     const runnerName = customMatch.runnerUpTeam?.name || 'Runner-up';
-    const mvpName =
-      customMatch.mvp?.gamingUsername || customMatch.mvp?.username || 'MVP';
     const teams = customMatch.teams || [];
     const winnerTeamId = customMatch.winnerTeam?._id || customMatch.winnerTeam;
     const runnerTeamId = customMatch.runnerUpTeam?._id || customMatch.runnerUpTeam;
 
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <ResultHeader title={tournament?.name || 'Results'} onBack={() => navigation.goBack()} />
+        <ResultHeader title="Match Result" onBack={() => navigation.goBack()} />
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={[styles.matchResultLabel, mine.outcome === 'loss' && { color: '#93C5FD' }]}>
-            {mine.participated
-              ? mine.outcome === 'win'
-                ? 'YOUR RESULT · VICTORY'
-                : 'YOUR RESULT · DEFEAT'
-              : 'MATCH RESULT'}
-          </Text>
-          <PersonalHero mine={mine} />
-          <Text style={styles.sectionTitle}>Teams</Text>
-          {teams.length
-            ? teams.map((team) => (
-                <TeamCard
-                  key={String(team._id)}
-                  team={team}
-                  viewerId={viewerId}
-                  prize={team.isWinner ? customMatch.winnerPrize : 0}
-                />
-              ))
-            : (
-              <>
-                <ResultRow
-                  icon="trophy"
-                  iconColor={GOLD}
-                  iconBg="rgba(251,191,36,0.16)"
-                  label="Winner"
-                  name={winnerName}
-                  amount={customMatch.winnerPrize}
-                  yours={sameId(winnerTeamId, mine.teamId)}
-                />
-                <ResultRow
-                  icon="sword-cross"
-                  iconColor="#FCA5A5"
-                  iconBg="rgba(239,68,68,0.16)"
-                  label="Loser"
-                  name={runnerName}
-                  amount={0}
-                  tone="loss"
-                  yours={sameId(runnerTeamId, mine.teamId)}
-                />
-              </>
-            )}
-          <ResultRow
-            icon="star"
-            iconColor={CYAN}
-            iconBg="rgba(0,229,255,0.14)"
-            label="Player of the Match"
-            name={mvpName}
-            tone="mvp"
-            yours={sameId(customMatch.mvp?.userId, viewerId)}
+          <MatchSummary
+            tournament={tournament}
+            entryFee={tournament?.entryFee}
+            prizePool={tournament?.prizePool ?? customMatch.winnerPrize}
+            showPerKill={false}
           />
+
+          <ResultNoteBox note={tournament?.resultNote} />
+
+          {teams.length ? (
+            <TeamResultTable teams={teams} viewerId={viewerId} winnerPrize={customMatch.winnerPrize} />
+          ) : (
+            <>
+              <Text style={styles.sectionTitleGold}>Result</Text>
+              <ResultRow
+                icon="trophy"
+                iconColor={GOLD}
+                iconBg="rgba(251,191,36,0.16)"
+                label="Winner"
+                name={winnerName}
+                amount={customMatch.winnerPrize}
+                yours={sameId(winnerTeamId, mine.teamId)}
+              />
+              <ResultRow
+                icon="sword-cross"
+                iconColor="#FCA5A5"
+                iconBg="rgba(239,68,68,0.16)"
+                label="Loser"
+                name={runnerName}
+                amount={0}
+                tone="loss"
+                yours={sameId(runnerTeamId, mine.teamId)}
+              />
+            </>
+          )}
         </ScrollView>
         {mine.participated ? <ConfettiBurst active={celebrate} mood={mood} /> : null}
       </SafeAreaView>
     );
   }
 
-  const top3 = leaderboard.filter((e) => e.rank >= 1 && e.rank <= 3);
-
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ResultHeader title={tournament?.name || 'Results'} onBack={() => navigation.goBack()} />
+      <ResultHeader title="Match Result" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <MatchSummary
+          tournament={tournament}
+          entryFee={tournament?.entryFee}
+          prizePool={tournament?.prizePool}
+          perKill={tournament?.perKill}
+          showPerKill={Boolean(isBattleRoyale)}
+        />
+
         {mine.participated ? <PersonalHero mine={mine} /> : null}
         {!mine.participated && winner ? (
           <PersonalHero
@@ -386,58 +508,9 @@ export default function TournamentResultsScreen({ navigation, route }) {
           />
         ) : null}
 
-        {top3.length > 0 && (
-          <View style={styles.top3Row}>
-            {top3.map((player) => (
-              <View
-                key={player.userId}
-                style={[
-                  styles.podiumCard,
-                  player.rank === 1 && styles.podiumFirst,
-                  sameId(player.userId, viewerId) && styles.podiumYou,
-                  { borderColor: MEDAL[player.rank] || CYAN },
-                ]}
-              >
-                <Text style={[styles.podiumRank, { color: MEDAL[player.rank] }]}>#{player.rank}</Text>
-                <Text style={styles.podiumName} numberOfLines={1}>
-                  {player.gamingID || player.username}
-                  {sameId(player.userId, viewerId) ? ' · YOU' : ''}
-                </Text>
-                <Text style={styles.podiumReward}>₹{player.totalReward}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        <ResultNoteBox note={tournament?.resultNote} />
 
-        <Text style={styles.sectionTitle}>Leaderboard</Text>
-        {leaderboard.map((player, idx) => (
-          <View
-            key={`${player.userId}-${idx}`}
-            style={[styles.row, sameId(player.userId, viewerId) && styles.rowYou]}
-          >
-            <View style={[styles.rankBadge, player.isWinner && styles.rankBadgeWinner]}>
-              <Text style={styles.rankText}>{player.rank || '—'}</Text>
-            </View>
-            <View style={styles.rowBody}>
-              <Text style={styles.rowName}>
-                {player.gamingID || player.username}
-                {sameId(player.userId, viewerId) ? '  ·  YOU' : ''}
-              </Text>
-              <Text style={styles.rowSub}>UID: {player.gamingUID || '—'}</Text>
-              {isBattleRoyale && (
-                <Text style={styles.rowSub}>Kills: {player.kills ?? 0}</Text>
-              )}
-            </View>
-            <View style={styles.rowRight}>
-              {player.isWinner ? (
-                <Text style={styles.statusWin}>Winner</Text>
-              ) : (
-                <Text style={styles.statusLose}>Lose</Text>
-              )}
-              <Text style={styles.rowReward}>₹{player.totalReward ?? 0}</Text>
-            </View>
-          </View>
-        ))}
+        <ResultTable rows={leaderboard} viewerId={viewerId} />
       </ScrollView>
       {mine.participated ? <ConfettiBurst active={celebrate} mood={mood} /> : null}
     </SafeAreaView>
@@ -464,14 +537,6 @@ const styles = StyleSheet.create({
   loadingText: { color: COLORS.gray, textAlign: 'center', marginTop: 12 },
   errorText: { color: COLORS.error, textAlign: 'center', marginTop: 80, paddingHorizontal: 24 },
   backBtn: { padding: 16 },
-  matchResultLabel: {
-    color: GOLD,
-    fontFamily: FONTS.bold,
-    fontSize: 12,
-    letterSpacing: 2,
-    textAlign: 'center',
-    marginBottom: 14,
-  },
   pendingWrap: {
     marginTop: 80,
     marginHorizontal: 24,
@@ -485,6 +550,103 @@ const styles = StyleSheet.create({
   },
   pendingTitle: { color: '#F59E0B', fontFamily: FONTS.bold, fontSize: 20, marginBottom: 4 },
   pendingSub: { color: COLORS.gray, textAlign: 'center', lineHeight: 20 },
+
+  summaryWrap: { marginBottom: 18 },
+  banner: {
+    height: 176,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  bannerImg: { borderRadius: 16 },
+  matchTitle: {
+    fontFamily: FONTS.bold,
+    fontSize: 16,
+    color: GOLD,
+    lineHeight: 22,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  pillCenterRow: { alignItems: 'center', marginBottom: 10 },
+  pillRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  pillFlex: { flex: 1 },
+  pill: {
+    backgroundColor: PAGE.cardAlt,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  pillText: { fontFamily: FONTS.bold, fontSize: 12, color: COLORS.white },
+  pillLabel: { fontFamily: FONTS.semiBold, fontSize: 10, color: PAGE.muted, letterSpacing: 0.5, marginBottom: 3 },
+  pillValue: { fontFamily: FONTS.bold, fontSize: 15, color: GOLD },
+
+  noteSection: { marginBottom: 18 },
+  sectionTitleGold: {
+    fontFamily: FONTS.bold,
+    color: GOLD,
+    marginBottom: 10,
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  noteBox: {
+    backgroundColor: PAGE.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+    padding: 16,
+  },
+  noteText: {
+    color: COLORS.white,
+    fontFamily: FONTS.medium,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+
+  tableSection: { marginBottom: 18 },
+  tableCard: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: PAGE.border,
+  },
+  tableHeadRow: {
+    flexDirection: 'row',
+    backgroundColor: '#0F1B3D',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  tableHeadText: { fontFamily: FONTS.bold, fontSize: 12, color: COLORS.white },
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: PAGE.cardAlt,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  tableRowAlt: { backgroundColor: PAGE.card },
+  tableRowYou: { backgroundColor: 'rgba(0,229,255,0.1)' },
+  colRank: { width: 30 },
+  colName: { flex: 1.6 },
+  colKills: { width: 52, textAlign: 'center' },
+  colTeam: { flex: 1, textAlign: 'left' },
+  colResult: { width: 66, textAlign: 'center' },
+  colPrize: { width: 72, textAlign: 'right' },
+  tableCellRank: { fontFamily: FONTS.bold, fontSize: 13 },
+  tableCellName: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 13 },
+  tableCellText: { color: COLORS.gray, fontSize: 13, fontFamily: FONTS.medium },
+  tableCellResult: { fontFamily: FONTS.bold, fontSize: 11, letterSpacing: 0.3 },
+  tableCellPrize: { color: CYAN, fontFamily: FONTS.bold, fontSize: 13 },
+  emptyRowsText: {
+    color: COLORS.gray,
+    textAlign: 'center',
+    paddingVertical: 20,
+    backgroundColor: PAGE.cardAlt,
+  },
+
   heroWrap: { marginBottom: 16 },
   heroCard: {
     borderRadius: 20,
@@ -555,37 +717,6 @@ const styles = StyleSheet.create({
   },
   prizeLabel: { color: COLORS.gray, fontSize: 11, letterSpacing: 0.8, fontFamily: FONTS.bold },
   prizeValue: { color: CYAN, fontFamily: FONTS.bold, fontSize: 28, marginTop: 2 },
-  teamCard: {
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    backgroundColor: '#121A28',
-  },
-  teamCardWin: { borderColor: 'rgba(251,191,36,0.45)' },
-  teamCardLoss: { borderColor: 'rgba(239,68,68,0.28)', backgroundColor: '#161018' },
-  teamHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  teamBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  teamBadgeWin: { backgroundColor: GOLD },
-  teamBadgeLoss: { backgroundColor: 'rgba(239,68,68,0.2)' },
-  teamBadgeText: { fontFamily: FONTS.bold, fontSize: 11, color: '#1A1200', letterSpacing: 0.6 },
-  teamPrize: { color: CYAN, fontFamily: FONTS.bold, fontSize: 16 },
-  teamPrizeMuted: { color: '#94A3B8', fontFamily: FONTS.bold, fontSize: 16 },
-  teamName: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 20, marginTop: 10, marginBottom: 8 },
-  memberRow: {
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
-  },
-  memberYou: {
-    backgroundColor: 'rgba(0,229,255,0.08)',
-    marginHorizontal: -8,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    borderTopColor: 'transparent',
-  },
-  memberName: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 14 },
-  memberMeta: { color: COLORS.gray, fontSize: 11, marginTop: 2 },
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -620,51 +751,4 @@ const styles = StyleSheet.create({
   infoName: { color: COLORS.white, fontFamily: FONTS.bold, fontSize: 16, marginTop: 2 },
   infoAmount: { color: CYAN, fontFamily: FONTS.bold, fontSize: 18 },
   infoAmountMuted: { color: '#94A3B8' },
-  top3Row: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-  podiumCard: {
-    flex: 1,
-    backgroundColor: '#121A21',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  podiumFirst: { transform: [{ scale: 1.03 }] },
-  podiumYou: { backgroundColor: 'rgba(0,229,255,0.08)' },
-  podiumRank: { fontFamily: FONTS.bold, fontSize: 18 },
-  podiumName: { color: COLORS.white, fontSize: 12, marginTop: 6 },
-  podiumReward: { color: CYAN, fontFamily: FONTS.bold, marginTop: 6, fontSize: 13 },
-  sectionTitle: { fontFamily: FONTS.bold, color: COLORS.white, marginBottom: 12, fontSize: 16 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#121A21',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  rowYou: {
-    borderColor: 'rgba(0,229,255,0.45)',
-    backgroundColor: 'rgba(0,229,255,0.08)',
-  },
-  rankBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1e2633',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rankBadgeWinner: { backgroundColor: 'rgba(251,191,36,0.2)' },
-  rankText: { fontFamily: FONTS.bold, color: COLORS.white },
-  rowBody: { flex: 1 },
-  rowName: { color: COLORS.white, fontFamily: FONTS.bold },
-  rowSub: { color: COLORS.gray, fontSize: 11, marginTop: 2 },
-  rowRight: { alignItems: 'flex-end' },
-  statusWin: { color: GOLD, fontFamily: FONTS.bold, fontSize: 11 },
-  statusLose: { color: COLORS.gray, fontSize: 11 },
-  rowReward: { color: CYAN, fontFamily: FONTS.bold, marginTop: 4 },
 });

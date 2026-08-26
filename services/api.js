@@ -470,6 +470,11 @@ export const tournamentManagementService = {
     apiCall(`/tournament-management/admin/${id}/complete-match`, { method: 'POST' }),
   publishResults: (id) =>
     apiCall(`/tournament-management/admin/${id}/publish-results`, { method: 'POST' }),
+  saveResultNote: (id, resultNote) =>
+    apiCall(`/tournament-management/admin/${id}/result-note`, {
+      method: 'PUT',
+      body: JSON.stringify({ resultNote }),
+    }),
   getPrizeDistribution: (id) => apiCall(`/tournament-management/admin/${id}/prize-distribution`),
   savePrizeDistribution: (id, data) =>
     apiCall(`/tournament-management/admin/${id}/prize-distribution`, {

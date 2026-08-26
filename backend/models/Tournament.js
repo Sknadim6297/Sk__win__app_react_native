@@ -99,6 +99,12 @@ const tournamentSchema = new mongoose.Schema({
   rules: [{
     type: String,
   }],
+  /** Free-text note shown on the published Match Result screen (e.g. proof submission instructions). */
+  resultNote: {
+    type: String,
+    default: '',
+    trim: true,
+  },
   entryFee: {
     type: Number,
     required: true,

@@ -63,19 +63,29 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
       : gameModeImage;
   const bannerSource = bannerUri ? { uri: bannerUri } : DEFAULT_BANNER;
 
-  const ctaLabel = isJoined
-    ? 'JOINED'
-    : !isJoinOpen
-      ? lifecycleStatus === 'ongoing' || lifecycleStatus === 'live'
-        ? 'ONGOING'
-        : lifecycleStatus === 'completed' || lifecycleStatus === 'result_published'
-          ? 'COMPLETED'
-          : String(lifecycleStatus || 'CLOSED').toUpperCase()
-      : full
-        ? 'JOINING FULL'
-        : 'JOIN MATCH';
+  const isCompleted = lifecycleStatus === 'completed' || lifecycleStatus === 'result_published';
+  const resultsPublished =
+    item.resultsPublished != null
+      ? Boolean(item.resultsPublished)
+      : lifecycleStatus === 'result_published';
 
-  const ctaDisabled = isJoined || !isJoinOpen || full;
+  let ctaLabel = 'JOIN MATCH';
+  if (isCompleted) {
+    ctaLabel = resultsPublished ? 'VIEW RESULT' : 'RESULT PENDING';
+  } else if (lifecycleStatus === 'ongoing' || lifecycleStatus === 'live') {
+    ctaLabel = 'ONGOING';
+  } else if (isJoined) {
+    ctaLabel = 'JOINED';
+  } else if (!isJoinOpen) {
+    ctaLabel = String(lifecycleStatus || 'CLOSED').toUpperCase();
+  } else if (full) {
+    ctaLabel = 'JOINING FULL';
+  }
+
+  const showViewResult = isCompleted && resultsPublished;
+  const ctaDisabled = isCompleted
+    ? !resultsPublished
+    : isJoined || !isJoinOpen || full;
 
   const topStats = [
     showPrizePool ? { label: 'PRIZE POOL', value: prizePool, coin: true } : null,
@@ -132,14 +142,22 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
             style={[
               styles.joinBtn,
               ctaDisabled && styles.joinBtnMuted,
-              isJoined && styles.joinBtnJoined,
+              isJoined && !isCompleted && styles.joinBtnJoined,
               full && isJoinOpen && styles.joinBtnFull,
+              showViewResult && styles.joinBtnResult,
             ]}
             activeOpacity={0.88}
-            disabled={ctaDisabled && !isJoinOpen}
+            disabled={ctaDisabled}
             onPress={() => onPress(item)}
           >
-            <Text style={styles.joinBtnText}>{String(ctaLabel).toUpperCase()}</Text>
+            <Text
+              style={[
+                styles.joinBtnText,
+                showViewResult && styles.joinBtnTextDark,
+              ]}
+            >
+              {String(ctaLabel).toUpperCase()}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -208,9 +226,15 @@ const styles = StyleSheet.create({
   joinBtnFull: {
     backgroundColor: '#2563EB',
   },
+  joinBtnResult: {
+    backgroundColor: PAGE.gold,
+  },
   joinBtnText: {
     fontFamily: FONTS.bold,
     fontSize: 13,
     color: COLORS.white,
+  },
+  joinBtnTextDark: {
+    color: '#1A1200',
   },
 });
