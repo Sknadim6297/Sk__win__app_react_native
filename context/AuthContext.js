@@ -178,13 +178,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
+  const login = async (identifier, password) => {
     const apiUrl = getApiUrl();
     try {
+      const loginId = String(identifier || '').trim();
       const response = await fetchWithTimeout(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify({
+          identifier: loginId,
+          email: loginId,
+          password,
+        }),
       });
 
       const data = await parseJsonResponse(response);
@@ -232,18 +237,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (username, email, password, referralCode = '') => {
+  const register = async (payload = {}) => {
     const apiUrl = getApiUrl();
     try {
+      const {
+        firstName = '',
+        lastName = '',
+        username = '',
+        email = '',
+        phone = '',
+        password = '',
+        referralCode = '',
+      } = payload;
+
       const response = await fetchWithTimeout(`${apiUrl}/auth/register`, {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
-          username: username.trim(),
-          email: email.trim().toLowerCase(),
+          firstName: String(firstName).trim(),
+          lastName: String(lastName).trim(),
+          username: String(username).trim(),
+          email: String(email).trim().toLowerCase(),
+          phone: String(phone).trim(),
           password,
-          confirmPassword: password,
-          referralCode: referralCode.trim(),
+          referralCode: String(referralCode).trim(),
         }),
       });
 

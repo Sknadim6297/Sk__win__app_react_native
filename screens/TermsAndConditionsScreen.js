@@ -38,7 +38,8 @@ const SECTIONS = [
   },
   {
     title: '7. Contact Information',
-    body: 'If you have any questions about these Terms and Conditions, please contact us at legal@warzoneff.com',
+    body:
+      'If you have any questions about these Terms and Conditions, please contact us at legal@warzoneff.com, WhatsApp https://whatsapp.com/channel/0029VbDkiqHHQbS2hjVWL72z, Telegram https://t.me/WARZONEXXSUPPORT, or Instagram https://www.instagram.com/warezonearena',
   },
 ];
 

@@ -94,8 +94,8 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
   ].filter(Boolean);
 
   while (topStats.length < 3) {
-    if (!topStats.find((s) => s.label === 'ENTRY / PLAYER')) {
-      topStats.push({ label: 'ENTRY / PLAYER', value: entryPerPlayer, coin: true });
+    if (!topStats.find((s) => s.label === 'ENTRY PER PLAYER')) {
+      topStats.push({ label: 'ENTRY PER PLAYER', value: entryPerPlayer, coin: true });
     } else if (!topStats.find((s) => s.label === 'MAP')) {
       topStats.push({ label: 'MAP', value: mapName });
     } else if (!topStats.find((s) => s.label === 'PLAYER FORMAT')) {
@@ -105,8 +105,8 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
 
   const usedLabels = new Set(topStats.map((s) => s.label));
   const bottomStats = [
-    !usedLabels.has('ENTRY / PLAYER')
-      ? { label: 'ENTRY / PLAYER', value: entryPerPlayer, coin: true }
+    !usedLabels.has('ENTRY PER PLAYER')
+      ? { label: 'ENTRY PER PLAYER', value: entryPerPlayer, coin: true }
       : null,
     !usedLabels.has('MAP') ? { label: 'MAP', value: mapName } : null,
     !usedLabels.has('PLAYER FORMAT')
@@ -135,9 +135,14 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
         {bottomStats.length ? <StatTriple items={bottomStats} /> : null}
 
         <View style={styles.ctaRow}>
-          <Text style={styles.matchType} numberOfLines={1}>
-            {String(matchTypeName || '').toUpperCase()} · {String(playerFormatLabel || '').toUpperCase()}
-          </Text>
+          <View style={styles.modeBlock}>
+            <Text style={styles.modeName} numberOfLines={1}>
+              {String(matchTypeName || '').toUpperCase()}
+            </Text>
+            <Text style={styles.modeFormat} numberOfLines={1}>
+              {String(playerFormatLabel || '').toUpperCase()}
+            </Text>
+          </View>
           <TouchableOpacity
             style={[
               styles.joinBtn,
@@ -201,13 +206,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 12,
   },
-  matchType: {
-    fontFamily: FONTS.bold,
-    fontSize: 11,
-    color: PAGE.gold,
-    letterSpacing: 0.4,
+  modeBlock: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 10,
+    minWidth: 0,
+  },
+  modeName: {
+    fontFamily: FONTS.bold,
+    fontSize: 16,
+    lineHeight: 20,
+    color: '#FFC53D',
+    letterSpacing: 0.6,
+    textShadowColor: 'rgba(255, 180, 40, 0.75)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  modeFormat: {
+    marginTop: 2,
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+    color: '#5CFFF7',
+    letterSpacing: 0.5,
   },
   joinBtn: {
     backgroundColor: PAGE.green,

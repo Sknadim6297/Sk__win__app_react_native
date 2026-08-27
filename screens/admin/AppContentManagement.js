@@ -183,12 +183,30 @@ const AppContentManagement = ({ navigation }) => {
               (consistent across home, tabs, and profile). Home banners: Admin → Home Banners.
             </Text>
 
-            <Text style={styles.label}>WhatsApp link / number</Text>
-            <TextInput style={styles.input} value={whatsapp} onChangeText={setWhatsapp} placeholderTextColor={COLORS.gray} />
+            <Text style={styles.label}>WhatsApp channel link</Text>
+            <TextInput
+              style={styles.input}
+              value={whatsapp}
+              onChangeText={setWhatsapp}
+              placeholder="https://whatsapp.com/channel/..."
+              placeholderTextColor={COLORS.gray}
+            />
             <Text style={styles.label}>Telegram link</Text>
-            <TextInput style={styles.input} value={telegram} onChangeText={setTelegram} placeholderTextColor={COLORS.gray} />
+            <TextInput
+              style={styles.input}
+              value={telegram}
+              onChangeText={setTelegram}
+              placeholder="https://t.me/WARZONEXXSUPPORT"
+              placeholderTextColor={COLORS.gray}
+            />
             <Text style={styles.label}>Instagram link</Text>
-            <TextInput style={styles.input} value={instagram} onChangeText={setInstagram} placeholderTextColor={COLORS.gray} />
+            <TextInput
+              style={styles.input}
+              value={instagram}
+              onChangeText={setInstagram}
+              placeholder="https://www.instagram.com/warezonearena"
+              placeholderTextColor={COLORS.gray}
+            />
 
             <Text style={styles.label}>Wallet footer note</Text>
             <TextInput style={styles.input} value={footerNote} onChangeText={setFooterNote} placeholderTextColor={COLORS.gray} />

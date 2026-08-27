@@ -8,7 +8,7 @@ function thumb(t) {
   if (t.thumbnail) return mediaUrl(t.thumbnail);
   const m = String(t.videoLink || '').match(/(?:youtu\.be\/|v=)([\w-]{6,})/);
   if (m) return `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg`;
-  return '/banner.jpg';
+  return '/web_image/dbc60886-e28f-4de6-9e6f-461dbfe670ee.png';
 }
 
 export default function TutorialsPage() {

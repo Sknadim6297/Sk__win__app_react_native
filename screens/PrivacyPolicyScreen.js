@@ -75,6 +75,12 @@ const PrivacyPolicyScreen = ({ navigation }) => {
             If you have questions about this Privacy Policy, please contact us at:
             {'\n\n'}
             Email: privacy@warzoneff.com
+            {'\n'}
+            WhatsApp: https://whatsapp.com/channel/0029VbDkiqHHQbS2hjVWL72z
+            {'\n'}
+            Telegram: https://t.me/WARZONEXXSUPPORT
+            {'\n'}
+            Instagram: https://www.instagram.com/warezonearena
           </Text>
         </View>
       </ScrollView>

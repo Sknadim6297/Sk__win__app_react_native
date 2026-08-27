@@ -1,6 +1,29 @@
 import { API_BASE } from './api';
 import { APP_RELEASE } from './release';
 
+/** Local promo posters in website/public/web_image */
+export const MODE_POSTERS = {
+  loneWolf: '/web_image/dbc60886-e28f-4de6-9e6f-461dbfe670ee.png',
+  clashSquad: '/web_image/4345a8f6-72b8-4f8e-9694-fac2200b3258.png',
+  csOneTap: '/web_image/3ea69319-1599-43dc-baee-9d8c290c9aeb.png',
+};
+
+export const DEFAULT_MODE_CARDS = [
+  { name: 'LONE WOLF', image: MODE_POSTERS.loneWolf },
+  { name: 'CLASH SQUAD', image: MODE_POSTERS.clashSquad },
+  { name: 'CS ONE TAP', image: MODE_POSTERS.csOneTap },
+];
+
+/** Prefer local WAREZONE posters for known Free Fire modes. */
+export function modePosterFor(name, fallback = '') {
+  const n = String(name || '').toUpperCase();
+  if (/ONE\s*TAP/.test(n)) return MODE_POSTERS.csOneTap;
+  if (/LW|LONE\s*WOLF/.test(n)) return MODE_POSTERS.loneWolf;
+  if (/CS|CLASH/.test(n)) return MODE_POSTERS.clashSquad;
+  if (/BR|BATTLE|ROYALE|FULL\s*MAP|SURVIVAL/.test(n)) return MODE_POSTERS.loneWolf;
+  return fallback || '';
+}
+
 export const DEFAULT_RULES = [
   'Minimum level 40+ required to join.',
   'Room ID and password shared 8–10 minutes before match.',
@@ -71,7 +94,8 @@ export function bannerOf(t) {
     mediaUrl(t?.bannerImage) ||
     mediaUrl(t?.gameMode?.image) ||
     mediaUrl(t?.game?.image) ||
-    '/banner.jpg'
+    modePosterFor(t?.gameMode?.name || t?.matchTypeName || t?.name) ||
+    MODE_POSTERS.loneWolf
   );
 }
 

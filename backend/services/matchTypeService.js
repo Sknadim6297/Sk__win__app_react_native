@@ -46,21 +46,77 @@ function playerFormatLabel(playerFormat) {
   return PLAYER_FORMATS[normalizePlayerFormat(playerFormat)]?.label || 'Solo';
 }
 
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function nameMatchRegex(canonicalName) {
+  // Treat any whitespace run as equivalent (e.g. "LONE  WOLF" ≈ "Lone Wolf")
+  const pattern = escapeRegex(canonicalName).replace(/\\?\s+/g, '\\s+');
+  return new RegExp(`^${pattern}$`, 'i');
+}
+
+/**
+ * Seed only when catalog is empty. Never re-create deleted types.
+ * Sync structural flags on existing rows; never force `active` back on.
+ * Collapse case/whitespace-only duplicates (e.g. "BATTLE ROYALE" vs "Battle Royale").
+ */
 async function ensureDefaultMatchTypes() {
-  for (const def of DEFAULT_MATCH_TYPES) {
-    const existing = await MatchType.findOne({ name: def.name });
-    if (!existing) {
-      await MatchType.create({ ...def, active: true });
-    } else {
-      // Always keep catalog defaults available for seeding / tournaments
-      existing.isTeamVsTeam = def.isTeamVsTeam;
-      existing.hasKillRewards = def.hasKillRewards;
-      if (existing.defaultSlots == null) existing.defaultSlots = def.defaultSlots;
-      if (existing.sortOrder == null) existing.sortOrder = def.sortOrder;
-      existing.active = true;
-      await existing.save();
+  const total = await MatchType.countDocuments();
+  if (total === 0) {
+    await MatchType.insertMany(
+      DEFAULT_MATCH_TYPES.map((def) => ({
+        ...def,
+        active: true,
+      }))
+    );
+  } else {
+    for (const def of DEFAULT_MATCH_TYPES) {
+      const matches = await MatchType.find({
+        name: { $regex: nameMatchRegex(def.name) },
+      }).sort({ createdAt: 1 });
+
+      if (!matches.length) {
+        // Do not recreate — admin may have deleted this type intentionally.
+        continue;
+      }
+
+      // Keep one row (prefer canonical casing / oldest); remove case duplicates.
+      let keeper =
+        matches.find((m) => m.name === def.name) ||
+        matches.find((m) => m.active !== false) ||
+        matches[0];
+
+      for (const dup of matches) {
+        if (String(dup._id) === String(keeper._id)) continue;
+        await MatchType.findByIdAndDelete(dup._id);
+      }
+
+      let dirty = false;
+      if (keeper.name !== def.name) {
+        keeper.name = def.name;
+        dirty = true;
+      }
+      if (keeper.isTeamVsTeam !== def.isTeamVsTeam) {
+        keeper.isTeamVsTeam = def.isTeamVsTeam;
+        dirty = true;
+      }
+      if (keeper.hasKillRewards !== def.hasKillRewards) {
+        keeper.hasKillRewards = def.hasKillRewards;
+        dirty = true;
+      }
+      if (keeper.defaultSlots == null) {
+        keeper.defaultSlots = def.defaultSlots;
+        dirty = true;
+      }
+      if (keeper.sortOrder == null) {
+        keeper.sortOrder = def.sortOrder;
+        dirty = true;
+      }
+      if (dirty) await keeper.save();
     }
   }
+
   // Soft-hide legacy Solo/Duo/Squad "match types" that were player formats
   await MatchType.updateMany(
     { name: { $in: ['Solo', 'Duo', 'Squad', 'Clash Squad Duo', 'Clash Squad Solo', 'Team'] } },

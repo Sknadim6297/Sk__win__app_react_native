@@ -4,9 +4,14 @@ import Navbar from './Navbar';
 import Footer from './Footer';
 import LatestReleaseBanner from './LatestReleaseBanner';
 import { api } from '../api';
+import { SUPPORT } from '../content';
 
 export default function Layout() {
-  const [socials, setSocials] = useState({});
+  const [socials, setSocials] = useState({
+    whatsapp: SUPPORT.whatsapp,
+    telegram: SUPPORT.telegram,
+    instagram: SUPPORT.instagram,
+  });
   const loc = useLocation();
 
   useEffect(() => {
@@ -16,7 +21,13 @@ export default function Layout() {
   useEffect(() => {
     api
       .homeConfig()
-      .then((c) => setSocials(c.supportLinks || {}))
+      .then((c) =>
+        setSocials({
+          whatsapp: c.supportLinks?.whatsapp || SUPPORT.whatsapp,
+          telegram: c.supportLinks?.telegram || SUPPORT.telegram,
+          instagram: c.supportLinks?.instagram || SUPPORT.instagram,
+        })
+      )
       .catch(() => {});
   }, []);
 

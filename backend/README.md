@@ -36,13 +36,16 @@ If running locally:
 mongod
 ```
 
-### 5. Seed Database (Optional)
+### 5. Create admin (if needed)
 ```bash
-npm run seed
+npm run create:admin
 ```
-This creates:
-- Admin user (admin@skwin.com / admin123)
-- Sample players (player1, player2)
+Default: admin@skwin.com / admin123
+
+To wipe all matches later (keeps users/games):
+```bash
+npm run clear:matches
+```
 
 ### 6. Start Backend Server
 ```bash

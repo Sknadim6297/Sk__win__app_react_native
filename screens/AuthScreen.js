@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -29,15 +30,22 @@ import OrDivider from '../components/auth/OrDivider';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import { isGoogleSignInConfigured, GOOGLE_SIGNIN_COMING_SOON } from '../utils/googleConfig';
 
+function digitsOnlyPhone(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 10);
+}
+
 export default function AuthScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const { login, register, loginWithGoogle } = useContext(AuthContext);
   const initialLogin = route.params?.mode !== 'register';
   const [isLogin, setIsLogin] = useState(initialLogin);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' });
@@ -66,81 +74,90 @@ export default function AuthScreen({ navigation, route }) {
   const showToast = (message, type = 'error') => setToast({ visible: true, message, type });
   const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
 
+  const resetFields = () => {
+    setFirstName('');
+    setLastName('');
+    setUsername('');
+    setPhone('');
+    setEmail('');
+    setLoginId('');
+    setPassword('');
+    setReferralCode('');
+    setShowPassword(false);
+  };
+
   const handleAuth = async () => {
     if (submitting) return;
 
     if (isLogin) {
-      if (!email || !password) {
-        showToast('Please enter email and password', 'warning');
-        return;
-      }
-      if (!email.includes('@')) {
-        showToast('Please enter a valid email', 'warning');
+      if (!loginId.trim() || !password) {
+        showToast('Please enter username / phone / email and password', 'warning');
         return;
       }
       setSubmitting(true);
-      const result = await login(email, password);
+      const result = await login(loginId.trim(), password);
       setSubmitting(false);
       if (result.success) {
         const isAdminUser = result.user?.role === 'admin' || result.role === 'admin';
-        if (__DEV__) {
-          console.log('[AuthScreen] login success', {
-            role: result.user?.role,
-            isAdmin: isAdminUser,
-          });
-        }
         showToast(isAdminUser ? 'Welcome, Admin!' : 'Welcome back!', 'success');
       } else {
         showToast(result.error || 'Invalid credentials', 'error');
       }
-    } else {
-      if (!username || !email || !password || !confirmPassword) {
-        showToast('Please fill all fields', 'warning');
-        return;
-      }
-      if (username.length < 3) {
-        showToast('Username must be at least 3 characters', 'warning');
-        return;
-      }
-      if (!email.includes('@')) {
-        showToast('Please enter a valid email', 'warning');
-        return;
-      }
-      if (password.length < 6) {
-        showToast('Password must be at least 6 characters', 'warning');
-        return;
-      }
-      if (password !== confirmPassword) {
-        showToast('Passwords do not match', 'warning');
-        return;
-      }
-      setSubmitting(true);
-      const result = await register(username, email, password, referralCode);
-      setSubmitting(false);
-      if (result.success) {
-        const referralText = result.referralApplied ? ' Referral bonus applied.' : '';
-        if (result.autoLogin) {
-          showToast(`Account created!${referralText}`, 'success');
-        } else {
-          showToast(`Registration successful.${referralText} Please login.`, 'success');
-          setIsLogin(true);
-          setPassword('');
-          setConfirmPassword('');
-          setReferralCode('');
-        }
+      return;
+    }
+
+    if (!firstName.trim() || !lastName.trim() || !username.trim() || !phone.trim() || !email.trim() || !password) {
+      showToast('Please fill all required fields', 'warning');
+      return;
+    }
+    if (username.trim().length < 3) {
+      showToast('Username must be at least 3 characters', 'warning');
+      return;
+    }
+    if (digitsOnlyPhone(phone).length !== 10) {
+      showToast('Enter a valid 10-digit mobile number', 'warning');
+      return;
+    }
+    if (!email.includes('@')) {
+      showToast('Please enter a valid email', 'warning');
+      return;
+    }
+    if (password.length < 6) {
+      showToast('Password must be at least 6 characters', 'warning');
+      return;
+    }
+
+    setSubmitting(true);
+    const result = await register({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      username: username.trim(),
+      phone: digitsOnlyPhone(phone),
+      email: email.trim(),
+      password,
+      referralCode: referralCode.trim(),
+    });
+    setSubmitting(false);
+
+    if (result.success) {
+      const referralText = result.referralApplied ? ' Referral bonus applied.' : '';
+      if (result.autoLogin) {
+        showToast(`Account created!${referralText}`, 'success');
       } else {
-        showToast(result.error || 'Registration failed', 'error');
+        showToast(`Registration successful.${referralText} Please login.`, 'success');
+        setIsLogin(true);
+        setLoginId(email.trim());
+        setPassword('');
+        setReferralCode('');
       }
+    } else {
+      showToast(result.error || 'Registration failed', 'error');
     }
   };
 
   const toggleAuthMode = () => {
     setIsLogin(!isLogin);
-    setUsername('');
-    setEmail('');
-    setPassword('');
-    setConfirmPassword('');
-    setReferralCode('');
+    resetFields();
   };
 
   const onGoogleToken = useCallback(
@@ -189,7 +206,6 @@ export default function AuthScreen({ navigation, route }) {
   };
 
   const handleForgotPassword = () => {
-    // Same Email OTP flow for players and admin
     setForgotVisible(true);
   };
 
@@ -202,7 +218,7 @@ export default function AuthScreen({ navigation, route }) {
       <ForgotPasswordModal
         visible={forgotVisible}
         onClose={() => setForgotVisible(false)}
-        initialEmail={email}
+        initialEmail={isLogin ? loginId : email}
       />
 
       <KeyboardAvoidingView
@@ -225,22 +241,61 @@ export default function AuthScreen({ navigation, route }) {
             <Text style={styles.welcomeLine}>Welcome to,</Text>
             <Text style={styles.title}>{isLogin ? 'Login' : 'Sign Up'}</Text>
 
-            {!isLogin && (
+            {isLogin ? (
               <AuthTextField
                 icon="account-outline"
-                placeholder="Username"
-                value={username}
-                onChangeText={setUsername}
+                placeholder="Username / Phone / Email"
+                value={loginId}
+                onChangeText={setLoginId}
+                keyboardType="email-address"
               />
+            ) : (
+              <>
+                <AuthTextField
+                  icon="account-outline"
+                  placeholder="First Name"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  autoCapitalize="words"
+                />
+                <AuthTextField
+                  icon="account-outline"
+                  placeholder="Last Name"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  autoCapitalize="words"
+                />
+                <AuthTextField
+                  icon="at"
+                  placeholder="Username"
+                  value={username}
+                  onChangeText={setUsername}
+                />
+                <View style={styles.phoneRow}>
+                  <View style={styles.countryCode}>
+                    <Text style={styles.countryCodeText}>+91</Text>
+                  </View>
+                  <View style={styles.phoneField}>
+                    <TextInput
+                      style={[styles.phoneInput, Platform.OS === 'web' && styles.phoneInputWeb]}
+                      placeholder="Mobile Number"
+                      placeholderTextColor="rgba(148, 163, 184, 0.65)"
+                      value={phone}
+                      onChangeText={(v) => setPhone(digitsOnlyPhone(v))}
+                      keyboardType="phone-pad"
+                      maxLength={10}
+                    />
+                  </View>
+                </View>
+                <AuthTextField
+                  icon="email-outline"
+                  placeholder="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                />
+              </>
             )}
-
-            <AuthTextField
-              icon="at"
-              placeholder="Email/Mobile No/Username"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-            />
 
             <AuthTextField
               icon="lock-outline"
@@ -253,22 +308,13 @@ export default function AuthScreen({ navigation, route }) {
             />
 
             {!isLogin && (
-              <>
-                <AuthTextField
-                  icon="lock-check-outline"
-                  placeholder="Confirm Password"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry={!showPassword}
-                />
-                <AuthTextField
-                  icon="gift-outline"
-                  placeholder="Promo Code (Optional)"
-                  value={referralCode}
-                  onChangeText={setReferralCode}
-                  autoCapitalize="characters"
-                />
-              </>
+              <AuthTextField
+                icon="gift-outline"
+                placeholder="Referral Code (Optional)"
+                value={referralCode}
+                onChangeText={setReferralCode}
+                autoCapitalize="characters"
+              />
             )}
 
             {isLogin && (
@@ -277,13 +323,32 @@ export default function AuthScreen({ navigation, route }) {
               </TouchableOpacity>
             )}
 
+            {!isLogin && (
+              <Text style={styles.legalText}>
+                By Registering, I agree to ours{' '}
+                <Text
+                  style={styles.legalLink}
+                  onPress={() => navigation.navigate('TermsAndConditions')}
+                >
+                  Terms and Conditions
+                </Text>{' '}
+                and{' '}
+                <Text
+                  style={styles.legalLink}
+                  onPress={() => navigation.navigate('PrivacyPolicy')}
+                >
+                  Privacy policy
+                </Text>
+              </Text>
+            )}
+
             <PrimaryButton
               label={submitting ? 'PLEASE WAIT...' : isLogin ? 'LOGIN' : 'SIGN UP'}
               onPress={handleAuth}
               disabled={submitting}
             />
 
-            <OrDivider label={isLogin ? 'or Login' : 'or SignUp'} />
+            <OrDivider label={isLogin ? 'or Login' : 'or Sign Up with'} />
             {GOOGLE_SIGNIN_COMING_SOON ? (
               <GoogleLoginButton
                 comingSoon
@@ -308,9 +373,9 @@ export default function AuthScreen({ navigation, route }) {
 
             <TouchableOpacity style={styles.switchRow} onPress={toggleAuthMode} activeOpacity={0.8}>
               <Text style={styles.switchMuted}>
-                {isLogin ? "Don't have an account? " : 'Already have an account? '}
+                {isLogin ? "Don't have an account? " : 'Already have a account? '}
               </Text>
-              <Text style={styles.switchBold}>{isLogin ? 'Sign Up' : 'LOGIN'}</Text>
+              <Text style={styles.switchBold}>{isLogin ? 'Sign Up' : 'Login'}</Text>
             </TouchableOpacity>
           </Animated.View>
         </ScrollView>
@@ -345,6 +410,57 @@ const styles = StyleSheet.create({
     ...TYPO.display,
     color: COLORS.white,
     marginBottom: 28,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+  },
+  countryCode: {
+    width: 64,
+    minHeight: 56,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.borderDark,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countryCodeText: {
+    ...TYPO.bodyMedium,
+    color: COLORS.white,
+    fontFamily: FONTS.bold,
+  },
+  phoneField: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.borderDark,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  phoneInput: {
+    ...TYPO.body,
+    color: COLORS.white,
+    paddingVertical: 14,
+  },
+  phoneInputWeb: {
+    fontSize: 16,
+    outlineStyle: 'none',
+  },
+  legalText: {
+    ...TYPO.caption,
+    color: COLORS.gray,
+    textAlign: 'center',
+    marginBottom: 14,
+    lineHeight: 18,
+  },
+  legalLink: {
+    color: COLORS.white,
+    fontFamily: FONTS.bold,
   },
   forgotWrap: {
     alignSelf: 'flex-end',

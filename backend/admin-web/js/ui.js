@@ -191,25 +191,40 @@ const AdminUI = (() => {
   }
 
   function bindActions(root, handler) {
+    const run = (act, id) => {
+      Promise.resolve(handler(act, id)).catch((err) => {
+        toast(err?.message || 'Action failed', 'err');
+      });
+    };
+
     root.querySelectorAll('[data-menu]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const source = btn.parentElement.querySelector('.menu');
-        const already = document.querySelector('.menu-portal');
+        const actions = btn.closest('.actions');
+        const source = actions?.querySelector('.menu');
+        if (!actions || !source) return;
+
+        const existingPortal = document.querySelector('.menu-portal');
+        const wasOpenForThis =
+          existingPortal && String(existingPortal.dataset.id) === String(actions.dataset.id);
         closeMenus();
-        if (already) return;
+        // Toggle closed if this row's menu was already open
+        if (wasOpenForThis) return;
+
         const clone = source.cloneNode(true);
         clone.classList.add('open', 'menu-portal');
-        clone.dataset.id = btn.closest('.actions').dataset.id;
+        clone.dataset.id = actions.dataset.id;
         document.body.appendChild(clone);
         placePortalMenu(btn, clone);
         clone.querySelectorAll('[data-act]').forEach((item) => {
           item.addEventListener('click', (ev) => {
+            ev.preventDefault();
             ev.stopPropagation();
             const id = clone.dataset.id;
+            const act = item.dataset.act;
             closeMenus();
-            handler(item.dataset.act, id);
+            run(act, id);
           });
         });
       });
@@ -217,10 +232,11 @@ const AdminUI = (() => {
     root.querySelectorAll('[data-act]').forEach((btn) => {
       if (btn.closest('.menu')) return;
       btn.addEventListener('click', (e) => {
+        e.preventDefault();
         e.stopPropagation();
         closeMenus();
         const id = btn.closest('[data-id]')?.dataset.id || btn.dataset.id;
-        handler(btn.dataset.act, id);
+        run(btn.dataset.act, id);
       });
     });
   }

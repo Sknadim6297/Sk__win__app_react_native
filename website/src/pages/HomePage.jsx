@@ -3,8 +3,8 @@ import Seo from '../components/Seo';
 import PhoneShowcase from '../components/PhoneShowcase';
 import { api } from '../api';
 import { useFetch } from '../hooks/useFetch';
-import { BRAND, HOME_FEATURES } from '../content';
-import { inr, mediaUrl, apkHref, bannerOf } from '../utils';
+import { BRAND, HOME_FEATURES, SUPPORT } from '../content';
+import { inr, mediaUrl, apkHref, bannerOf, modePosterFor, DEFAULT_MODE_CARDS, MODE_POSTERS } from '../utils';
 import { sortBySortOrder } from '../sortBySortOrder';
 import { APP_RELEASE, PWA_URL } from '../release';
 
@@ -128,10 +128,14 @@ export default function HomePage() {
   const siteModes = Array.isArray(data?.site?.modes) ? data.site.modes : [];
   const gameModes = Array.isArray(data?.modesFromGame) ? data.modesFromGame : [];
   const modeCards = sortBySortOrder(siteModes.length ? siteModes : gameModes).slice(0, 6);
-  const modes = modeCards.map((m) => ({
-    name: (m.name || 'MODE').toUpperCase(),
-    image: mediaUrl(m.image),
-  }));
+  const modesFromApi = modeCards.map((m) => {
+    const name = (m.name || 'MODE').toUpperCase();
+    return {
+      name,
+      image: modePosterFor(name) || mediaUrl(m.image) || MODE_POSTERS.loneWolf,
+    };
+  });
+  const modes = modesFromApi.length ? modesFromApi : DEFAULT_MODE_CARDS;
   const ticker = data?.home?.latestAnnouncementTitle || data?.home?.latestNews?.text;
   const stats = data?.site?.stats || {};
   const apk = apkHref(data?.release);
@@ -196,6 +200,30 @@ export default function HomePage() {
           </div>
           <div className="lz-hero-visual fade-up d2">
             <PhoneShowcase single news={ticker} modes={modes} liveName={liveUp[0]?.name} />
+          </div>
+        </div>
+      </section>
+
+      {/* ESPORTS MODE POSTERS */}
+      <section className="lz-section" id="modes">
+        <div className="container">
+          <div className="lz-section-head">
+            <span className="lz-eyebrow">Esports Games</span>
+            <h2>Pick your mode. Play to win.</h2>
+            <div className="lz-rule" />
+          </div>
+          <div className="lz-mode-posters">
+            {modes.slice(0, 3).map((m) => (
+              <article className="lz-mode-poster" key={m.name}>
+                <img src={m.image} alt={m.name} loading="lazy" />
+                <div className="lz-mode-poster-foot">
+                  <strong>{m.name}</strong>
+                  <a className="btn btn-primary" href={apk}>
+                    Play in app
+                  </a>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
@@ -342,7 +370,7 @@ export default function HomePage() {
             </div>
             <a
               className="btn btn-wa"
-              href={data?.home?.supportLinks?.whatsapp || `${PWA_URL}/login`}
+              href={data?.home?.supportLinks?.whatsapp || SUPPORT.whatsapp}
               target="_blank"
               rel="noreferrer"
             >

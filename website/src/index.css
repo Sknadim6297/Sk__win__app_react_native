@@ -296,13 +296,34 @@ button { cursor: pointer; }
   padding: 12px 12px 8px;
   background: linear-gradient(180deg, #1a2744, #0b1224);
 }
+.phone-header-app { padding-bottom: 6px; }
 .phone-header .left { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .phone-header img.logo { width: auto; height: 22px; max-width: 72px; object-fit: contain; border-radius: 0; }
+.phone-avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: linear-gradient(145deg, #3b82f6, #1e3a5f);
+  border: 1px solid rgba(255,255,255,0.25);
+  flex-shrink: 0;
+}
+.phone-header-right { display: flex; align-items: center; gap: 6px; }
 .coin-pill {
   display: flex; align-items: center; gap: 4px;
-  background: #151d36; border-radius: 999px; padding: 3px 8px 3px 10px; font-size: 11px;
+  background: #151d36; border-radius: 999px; padding: 3px 8px 3px 6px; font-size: 11px; font-weight: 700;
 }
-.coin-pill img { width: 18px; height: 18px; }
+.coin-pill img { width: 16px; height: 16px; }
+.phone-bell {
+  position: relative; font-size: 12px; line-height: 1;
+  width: 24px; height: 24px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: #1e3a5f;
+}
+.phone-bell i {
+  position: absolute; top: -4px; right: -4px;
+  font-style: normal; font-size: 7px; font-weight: 800;
+  background: #e11d2e; color: #fff;
+  min-width: 12px; height: 12px; border-radius: 999px;
+  display: grid; place-items: center; padding: 0 2px;
+}
 .phone-news {
   margin: 8px 10px 0;
   background: #151d36;
@@ -312,20 +333,133 @@ button { cursor: pointer; }
   color: var(--muted);
   display: flex; gap: 6px; align-items: center;
 }
-.tag { background: var(--orange); color: #fff; font-size: 8px; padding: 2px 6px; border-radius: 6px; letter-spacing: 0.6px; }
+.phone-news-text {
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: #e2e8f0; font-weight: 600;
+}
+.tag { background: var(--orange); color: #fff; font-size: 8px; padding: 2px 6px; border-radius: 6px; letter-spacing: 0.6px; font-weight: 800; }
 .phone-body { padding: 10px; display: grid; gap: 8px; }
+.phone-body-home { gap: 10px; padding-bottom: 12px; }
 .mini-card { background: #151d36; border-radius: 12px; padding: 10px; }
 .mini-card h4 { font-size: 11px; }
 .mini-card p { font-size: 9px; color: var(--dim); font-weight: 500; }
+
+.phone-contests-head h4 {
+  margin: 0; font-size: 13px; font-weight: 800; color: #fff; letter-spacing: 0.2px;
+}
+.phone-contests-head p {
+  margin: 2px 0 8px; font-size: 9px; color: #94a3b8; font-weight: 500;
+}
+.phone-contest-row {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+}
+.phone-contest-tile {
+  background: #151d36; border-radius: 10px; padding: 8px 4px;
+  display: grid; place-items: center; gap: 4px;
+  font-size: 8px; font-weight: 700; color: #cbd5e1;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.phone-contest-icon {
+  font-size: 14px; color: #22d3ee; line-height: 1;
+}
+
+.phone-esports-head h4 {
+  margin: 0; font-size: 13px; font-weight: 800; color: #fff;
+}
+
 .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mini-grid-modes { gap: 7px; }
 .mode-tile {
-  height: 64px; border-radius: 10px; overflow: hidden; position: relative;
-  background: #121b33 center/cover;
+  min-height: 110px; border-radius: 12px; overflow: hidden; position: relative;
+  background: #121b33 center top / cover no-repeat;
+  border: 1.5px solid rgba(0, 229, 255, 0.35);
+  display: flex; align-items: flex-end;
 }
-.mode-tile span {
-  position: absolute; left: 6px; bottom: 6px; font-size: 9px;
-  text-shadow: 0 1px 4px #000;
+.mode-tile-copy {
+  width: 100%;
+  padding: 8px 8px 7px;
+  display: flex; flex-direction: column; gap: 2px;
+  background: linear-gradient(180deg, transparent, rgba(5,10,22,0.55));
 }
+.mode-tile-title {
+  font-size: 11px; line-height: 1.15; font-weight: 900;
+  color: #fff; letter-spacing: 0.3px;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.85);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.mode-tile-short {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.35px;
+  text-shadow: 0 0 10px currentColor;
+}
+.mode-tile-play {
+  margin-top: 2px; font-size: 8px; font-weight: 800; letter-spacing: 0.8px;
+}
+.mode-tile-copy-poster {
+  background: linear-gradient(180deg, transparent 30%, rgba(5,10,22,0.75));
+  padding-top: 18px;
+}
+.mode-tile-copy-poster .mode-tile-play {
+  align-self: flex-start;
+}
+
+.lz-mode-posters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.lz-mode-poster {
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0f1628;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+}
+.lz-mode-poster img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  display: block;
+  background: #121b33;
+}
+.lz-mode-poster-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #121a2e, #0b1224);
+}
+.lz-mode-poster-foot strong {
+  font-size: 14px;
+  letter-spacing: 0.4px;
+}
+.lz-mode-poster-foot .btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .lz-mode-posters { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .lz-mode-posters { grid-template-columns: 1fr; }
+  .lz-mode-poster img { aspect-ratio: 4 / 5; max-height: 420px; }
+}
+
+.phone-action-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+}
+.phone-share-btn,
+.phone-wa-btn {
+  border-radius: 10px; padding: 9px 8px; text-align: center;
+  font-size: 10px; font-weight: 800; color: #fff;
+}
+.phone-share-btn { background: linear-gradient(90deg, #9B6DFF, #5B4FCF); }
+.phone-wa-btn { background: linear-gradient(90deg, #16a34a, #15803d); }
 
 /* PODIUM */
 .podium { display: grid; grid-template-columns: 1fr 1.1fr 1fr; gap: 12px; align-items: end; margin-bottom: 22px; }
@@ -491,7 +625,7 @@ footer.site-footer {
   object-fit: cover;
   background:
     linear-gradient(180deg, rgba(11,14,30,.1), rgba(11,14,30,.7)),
-    url(/banner.jpg) center/cover;
+    url(/web_image/dbc60886-e28f-4de6-9e6f-461dbfe670ee.png) center/cover;
 }
 .os-grid {
   display: grid;

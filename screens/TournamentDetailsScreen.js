@@ -320,23 +320,10 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     tournament.playerFormatLabel ||
     structure.playerFormatLabel ||
     getPlayerFormatLabel(tournament);
-  const gameNameRaw = tournament.gameName || tournament.game?.name || '';
-  const gameName =
-    gameNameRaw && String(gameNameRaw) !== 'undefined' ? String(gameNameRaw) : '';
   const mapName = String(tournament.mapName || tournament.map || '—');
   const entryFee = Number(
     tournament.entryFeePerPlayer ?? tournament.feePerPlayer ?? tournament.entryFee ?? 0
   );
-  const backendTotal = Number(
-    tournament.totalAmount ?? tournament.entryCharge?.totalAmount ?? NaN
-  );
-  const entryCharge = Number.isFinite(backendTotal)
-    ? {
-        feePerPlayer: entryFee,
-        playersCharged: Number(tournament.playersCharged ?? tournament.entryCharge?.playersCharged) || 1,
-        totalAmount: backendTotal,
-      }
-    : resolveEntryCharge(tournament);
   const showPrizePool =
     tournament.showPrizePool != null
       ? Boolean(tournament.showPrizePool)
@@ -348,21 +335,16 @@ export default function TournamentDetailsScreen({ navigation, route }) {
   const prizePerKill = Number(tournament.prizePerKill ?? tournament.perKill ?? 0);
   const scheduleLabel = formatScheduleLine(tournament.startDate);
 
-  // Third cell on row 2: prefer Prize Per Kill, then Prize Pool, then Team Total
+  // Prefer Prize Per Kill, then Prize Pool for the extra meta cell
   const secondaryStat = showPerKill
-    ? { label: 'Prize / Kill', value: prizePerKill, coin: true }
+    ? { label: 'Prize per kill', value: prizePerKill, coin: true }
     : showPrizePool
       ? { label: 'Prize Pool', value: totalPrize, coin: true }
-      : entryCharge.playersCharged > 1
-        ? { label: 'Team Total', value: entryCharge.totalAmount, coin: true }
-        : null;
+      : null;
 
   const extraStats = [];
   if (showPerKill && showPrizePool) {
     extraStats.push({ label: 'Prize Pool', value: totalPrize, coin: true });
-  }
-  if (entryCharge.playersCharged > 1 && (showPerKill || showPrizePool)) {
-    extraStats.push({ label: 'Team Total', value: entryCharge.totalAmount, coin: true });
   }
 
   return (
@@ -396,26 +378,24 @@ export default function TournamentDetailsScreen({ navigation, route }) {
         </Text>
 
         <View style={styles.metaBlock}>
-          <View style={styles.grid3}>
-            {gameName ? <InfoCell label="Game" value={gameName} flex={1} inline /> : null}
-            <InfoCell label="Match Type" value={matchTypeName} flex={1} inline />
-            <InfoCell label="Map" value={mapName} flex={1} inline />
+          <View style={styles.grid2}>
+            <InfoCell label="Match Type" value={matchTypeName} flex={1} />
+            <InfoCell label="Map" value={mapName} flex={1} />
           </View>
-          <View style={styles.grid3}>
-            <InfoCell label="Player Format" value={playerFormatLabel} flex={1} inline />
-            <InfoCell label="Entry / Player" value={entryFee} coin flex={1} inline />
-            {secondaryStat ? (
-              <InfoCell
-                label={secondaryStat.label}
-                value={secondaryStat.value}
-                coin={Boolean(secondaryStat.coin)}
-                flex={1}
-                inline
-              />
-            ) : null}
+          <View style={styles.grid2}>
+            <InfoCell label="Player Format" value={playerFormatLabel} flex={1} />
+            <InfoCell label="Entry per player" value={entryFee} coin flex={1} />
           </View>
-          {extraStats.length ? (
-            <View style={styles.grid3}>
+          {secondaryStat || extraStats.length ? (
+            <View style={styles.grid2}>
+              {secondaryStat ? (
+                <InfoCell
+                  label={secondaryStat.label}
+                  value={secondaryStat.value}
+                  coin={Boolean(secondaryStat.coin)}
+                  flex={1}
+                />
+              ) : null}
               {extraStats.map((stat) => (
                 <InfoCell
                   key={stat.label}
@@ -423,12 +403,11 @@ export default function TournamentDetailsScreen({ navigation, route }) {
                   value={stat.value}
                   coin={Boolean(stat.coin)}
                   flex={1}
-                  inline
                 />
               ))}
             </View>
           ) : null}
-          <InfoCell label="Match Schedule" value={scheduleLabel} inline />
+          <InfoCell label="Match Schedule" value={scheduleLabel} />
         </View>
 
         <Text style={styles.sectionHead}>PRIZE DETAILS</Text>
@@ -608,8 +587,8 @@ const styles = StyleSheet.create({
   metaBlock: {
     gap: 8,
   },
-  grid3: { flexDirection: 'row', gap: 8 },
-  grid2: { flexDirection: 'row', gap: 8 },
+  grid3: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  grid2: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   sectionHead: {
     fontFamily: FONTS.bold,
     fontSize: 15,

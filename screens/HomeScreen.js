@@ -18,6 +18,7 @@ import AppIcon from '../components/ui/AppIcon';
 import AppHeader from '../components/navigation/AppHeader';
 import GameModePoster from '../components/home/GameModePoster';
 import { BRAND } from '../constants/branding';
+import { SUPPORT_LINKS } from '../constants/supportContacts';
 import {
   gameService,
   configService,
@@ -28,7 +29,8 @@ import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import { sortBySortOrder } from '../utils/sortBySortOrder';
 
 const MODE_CARD_WIDTH = (getLayoutWidth() - 32 - 12) / 2;
-const MODE_CARD_HEIGHT = MODE_CARD_WIDTH * 0.72;
+/** Compact portrait poster */
+const MODE_CARD_HEIGHT = Math.round(MODE_CARD_WIDTH * 1.12);
 
 export default function HomeScreen({ navigation }) {
   const [esportsModes, setEsportsModes] = useState([]);
@@ -214,7 +216,7 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
-                const url = supportLinks.whatsapp || 'https://wa.me/';
+                const url = supportLinks.whatsapp || SUPPORT_LINKS.whatsapp;
                 Linking.openURL(url.startsWith('http') ? url : `https://wa.me/${url}`).catch(() => {});
               }}
               activeOpacity={0.9}
@@ -246,13 +248,13 @@ export default function HomeScreen({ navigation }) {
                 activeOpacity={0.85}
                 onPress={() => {
                   if (icon.action === 'whatsapp') {
-                    const url = supportLinks.whatsapp || 'https://wa.me/';
+                    const url = supportLinks.whatsapp || SUPPORT_LINKS.whatsapp;
                     Linking.openURL(url.startsWith('http') ? url : `https://wa.me/${url}`).catch(() => {});
                   } else if (icon.action === 'telegram') {
-                    const url = supportLinks.telegram || 'https://t.me/';
+                    const url = supportLinks.telegram || SUPPORT_LINKS.telegram;
                     Linking.openURL(url.startsWith('http') ? url : `https://t.me/${url}`).catch(() => {});
                   } else if (icon.action === 'instagram') {
-                    const url = supportLinks.instagram || 'https://instagram.com/';
+                    const url = supportLinks.instagram || SUPPORT_LINKS.instagram;
                     Linking.openURL(url.startsWith('http') ? url : `https://instagram.com/${url}`).catch(() => {});
                   }
                 }}
@@ -372,6 +374,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 12,
     marginBottom: 26,
+    justifyContent: 'flex-start',
   },
   emptyGames: {
     ...TEXT.body,

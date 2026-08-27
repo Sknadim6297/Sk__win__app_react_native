@@ -17,14 +17,24 @@ const REFERRAL_BONUS = 25;
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password, confirmPassword, referralCode } = req.body;
+    const {
+      username,
+      email,
+      password,
+      confirmPassword,
+      referralCode,
+      firstName,
+      lastName,
+      phone,
+      phoneNumber,
+    } = req.body;
 
     // Validation
     if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Please provide all fields' });
+      return res.status(400).json({ error: 'Please provide username, email and password' });
     }
 
-    if (password !== confirmPassword) {
+    if (confirmPassword != null && password !== confirmPassword) {
       return res.status(400).json({ error: 'Passwords do not match' });
     }
 
@@ -32,10 +42,42 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
+    const cleanedUsername = String(username).trim();
+    const cleanedEmail = String(email).trim().toLowerCase();
+    const cleanedFirst = String(firstName || '').trim();
+    const cleanedLast = String(lastName || '').trim();
+    const rawPhone = String(phone || phoneNumber || '').replace(/\D/g, '');
+    const cleanedPhone =
+      rawPhone.length === 12 && rawPhone.startsWith('91')
+        ? rawPhone.slice(2)
+        : rawPhone.length === 11 && rawPhone.startsWith('0')
+          ? rawPhone.slice(1)
+          : rawPhone;
+
+    if (cleanedUsername.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    }
+    if (!cleanedEmail.includes('@')) {
+      return res.status(400).json({ error: 'Please enter a valid email' });
+    }
+    if (cleanedPhone && cleanedPhone.length !== 10) {
+      return res.status(400).json({ error: 'Mobile number must be 10 digits' });
+    }
+
     // Check if user already exists
-    let user = await User.findOne({ $or: [{ email }, { username }] });
+    const orChecks = [{ email: cleanedEmail }, { username: cleanedUsername }];
+    if (cleanedPhone) {
+      orChecks.push({ phone: cleanedPhone }, { phoneNumber: cleanedPhone });
+    }
+    let user = await User.findOne({ $or: orChecks });
     if (user) {
-      return res.status(400).json({ error: 'User already exists' });
+      if (String(user.email).toLowerCase() === cleanedEmail) {
+        return res.status(400).json({ error: 'Email already registered' });
+      }
+      if (String(user.username).toLowerCase() === cleanedUsername.toLowerCase()) {
+        return res.status(400).json({ error: 'Username already taken' });
+      }
+      return res.status(400).json({ error: 'Mobile number already registered' });
     }
 
     // Hash password
@@ -51,12 +93,18 @@ router.post('/register', async (req, res) => {
       }
     }
 
-    const ownReferralCode = await getUniqueReferralCode(username);
+    const ownReferralCode = await getUniqueReferralCode(cleanedUsername);
+    const displayName = [cleanedFirst, cleanedLast].filter(Boolean).join(' ').trim();
 
     // Create user
     user = new User({
-      username,
-      email,
+      username: cleanedUsername,
+      email: cleanedEmail,
+      firstName: cleanedFirst,
+      lastName: cleanedLast,
+      name: displayName || cleanedUsername,
+      phone: cleanedPhone,
+      phoneNumber: cleanedPhone,
       password: hashedPassword,
       role: 'user',
       referralCode: ownReferralCode,
@@ -84,7 +132,7 @@ router.post('/register', async (req, res) => {
           userId: referrer._id,
           type: 'referral_bonus',
           amount: REFERRAL_BONUS,
-          description: `Referral bonus: ${username} joined using your code`,
+          description: `Referral bonus: ${cleanedUsername} joined using your code`,
           status: 'completed',
         });
 
@@ -92,7 +140,7 @@ router.post('/register', async (req, res) => {
           userId: referrer._id,
           type: 'wallet',
           title: 'Referral Bonus Credited',
-          message: `You earned ₹${REFERRAL_BONUS} referral bonus because ${username} joined using your referral code.`,
+          message: `You earned ₹${REFERRAL_BONUS} referral bonus because ${cleanedUsername} joined using your referral code.`,
         });
       }
     }
@@ -118,6 +166,10 @@ router.post('/register', async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        name: user.name,
+        phone: user.phone,
         role: user.role,
         referralCode: user.referralCode,
         wallet: user.wallet,
@@ -139,24 +191,37 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login
+// Login — email, username, or phone
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, identifier } = req.body;
+    const loginId = String(identifier || email || '').trim();
 
     // Validation
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Please provide email and password' });
+    if (!loginId || !password) {
+      return res.status(400).json({ error: 'Please provide email/username/phone and password' });
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase();
+    const escaped = loginId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const digitsOnly = loginId.replace(/\D/g, '');
+    const phoneDigits =
+      digitsOnly.length === 12 && digitsOnly.startsWith('91')
+        ? digitsOnly.slice(2)
+        : digitsOnly.length === 11 && digitsOnly.startsWith('0')
+          ? digitsOnly.slice(1)
+          : digitsOnly;
 
-    // Find user (case-insensitive email)
-    const user = await User.findOne({
-      email: { $regex: new RegExp(`^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-    });
+    const orQuery = [
+      { email: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+      { username: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+    ];
+    if (phoneDigits.length >= 10) {
+      orQuery.push({ phone: phoneDigits }, { phoneNumber: phoneDigits });
+    }
+
+    const user = await User.findOne({ $or: orQuery });
     if (!user) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+      return res.status(400).json({ error: 'Invalid credentials' });
     }
 
     // Check password (Google-only accounts must use Google sign-in)
@@ -169,7 +234,7 @@ router.post('/login', async (req, res) => {
 
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+      return res.status(400).json({ error: 'Invalid credentials' });
     }
 
     // Backfill missing referral code for old users.
@@ -198,6 +263,10 @@ router.post('/login', async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        name: user.name,
+        phone: user.phone,
         role: user.role,
         verified: user.verified,
         wallet: user.wallet,

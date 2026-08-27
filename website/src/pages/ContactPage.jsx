@@ -4,6 +4,12 @@ import { SUPPORT } from '../content';
 
 export default function ContactPage() {
   const { socials = {} } = useOutletContext() || {};
+  const links = {
+    whatsapp: socials.whatsapp || SUPPORT.whatsapp,
+    telegram: socials.telegram || SUPPORT.telegram,
+    instagram: socials.instagram || SUPPORT.instagram,
+  };
+
   return (
     <>
       <Seo title="Contact" />
@@ -24,32 +30,24 @@ export default function ContactPage() {
             </a>
           </article>
           <article className="card" style={{ padding: 24 }}>
-            <h3>Phone / WhatsApp</h3>
+            <h3>Phone</h3>
             <p className="muted">{SUPPORT.phoneDisplay}</p>
           </article>
-          {(socials.whatsapp || socials.telegram || socials.instagram) && (
-            <article className="card" style={{ padding: 24 }}>
-              <h3>Social</h3>
-              <p className="muted">Links from WAREZONE Home Config — not invented.</p>
-              <div className="socials" style={{ marginTop: 12 }}>
-                {socials.whatsapp && (
-                  <a href={socials.whatsapp} target="_blank" rel="noreferrer">
-                    WhatsApp
-                  </a>
-                )}
-                {socials.telegram && (
-                  <a href={socials.telegram} target="_blank" rel="noreferrer">
-                    Telegram
-                  </a>
-                )}
-                {socials.instagram && (
-                  <a href={socials.instagram} target="_blank" rel="noreferrer">
-                    Instagram
-                  </a>
-                )}
-              </div>
-            </article>
-          )}
+          <article className="card" style={{ padding: 24 }}>
+            <h3>Social & Channels</h3>
+            <p className="muted">Official WAREZONE support links.</p>
+            <div className="socials" style={{ marginTop: 12 }}>
+              <a href={links.whatsapp} target="_blank" rel="noreferrer">
+                WhatsApp Channel
+              </a>
+              <a href={links.telegram} target="_blank" rel="noreferrer">
+                Telegram
+              </a>
+              <a href={links.instagram} target="_blank" rel="noreferrer">
+                Instagram
+              </a>
+            </div>
+          </article>
         </div>
       </section>
     </>

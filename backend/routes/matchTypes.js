@@ -90,6 +90,12 @@ router.post('/admin/create', authMiddleware, async (req, res) => {
     if (!data.name) {
       return res.status(400).json({ error: 'Match Type name is required' });
     }
+    const dup = await MatchType.findOne({
+      name: { $regex: new RegExp(`^${String(data.name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\?\s+/g, '\\s+')}$`, 'i') },
+    });
+    if (dup) {
+      return res.status(400).json({ error: 'A Match Type with this name already exists' });
+    }
     const matchType = await MatchType.create(data);
     res.status(201).json({ message: 'Match Type created', matchType });
   } catch (error) {
@@ -146,7 +152,8 @@ router.delete('/admin/:id', authMiddleware, async (req, res) => {
 router.post('/admin/:id/active', authMiddleware, async (req, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
-    const active = req.body.active !== false && req.body.active !== 'false';
+    const raw = req.body?.active;
+    const active = raw === true || raw === 'true' || raw === 1 || raw === '1';
     const matchType = await MatchType.findByIdAndUpdate(
       req.params.id,
       { active, updatedAt: new Date() },

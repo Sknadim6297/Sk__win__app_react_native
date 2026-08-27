@@ -17,9 +17,12 @@ const homeConfigSchema = new mongoose.Schema(
       },
     ],
     supportLinks: {
-      whatsapp: { type: String, default: '' },
-      telegram: { type: String, default: '' },
-      instagram: { type: String, default: '' },
+      whatsapp: {
+        type: String,
+        default: 'https://whatsapp.com/channel/0029VbDkiqHHQbS2hjVWL72z',
+      },
+      telegram: { type: String, default: 'https://t.me/WARZONEXXSUPPORT' },
+      instagram: { type: String, default: 'https://www.instagram.com/warezonearena' },
     },
     walletFooterNote: {
       type: String,

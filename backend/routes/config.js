@@ -12,6 +12,12 @@ const { sortBySortOrder } = require('../utils/sortBySortOrder');
 
 const router = express.Router();
 
+const DEFAULT_SUPPORT_LINKS = {
+  whatsapp: 'https://whatsapp.com/channel/0029VbDkiqHHQbS2hjVWL72z',
+  telegram: 'https://t.me/WARZONEXXSUPPORT',
+  instagram: 'https://www.instagram.com/warezonearena',
+};
+
 const DEFAULT_HOME = {
   key: 'main',
   latestNews: { text: '🏆 Tournaments Are Back! 🎮', isActive: true },
@@ -24,7 +30,7 @@ const DEFAULT_HOME = {
       isActive: true,
     },
   ],
-  supportLinks: { whatsapp: '', telegram: '', instagram: '' },
+  supportLinks: { ...DEFAULT_SUPPORT_LINKS },
 };
 
 const DEFAULT_PACKS = [
@@ -33,10 +39,30 @@ const DEFAULT_PACKS = [
   { label: '100 COINS', coins: 90, bonusCoins: 10, priceInr: 100, isBest: false, sortOrder: 3 },
 ];
 
+function resolveSupportLinks(raw = {}) {
+  return {
+    whatsapp: String(raw.whatsapp || '').trim() || DEFAULT_SUPPORT_LINKS.whatsapp,
+    telegram: String(raw.telegram || '').trim() || DEFAULT_SUPPORT_LINKS.telegram,
+    instagram: String(raw.instagram || '').trim() || DEFAULT_SUPPORT_LINKS.instagram,
+  };
+}
+
 async function getOrCreateHomeConfig() {
   let config = await HomeConfig.findOne({ key: 'main' });
   if (!config) {
     config = await HomeConfig.create(DEFAULT_HOME);
+    return config;
+  }
+
+  const next = resolveSupportLinks(config.supportLinks || {});
+  const prev = config.supportLinks || {};
+  if (
+    prev.whatsapp !== next.whatsapp ||
+    prev.telegram !== next.telegram ||
+    prev.instagram !== next.instagram
+  ) {
+    config.supportLinks = next;
+    await config.save();
   }
   return config;
 }
@@ -67,7 +93,7 @@ router.get('/home', async (req, res) => {
       latestNews: config.latestNews,
       latestAnnouncementTitle: latestAnnouncement?.title || '',
       banners: (config.banners || []).filter((b) => b.isActive),
-      supportLinks: config.supportLinks || {},
+      supportLinks: resolveSupportLinks(config.supportLinks || {}),
       carousel: carouselTutorials.map((t) => ({
         id: t._id,
         title: t.title,

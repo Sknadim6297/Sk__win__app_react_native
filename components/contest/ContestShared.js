@@ -59,33 +59,36 @@ export function TimeLeftBar({ startDate }) {
 export function InfoCell({ label, value, coin, rupee, flex, inline }) {
   const labelText = toCaps(label);
   const valueText = toCaps(value);
-  const forceInline = Boolean(inline || coin || rupee);
 
   const renderValue = () => {
     if (rupee) return <RupeeValue value={value} color={PAGE.gold} />;
     if (coin) return <CoinValue value={value} size={15} color={PAGE.gold} />;
     return (
-      <Text style={forceInline ? styles.infoValueInline : styles.infoValue} numberOfLines={forceInline ? 1 : 2}>
+      <Text style={inline ? styles.infoValueInline : styles.infoValue} numberOfLines={2}>
         {valueText}
       </Text>
     );
   };
 
-  if (forceInline) {
+  // Stacked layout (label above value) keeps long labels like MATCH TYPE fully readable.
+  if (!inline) {
     return (
-      <View style={[styles.infoCell, styles.infoCellInline, flex != null && { flex }]}>
-        <Text style={styles.infoLabelInline} numberOfLines={1}>
-          {labelText}:{' '}
-        </Text>
-        <View style={styles.infoValueWrap}>{renderValue()}</View>
+      <View
+        style={[
+          styles.infoCell,
+          flex != null && { flex, minWidth: '46%', flexBasis: '46%' },
+        ]}
+      >
+        <Text style={styles.infoLabel}>{labelText}</Text>
+        {renderValue()}
       </View>
     );
   }
 
   return (
-    <View style={[styles.infoCell, flex != null && { flex }]}>
-      <Text style={styles.infoLabel}>{labelText}:</Text>
-      {renderValue()}
+    <View style={[styles.infoCell, styles.infoCellInline, flex != null && { flex }]}>
+      <Text style={styles.infoLabelInline}>{labelText}: </Text>
+      <View style={styles.infoValueWrap}>{renderValue()}</View>
     </View>
   );
 }
@@ -145,40 +148,43 @@ const styles = StyleSheet.create({
     borderColor: PAGE.border,
     borderRadius: 10,
     paddingVertical: 12,
-    paddingHorizontal: 8,
-    minHeight: 48,
+    paddingHorizontal: 10,
+    minHeight: 58,
     justifyContent: 'center',
   },
   infoCellInline: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
     paddingVertical: 11,
+    gap: 4,
   },
   infoLabel: {
     ...TEXT.caption,
     color: PAGE.muted,
-    marginBottom: 4,
+    marginBottom: 6,
+    fontSize: 11,
+    letterSpacing: 0.3,
   },
   infoLabelInline: {
     fontFamily: FONTS.semiBold,
     fontSize: 11,
     color: PAGE.muted,
-    flexShrink: 1,
+    flexShrink: 0,
   },
   infoValueWrap: {
-    flexShrink: 0,
+    flexShrink: 1,
+    flexGrow: 1,
   },
   infoValue: {
     fontFamily: FONTS.bold,
-    fontSize: 13,
+    fontSize: 14,
     color: COLORS.white,
   },
   infoValueInline: {
     fontFamily: FONTS.bold,
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.white,
-    flexShrink: 1,
   },
   triple: {
     flexDirection: 'row',

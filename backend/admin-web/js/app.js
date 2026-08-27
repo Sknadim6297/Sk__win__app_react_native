@@ -1669,23 +1669,28 @@ const App = (() => {
     };
     document.getElementById('add-mt').onclick = () => openMt();
     AdminUI.bindActions(root(), async (act, id) => {
-      const item = (list || []).find((x) => String(x._id) === String(id));
-      if (act === 'edit') return openMt(item || {});
-      if (act === 'activate') {
-        await AdminAPI.setMatchTypeActive(id, true);
-        AdminUI.toast('Activated');
-        return matchTypesPage();
-      }
-      if (act === 'deactivate') {
-        await AdminAPI.setMatchTypeActive(id, false);
-        AdminUI.toast('Deactivated');
-        return matchTypesPage();
-      }
-      if (act === 'delete' && await AdminUI.confirm('Delete Match Type', 'This permanently removes it from the catalog. Existing tournaments keep their saved Match Type name.')) {
-        await AdminAPI.deleteMatchType(id);
-        AdminUI.toast('Deleted');
-        matchTypesPage();
-      }
+      await guarded(async () => {
+        const item = (list || []).find((x) => String(x._id) === String(id));
+        if (act === 'edit') return openMt(item || {});
+        if (act === 'activate') {
+          await AdminAPI.setMatchTypeActive(id, true);
+          AdminUI.toast('Activated');
+          return matchTypesPage();
+        }
+        if (act === 'deactivate') {
+          await AdminAPI.setMatchTypeActive(id, false);
+          AdminUI.toast('Deactivated');
+          return matchTypesPage();
+        }
+        if (act === 'delete') {
+          if (!(await AdminUI.confirm('Delete Match Type', 'This permanently removes it from the catalog. Existing tournaments keep their saved Match Type name.'))) {
+            return;
+          }
+          await AdminAPI.deleteMatchType(id);
+          AdminUI.toast('Deleted');
+          return matchTypesPage();
+        }
+      });
     });
   }
 
@@ -1698,22 +1703,43 @@ const App = (() => {
       <div class="card"><div class="table-wrap"><table>
         <thead><tr><th>Name</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>${(list || []).map((m) => `<tr><td>${AdminUI.esc(m.name)}</td><td>${m.active === false ? badge('draft') : badge('active')}</td>
-          <td>${AdminUI.actionsMenu(m._id, [{ act: 'edit', label: 'Edit' }, { act: 'delete', label: 'Delete', danger: true }])}</td></tr>`).join('') || `<tr><td colspan="3">${AdminUI.empty('No maps')}</td></tr>`}</tbody>
+          <td>${AdminUI.actionsMenu(m._id, [
+            { act: 'edit', label: 'Edit' },
+            { act: m.active === false ? 'activate' : 'deactivate', label: m.active === false ? 'Activate' : 'Deactivate' },
+            { act: 'delete', label: 'Delete', danger: true },
+          ])}</td></tr>`).join('') || `<tr><td colspan="3">${AdminUI.empty('No maps')}</td></tr>`}</tbody>
       </table></div></div>`);
     AdminUI.bindShell();
     document.getElementById('add-map').onclick = () => simpleForm('Add map', [['name', 'Name']], async (body) => {
       await AdminAPI.createMap(body); AdminUI.toast('Created'); maps();
     });
     AdminUI.bindActions(root(), async (act, id) => {
-      if (act === 'delete' && await AdminUI.confirm('Delete map', 'Remove this map?')) {
-        await AdminAPI.deleteMap(id); AdminUI.toast('Deleted'); maps();
-      }
-      if (act === 'edit') {
-        const m = (list || []).find((x) => x._id === id);
-        simpleForm('Edit map', [['name', 'Name', m?.name]], async (body) => {
-          await AdminAPI.updateMap(id, body); AdminUI.toast('Updated'); maps();
-        });
-      }
+      await guarded(async () => {
+        if (act === 'activate') {
+          await AdminAPI.updateMap(id, { active: true });
+          AdminUI.toast('Activated');
+          return maps();
+        }
+        if (act === 'deactivate') {
+          await AdminAPI.updateMap(id, { active: false });
+          AdminUI.toast('Deactivated');
+          return maps();
+        }
+        if (act === 'delete') {
+          if (!(await AdminUI.confirm('Delete map', 'Remove this map?'))) return;
+          await AdminAPI.deleteMap(id);
+          AdminUI.toast('Deleted');
+          return maps();
+        }
+        if (act === 'edit') {
+          const m = (list || []).find((x) => String(x._id) === String(id));
+          simpleForm('Edit map', [['name', 'Name', m?.name]], async (body) => {
+            await AdminAPI.updateMap(id, body);
+            AdminUI.toast('Updated');
+            maps();
+          });
+        }
+      });
     });
   }
 
@@ -1730,7 +1756,11 @@ const App = (() => {
           <td>${s.image ? AdminUI.img(s.image, 'thumb') : '—'}</td>
           <td>${AdminUI.esc(s.link || '—')}</td>
           <td>${s.active === false ? badge('draft') : badge('active')}</td>
-          <td>${AdminUI.actionsMenu(s._id || s.id, [{ act: 'edit', label: 'Edit' }, { act: 'delete', label: 'Delete', danger: true }])}</td>
+          <td>${AdminUI.actionsMenu(s._id || s.id, [
+            { act: 'edit', label: 'Edit' },
+            { act: s.active === false ? 'activate' : 'deactivate', label: s.active === false ? 'Activate' : 'Deactivate' },
+            { act: 'delete', label: 'Delete', danger: true },
+          ])}</td>
         </tr>`).join('') || `<tr><td colspan="4">${AdminUI.empty('No banners yet', 'Upload home slider images from here.')}</td></tr>`}</tbody>
       </table></div></div>`);
     AdminUI.bindShell();
@@ -1753,13 +1783,26 @@ const App = (() => {
     );
     document.getElementById('add-s').onclick = () => openSlider();
     AdminUI.bindActions(root(), async (act, id) => {
-      const item = items.find((x) => String(x._id || x.id) === String(id));
-      if (act === 'edit') return openSlider(item || {});
-      if (act === 'delete' && await AdminUI.confirm('Delete banner', 'Remove this home banner?')) {
-        await AdminAPI.deleteSlider(id);
-        AdminUI.toast('Deleted');
-        sliders();
-      }
+      await guarded(async () => {
+        const item = items.find((x) => String(x._id || x.id) === String(id));
+        if (act === 'edit') return openSlider(item || {});
+        if (act === 'activate') {
+          await AdminAPI.updateSlider(id, { active: true });
+          AdminUI.toast('Activated');
+          return sliders();
+        }
+        if (act === 'deactivate') {
+          await AdminAPI.updateSlider(id, { active: false });
+          AdminUI.toast('Deactivated');
+          return sliders();
+        }
+        if (act === 'delete') {
+          if (!(await AdminUI.confirm('Delete banner', 'Remove this home banner?'))) return;
+          await AdminAPI.deleteSlider(id);
+          AdminUI.toast('Deleted');
+          return sliders();
+        }
+      });
     });
   }
 
@@ -1782,11 +1825,13 @@ const App = (() => {
       </table></div></div>`);
     AdminUI.bindShell();
     AdminUI.bindActions(root(), async (act, id) => {
-      if (act === 'close') {
-        await AdminAPI.updateTicket(id, { status: 'closed' });
-        AdminUI.toast('Updated');
-        support();
-      }
+      await guarded(async () => {
+        if (act === 'close') {
+          await AdminAPI.updateTicket(id, { status: 'closed' });
+          AdminUI.toast('Updated');
+          return support();
+        }
+      });
     });
   }
 
@@ -1814,14 +1859,20 @@ const App = (() => {
       await AdminAPI.createAnnouncement(body); AdminUI.toast('Created'); announcements();
     });
     AdminUI.bindActions(root(), async (act, id) => {
-      const a = items.find((x) => String(x.id || x._id) === String(id));
-      if (act === 'toggle') {
-        await AdminAPI.updateAnnouncement(id, { isActive: a?.isActive === false });
-        AdminUI.toast('Updated'); announcements();
-      }
-      if (act === 'delete' && await AdminUI.confirm('Delete', 'Remove this announcement?')) {
-        await AdminAPI.deleteAnnouncement(id); AdminUI.toast('Deleted'); announcements();
-      }
+      await guarded(async () => {
+        const a = items.find((x) => String(x.id || x._id) === String(id));
+        if (act === 'toggle') {
+          await AdminAPI.updateAnnouncement(id, { isActive: a?.isActive === false });
+          AdminUI.toast('Updated');
+          return announcements();
+        }
+        if (act === 'delete') {
+          if (!(await AdminUI.confirm('Delete', 'Remove this announcement?'))) return;
+          await AdminAPI.deleteAnnouncement(id);
+          AdminUI.toast('Deleted');
+          return announcements();
+        }
+      });
     });
   }
 

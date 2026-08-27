@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
-import { BRAND, POLICY_LINKS } from '../content';
+import { BRAND, POLICY_LINKS, SUPPORT } from '../content';
 import { brandLogoUrl, apkHref } from '../utils';
 import { APP_RELEASE, PWA_URL } from '../release';
 
@@ -55,9 +55,9 @@ function AppleIcon() {
 export default function Footer({ socials = {} }) {
   const [policiesOpen, setPoliciesOpen] = useState(false);
   const items = [
-    { key: 'instagram', label: 'Instagram', href: socials.instagram },
-    { key: 'telegram', label: 'Telegram', href: socials.telegram },
-    { key: 'whatsapp', label: 'WhatsApp', href: socials.whatsapp },
+    { key: 'instagram', label: 'Instagram', href: socials.instagram || SUPPORT.instagram },
+    { key: 'telegram', label: 'Telegram', href: socials.telegram || SUPPORT.telegram },
+    { key: 'whatsapp', label: 'WhatsApp', href: socials.whatsapp || SUPPORT.whatsapp },
   ].filter((s) => s.href);
 
   const apk = apkHref();

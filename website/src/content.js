@@ -46,6 +46,9 @@ export const SUPPORT = {
   email: 'support@warzoneff.com',
   phoneDisplay: '+91 6297616918',
   teamLabel: 'WAREZONE Support Team',
+  whatsapp: 'https://whatsapp.com/channel/0029VbDkiqHHQbS2hjVWL72z',
+  telegram: 'https://t.me/WARZONEXXSUPPORT',
+  instagram: 'https://www.instagram.com/warezonearena',
 };
 
 /** Legal / policy links used in navbar + footer dropdowns */
@@ -128,7 +131,7 @@ export const TERMS = {
     },
     {
       title: '7. Contact Information',
-      body: 'If you have any questions about these Terms and Conditions, please contact us at legal@warzoneff.com',
+      body: 'If you have any questions about these Terms and Conditions, please contact us at legal@warzoneff.com, WhatsApp https://whatsapp.com/channel/0029VbDkiqHHQbS2hjVWL72z, Telegram https://t.me/WARZONEXXSUPPORT, or Instagram https://www.instagram.com/warezonearena',
     },
   ],
 };
@@ -158,7 +161,7 @@ export const PRIVACY = {
     },
     {
       title: 'Contact Us',
-      body: 'If you have questions about this Privacy Policy, please contact us at privacy@warzoneff.com',
+      body: 'If you have questions about this Privacy Policy, please contact us at privacy@warzoneff.com, WhatsApp https://whatsapp.com/channel/0029VbDkiqHHQbS2hjVWL72z, Telegram https://t.me/WARZONEXXSUPPORT, or Instagram https://www.instagram.com/warezonearena',
     },
   ],
 };
