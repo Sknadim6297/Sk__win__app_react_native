@@ -23,6 +23,17 @@ function isCustomMatch(tournament) {
   return c === 'custom' || c === 'custom_match' || !!tournament?.isCustomMatch;
 }
 
+function isLoneWolfMatch(tournament) {
+  const mt = resolveMatchTypeDoc(tournament);
+  if (mt?.name && /lone\s*wolf/i.test(mt.name)) return true;
+  const name =
+    tournament?.matchTypeName ||
+    (typeof tournament?.matchType === 'string' && !/^[a-f0-9]{24}$/i.test(tournament.matchType)
+      ? tournament.matchType
+      : '');
+  return /lone\s*wolf/i.test(String(name || ''));
+}
+
 function isBattleRoyale(tournament) {
   if (isCustomMatch(tournament)) return false;
   const mt = resolveMatchTypeDoc(tournament);
@@ -96,7 +107,31 @@ function getMatchStructure(tournament) {
     };
   }
 
-  // Battle Royale / Lone Wolf: fixed 48-slot grid
+  if (isLoneWolfMatch(tournament)) {
+    return {
+      kind: 'lone_wolf',
+      matchType: matchTypeName,
+      matchTypeName,
+      playerFormat,
+      playerFormatLabel: pfLabel,
+      formatLabel: customFormatLabel(playersPerTeam),
+      mode: playerFormat,
+      modeLabel: pfLabel,
+      playersPerTeam,
+      slotsRequiredToJoin: playersPerTeam,
+      slots: 2,
+      totalSlots: 2,
+      totalPlayerCapacity: 2 * playersPerTeam,
+      slotUnit: 'teams',
+      entryUnit: 'player',
+      hasKillRewards,
+      usesTeamRegistration: true,
+      usesSlotGrid: false,
+      usesTeamSides: true,
+    };
+  }
+
+  // Battle Royale only: fixed 48-slot grid
   return {
     kind: 'battle_royale',
     matchType: matchTypeName,
@@ -114,7 +149,7 @@ function getMatchStructure(tournament) {
     slotUnit: 'slots',
     entryUnit: 'player',
     hasKillRewards,
-    /** Only Clash Squad uses team A/B form. Duo/Squad pick multiple slots. */
+    /** Only Battle Royale uses the 48-slot grid. Lone Wolf + Clash Squad use team join. */
     usesTeamRegistration: false,
     usesSlotGrid: true,
     usesTeamSides: false,
@@ -201,6 +236,7 @@ module.exports = {
   BR_MAX_PLAYERS,
   BR_GRID_SLOTS,
   isCustomMatch,
+  isLoneWolfMatch,
   isBattleRoyale,
   getPlayersPerTeam,
   formatModeLabel,

@@ -248,10 +248,13 @@ svg { stroke-linecap: round; stroke-linejoin: round; }
 .form-section h3 { margin: 0 0 4px; font-size: 15px; color: var(--primary); }
 .form-section p { margin: 0 0 14px; font-size: 13px; color: var(--text-2); }
 .match-banner {
-  width: 100%; height: 200px; border-radius: 16px; overflow: hidden;
-  background: linear-gradient(135deg, #1b365d, #2c5282); margin-bottom: 16px;
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0f1628;
+  margin-bottom: 16px;
 }
-.match-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.match-banner img { width: 100%; height: auto; object-fit: contain; display: block; }
 .match-banner .banner-fallback {
   height: 100%; display: grid; place-items: center; color: #fff;
   font-weight: 800; font-size: 22px; padding: 20px; text-align: center;
@@ -329,7 +332,6 @@ svg { stroke-linecap: round; stroke-linejoin: round; }
   .modal { border-radius: 16px 16px 0 0; width: 100%; }
   .kv { grid-template-columns: 1fr; }
   .info-grid { grid-template-columns: 1fr; }
-  .match-banner { height: 140px; }
   .filters { flex-direction: column; align-items: stretch; }
   .filters input, .filters select, .filters .btn { width: 100%; }
 }

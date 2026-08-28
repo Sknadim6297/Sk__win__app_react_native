@@ -43,6 +43,30 @@ const App = (() => {
     return String(text || '').replace(/Custom Match/gi, 'Clash Squad');
   }
 
+  function bucketForModeLabel(label) {
+    const key = String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!key) return null;
+    if (/lonewolf/.test(key) || /^lw/.test(key)) return 'lonewolf';
+    if (/clashsquad/.test(key) || /^cs/.test(key) || key.includes('clash')) return 'clashsquad';
+    if (/onetap/.test(key)) return 'onetap';
+    if (/battleroyale/.test(key) || /^br/.test(key) || key.includes('royale')) return 'battleroyale';
+    return null;
+  }
+
+  function pickGameModeForMatchType(modes, matchTypeName) {
+    const bucket = bucketForModeLabel(matchTypeName);
+    if (!bucket || !modes?.length) return null;
+    return modes.find((m) => bucketForModeLabel(m.name) === bucket) || null;
+  }
+
+  function syncGameModeFromMatchType(modes) {
+    const opt = document.getElementById('f-match-type')?.selectedOptions?.[0];
+    const mtName = opt?.textContent?.trim() || '';
+    const picked = pickGameModeForMatchType(modes, mtName);
+    const modeEl = document.getElementById('f-mode');
+    if (picked && modeEl) modeEl.value = String(picked._id);
+  }
+
   function displayMatchType(row) {
     if (row.matchTypeName && String(row.matchTypeName) !== 'undefined') return String(row.matchTypeName);
     if (row.matchType && typeof row.matchType === 'object' && row.matchType.name) {
@@ -584,11 +608,16 @@ const App = (() => {
       const format = document.getElementById('f-player-format')?.value || 'solo';
       const pptEl = document.getElementById('f-ppt');
       if (pptEl) pptEl.value = String(playersPerTeamFor(format));
+      const gid = document.getElementById('f-game').value;
+      syncGameModeFromMatchType(modesByGame[gid] || []);
     };
     fillModes();
     syncStructureFields();
     AdminUI.bindImageUploads(document.getElementById('t-form'));
-    document.getElementById('f-game').onchange = fillModes;
+    document.getElementById('f-game').onchange = () => {
+      fillModes();
+      syncStructureFields();
+    };
     document.getElementById('f-match-type').onchange = syncStructureFields;
     document.getElementById('f-player-format').onchange = syncStructureFields;
     document.getElementById('back').onclick = () => go('tournaments');
@@ -1901,33 +1930,12 @@ const App = (() => {
     root().innerHTML = AdminUI.layout('daily-auto', '<div class="loading">Loading Daily Auto Matches…</div>');
     AdminUI.bindShell();
     const items = await AdminAPI.dailyAutoMatches();
-    const todayReady = items.filter((r) => r.todayTournamentExists).length;
     root().innerHTML = AdminUI.layout('daily-auto', `
       ${AdminUI.pageHead(
         'Daily Auto Matches',
         'Master templates run daily at 12:05 AM IST. Each active master creates a real Upcoming tournament players can join.',
-        `<div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-secondary" id="seed-auto">Add 5 sample matches</button>
-          <button class="btn btn-primary" id="add-auto">${AdminUI.icon.plus} Create Daily Auto Match</button>
-        </div>`
+        `<button class="btn btn-primary" id="add-auto">${AdminUI.icon.plus} Create Daily Auto Match</button>`
       )}
-      <div class="panel" style="margin-bottom:16px">
-        <div style="display:grid;gap:10px">
-          <div><strong>Full feature preview</strong> — click <em>Add 5 sample matches</em> to seed:</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;font-size:13px;color:var(--muted)">
-            <div>① BR Solo · 1 slot · kill rewards</div>
-            <div>② BR Duo · 2 slots · pay ×2</div>
-            <div>③ BR Squad · 4 slots · pay ×4</div>
-            <div>④ Clash Squad · Team A/B</div>
-            <div>⑤ Lone Wolf Solo · late night</div>
-          </div>
-          <div style="font-size:13px;color:var(--muted)">
-            Maps / fees are randomized each seed. Today’s tournaments are generated automatically —
-            then open <a class="name-link" href="#/tournaments">All Tournaments</a> to inspect join, slots, and Clash Squad registration.
-            ${items.length ? ` · <b>${items.length}</b> masters · <b>${todayReady}</b> ready today` : ''}
-          </div>
-        </div>
-      </div>
       <div class="card">
         <div class="table-wrap desktop-table">
           <table>
@@ -1966,7 +1974,7 @@ const App = (() => {
                   </div>
                 </td>
               </tr>`;
-            }).join('') : `<tr><td colspan="14">${AdminUI.empty('No Daily Auto Matches yet', 'Click “Add 5 sample matches” to create BR Solo/Duo/Squad, Clash Squad, and Lone Wolf templates with today’s tournaments.')}</td></tr>`}</tbody>
+            }).join('') : `<tr><td colspan="14">${AdminUI.empty('No Daily Auto Matches yet', 'Create a master template to auto-generate tournaments each day.')}</td></tr>`}</tbody>
           </table>
         </div>
         ${items.length ? `<div class="mobile-list">${items.map((row) => {
@@ -1995,25 +2003,10 @@ const App = (() => {
               ${row.todayTournamentId ? `<a class="btn btn-secondary btn-sm" href="#/tournaments/${row.todayTournamentId}">Open today</a>` : ''}
             </div>
           </div>`;
-        }).join('')}</div>` : `<div class="mobile-list">${AdminUI.empty('No Daily Auto Matches yet', 'Tap “Add 5 sample matches” above.')}</div>`}
+        }).join('')}</div>` : `<div class="mobile-list">${AdminUI.empty('No Daily Auto Matches yet', 'Create a master template to get started.')}</div>`}
       </div>`);
     AdminUI.bindShell();
     document.getElementById('add-auto').onclick = () => go('daily-auto/new');
-    document.getElementById('seed-auto').onclick = () => guarded(async () => {
-      if (!(await AdminUI.confirm(
-        'Add 5 sample Daily Auto Matches?',
-        'Creates (or reuses) BR Solo, Duo, Squad, Clash Squad 4v4, and Lone Wolf with randomized maps/fees, then generates today’s tournaments so you can open them in All Tournaments.'
-      ))) return;
-      const result = await AdminAPI.seedDailyAutoSamples({ generateToday: true });
-      AdminUI.toast(result.message || 'Samples ready');
-      const firstReady = (result.generated || []).find((g) => g.tournamentId);
-      if (firstReady?.tournamentId) {
-        if (await AdminUI.confirm('Samples ready', 'Open a generated tournament now to review Match Type, Player Format, slots, and join flow?')) {
-          return go(`tournaments/${firstReady.tournamentId}`);
-        }
-      }
-      dailyAutoMatches();
-    });
     AdminUI.bindActions(root(), handleDailyAutoAction);
     root().querySelectorAll('button[data-act="generate"]').forEach((btn) => {
       btn.onclick = (e) => {
@@ -2258,11 +2251,16 @@ const App = (() => {
       const ppt = playersPerTeamFor(format);
       const pptEl = document.getElementById('f-ppt');
       if (pptEl) pptEl.value = String(ppt);
+      const gid = document.getElementById('f-game').value;
+      syncGameModeFromMatchType(modesByGame[gid] || []);
       };
     fillModes();
     syncStructureFields();
     AdminUI.bindImageUploads(document.getElementById('auto-form'));
-    document.getElementById('f-game').onchange = fillModes;
+    document.getElementById('f-game').onchange = () => {
+      fillModes();
+      syncStructureFields();
+    };
     document.getElementById('f-match-type').onchange = syncStructureFields;
     document.getElementById('f-player-format').onchange = syncStructureFields;
     document.getElementById('back').onclick = () => go('daily-auto');

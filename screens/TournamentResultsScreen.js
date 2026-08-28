@@ -7,10 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
-  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AppIcon from '../components/ui/AppIcon';
 import ConfettiBurst from '../components/ConfettiBurst';
@@ -18,10 +16,8 @@ import { COLORS, FONTS } from '../styles/theme';
 import { PAGE } from '../styles/pageTheme';
 import { tournamentService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
-import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import { formatScheduleLine } from '../utils/tournamentHelpers';
-
-const DEFAULT_BANNER = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
+import TournamentBanner from '../components/contest/TournamentBanner';
 
 const CYAN = '#00E5FF';
 const GOLD = '#FBBF24';
@@ -93,18 +89,16 @@ function ResultHeader({ title, onBack }) {
 
 function MatchSummary({ tournament, entryFee, prizePool, perKill, showPerKill }) {
   const matchNo = getMatchNumber(tournament);
-  const bannerUri = tournament?.bannerImage ? resolveMediaUrl(tournament.bannerImage) : null;
-  const bannerSource = bannerUri ? { uri: bannerUri } : DEFAULT_BANNER;
   const organizedLine = tournament?.startDate ? formatScheduleLine(tournament.startDate) : null;
 
   return (
     <View style={styles.summaryWrap}>
-      <ImageBackground source={bannerSource} style={styles.banner} imageStyle={styles.bannerImg} resizeMode="cover">
-        <LinearGradient
-          colors={['rgba(11,14,30,0.05)', 'rgba(11,14,30,0.55)']}
-          style={StyleSheet.absoluteFill}
-        />
-      </ImageBackground>
+      <TournamentBanner
+        bannerImage={tournament?.bannerImage || tournament?.gameMode?.image || tournament?.game?.image}
+        maxHeight={220}
+        horizontalPadding={32}
+        style={styles.banner}
+      />
 
       <Text style={styles.matchTitle}>
         {String(tournament?.name || 'Tournament').toUpperCase()} - ID#{matchNo}
@@ -553,12 +547,8 @@ const styles = StyleSheet.create({
 
   summaryWrap: { marginBottom: 18 },
   banner: {
-    height: 176,
-    borderRadius: 16,
-    overflow: 'hidden',
     marginBottom: 14,
   },
-  bannerImg: { borderRadius: 16 },
   matchTitle: {
     fontFamily: FONTS.bold,
     fontSize: 16,

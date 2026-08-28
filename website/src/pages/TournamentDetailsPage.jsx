@@ -34,7 +34,8 @@ export default function TournamentDetailsPage() {
           {error && <p className="error">{error}</p>}
           {t && (
             <>
-              <div className="details-hero" style={{ backgroundImage: `url(${bannerOf(t)})` }}>
+              <div className="details-hero">
+                <img className="details-hero-img" src={bannerOf(t)} alt="" />
                 <div className="details-hero-content">
                   <span className={`badge ${statusBucket(t) === 'live' ? 'badge-live' : statusBucket(t) === 'completed' ? 'badge-done' : 'badge-up'}`}>
                     {statusLabel(t)}

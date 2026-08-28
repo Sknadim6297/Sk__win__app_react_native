@@ -227,10 +227,5 @@ const AdminAPI = (() => {
       request(`/daily-auto-matches/admin/${id}/generate-today`, { method: 'POST' }),
     dailyAutoMatchTournaments: (id) =>
       request(`/daily-auto-matches/admin/${id}/tournaments`),
-    seedDailyAutoSamples: (body = { generateToday: true }) =>
-      request('/daily-auto-matches/admin/seed-samples', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
   };
 })();

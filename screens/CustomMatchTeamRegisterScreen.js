@@ -197,10 +197,12 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
     }
 
     try {
+      const structure = getMatchStructure(tournament);
+      const custom = isCustomMatch(tournament);
       await tournamentManagementService.registerTeam(tournamentId, {
         teamName: join.teamName,
-        teamSide: isCustomMatch(tournament) ? join.teamSide : undefined,
-        slotNumber: isCustomMatch(tournament) ? undefined : join.slotNumber,
+        teamSide: structure.usesTeamSides ? join.teamSide : undefined,
+        slotNumber: custom ? undefined : join.slotNumber,
         players: join.players,
       });
     } catch (e) {
@@ -278,7 +280,8 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       showToast('This tournament does not use team registration');
       return;
     }
-    if (isCustomMatch(tournament) && takenSides.has(teamSide)) {
+    const joinStructure = getMatchStructure(tournament);
+    if (joinStructure.usesTeamSides && takenSides.has(teamSide)) {
       showToast(`Team ${teamSide} is already taken`);
       return;
     }
@@ -328,6 +331,8 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
   }
 
   const isCustom = isCustomMatch(tournament);
+  const structure = getMatchStructure(tournament);
+  const showTeamSides = Boolean(structure.usesTeamSides);
   const allReady = players.length === playersPerTeam && players.every(isPlayerComplete);
 
   const BalanceBlock = () => (
@@ -366,7 +371,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
           <ScrollView contentContainerStyle={styles.confirmScroll} keyboardShouldPersistTaps="handled">
             <BalanceBlock />
 
-            {isCustom ? (
+            {showTeamSides ? (
               <View style={styles.sidePickRow}>
                       {['A', 'B'].map((side) => {
                         const taken = takenSides.has(side);
@@ -400,38 +405,45 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
             <View style={styles.positionCard}>
               <Text style={styles.positionTitle}>SELECTED POSITION</Text>
               <View style={styles.posHeadRow}>
-                <Text style={[styles.posCol, styles.posHead]}>SLOT</Text>
-                <Text style={[styles.posCol, styles.posHead]}>STATUS</Text>
-                <Text style={[styles.posColWide, styles.posHead]}>INGAMENAME</Text>
+                <Text style={[styles.posColSlot, styles.posHead]}>SLOT</Text>
+                <Text style={[styles.posColName, styles.posHead]}>GAME NAME</Text>
+                <Text style={[styles.posColId, styles.posHead]}>GAME ID</Text>
               </View>
               {players.map((player, index) => {
                 const complete = isPlayerComplete(player);
-                        return (
-                  <View key={`p-${index}`} style={styles.posDataRow}>
-                    <Text style={styles.posCol}>
-                      {isCustom ? `TEAM ${teamSide} P${index + 1}` : `P${index + 1}`}
+                return (
+                  <TouchableOpacity
+                    key={`p-${index}`}
+                    style={styles.posDataRow}
+                    activeOpacity={0.85}
+                    onPress={() => openPlayerDetails(index)}
+                  >
+                    <Text style={styles.posColSlot}>
+                      {showTeamSides ? `TEAM ${teamSide} P${index + 1}` : `P${index + 1}`}
                     </Text>
-                    <Text style={styles.posCol}>{complete ? 'READY' : 'SELECTED'}</Text>
-                    <View style={styles.posColWide}>
-                      {complete ? (
-                        <TouchableOpacity onPress={() => openPlayerDetails(index)}>
-                          <Text style={styles.inGameName} numberOfLines={1}>
-                            {String(player.name).toUpperCase()}
-                            </Text>
-                          </TouchableOpacity>
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.addInfoBtn}
-                          onPress={() => openPlayerDetails(index)}
-                        >
-                          <Text style={styles.addInfoText}>ADD INFO</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                        );
-                      })}
-                    </View>
+                    {complete ? (
+                      <>
+                        <Text style={styles.posColName} numberOfLines={1}>
+                          {String(player.name).toUpperCase()}
+                        </Text>
+                        <Text style={styles.posColId} numberOfLines={1}>
+                          {String(player.gamingUID).toUpperCase()}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.posColName}>
+                          <View style={styles.addInfoBtn}>
+                            <Text style={styles.addInfoText}>ADD INFO</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.posColId, styles.posEmpty]}>—</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             <Text style={styles.note}>
               NOTE – PLEASE ENTER GAME NAME & UID FOR ALL {playersPerTeam}{' '}
               {playersPerTeam === 1 ? 'PLAYER' : 'PLAYERS'}
@@ -566,10 +578,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  posCol: { flex: 1, color: '#111827', fontFamily: FONTS.bold, fontSize: 12 },
-  posColWide: { flex: 1.3, alignItems: 'flex-start' },
-  posHead: { color: '#6B7280', fontSize: 11 },
-  inGameName: { color: '#2563EB', fontFamily: FONTS.bold, fontSize: 12 },
+  posColSlot: { flex: 1.1, color: '#111827', fontFamily: FONTS.bold, fontSize: 11 },
+  posColName: { flex: 1.2, color: '#111827', fontFamily: FONTS.bold, fontSize: 11 },
+  posColId: { flex: 1, color: '#111827', fontFamily: FONTS.bold, fontSize: 11 },
+  posEmpty: { color: '#9CA3AF' },
+  posHead: { color: '#6B7280', fontSize: 10 },
   addInfoBtn: {
     backgroundColor: '#3B82F6',
     borderRadius: 8,

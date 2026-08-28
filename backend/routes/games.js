@@ -5,6 +5,7 @@ const Tournament = require('../models/Tournament');
 const { authMiddleware } = require('../middleware/auth');
 const { normalizeMediaUrl } = require('../utils/publicUrl');
 const { sortBySortOrder } = require('../utils/sortBySortOrder');
+const { resolveTournamentGameModeId } = require('../utils/gameModeMatching');
 
 function withNormalizedImage(doc, req) {
   const obj = doc.toObject ? doc.toObject() : { ...doc };
@@ -48,13 +49,36 @@ async function countTournamentsByGame(gameIds) {
   return new Map(rows.map((r) => [String(r._id), r.count]));
 }
 
-async function countTournamentsByMode(modeIds) {
-  if (!modeIds.length) return new Map();
-  const rows = await Tournament.aggregate([
-    { $match: upcomingMatchFilter('gameMode', modeIds) },
-    { $group: { _id: '$gameMode', count: { $sum: 1 } } },
-  ]);
-  return new Map(rows.map((r) => [String(r._id), r.count]));
+async function countTournamentsByMode(modes) {
+  if (!modes.length) return new Map();
+  const modeList = modes.map((m) => ({ _id: m._id, id: m._id, name: m.name, game: m.game }));
+  const gameIds = [...new Set(modeList.map((m) => String(m.game)))];
+  const tournaments = await Tournament.find({
+    game: { $in: gameIds },
+    $or: [
+      { lifecycleStatus: { $in: UPCOMING_MATCH_STATUSES } },
+      {
+        $and: [
+          {
+            $or: [{ lifecycleStatus: { $exists: false } }, { lifecycleStatus: null }],
+          },
+          { status: { $in: UPCOMING_MATCH_STATUSES } },
+        ],
+      },
+    ],
+  })
+    .select('game gameMode matchType')
+    .populate('matchType', 'name')
+    .lean();
+
+  const counts = new Map(modeList.map((m) => [String(m._id), 0]));
+  for (const t of tournaments) {
+    const modeId = resolveTournamentGameModeId(t, modeList);
+    if (modeId && counts.has(modeId)) {
+      counts.set(modeId, counts.get(modeId) + 1);
+    }
+  }
+  return counts;
 }
 
 function withTournamentCount(doc, countMap, idField = '_id', req) {
@@ -299,7 +323,7 @@ router.get('/:gameId/modes', async (req, res) => {
   try {
     const modes = await GameMode.find({ game: req.params.gameId, status: 'active' }).lean();
     const sorted = sortBySortOrder(modes);
-    const countMap = await countTournamentsByMode(sorted.map((m) => m._id));
+    const countMap = await countTournamentsByMode(sorted);
     res.json(sorted.map((m) => withTournamentCount(m, countMap, '_id', req)));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch game modes', message: error.message });

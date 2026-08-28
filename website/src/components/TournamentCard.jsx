@@ -8,7 +8,9 @@ export default function TournamentCard({ t }) {
   return (
     <article className="card fade-up">
       <Link to={`/tournaments/${t._id}`}>
-        <div className="card-banner" style={{ backgroundImage: `url(${bannerOf(t)})` }} />
+        <div className="card-banner">
+          <img src={bannerOf(t)} alt="" loading="lazy" />
+        </div>
         <div className="card-body">
           <span className={`badge ${badgeClass}`}>{statusLabel(t)}</span>
           <h3 style={{ margin: '10px 0 4px', fontSize: 18 }}>{t.name}</h3>

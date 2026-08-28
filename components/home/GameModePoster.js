@@ -114,7 +114,7 @@ export default function GameModePoster({ item, width, height, onPress }) {
         {item.tournamentCount > 0 ? (
           <View style={styles.countBadge}>
             <View style={styles.liveDot} />
-            <Text style={styles.liveCount}>{item.tournamentCount} LIVE</Text>
+            <Text style={styles.liveCount}>{item.tournamentCount} UPCOMING</Text>
           </View>
         ) : null}
 

@@ -17,6 +17,7 @@ import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import { LIST_PERF } from '../utils/listPerf';
 import ScreenHeader from '../components/navigation/ScreenHeader';
 import MatchListCard from '../components/contest/MatchListCard';
+import { tournamentBelongsToGameMode } from '../utils/gameModeMatching';
 import { toPlayerMatchLabel } from '../utils/tournamentHelpers';
 
 const STATUS_TABS = [
@@ -44,8 +45,8 @@ export default function GameDetailsScreen({ navigation, route }) {
       let filtered = Array.isArray(data) ? data : [];
 
       if (modeId) {
-        filtered = filtered.filter(
-          (t) => String(t.gameMode?._id || t.gameMode) === String(modeId)
+        filtered = filtered.filter((t) =>
+          tournamentBelongsToGameMode(t, { _id: modeId, id: modeId, name: gameMode?.name })
         );
       } else if (gameMode?.name) {
         filtered = filtered.filter((t) => t.gameMode?.name === gameMode.name);

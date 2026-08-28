@@ -219,15 +219,24 @@ button { cursor: pointer; }
   box-shadow: 0 18px 40px rgba(123, 97, 255, 0.12);
 }
 .card-banner {
-  height: 148px;
-  background: #0c1228 center/cover no-repeat;
+  background: #0c1228;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-banner img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
 }
 .card-banner::after {
   content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, transparent, rgba(11, 14, 30, 0.72));
+  pointer-events: none;
 }
 .card-body { padding: 16px; }
 .badge {
@@ -491,18 +500,24 @@ table.table { width: 100%; border-collapse: collapse; }
 .legal h3 { margin: 22px 0 8px; }
 
 .details-hero {
-  min-height: 280px;
   border-radius: var(--radius-lg);
-  background: #121b33 center/cover;
+  background: #121b33;
   position: relative;
   overflow: hidden;
+}
+.details-hero-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
 }
 .details-hero::after {
   content: "";
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(11,14,30,.2), rgba(11,14,30,.88));
+  background: linear-gradient(180deg, rgba(11,14,30,.15), rgba(11,14,30,.75));
+  pointer-events: none;
 }
-.details-hero-content { position: relative; z-index: 1; padding: 36px 28px; }
+.details-hero-content { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 36px 28px; }
 .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0; }
 .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
 .stat span { display: block; color: var(--dim); font-size: 12px; }

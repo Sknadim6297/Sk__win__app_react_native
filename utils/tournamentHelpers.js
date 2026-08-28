@@ -53,9 +53,77 @@ export function toPlayerMatchLabel(text) {
   return String(text).replace(/Custom Match/gi, CLASH_SQUAD_LABEL);
 }
 
+/** Player-facing mode label (Esports game mode, e.g. LW 1V1/2V2). */
+export function resolveModeLabel(tournamentOrItem) {
+  const gameMode =
+    tournamentOrItem?.gameMode?.name ||
+    (typeof tournamentOrItem?.gameMode === 'string' ? tournamentOrItem.gameMode : null) ||
+    tournamentOrItem?.gameModeName ||
+    '';
+  if (gameMode) return toPlayerMatchLabel(String(gameMode));
+
+  const fallback =
+    tournamentOrItem?.matchTypeName ||
+    (tournamentOrItem?.matchType &&
+    typeof tournamentOrItem.matchType === 'object' &&
+    tournamentOrItem.matchType.name
+      ? tournamentOrItem.matchType.name
+      : null) ||
+    (typeof tournamentOrItem?.matchType === 'string' &&
+    tournamentOrItem.matchType &&
+    !/^[a-f0-9]{24}$/i.test(tournamentOrItem.matchType)
+      ? tournamentOrItem.matchType
+      : null);
+  return fallback ? toPlayerMatchLabel(String(fallback)) : '—';
+}
+
+export function resolveEntryFeePerPlayer(tournamentOrItem) {
+  return Number(
+    tournamentOrItem?.entryFeePerPlayer ??
+      tournamentOrItem?.feePerPlayer ??
+      tournamentOrItem?.entryFee ??
+      0
+  );
+}
+
+export function shouldShowPrizePerKill(tournamentOrItem, structure) {
+  const prizePerKill = Number(
+    tournamentOrItem?.prizePerKill ?? tournamentOrItem?.perKill ?? 0
+  );
+  if (prizePerKill <= 0) return false;
+  if (tournamentOrItem?.showPrizePerKill != null) {
+    return Boolean(tournamentOrItem.showPrizePerKill);
+  }
+  const custom = isCustomMatch(tournamentOrItem);
+  return !custom && Boolean(structure?.hasKillRewards);
+}
+
 export function isCustomMatch(tournament) {
   const c = tournament?.category || tournament?.tournamentType;
-  return c === 'custom' || c === 'custom_match' || !!tournament?.isCustomMatch;
+  if (c === 'custom' || c === 'custom_match' || !!tournament?.isCustomMatch) return true;
+  const mt = tournament?.matchType;
+  if (mt && typeof mt === 'object' && mt.isTeamVsTeam) return true;
+  return false;
+}
+
+export function resolveMatchTypeName(tournament) {
+  return (
+    (tournament?.matchType && typeof tournament.matchType === 'object' && tournament.matchType.name) ||
+    tournament?.matchTypeName ||
+    (typeof tournament?.matchType === 'string' &&
+    tournament.matchType &&
+    !/^[a-f0-9]{24}$/i.test(tournament.matchType)
+      ? tournament.matchType
+      : '') ||
+    ''
+  );
+}
+
+/** Lone Wolf uses Team A/B joining — not the 48-slot Battle Royale grid. */
+export function isLoneWolfMatch(tournament) {
+  if (!tournament) return false;
+  if (tournament.matchKind === 'lone_wolf') return true;
+  return /lone\s*wolf|^lw\b/i.test(String(resolveMatchTypeName(tournament)));
 }
 
 export function isBattleRoyaleMatch(tournamentOrMode) {
@@ -92,20 +160,23 @@ export function getMatchStructure(tournament) {
   // Prefer backend-resolved public fields when present (and consistent)
   if (tournament?.totalSlots != null && tournament?.matchTypeName) {
     const custom = isCustomMatch(tournament) || tournament.matchKind === 'team_vs_team';
-    const slots = custom
+    const loneWolf = isLoneWolfMatch(tournament);
+    const teamJoin = custom || loneWolf;
+    const slots = teamJoin
       ? Number(tournament.slots ?? tournament.totalSlots) || 2
       : Number(tournament.totalSlots) || 48;
     const playerFormatLabel =
       tournament.playerFormatLabel || formatModeLabel(playerFormat);
-    const matchTypeName = String(tournament.matchTypeName || tournament.matchType || (custom ? 'Clash Squad' : 'Battle Royale'));
-    const usesTeamRegistration = custom;
+    const matchTypeName = String(
+      tournament.matchTypeName || tournament.matchType || (custom ? 'Clash Squad' : loneWolf ? 'Lone Wolf' : 'Battle Royale')
+    );
     return {
-      kind: custom ? 'team_vs_team' : 'battle_royale',
+      kind: custom ? 'team_vs_team' : loneWolf ? 'lone_wolf' : 'battle_royale',
       matchType: matchTypeName,
       matchTypeName,
       playerFormat,
       playerFormatLabel,
-      formatLabel: custom
+      formatLabel: teamJoin
         ? playersPerTeam === 4
           ? '4v4'
           : playersPerTeam === 2
@@ -118,33 +189,29 @@ export function getMatchStructure(tournament) {
       slotsRequiredToJoin: playersPerTeam,
       slots,
       totalSlots: slots,
-      totalPlayerCapacity: custom ? slots * playersPerTeam : 48,
-      slotUnit: custom ? 'teams' : 'slots',
+      totalPlayerCapacity: teamJoin ? slots * playersPerTeam : 48,
+      slotUnit: teamJoin ? 'teams' : 'slots',
       entryUnit: 'player',
       hasKillRewards:
         tournament.hasKillRewards != null ? Boolean(tournament.hasKillRewards) : !custom,
-      usesTeamRegistration,
-      usesSlotGrid: !custom,
-      usesTeamSides: custom,
+      usesTeamRegistration: teamJoin,
+      usesSlotGrid: !teamJoin,
+      usesTeamSides: teamJoin,
     };
   }
 
   const fallbackFormat = String(tournament?.playerFormat || tournament?.mode || 'solo').toLowerCase();
   const fallbackPpt = getTeamSize(fallbackFormat);
   const custom = isCustomMatch(tournament);
+  const loneWolf = isLoneWolfMatch(tournament);
   const playerFormatLabel = formatModeLabel(fallbackFormat);
-  const mt =
-    (tournament?.matchType && typeof tournament.matchType === 'object' && tournament.matchType.name) ||
-    (typeof tournament?.matchType === 'string' && !/^[a-f0-9]{24}$/i.test(tournament.matchType)
-      ? tournament.matchType
-      : null) ||
-    tournament?.matchTypeName;
+  const mt = resolveMatchTypeName(tournament) || null;
 
-  if (custom) {
+  if (custom || loneWolf) {
     return {
-      kind: 'team_vs_team',
-      matchType: mt || 'Clash Squad',
-      matchTypeName: mt || 'Clash Squad',
+      kind: custom ? 'team_vs_team' : 'lone_wolf',
+      matchType: mt || (custom ? 'Clash Squad' : 'Lone Wolf'),
+      matchTypeName: mt || (custom ? 'Clash Squad' : 'Lone Wolf'),
       playerFormat: fallbackFormat,
       playerFormatLabel,
       formatLabel: fallbackPpt === 4 ? '4v4' : fallbackPpt === 2 ? '2v2' : '1v1',
@@ -157,7 +224,7 @@ export function getMatchStructure(tournament) {
       totalPlayerCapacity: 2 * fallbackPpt,
       slotUnit: 'teams',
       entryUnit: 'player',
-      hasKillRewards: false,
+      hasKillRewards: loneWolf,
       usesTeamRegistration: true,
       usesSlotGrid: false,
       usesTeamSides: true,

@@ -1219,6 +1219,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
 
     const isCustom = lifecycle.isCustomMatch(tournament);
     const structure = lifecycle.getMatchStructure(tournament);
+    const needsTeamSide = Boolean(structure.usesTeamSides);
     const { teamName, teamSide, players, slotNumber: slotNumberRaw } = req.body;
     const sideRaw = String(teamSide || req.body.side || '')
       .trim()
@@ -1229,7 +1230,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
     if (!teamName || !String(teamName).trim()) {
       return res.status(400).json({ error: 'Team name is required' });
     }
-    if (isCustom && !side) {
+    if (needsTeamSide && !side) {
       return res.status(400).json({ error: 'Team side must be Team A or Team B' });
     }
 
@@ -1282,7 +1283,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
       });
     }
 
-    if (isCustom && side) {
+    if (needsTeamSide && side) {
       const sideTaken = await Team.findOne({
         tournamentId: tournament._id,
         side,

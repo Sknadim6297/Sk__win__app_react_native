@@ -7,12 +7,10 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
-  ImageBackground,
   Share,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
@@ -20,21 +18,17 @@ import { tournamentService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import Toast from '../components/Toast';
 import ScreenHeader from '../components/navigation/ScreenHeader';
-import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import {
   formatScheduleLine,
   isCustomMatch,
   getMatchStructure,
   resolveEntryCharge,
-  resolveDisplayPrizePool,
-  resolvePrizePlaces,
   resolveMatchRules,
   getPlayerFormatLabel,
 } from '../utils/tournamentHelpers';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
-import { CoinValue, TimeLeftBar, InfoCell } from '../components/contest/ContestShared';
-
-const DEFAULT_BANNER = require('../assets/images/1e84951ea4e43a94485c30851c151ad2.jpg');
+import { TimeLeftBar, InfoCell } from '../components/contest/ContestShared';
+import TournamentBanner from '../components/contest/TournamentBanner';
 
 async function copyToClipboard(value) {
   const text = String(value || '').trim();
@@ -267,12 +261,6 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     );
   }
 
-  const bannerUri =
-    (tournament.bannerImage && resolveMediaUrl(tournament.bannerImage)) ||
-    (tournament.gameMode?.image && resolveMediaUrl(tournament.gameMode.image)) ||
-    (tournament.game?.image && resolveMediaUrl(tournament.game.image)) ||
-    null;
-
   const rules = resolveMatchRules(tournament);
   const custom = isCustomMatch(tournament);
   const structure = getMatchStructure(tournament);
@@ -280,8 +268,6 @@ export default function TournamentDetailsScreen({ navigation, route }) {
   const maxP = tournament.totalSlots || structure.totalSlots;
   const joined = tournament.participantCount || 0;
   const matchNo = tournament.matchNumber || 10000;
-  const totalPrize = resolveDisplayPrizePool(tournament);
-  const places = resolvePrizePlaces(tournament);
   const lifecycleStatus = tournament.lifecycleStatus || tournament.status;
   const isJoinOpen = lifecycleStatus === 'upcoming' || lifecycleStatus === 'incoming';
   const canViewResults = lifecycleStatus === 'completed' || lifecycleStatus === 'result_published';
@@ -324,28 +310,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
   const entryFee = Number(
     tournament.entryFeePerPlayer ?? tournament.feePerPlayer ?? tournament.entryFee ?? 0
   );
-  const showPrizePool =
-    tournament.showPrizePool != null
-      ? Boolean(tournament.showPrizePool)
-      : Number(totalPrize) > 0;
-  const showPerKill =
-    tournament.showPrizePerKill != null
-      ? Boolean(tournament.showPrizePerKill)
-      : !custom && structure.hasKillRewards && Number(tournament.perKill || tournament.prizePerKill) > 0;
-  const prizePerKill = Number(tournament.prizePerKill ?? tournament.perKill ?? 0);
   const scheduleLabel = formatScheduleLine(tournament.startDate);
-
-  // Prefer Prize Per Kill, then Prize Pool for the extra meta cell
-  const secondaryStat = showPerKill
-    ? { label: 'Prize per kill', value: prizePerKill, coin: true }
-    : showPrizePool
-      ? { label: 'Prize Pool', value: totalPrize, coin: true }
-      : null;
-
-  const extraStats = [];
-  if (showPerKill && showPrizePool) {
-    extraStats.push({ label: 'Prize Pool', value: totalPrize, coin: true });
-  }
 
   return (
     <SafeAreaView style={pageStyles.container} edges={['top']}>
@@ -356,17 +321,12 @@ export default function TournamentDetailsScreen({ navigation, route }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 + insets.bottom }}
       >
-        <ImageBackground
-          source={bannerUri ? { uri: bannerUri } : DEFAULT_BANNER}
+        <TournamentBanner
+          bannerImage={tournament.bannerImage || tournament.gameMode?.image || tournament.game?.image}
+          maxHeight={220}
+          horizontalPadding={32}
           style={styles.banner}
-          imageStyle={styles.bannerImg}
-          resizeMode="cover"
-        >
-          <LinearGradient
-            colors={['rgba(11,14,30,0.05)', 'rgba(11,14,30,0.7)']}
-            style={StyleSheet.absoluteFill}
-          />
-        </ImageBackground>
+        />
 
         <TimeLeftBar startDate={tournament.startDate} />
         <Text style={styles.scheduleUnderTimer}>
@@ -378,76 +338,17 @@ export default function TournamentDetailsScreen({ navigation, route }) {
         </Text>
 
         <View style={styles.metaBlock}>
-          <View style={styles.grid2}>
-            <InfoCell label="Match Type" value={matchTypeName} flex={1} />
-            <InfoCell label="Map" value={mapName} flex={1} />
+          <View style={styles.metaChips}>
+            <InfoCell label="Entry fee" value={entryFee} coin compact />
+            <InfoCell label="Mode" value={matchTypeName} compact />
+            <InfoCell label="Map" value={mapName} compact />
+            <InfoCell label="Player Format" value={playerFormatLabel} compact />
+            <InfoCell label="Match Schedule" value={scheduleLabel} compact />
           </View>
-          <View style={styles.grid2}>
-            <InfoCell label="Player Format" value={playerFormatLabel} flex={1} />
-            <InfoCell label="Entry per player" value={entryFee} coin flex={1} />
-          </View>
-          {secondaryStat || extraStats.length ? (
-            <View style={styles.grid2}>
-              {secondaryStat ? (
-                <InfoCell
-                  label={secondaryStat.label}
-                  value={secondaryStat.value}
-                  coin={Boolean(secondaryStat.coin)}
-                  flex={1}
-                />
-              ) : null}
-              {extraStats.map((stat) => (
-                <InfoCell
-                  key={stat.label}
-                  label={stat.label}
-                  value={stat.value}
-                  coin={Boolean(stat.coin)}
-                  flex={1}
-                />
-              ))}
-            </View>
-          ) : null}
-          <InfoCell label="Match Schedule" value={scheduleLabel} />
         </View>
 
         <Text style={styles.sectionHead}>PRIZE DETAILS</Text>
-        <View style={styles.prizeCard}>
-          {showPrizePool ? (
-            <View style={styles.prizeLine}>
-              <Text style={styles.prizeLabel}>PRIZE POOL</Text>
-              <CoinValue value={totalPrize} color={PAGE.gold} />
-            </View>
-          ) : null}
-          {showPerKill ? (
-            <View style={styles.prizeLine}>
-              <Text style={styles.prizeLabel}>PRIZE PER KILL</Text>
-              <CoinValue value={prizePerKill} color={PAGE.gold} />
-            </View>
-          ) : null}
-          {places.first > 0 ? (
-            <View style={styles.prizeLine}>
-              <Text style={styles.prizeLabel}>{custom ? 'WINNER' : '1ST PLACE'}</Text>
-              <CoinValue value={places.first} color={PAGE.gold} />
-            </View>
-          ) : null}
-          {places.second > 0 ? (
-            <View style={styles.prizeLine}>
-              <Text style={styles.prizeLabel}>2ND PLACE</Text>
-              <CoinValue value={places.second} color={PAGE.gold} />
-            </View>
-          ) : null}
-          {places.third > 0 ? (
-            <View style={[styles.prizeLine, styles.prizeLineLast]}>
-              <Text style={styles.prizeLabel}>3RD PLACE</Text>
-              <CoinValue value={places.third} color={PAGE.gold} />
-            </View>
-          ) : null}
-          {!showPrizePool && !showPerKill && !places.first && !places.second && !places.third ? (
-            <View style={[styles.prizeLine, styles.prizeLineLast]}>
-              <Text style={styles.prizeLabel}>NO PRIZE DETAILS YET</Text>
-            </View>
-          ) : null}
-        </View>
+        <View style={styles.prizeCard} />
 
         {showRoom ? (
           <View style={styles.roomBox}>
@@ -562,13 +463,8 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   banner: {
-    height: 168,
-    borderRadius: 16,
-    overflow: 'hidden',
     marginTop: 4,
-    justifyContent: 'flex-end',
   },
-  bannerImg: { borderRadius: 16 },
   matchTitle: {
     fontFamily: FONTS.bold,
     fontSize: 17,
@@ -585,10 +481,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   metaBlock: {
-    gap: 8,
+    marginBottom: 2,
   },
-  grid3: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  grid2: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  metaChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   sectionHead: {
     fontFamily: FONTS.bold,
     fontSize: 15,
@@ -601,19 +500,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: PAGE.border,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
+    minHeight: 56,
   },
-  prizeLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: PAGE.border,
-  },
-  prizeLineLast: { borderBottomWidth: 0 },
-  prizeLabel: { ...TEXT.body, color: PAGE.muted },
   aboutCard: {
     backgroundColor: PAGE.card,
     borderRadius: 14,

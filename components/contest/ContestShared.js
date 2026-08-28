@@ -56,15 +56,21 @@ export function TimeLeftBar({ startDate }) {
   );
 }
 
-export function InfoCell({ label, value, coin, rupee, flex, inline }) {
+export function InfoCell({ label, value, coin, rupee, flex, inline, compact }) {
   const labelText = toCaps(label);
   const valueText = toCaps(value);
 
   const renderValue = () => {
     if (rupee) return <RupeeValue value={value} color={PAGE.gold} />;
-    if (coin) return <CoinValue value={value} size={15} color={PAGE.gold} />;
+    if (coin) return <CoinValue value={value} size={compact ? 13 : 15} color={PAGE.gold} />;
     return (
-      <Text style={inline ? styles.infoValueInline : styles.infoValue} numberOfLines={2}>
+      <Text
+        style={[
+          inline ? styles.infoValueInline : styles.infoValue,
+          compact && styles.infoValueCompact,
+        ]}
+        numberOfLines={compact ? 2 : 2}
+      >
         {valueText}
       </Text>
     );
@@ -76,39 +82,49 @@ export function InfoCell({ label, value, coin, rupee, flex, inline }) {
       <View
         style={[
           styles.infoCell,
-          flex != null && { flex, minWidth: '46%', flexBasis: '46%' },
+          compact && styles.infoCellCompact,
+          flex != null && !compact && { flex, minWidth: '46%', flexBasis: '46%' },
+          flex != null && compact && { flex, minWidth: 0 },
         ]}
       >
-        <Text style={styles.infoLabel}>{labelText}</Text>
+        <Text style={[styles.infoLabel, compact && styles.infoLabelCompact]}>{labelText}</Text>
         {renderValue()}
       </View>
     );
   }
 
   return (
-    <View style={[styles.infoCell, styles.infoCellInline, flex != null && { flex }]}>
-      <Text style={styles.infoLabelInline}>{labelText}: </Text>
+    <View
+      style={[
+        styles.infoCell,
+        styles.infoCellInline,
+        compact && styles.infoCellCompact,
+        compact && styles.infoCellInlineCompact,
+        flex != null && { flex },
+      ]}
+    >
+      <Text style={[styles.infoLabelInline, compact && styles.infoLabelCompact]}>{labelText}: </Text>
       <View style={styles.infoValueWrap}>{renderValue()}</View>
     </View>
   );
 }
 
-export function StatTriple({ items }) {
+export function StatTriple({ items, compact }) {
   const list = (items || []).filter(Boolean);
   if (!list.length) return null;
   return (
-    <View style={styles.triple}>
+    <View style={[styles.triple, compact && styles.tripleCompact]}>
       {list.map((item, i) => (
-        <View key={`${item.label}-${i}`} style={styles.tripleCol}>
-          <Text style={styles.tripleLabel} numberOfLines={1}>
+        <View key={`${item.label}-${i}`} style={[styles.tripleCol, compact && styles.tripleColCompact]}>
+          <Text style={[styles.tripleLabel, compact && styles.tripleLabelCompact]} numberOfLines={1}>
             {toCaps(item.label)}
           </Text>
           {item.rupee ? (
             <RupeeValue value={item.value} color={PAGE.gold} />
           ) : item.coin ? (
-            <CoinValue value={item.value} size={16} color={PAGE.gold} />
+            <CoinValue value={item.value} size={compact ? 14 : 16} color={PAGE.gold} />
           ) : (
-            <Text style={styles.tripleValue} numberOfLines={2}>
+            <Text style={[styles.tripleValue, compact && styles.tripleValueCompact]} numberOfLines={2}>
               {toCaps(item.value)}
             </Text>
           )}
@@ -152,6 +168,14 @@ const styles = StyleSheet.create({
     minHeight: 58,
     justifyContent: 'center',
   },
+  infoCellCompact: {
+    minHeight: 0,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
   infoCellInline: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -159,12 +183,20 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     gap: 4,
   },
+  infoCellInlineCompact: {
+    paddingVertical: 7,
+  },
   infoLabel: {
     ...TEXT.caption,
     color: PAGE.muted,
     marginBottom: 6,
     fontSize: 11,
     letterSpacing: 0.3,
+  },
+  infoLabelCompact: {
+    marginBottom: 3,
+    fontSize: 9,
+    letterSpacing: 0.2,
   },
   infoLabelInline: {
     fontFamily: FONTS.semiBold,
@@ -181,6 +213,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.white,
   },
+  infoValueCompact: {
+    fontSize: 11,
+    lineHeight: 14,
+  },
   infoValueInline: {
     fontFamily: FONTS.bold,
     fontSize: 13,
@@ -190,11 +226,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 10,
   },
+  tripleCompact: {
+    marginTop: 0,
+    backgroundColor: PAGE.card,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+    borderRadius: 8,
+  },
   tripleCol: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 8,
     position: 'relative',
+  },
+  tripleColCompact: {
+    paddingVertical: 6,
   },
   tripleLabel: {
     fontFamily: FONTS.semiBold,
@@ -202,11 +248,18 @@ const styles = StyleSheet.create({
     color: PAGE.muted,
     marginBottom: 6,
   },
+  tripleLabelCompact: {
+    fontSize: 9,
+    marginBottom: 3,
+  },
   tripleValue: {
     fontFamily: FONTS.bold,
     fontSize: 13,
     color: COLORS.white,
     textAlign: 'center',
+  },
+  tripleValueCompact: {
+    fontSize: 11,
   },
   tripleRule: {
     position: 'absolute',

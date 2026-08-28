@@ -67,8 +67,8 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
         ]);
         setTournament(tData);
         // Clash Squad only uses team registration; BR Duo/Squad pick slots on the 48 grid
-        if (getMatchStructure(tData).kind === 'team_vs_team') {
-          showToast('This match uses team registration. Captain pays once for the team.', 'warning');
+        if (getMatchStructure(tData).usesTeamRegistration) {
+          showToast('This match uses team registration.', 'warning');
           navigation.replace('CustomMatchTeamRegister', { tournamentId });
           return;
         }
@@ -528,9 +528,9 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
             <View style={styles.positionCard}>
               <Text style={styles.positionTitle}>SELECTED POSITION</Text>
               <View style={styles.posHeadRow}>
-                <Text style={[styles.posCol, styles.posHead]}>SLOT</Text>
-                <Text style={[styles.posCol, styles.posHead]}>STATUS</Text>
-                <Text style={[styles.posColWide, styles.posHead]}>INGAMENAME</Text>
+                <Text style={[styles.posColSlot, styles.posHead]}>SLOT</Text>
+                <Text style={[styles.posColName, styles.posHead]}>GAME NAME</Text>
+                <Text style={[styles.posColId, styles.posHead]}>GAME ID</Text>
               </View>
               {selected.map((num) => {
                 const p = slotPlayers[num];
@@ -538,26 +538,33 @@ export default function TournamentSlotBookingScreen({ navigation, route }) {
                   String(p?.name || '').trim().length >= 3 &&
                   String(p?.uid || '').trim().length >= 3;
                 return (
-                  <View key={num} style={styles.posDataRow}>
-                    <Text style={styles.posCol}>SLOT {num}</Text>
-                    <Text style={styles.posCol}>SELECTED</Text>
-                    <View style={styles.posColWide}>
-                      {complete ? (
-                        <TouchableOpacity onPress={() => openPlayerDetails(num)}>
-                          <Text style={styles.inGameName} numberOfLines={1}>
-                            {String(p.name).toUpperCase()}
-                          </Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.addInfoBtn}
-                          onPress={() => openPlayerDetails(num)}
-                        >
-                          <Text style={styles.addInfoText}>ADD INFO</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
+                  <TouchableOpacity
+                    key={num}
+                    style={styles.posDataRow}
+                    activeOpacity={0.85}
+                    onPress={() => openPlayerDetails(num)}
+                  >
+                    <Text style={styles.posColSlot}>SLOT {num}</Text>
+                    {complete ? (
+                      <>
+                        <Text style={styles.posColName} numberOfLines={1}>
+                          {String(p.name).toUpperCase()}
+                        </Text>
+                        <Text style={styles.posColId} numberOfLines={1}>
+                          {String(p.uid).toUpperCase()}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.posColName}>
+                          <View style={styles.addInfoBtn}>
+                            <Text style={styles.addInfoText}>ADD INFO</Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.posColId, styles.posEmpty]}>—</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -753,11 +760,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   posHeadRow: { flexDirection: 'row', marginBottom: 8 },
-  posDataRow: { flexDirection: 'row', alignItems: 'center' },
-  posCol: { flex: 1, fontFamily: FONTS.bold, fontSize: 13, color: '#334155' },
-  posColWide: { flex: 1.4, alignItems: 'flex-start' },
-  posHead: { color: '#64748B', fontSize: 12 },
-  inGameName: { fontFamily: FONTS.bold, fontSize: 13, color: '#1E3A5F' },
+  posDataRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  posColSlot: { flex: 1.1, fontFamily: FONTS.bold, fontSize: 12, color: '#334155' },
+  posColName: { flex: 1.2, fontFamily: FONTS.bold, fontSize: 12, color: '#334155' },
+  posColId: { flex: 1, fontFamily: FONTS.bold, fontSize: 12, color: '#334155' },
+  posEmpty: { color: '#94A3B8' },
+  posHead: { color: '#64748B', fontSize: 11 },
   addInfoBtn: {
     backgroundColor: '#3B82F6',
     borderRadius: 8,
