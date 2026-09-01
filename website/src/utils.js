@@ -127,7 +127,7 @@ export function brandLogoUrl() {
 }
 
 export function apkHref(releaseInfo) {
-  const fileName = releaseInfo?.fileName || APP_RELEASE.fileName || 'WAREZONE-v1.0.4.apk';
+  const fileName = releaseInfo?.fileName || APP_RELEASE.fileName;
   const version = releaseInfo?.version || APP_RELEASE.version || '1.0.0';
   const cache = `v=${encodeURIComponent(version)}`;
 
