@@ -73,7 +73,7 @@ function listApkFiles() {
 function getApkStats(fileName) {
   const wanted = path.basename(String(fileName || DEFAULT_RELEASE.fileName));
   const all = listApkFiles();
-  const match = all.find((f) => f.name === wanted) || all[0] || null;
+  const match = all.find((f) => f.name === wanted) || null;
   if (!match) {
     return { exists: false, sizeBytes: 0, sizeLabel: 'APK not uploaded yet', mtime: null, fileName: wanted };
   }
@@ -94,25 +94,21 @@ async function getOrCreateLatestRelease() {
   }
 
   const configured = getApkStats(DEFAULT_RELEASE.fileName);
-  const newest = listApkFiles()[0];
-  const stats = configured.exists
-    ? configured
-    : newest
-      ? getApkStats(newest.name)
-      : getApkStats(release.fileName);
+  const stats = configured.exists ? configured : getApkStats(release.fileName);
 
   const nextFile = stats.fileName || DEFAULT_RELEASE.fileName;
-  const versionMatch = String(nextFile).match(/v(\d+\.\d+\.\d+)/i);
-  const nextVersion = versionMatch?.[1] || DEFAULT_RELEASE.version;
+  const nextVersion = DEFAULT_RELEASE.version;
   const needsUpdate =
     release.fileName !== nextFile ||
     release.version !== nextVersion ||
+    Number(release.versionCode) !== Number(DEFAULT_RELEASE.versionCode) ||
     release.title !== DEFAULT_RELEASE.title ||
     release.releaseNotes !== DEFAULT_RELEASE.releaseNotes;
 
   if (needsUpdate) {
     release.fileName = nextFile;
     release.version = nextVersion;
+    release.versionCode = Number(DEFAULT_RELEASE.versionCode) || 1;
     release.title = DEFAULT_RELEASE.title;
     release.androidMin = DEFAULT_RELEASE.androidMin;
     release.releaseNotes = DEFAULT_RELEASE.releaseNotes;
@@ -180,13 +176,13 @@ function buildReleasePayload(req, release, stats) {
   const external = String(
     DEFAULT_RELEASE.externalDownloadUrl || RELEASE.externalDownloadUrl || ''
   ).trim();
-  const downloadUrl =
-    external && /^https?:\/\//i.test(external)
-      ? external
-      : stats.exists
-        ? localAbsolute
-        : localAbsolute;
-  const apkExists = Boolean(stats.exists || (external && /^https?:\/\//i.test(external)));
+  const useExternal = Boolean(
+    external &&
+      /^https?:\/\//i.test(external) &&
+      !stats.exists
+  );
+  const downloadUrl = useExternal ? external : localAbsolute;
+  const apkExists = Boolean(stats.exists || useExternal);
 
   return {
     title: release.title || DEFAULT_RELEASE.title,

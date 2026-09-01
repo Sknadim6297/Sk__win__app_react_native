@@ -138,34 +138,42 @@ function resolveMatchTypeDoc(tournament) {
   return null;
 }
 
+function isLoneWolfMatchType(matchType) {
+  const name =
+    typeof matchType === 'string'
+      ? matchType
+      : matchType?.name || matchType?.matchTypeName || '';
+  return /lone\s*wolf/i.test(String(name));
+}
+
+/** Clash Squad + Lone Wolf use Team A/B join (2 sides). Battle Royale uses 48-slot grid. */
+function usesTeamJoinMatchType(matchType, category) {
+  const mt = matchType && typeof matchType === 'object' ? matchType : { name: matchType };
+  if (mt.isTeamVsTeam) return true;
+  if (category === 'custom' || category === 'custom_match') return true;
+  return isLoneWolfMatchType(mt);
+}
+
 /**
  * Resolve capacity from Match Type + Player Format.
- * Battle Royale / Lone Wolf: always 48 player slots on the grid.
- * Clash Squad (team vs team): 2 sides.
- * Solo joins 1 slot, Duo 2, Squad 4 (validated at book time).
+ * Battle Royale: 48-slot grid.
+ * Clash Squad / Lone Wolf: 2 team sides (Team A / Team B).
  */
 function resolveCapacityFromSelection({
   matchType,
   playerFormat,
-  slots, // ignored for BR — always 48
+  slots, // ignored — derived from match type
 }) {
   const mt = matchType || {};
   const format = normalizePlayerFormat(playerFormat);
   const playersPerTeam = playersPerTeamFromFormat(format);
   const isTeamVsTeam = Boolean(mt.isTeamVsTeam);
+  const teamJoin = usesTeamJoinMatchType(mt);
   const hasKillRewards = mt.hasKillRewards != null ? Boolean(mt.hasKillRewards) : !isTeamVsTeam;
 
-  let slotCount;
-  if (isTeamVsTeam) {
-    slotCount = 2;
-  } else {
-    // Fixed 48-player grid for Solo / Duo / Squad
-    slotCount = 48;
-  }
-
-  const totalPlayerCapacity = isTeamVsTeam ? slotCount * playersPerTeam : 48;
-  // Team registration UI only for Clash Squad; BR Duo/Squad pick multiple slots on the grid
-  const usesTeamRegistration = isTeamVsTeam;
+  const slotCount = teamJoin ? 2 : 48;
+  const totalPlayerCapacity = teamJoin ? slotCount * playersPerTeam : 48;
+  const usesTeamRegistration = teamJoin;
   const category = isTeamVsTeam ? 'custom' : 'battle_royale';
 
   return {
@@ -175,9 +183,9 @@ function resolveCapacityFromSelection({
     category,
     slots: slotCount,
     playersPerTeam,
-    slotsRequiredToJoin: isTeamVsTeam ? playersPerTeam : playersPerTeam,
+    slotsRequiredToJoin: playersPerTeam,
     totalPlayerCapacity,
-    maxTeams: isTeamVsTeam ? 2 : Math.floor(48 / playersPerTeam),
+    maxTeams: teamJoin ? 2 : Math.floor(48 / playersPerTeam),
     maxParticipants: totalPlayerCapacity,
     usesTeamRegistration,
     isTeamVsTeam,
@@ -199,6 +207,8 @@ module.exports = {
   ensureDefaultMatchTypes,
   findMatchTypeByName,
   resolveMatchTypeDoc,
+  isLoneWolfMatchType,
+  usesTeamJoinMatchType,
   resolveCapacityFromSelection,
   applyMatchTypeToTournamentFields,
 };

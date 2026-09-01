@@ -8,11 +8,19 @@
  */
 const fs = require('fs');
 const path = require('path');
-const release = require('../release.config.cjs');
+const { execSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const DEST_DIR = path.join(ROOT, 'public', 'downloads');
-const DEST_FILE = path.join(DEST_DIR, release.fileName);
+
+function loadRelease() {
+  delete require.cache[require.resolve('../release.config.cjs')];
+  return require('../release.config.cjs');
+}
+
+function syncMetadata() {
+  execSync('node scripts/sync-release-metadata.js', { cwd: ROOT, stdio: 'inherit' });
+}
 
 function findNewestApk(dirs) {
   const found = [];
@@ -34,6 +42,10 @@ function findNewestApk(dirs) {
 }
 
 function main() {
+  syncMetadata();
+  const release = loadRelease();
+  const DEST_FILE = path.join(DEST_DIR, release.fileName);
+
   const argPath = process.argv[2] ? path.resolve(process.argv[2]) : null;
   let source = null;
 
@@ -59,7 +71,7 @@ function main() {
 
   fs.mkdirSync(DEST_DIR, { recursive: true });
 
-  // Remove older APK files so the server only serves the latest build.
+  // Remove every other APK so only the configured latest file is served.
   for (const name of fs.readdirSync(DEST_DIR)) {
     if (!name.toLowerCase().endsWith('.apk')) continue;
     if (name === release.fileName) continue;

@@ -1,22 +1,18 @@
 # Android APK downloads
 
-## Current public download
+The website serves **one** APK: `WAREZONE-v{version}.apk` from `app.json`.
 
-**WAREZONE v1.0.4** — website `/download` (local file or Expo artifact URL).
+## Release workflow (every new app version)
 
-## Next release (prepared in app)
+1. Bump version in `app.json` (`expo.version` + `expo.android.versionCode`).
+2. Build: `npm run build:android` (EAS preview APK).
+3. Sync APK into this folder:
+   ```bash
+   npm run apk:sync -- path\to\downloaded\WAREZONE-v1.0.5.apk
+   ```
+4. Publish website: `npm run website:build` then deploy.
+5. Tell users to **uninstall the old WAREZONE app** before installing the new APK.
 
-`app.json` is already bumped to **1.0.5** (versionCode 6) with latest features.
-EAS Free Android builds for `@nadim123456` are exhausted until **Tue Sep 01 2026**.
+`npm run release:prepare` runs metadata sync + apk sync + website build.
 
-When quota resets (or after upgrading Expo):
-
-```bash
-eas build --platform android --profile production --non-interactive
-# then update release.config.cjs version/fileName/externalDownloadUrl to 1.0.5
-node scripts/sync-latest-apk.js path\to\WAREZONE-v1.0.5.apk
-npm run website:build
-git add release.config.cjs website/src/release.js public/downloads app.json
-git commit -m "Release WAREZONE v1.0.5 APK for website download"
-git push
-```
+**Important:** Do not keep multiple `.apk` files here. Old files are removed automatically on sync.

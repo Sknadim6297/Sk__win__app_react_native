@@ -67,6 +67,19 @@ const App = (() => {
     if (picked && modeEl) modeEl.value = String(picked._id);
   }
 
+  function slotsForMatchTypeOption(opt) {
+    if (!opt) return 48;
+    if (opt.dataset?.tvt === '1') return 2;
+    if (/lone\s*wolf/i.test(String(opt.textContent || ''))) return 2;
+    return 48;
+  }
+
+  function slotsHelpForMatchTypeOption(opt) {
+    return slotsForMatchTypeOption(opt) === 2
+      ? 'Team join: 2 sides (Team A / Team B). Solo=1, Duo=2, Squad=4 players per entry.'
+      : 'Battle Royale only: fixed 48 slots. Solo=1, Duo=2, Squad=4 when joining.';
+  }
+
   function displayMatchType(row) {
     if (row.matchTypeName && String(row.matchTypeName) !== 'undefined') return String(row.matchTypeName);
     if (row.matchType && typeof row.matchType === 'object' && row.matchType.name) {
@@ -631,7 +644,7 @@ const App = (() => {
         body.prizePool = Number(body.prizePool || 0);
         body.playerFormat = body.playerFormat || 'solo';
         body.mode = body.playerFormat;
-        body.slots = 48;
+        body.slots = slotsForMatchTypeOption(document.getElementById('f-match-type')?.selectedOptions?.[0]);
         const opt = document.getElementById('f-match-type')?.selectedOptions?.[0];
         const allowKill = opt?.dataset?.kill === '1';
         body.perKill = allowKill ? Number(body.perKill || 0) : 0;
@@ -2178,7 +2191,7 @@ const App = (() => {
           <div class="field">
             <label>Players per entry</label>
             <input id="f-ppt" type="number" readonly value="1" />
-            <span class="help">Fixed 48 slots. Solo=1, Duo=2, Squad=4 when joining.</span>
+            <span class="help" id="f-slots-help">Battle Royale only: fixed 48 slots. Solo=1, Duo=2, Squad=4 when joining.</span>
           </div>
           <div class="field"><label>Daily start time <span class="req">*</span></label>
             <input name="startTime" type="time" required value="${AdminUI.esc((t.startTime || '10:00').slice(0, 5))}" />
@@ -2253,6 +2266,10 @@ const App = (() => {
       if (pptEl) pptEl.value = String(ppt);
       const gid = document.getElementById('f-game').value;
       syncGameModeFromMatchType(modesByGame[gid] || []);
+      const slotHelp = document.getElementById('f-slots-help');
+      if (slotHelp) {
+        slotHelp.textContent = slotsHelpForMatchTypeOption(opt);
+      }
       };
     fillModes();
     syncStructureFields();
@@ -2274,7 +2291,7 @@ const App = (() => {
         body.prizePool = Number(body.prizePool || 0);
         body.playerFormat = body.playerFormat || 'solo';
         body.mode = body.playerFormat;
-        body.slots = 48;
+        body.slots = slotsForMatchTypeOption(document.getElementById('f-match-type')?.selectedOptions?.[0]);
         const opt = document.getElementById('f-match-type')?.selectedOptions?.[0];
         const allowKill = opt?.dataset?.kill === '1';
         body.perKill = allowKill ? Number(body.perKill || 0) : 0;
