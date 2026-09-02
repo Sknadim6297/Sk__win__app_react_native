@@ -309,13 +309,6 @@ const TournamentScreen = ({ navigation }) => {
             <Text style={styles.infoLabel}>Entry Fee</Text>
             <Text style={styles.infoValue}>₹{tournament.entryFee}</Text>
           </View>
-          {Number(tournament.prizePool) > 0 && (
-            <View style={styles.infoItem}>
-              <TrophyIcon size={18} color={COLORS.accent} />
-              <Text style={styles.infoLabel}>Prize Pool</Text>
-              <Text style={styles.infoValue}>₹{tournament.prizePool}</Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.infoRow}>

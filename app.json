@@ -28,7 +28,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo/WAREZONE_LOGO.png",
+        "foregroundImage": "./assets/logo/WAREZONE_ADAPTIVE_FOREGROUND.png",
         "backgroundColor": "#0a0e1a"
       },
       "package": "com.skwin.tournament",

@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppIcon from '../components/ui/AppIcon';
 import { COLORS, FONTS } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
-import { tournamentService } from '../services/api';
+import { tournamentService, gameService } from '../services/api';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import { LIST_PERF } from '../utils/listPerf';
 import ScreenHeader from '../components/navigation/ScreenHeader';
@@ -28,6 +28,7 @@ const STATUS_TABS = [
 
 export default function GameDetailsScreen({ navigation, route }) {
   const gameMode = route?.params?.gameMode;
+  const gameId = route?.params?.gameId;
   const modeId = gameMode?.id || gameMode?._id;
   const headerTitle = toPlayerMatchLabel((gameMode?.name || 'FULL MAP').toUpperCase());
   const gameModeImage =
@@ -36,20 +37,28 @@ export default function GameDetailsScreen({ navigation, route }) {
 
   const [selectedTab, setSelectedTab] = useState('upcoming');
   const [tournaments, setTournaments] = useState([]);
+  const [allGameModes, setAllGameModes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadTournaments = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await tournamentService.getList().catch(() => []);
+      const [data, modes] = await Promise.all([
+        tournamentService.getList().catch(() => []),
+        gameId ? gameService.getGameModes(gameId).catch(() => []) : Promise.resolve([]),
+      ]);
+      const modeList = Array.isArray(modes) ? modes : [];
+      setAllGameModes(modeList);
       let filtered = Array.isArray(data) ? data : [];
 
-      if (modeId) {
+      if (modeId || gameMode?.name) {
         filtered = filtered.filter((t) =>
-          tournamentBelongsToGameMode(t, { _id: modeId, id: modeId, name: gameMode?.name })
+          tournamentBelongsToGameMode(
+            t,
+            { _id: modeId, id: modeId, name: gameMode?.name },
+            modeList.length ? modeList : undefined
+          )
         );
-      } else if (gameMode?.name) {
-        filtered = filtered.filter((t) => t.gameMode?.name === gameMode.name);
       }
 
       if (selectedTab === 'upcoming') {
@@ -81,7 +90,7 @@ export default function GameDetailsScreen({ navigation, route }) {
     } finally {
       setLoading(false);
     }
-  }, [modeId, gameMode?.name, selectedTab]);
+  }, [modeId, gameMode?.name, gameId, selectedTab]);
 
   useEffect(() => {
     loadTournaments();

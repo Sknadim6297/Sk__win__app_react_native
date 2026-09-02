@@ -20,6 +20,7 @@ import { AuthContext } from '../context/AuthContext';
 import { userService } from '../services/api';
 import BrandCoin from '../components/ui/BrandCoin';
 import { getApiOrigin } from '../utils/apiConfig';
+import { copyToClipboard } from '../utils/copyToClipboard';
 
 const PWA_URL = String(process.env.EXPO_PUBLIC_PWA_URL || 'https://sk-win-pwa.onrender.com').replace(
   /\/$/,
@@ -94,12 +95,12 @@ const ShareAppScreen = ({ navigation, route }) => {
 
   const copyText = async (value, okMessage) => {
     try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
+      const ok = await copyToClipboard(value);
+      if (ok) {
         Alert.alert('Copied', okMessage);
         return;
       }
-      await Share.share({ message: value });
+      Alert.alert('Error', 'Could not copy to clipboard');
     } catch (error) {
       Alert.alert('Error', error.message);
     }

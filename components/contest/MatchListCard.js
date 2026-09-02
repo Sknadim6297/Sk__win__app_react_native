@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS, FONTS } from '../../styles/theme';
 import { PAGE } from '../../styles/pageTheme';
-import { getMatchStructure, formatScheduleLine, getPlayerFormatLabel } from '../../utils/tournamentHelpers';
+import { getMatchStructure, formatScheduleLine, getPlayerFormatLabel, resolveModeLabel } from '../../utils/tournamentHelpers';
 import { StatTriple } from './ContestShared';
 import TournamentBanner from './TournamentBanner';
 
@@ -39,6 +39,7 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
   const scheduleLine = formatScheduleLine(item.startDate);
 
   const matchTypeName = resolveMatchTypeLabel(item, structure);
+  const gameModeLabel = resolveModeLabel(item);
   const playerFormatLabel =
     item.playerFormatLabel || structure.playerFormatLabel || getPlayerFormatLabel(item);
   const mapName = String(item.mapName || item.map || '—');
@@ -111,7 +112,7 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
         <View style={styles.ctaRow}>
           <View style={styles.modeBlock}>
             <Text style={styles.modeName} numberOfLines={1}>
-              {String(matchTypeName || '').toUpperCase()}
+              {String(gameModeLabel || matchTypeName || '').toUpperCase()}
             </Text>
             <Text style={styles.modeFormat} numberOfLines={1}>
               {String(playerFormatLabel || '').toUpperCase()}

@@ -260,9 +260,64 @@ svg { stroke-linecap: round; stroke-linejoin: round; }
   font-weight: 800; font-size: 22px; padding: 20px; text-align: center;
 }
 .info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.info-grid-meta { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .info-cell { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
 .info-cell .lbl { font-size: 11px; font-weight: 700; color: var(--text-2); letter-spacing: .06em; text-transform: uppercase; }
 .info-cell .val { margin-top: 6px; font-size: 15px; font-weight: 700; color: var(--text); word-break: break-word; }
+.player-preview-note {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.match-preview-title {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1.35;
+}
+.match-section-head {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.prize-placeholder {
+  min-height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+}
+.about-rules-card {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+.about-rules-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  text-transform: uppercase;
+}
+.rules-bullets {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rules-bullets li {
+  margin: 6px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  line-height: 1.55;
+}
+.rules-bullets li::before {
+  content: '• ';
+}
 .rules-list { margin: 0; padding: 0 0 0 18px; }
 .rules-list li { margin: 8px 0; font-size: 14px; color: #334155; line-height: 1.55; }
 .prize-lines { display: flex; flex-direction: column; gap: 10px; }

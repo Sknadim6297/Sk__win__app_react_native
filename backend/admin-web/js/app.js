@@ -39,16 +39,37 @@ const App = (() => {
     );
   }
 
-  function toPlayerMatchLabel(text) {
-    return String(text || '').replace(/Custom Match/gi, 'Clash Squad');
+  function isLoneWolfMatch(detail, t) {
+    const kind = String(detail?.matchKind || '');
+    if (kind === 'lone_wolf') return true;
+    const mt = displayMatchType(detail || t || {});
+    return /lone\s*wolf/i.test(mt);
   }
+
+  /** Lone Wolf, Clash Squad, CS One Tap → Team A/B (2 slots). Battle Royale → 48-slot grid. */
+  function usesTeamJoinMatch(detail, t) {
+    if (detail?.usesTeams) return true;
+    const kind = String(detail?.matchKind || '');
+    if (kind === 'lone_wolf' || kind === 'team_vs_team') return true;
+    if (isCustom(t)) return true;
+    const mt = displayMatchType(detail || t || {});
+    return /lone\s*wolf|clash\s*squad|one\s*tap/i.test(mt);
+  }
+
+  function isBattleRoyaleMatch(detail, t) {
+    if (String(detail?.matchKind || '') === 'battle_royale') return true;
+    return !usesTeamJoinMatch(detail, t);
+  }
+
 
   function bucketForModeLabel(label) {
     const key = String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     if (!key) return null;
-    if (/lonewolf/.test(key) || /^lw/.test(key)) return 'lonewolf';
-    if (/clashsquad/.test(key) || /^cs/.test(key) || key.includes('clash')) return 'clashsquad';
     if (/onetap/.test(key)) return 'onetap';
+    if (/lonewolf/.test(key) || /^lw/.test(key)) return 'lonewolf';
+    if (/clashsquad/.test(key) || (key.includes('clash') && !/onetap/.test(key)) || (/^cs/.test(key) && !/onetap/.test(key))) {
+      return 'clashsquad';
+    }
     if (/battleroyale/.test(key) || /^br/.test(key) || key.includes('royale')) return 'battleroyale';
     return null;
   }
@@ -69,8 +90,11 @@ const App = (() => {
 
   function slotsForMatchTypeOption(opt) {
     if (!opt) return 48;
+    const label = String(opt.textContent || '');
     if (opt.dataset?.tvt === '1') return 2;
-    if (/lone\s*wolf/i.test(String(opt.textContent || ''))) return 2;
+    if (/lone\s*wolf/i.test(label)) return 2;
+    if (/one\s*tap/i.test(label)) return 2;
+    if (/clash/i.test(label) || /^cs\b/i.test(label)) return 2;
     return 48;
   }
 
@@ -143,6 +167,23 @@ const App = (() => {
     if (format === 'duo') return 24;
     if (format === 'squad') return 12;
     return 48;
+  }
+
+  function formatScheduleLine(dateString) {
+    if (!dateString) return 'Schedule TBA';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return 'Schedule TBA';
+    const d = date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    const t = date.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    return `${d} at ${t}`;
   }
 
   function infoCell(label, value) {
@@ -270,12 +311,12 @@ const App = (() => {
 
   function tournamentActions(row) {
     const s = row.status || row.lifecycleStatus;
-    const custom = isCustom(row);
+    const teamJoin = usesTeamJoinMatch(row, row);
     return [
       s === 'draft' ? { act: 'publish', label: 'Publish to Upcoming' } : null,
       { act: 'view', label: 'View' },
       { act: 'edit', label: 'Edit' },
-      { act: 'slots', label: custom ? 'Manage teams' : 'Manage slots' },
+      { act: 'slots', label: teamJoin ? 'Manage teams' : 'Manage slots' },
       { act: 'room', label: 'Room details' },
       { act: 'winners', label: 'Winners' },
       { act: 'results', label: 'Results' },
@@ -345,7 +386,11 @@ const App = (() => {
     await guarded(async () => {
       if (act === 'view') return go(`tournaments/${id}`);
       if (act === 'edit') return go(`tournaments/${id}/edit`);
-      if (act === 'slots') return go(`tournaments/${id}?tab=slots`);
+      if (act === 'slots') {
+        const detail = await AdminAPI.tournament(id).catch(() => ({}));
+        const tab = usesTeamJoinMatch(detail, detail.tournament) ? 'teams' : 'slots';
+        return go(`tournaments/${id}?tab=${tab}`);
+      }
       if (act === 'room') return go(`tournaments/${id}?tab=room`);
       if (act === 'winners') return go(`tournaments/${id}?tab=winners`);
       if (act === 'results') return go(`tournaments/${id}?tab=results`);
@@ -580,14 +625,14 @@ const App = (() => {
           </div>
 
           <div class="form-section">
-            <h3>Match ID &amp; Password</h3>
+            <h3>Room ID &amp; Password</h3>
             <p>Optional now. Only players who have <b>joined this match</b> can see these (when unlocked or force-shown). Non-joined users never see them.</p>
           </div>
-          <div class="field"><label>Match ID</label><input name="roomId" value="${AdminUI.esc(t.roomId || '')}" placeholder="Game Match / Room ID" /></div>
-          <div class="field"><label>Password</label><input name="roomPassword" value="${AdminUI.esc(t.roomPassword || '')}" placeholder="Match password" /></div>
+          <div class="field"><label>Room ID</label><input name="roomId" value="${AdminUI.esc(t.roomId || '')}" placeholder="Free Fire Room ID" /></div>
+          <div class="field"><label>Password</label><input name="roomPassword" value="${AdminUI.esc(t.roomPassword || '')}" placeholder="Room password" /></div>
           <div class="field full"><label style="display:flex;gap:8px;align-items:center;font-weight:600">
             <input type="checkbox" name="showRoomCredentials" ${t.showRoomCredentials ? 'checked' : ''} />
-            Show Match ID and Password to joined players now
+            Show Room ID and Password to joined players now
           </label></div>
           ${id ? '' : `<div class="field full"><label style="display:flex;gap:8px;align-items:center;font-weight:600">
             <input type="checkbox" name="publishNow" value="true" checked />
@@ -701,50 +746,47 @@ const App = (() => {
     ]);
     const t = detail.tournament || {};
     const custom = detail.matchKind === 'team_vs_team' || isCustom(t);
+    const teamJoin = usesTeamJoinMatch(detail, t);
     const slots = entries.slots || [];
     const teams = detail.teams || [];
     const participants = detail.participants || [];
-    const usesTeams = Boolean(detail.usesTeams || custom);
-    const prizeData = prize?.prizeDistribution || prize || detail.prizeDistribution || {};
+    const usesTeams = teamJoin;
     const rules = parseRulesList(t.rules);
     const gameName = t.game?.name || '—';
     const gameModeName = t.gameMode?.name || '—';
     const bannerSrc = AdminUI.mediaUrl(t.bannerImage || t.gameMode?.image || t.game?.image || '');
     const format = detail.playerFormatLabel || detail.modeLabel || formatLabel(t);
     const modeLabel = modeDisplay(detail, t, custom);
-    const teamSetup = detail.teamSetup || (custom ? 'Team A vs Team B' : usesTeams ? `${modeLabel} teams` : 'Solo — individual slots');
+    const teamSetup = detail.teamSetup || (teamJoin ? 'Team A vs Team B' : 'Solo — individual slots');
     const joinUnit = 'player';
     const ppt = Number(detail.playersPerTeam || detail.playersCharged || (t.mode === 'squad' || t.mode === 'team' ? 4 : t.mode === 'duo' ? 2 : 1));
     const feePerPlayer = Number(detail.feePerPlayer ?? t.entryFee ?? 0);
-    const teamTotal = Number(detail.entryChargeTotal ?? (custom || usesTeams ? feePerPlayer * ppt : feePerPlayer));
+    const teamTotal = Number(detail.entryChargeTotal ?? (teamJoin ? feePerPlayer * ppt : feePerPlayer));
     const entryFeeDisplay =
-      custom || usesTeams
+      teamJoin
         ? `${AdminUI.money(feePerPlayer)} / player · team total ${AdminUI.money(teamTotal)}`
         : `${AdminUI.money(feePerPlayer)} / player`;
-    const slotUnit = detail.slotUnit || (custom ? 'teams' : 'slots');
+    const slotUnit = detail.slotUnit || (teamJoin ? 'teams' : 'slots');
+    const slotCapacity = Number(detail.capacity) || (teamJoin ? 2 : 48);
     let current = tab || 'overview';
-    if (custom && current === 'slots') current = 'teams';
-    if (!usesTeams && current === 'teams') current = 'slots';
-    if (custom && current === 'kills') current = 'overview';
+    if (teamJoin && current === 'slots') current = 'teams';
+    if (!teamJoin && current === 'teams') current = 'slots';
     const tabDefs = [
       ['overview', 'Match details'],
       ['participants', 'Participants'],
-      custom ? null : ['slots', 'Slots'],
-      usesTeams ? ['teams', 'Teams'] : null,
+      teamJoin ? null : ['slots', 'Slots'],
+      teamJoin ? ['teams', 'Teams'] : null,
       ['payments', 'Payments'],
       ['room', 'Room'],
       ['results', 'Results'],
       ['winners', 'Winners'],
-      custom ? null : ['kills', 'Kill rewards'],
+      detail.hasKillRewards && isBattleRoyaleMatch(detail, t) ? ['kills', 'Kill rewards'] : null,
       ['activity', 'Activity'],
     ].filter(Boolean);
     if (!tabDefs.some(([key]) => key === current)) current = 'overview';
 
-    const winnerPrize = prizeData.winnerPrize ?? t.prizes?.first ?? 0;
-    const runnerUp = prizeData.runnerUpPrize ?? t.prizes?.second ?? 0;
-    const r1 = prizeData.rankTiers?.[0]?.prize ?? t.prizes?.first ?? 0;
-    const r2 = prizeData.rankTiers?.[1]?.prize ?? t.prizes?.second ?? 0;
-    const r3 = prizeData.rankTiers?.[2]?.prize ?? t.prizes?.third ?? 0;
+    const scheduleLabel = formatScheduleLine(t.startDate);
+    const matchNo = t.matchNumber || '—';
 
     const overview = `
       <div class="match-banner">
@@ -752,64 +794,56 @@ const App = (() => {
           ? `<img src="${AdminUI.esc(bannerSrc)}" alt="" />`
           : `<div class="banner-fallback">${AdminUI.esc(t.bannerTitle || t.name || 'Match banner')}</div>`}
       </div>
-      <div class="info-grid">
-        ${infoCell('Player Format', AdminUI.esc(format))}
+      <p class="player-preview-note">Player preview — this tab mirrors the app match details screen.</p>
+      <h2 class="match-preview-title">${AdminUI.esc(String(t.name || 'Tournament').toUpperCase())} - ID#${AdminUI.esc(matchNo)}</h2>
+      <div class="info-grid info-grid-meta">
+        ${infoCell('Entry fee', AdminUI.money(feePerPlayer))}
         ${infoCell('Mode', AdminUI.esc(displayMatchType(detail)))}
         ${infoCell('Map', AdminUI.esc((t.map || 'Bermuda').toString()))}
-        ${infoCell('Game', AdminUI.esc(gameName))}
-        ${infoCell('Game mode', AdminUI.esc(gameModeName))}
-        ${infoCell('Team setup', AdminUI.esc(teamSetup))}
-        ${infoCell('Slots', `${detail.joinedCount ?? 0}/${detail.capacity ?? 0} ${AdminUI.esc(slotUnit)}`)}
-        ${infoCell('Entry fee', entryFeeDisplay)}
-        ${infoCell('Prize pool', AdminUI.money(t.prizePool))}
-        ${infoCell('Per kill', detail.hasKillRewards ? AdminUI.money(t.perKill) : 'Not applicable')}
-        ${infoCell('Start time', AdminUI.dt(t.startDate))}
-        ${t.isAutoGenerated ? infoCell('Source', `Daily Auto · ${AdminUI.esc(t.autoMatchId?.displayId || t.autoMatchId?.name || 'AUTO')} — edits here apply only to this match`) : ''}
+        ${infoCell('Player Format', AdminUI.esc(format))}
+        ${infoCell('Match Schedule', AdminUI.esc(scheduleLabel))}
       </div>
-      <div class="split">
-        <div class="panel">
-          <h3 style="margin-top:0">Rules &amp; regulations</h3>
+      <div class="panel match-section">
+        <h3 class="match-section-head">Prize details</h3>
+        <div class="prize-placeholder" aria-hidden="true"></div>
+        <p class="help">Players see an empty prize box in the app. Manage payouts from the Winners tab after results.</p>
+      </div>
+      <div class="panel match-section">
+        <h3 class="match-section-head">About this match</h3>
+        <div class="about-rules-card">
+          <h4 class="about-rules-title">Rules and regulations</h4>
           ${rules.length
-            ? `<ol class="rules-list">${rules.map((rule) => `<li>${AdminUI.esc(rule)}</li>`).join('')}</ol>`
-            : `<ol class="rules-list"><li>Follow fair play. No hacks or teaming.</li></ol>
-               <p class="help" style="margin-top:12px">Players currently see this fallback. Add official match rules so they appear here and in the app.</p>
+            ? `<ul class="rules-bullets">${rules.map((rule) => `<li>${AdminUI.esc(String(rule).toUpperCase())}</li>`).join('')}</ul>`
+            : `<ul class="rules-bullets"><li>FOLLOW FAIR PLAY. NO HACKS OR TEAMING.</li></ul>
+               <p class="help" style="margin-top:12px">Players currently see this fallback. Add official match rules in Edit match.</p>
                <button class="btn btn-primary" id="add-rules" type="button">Add rules &amp; regulations</button>`}
         </div>
-        <div class="panel">
-          <h3 style="margin-top:0">Prize details</h3>
-          <div class="prize-lines">
-            <div class="prize-line"><span>Prize pool</span><b>${AdminUI.money(t.prizePool)}</b></div>
-            ${detail.hasKillRewards ? `<div class="prize-line"><span>Per kill</span><b>${AdminUI.money(t.perKill)}</b></div>` : '<div class="prize-line"><span>Per kill</span><b>Not applicable</b></div>'}
-            ${custom
-              ? `<div class="prize-line"><span>Winner</span><b>${AdminUI.money(winnerPrize)}</b></div>
-                 <div class="prize-line"><span>Runner-up</span><b>${AdminUI.money(runnerUp)}</b></div>`
-              : `<div class="prize-line"><span>1st place</span><b>${AdminUI.money(r1)}</b></div>
-                 <div class="prize-line"><span>2nd place</span><b>${AdminUI.money(r2)}</b></div>
-                 <div class="prize-line"><span>3rd place</span><b>${AdminUI.money(r3)}</b></div>`}
-          </div>
-          <button class="btn btn-primary" id="edit-prize" style="margin-top:16px">Edit prize pool</button>
-        </div>
       </div>
-      <div class="panel" style="margin-top:16px">
-        <h3 style="margin-top:0">About this match</h3>
-        <div style="font-size:14px;line-height:1.6">${textBlock(t.description, 'No description added.')}</div>
-      </div>
-      <div class="panel" style="margin-top:16px">
-        <h3 style="margin-top:0">Full match record</h3>
+      <div class="panel match-section" style="margin-top:16px">
+        <h3 class="match-section-head">Admin record</h3>
+        <p class="help" style="margin:0 0 12px">Backend fields — not shown to players on the match details screen.</p>
         <dl class="kv">
-          <dt>Match ID</dt><dd>#${AdminUI.esc(t.matchNumber || t._id || '—')}</dd>
+          <dt>Match ID</dt><dd>#${AdminUI.esc(matchNo)}</dd>
           <dt>Status</dt><dd>${badge(detail.status)}</dd>
           <dt>Match type</dt><dd>${AdminUI.esc(displayMatchType(detail))}</dd>
           <dt>Player Format</dt><dd>${AdminUI.esc(format)}</dd>
           <dt>Map</dt><dd>${AdminUI.esc(t.map || '—')}</dd>
           <dt>Game</dt><dd>${AdminUI.esc(gameName)}</dd>
           <dt>Game mode</dt><dd>${AdminUI.esc(gameModeName)}</dd>
+          <dt>Team setup</dt><dd>${AdminUI.esc(teamSetup)}</dd>
+          <dt>Slots</dt><dd>${detail.joinedCount ?? 0}/${slotCapacity} ${AdminUI.esc(slotUnit)}</dd>
+          <dt>Entry fee (detail)</dt><dd>${entryFeeDisplay}</dd>
+          <dt>Prize pool</dt><dd>${AdminUI.money(t.prizePool)}</dd>
+          <dt>Per kill</dt><dd>${detail.hasKillRewards ? AdminUI.money(t.perKill) : 'Not applicable'}</dd>
+          <dt>Start time</dt><dd>${AdminUI.dt(t.startDate)}</dd>
           <dt>Banner title</dt><dd>${AdminUI.esc(t.bannerTitle || '—')}</dd>
-          <dt>Match ID (room)</dt><dd>${AdminUI.esc(t.roomId || 'Not set')}</dd>
+          <dt>About text</dt><dd>${textBlock(t.description, 'No description added.')}</dd>
+          <dt>Room ID</dt><dd>${AdminUI.esc(t.roomId || 'Not set')}</dd>
           <dt>Password</dt><dd>${t.roomPassword ? '••••••' : 'Not set'}</dd>
           <dt>Credentials for joined players</dt><dd>${t.showRoomCredentials ? 'Forced visible' : 'Auto (2 min before start)'}</dd>
           <dt>Locked</dt><dd>${t.locked ? 'Yes' : 'No'}</dd>
           <dt>Results published</dt><dd>${detail.resultsPublished ? 'Yes' : 'No'}</dd>
+          ${t.isAutoGenerated ? `<dt>Source</dt><dd>Daily Auto · ${AdminUI.esc(t.autoMatchId?.displayId || t.autoMatchId?.name || 'AUTO')}</dd>` : ''}
         </dl>
       </div>`;
 
@@ -835,10 +869,12 @@ const App = (() => {
           </div>`).join('') || AdminUI.empty('No participants yet')}</div>
       </div>`;
 
-    const slotsHtml = custom ? `
-      <div class="panel">${AdminUI.empty('Slot grid is for Battle Royale', 'Use the Teams tab for 1v1 / 2v2 / 4v4.')}</div>
+    const slotsHtml = teamJoin ? `
+      <div class="panel">
+        ${AdminUI.empty('2 team slots only', 'Lone Wolf, Clash Squad and CS One Tap use Team A / Team B — not a 48-slot grid. Open the Teams tab.')}
+      </div>
     ` : `
-      <div class="slots">${(slots.length ? slots : Array.from({ length: detail.capacity || 50 }, (_, i) => ({ slotNumber: i + 1, available: true }))).map((s) => {
+      <div class="slots">${(slots.length ? slots : Array.from({ length: slotCapacity }, (_, i) => ({ slotNumber: i + 1, available: true }))).map((s) => {
         const state = slotState(s);
         const who = s.displayName || s.teamName || s.players?.[0]?.displayName || s.players?.[0]?.gamingUsername || 'Open';
         return `<div class="slot ${state}">
@@ -848,7 +884,14 @@ const App = (() => {
         </div>`;
       }).join('')}</div>`;
 
-    const teamBoxes = (teams.length ? teams : slots.filter((s) => s.side)).map((team) => `
+    const teamList = teams.length
+      ? teams
+      : slots.filter((s) => s.side).length
+        ? slots.filter((s) => s.side)
+        : teamJoin
+          ? [{ side: 'A', name: 'Team A', status: 'available', players: [] }, { side: 'B', name: 'Team B', status: 'available', players: [] }]
+          : [];
+    const teamBoxes = teamList.map((team) => `
       <div class="team-box">
         <h3>${AdminUI.esc(team.side ? `Team ${team.side}` : team.name || team.label || 'Team')}</h3>
         <div class="m-row"><span>Status</span>${badge(team.status || team.paymentStatus || 'available')}</div>
@@ -877,18 +920,18 @@ const App = (() => {
 
     const roomHtml = `
       <div class="form-card" style="max-width:640px">
-        <p style="color:var(--text-2);font-size:13px;margin:0 0 12px">Match ID and Password are visible only to players who joined this match. Non-joined users never see them. Auto-unlock is 2 minutes before start unless you force-show below.</p>
+        <p style="color:var(--text-2);font-size:13px;margin:0 0 12px">Room ID and Password are visible only to players who joined this match. Non-joined users never see them. Auto-unlock is 2 minutes before start unless you force-show below.</p>
         <div class="form-grid">
-          <div class="field"><label>Match ID</label><input id="room-id" value="${AdminUI.esc(t.roomId || '')}" /></div>
+          <div class="field"><label>Room ID</label><input id="room-id" value="${AdminUI.esc(t.roomId || '')}" /></div>
           <div class="field"><label>Password</label><input id="room-pw" value="${AdminUI.esc(t.roomPassword || '')}" /></div>
-          <div class="field full"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="room-show" ${t.showRoomCredentials ? 'checked' : ''} /> Show Match ID &amp; Password to joined players now</label></div>
+          <div class="field full"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="room-show" ${t.showRoomCredentials ? 'checked' : ''} /> Show Room ID &amp; Password to joined players now</label></div>
         </div>
-        <button class="btn btn-primary" id="save-room" style="margin-top:12px">Save match credentials</button>
+        <button class="btn btn-primary" id="save-room" style="margin-top:12px">Save room credentials</button>
       </div>`;
 
     const resultsHtml = `<div class="panel" id="results-panel"><div class="loading">Loading results…</div></div>`;
     const winnersHtml = `<div class="panel" id="winners-panel"><div class="loading">Loading winners…</div></div>`;
-    const killsHtml = custom
+    const killsHtml = !detail.hasKillRewards || teamJoin
       ? `<div class="panel">${AdminUI.empty('Kill rewards apply to Battle Royale only')}</div>`
       : `<div class="panel"><p>Per-kill: <strong>${AdminUI.money(t.perKill)}</strong></p><p style="color:var(--text-2)">Enter kills on the Results tab after the match is completed.</p></div>`;
     const activityHtml = `<div class="panel" id="activity-panel"><div class="loading">Loading activity…</div></div>`;
@@ -936,8 +979,6 @@ const App = (() => {
     document.querySelectorAll('[data-tab]').forEach((btn) => {
       btn.onclick = () => go(`tournaments/${id}?tab=${btn.dataset.tab}`);
     });
-    const prizeBtn = document.getElementById('edit-prize');
-    if (prizeBtn) prizeBtn.onclick = () => prizeModal(id, custom, prize);
     const saveRoom = document.getElementById('save-room');
     if (saveRoom) saveRoom.onclick = () => guarded(async () => {
       await AdminAPI.setRoom(id, {
@@ -947,8 +988,8 @@ const App = (() => {
       });
       AdminUI.toast('Room details saved');
     });
-    if (current === 'results') loadResults(id, custom);
-    if (current === 'winners') loadWinners(id);
+    if (current === 'results') loadResults(id, teamJoin);
+    if (current === 'winners') loadWinners(id, custom, prize, t, detail);
     if (current === 'activity') loadActivity(id);
   }
 
@@ -1057,18 +1098,44 @@ const App = (() => {
     }
   }
 
-  async function loadWinners(id) {
+  async function loadWinners(id, custom, prizeData, tournament, detail) {
     const panel = document.getElementById('winners-panel');
     if (!panel) return;
+    const t = tournament || {};
+    const prize = prizeData?.prizeDistribution || prizeData || {};
+    const winnerPrize = prize.winnerPrize ?? t.prizes?.first ?? 0;
+    const runnerUp = prize.runnerUpPrize ?? t.prizes?.second ?? 0;
+    const r1 = prize.rankTiers?.[0]?.prize ?? t.prizes?.first ?? 0;
+    const r2 = prize.rankTiers?.[1]?.prize ?? t.prizes?.second ?? 0;
+    const r3 = prize.rankTiers?.[2]?.prize ?? t.prizes?.third ?? 0;
     try {
       const data = await AdminAPI.tournamentPayouts(id);
       const items = data.payouts || data.items || data || [];
-      panel.innerHTML = `<div class="table-wrap"><table>
+      panel.innerHTML = `
+        <div class="panel" style="margin-bottom:16px">
+          <h3 style="margin-top:0">Prize pool (admin)</h3>
+          <p class="help" style="margin:0 0 12px">Not shown to players on match details. Use this to configure payouts before publishing results.</p>
+          <div class="prize-lines">
+            <div class="prize-line"><span>Prize pool</span><b>${AdminUI.money(t.prizePool)}</b></div>
+            ${detail?.hasKillRewards ? `<div class="prize-line"><span>Per kill</span><b>${AdminUI.money(t.perKill)}</b></div>` : ''}
+            ${custom
+              ? `<div class="prize-line"><span>Winner</span><b>${AdminUI.money(winnerPrize)}</b></div>
+                 <div class="prize-line"><span>Runner-up</span><b>${AdminUI.money(runnerUp)}</b></div>`
+              : `<div class="prize-line"><span>1st place</span><b>${AdminUI.money(r1)}</b></div>
+                 <div class="prize-line"><span>2nd place</span><b>${AdminUI.money(r2)}</b></div>
+                 <div class="prize-line"><span>3rd place</span><b>${AdminUI.money(r3)}</b></div>`}
+          </div>
+          <button class="btn btn-primary" id="edit-prize" style="margin-top:16px">Edit prize pool</button>
+        </div>
+        <h3 style="margin-top:0">Winner payouts</h3>
+        <div class="table-wrap"><table>
         <thead><tr><th>Player</th><th>Amount</th><th>Status</th></tr></thead>
         <tbody>${(items || []).map((p) => `
           <tr><td>${AdminUI.esc(p.userId?.username || p.username || '—')}</td>
           <td>${AdminUI.money(p.amount)}</td><td>${badge(p.status)}</td></tr>`).join('') || `<tr><td colspan="3">${AdminUI.empty('No winner payouts yet')}</td></tr>`}
         </tbody></table></div>`;
+      const prizeBtn = document.getElementById('edit-prize');
+      if (prizeBtn) prizeBtn.onclick = () => prizeModal(id, custom, prizeData);
     } catch (err) {
       panel.innerHTML = `<div class="error-box">${AdminUI.esc(err.message)}</div>`;
     }
@@ -2220,14 +2287,14 @@ const App = (() => {
           </div>
 
           <div class="form-section">
-            <h3>Match ID &amp; Password</h3>
+            <h3>Room ID &amp; Password</h3>
             <p>Optional. Copied to each generated match. Only <b>joined</b> players can see them on Match Details.</p>
           </div>
-          <div class="field"><label>Match ID</label><input name="roomId" value="${AdminUI.esc(t.roomId || '')}" /></div>
+          <div class="field"><label>Room ID</label><input name="roomId" value="${AdminUI.esc(t.roomId || '')}" /></div>
           <div class="field"><label>Password</label><input name="roomPassword" value="${AdminUI.esc(t.roomPassword || '')}" /></div>
           <div class="field full"><label style="display:flex;gap:8px;align-items:center;font-weight:600">
             <input type="checkbox" name="showRoomCredentials" ${t.showRoomCredentials ? 'checked' : ''} />
-            Show Match ID and Password to joined players
+            Show Room ID and Password to joined players
           </label></div>
           <div class="field full"><label style="display:flex;gap:8px;align-items:center;font-weight:600">
             <input type="checkbox" name="isActive" ${t.isActive !== false ? 'checked' : ''} />

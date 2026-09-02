@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StatusBar,
   ActivityIndicator,
-  Share,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -27,27 +26,9 @@ import {
   getPlayerFormatLabel,
 } from '../utils/tournamentHelpers';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
+import { copyToClipboard } from '../utils/copyToClipboard';
 import { TimeLeftBar, InfoCell } from '../components/contest/ContestShared';
 import TournamentBanner from '../components/contest/TournamentBanner';
-
-async function copyToClipboard(value) {
-  const text = String(value || '').trim();
-  if (!text) return false;
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    /* fall through */
-  }
-  try {
-    await Share.share({ message: text });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function CredentialRow({ label, value, onCopy }) {
   if (!value) return null;
@@ -352,14 +333,14 @@ export default function TournamentDetailsScreen({ navigation, route }) {
 
         {showRoom ? (
           <View style={styles.roomBox}>
-            <Text style={styles.roomTitle}>MATCH ID & PASSWORD</Text>
+            <Text style={styles.roomTitle}>ROOM ID & PASSWORD</Text>
             <Text style={styles.roomHint}>
               Only visible because you joined this match. Copy into Free Fire before start.
             </Text>
             <CredentialRow
-              label="Match ID"
+              label="Room ID"
               value={tournament.roomId}
-              onCopy={() => handleCopy(tournament.roomId, 'Match ID')}
+              onCopy={() => handleCopy(tournament.roomId, 'Room ID')}
             />
             <CredentialRow
               label="Password"
@@ -373,7 +354,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
           <View style={styles.roomWaitBox}>
             <Text style={styles.roomWaitText}>
               {tournament.roomCredentialsMessage ||
-                'Please wait. Match ID and password will be available 2 minutes before the match starts.'}
+                'Please wait. Room ID and password will be available 2 minutes before the match starts.'}
             </Text>
           </View>
         ) : null}

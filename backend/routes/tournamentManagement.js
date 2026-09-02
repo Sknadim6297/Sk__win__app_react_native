@@ -1208,7 +1208,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
 
     if (!lifecycle.isCustomMatch(tournament) && !lifecycle.usesTeamRegistration(tournament)) {
       return res.status(400).json({
-        error: 'Team registration is for Clash Squad or Duo/Squad Battle Royale only. Solo uses slot booking.',
+        error: 'Team registration is for Clash Squad, Lone Wolf, or CS One Tap. Battle Royale solo uses slot booking.',
       });
     }
 
@@ -1272,13 +1272,15 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
     }
 
     const teamCount = await Team.countDocuments({ tournamentId: tournament._id, status: 'registered' });
-    const maxTeams = isCustom
-      ? tournament.maxTeams || 2
-      : tournament.maxTeams ||
-        Math.floor((tournament.maxParticipants || 50) / requiredPlayers);
+    const maxTeams = needsTeamSide
+      ? Number(tournament.maxTeams || structure.totalSlots || 2)
+      : isCustom
+        ? tournament.maxTeams || 2
+        : tournament.maxTeams ||
+          Math.floor((tournament.maxParticipants || 50) / requiredPlayers);
     if (teamCount >= maxTeams) {
       return res.status(400).json({
-        error: isCustom ? 'Match is full — both teams registered' : 'All team slots are full',
+        error: needsTeamSide ? 'Match is full — both teams registered' : 'All team slots are full',
         isFull: true,
       });
     }
@@ -1295,7 +1297,8 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
     }
 
     let slotNumber = null;
-    if (!isCustom && structure.usesTeamRegistration) {
+    // Lone Wolf / Clash Squad / CS One Tap use Team A/B — never numbered BR slots.
+    if (!needsTeamSide && structure.usesTeamRegistration) {
       slotNumber = Number(slotNumberRaw);
       if (!slotNumber || slotNumber < 1 || slotNumber > structure.totalSlots) {
         const taken = await Team.find({ tournamentId: tournament._id, status: 'registered' }).select('slotNumber');
@@ -1356,7 +1359,7 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
       players: normalizedPlayers.map(({ name, gamingUID }) => ({ name, gamingUID })),
       captainUserId: req.userId,
     };
-    if (isCustom && side) teamPayload.side = side;
+    if (needsTeamSide && side) teamPayload.side = side;
     if (slotNumber) teamPayload.slotNumber = slotNumber;
 
     const team = await Team.create(teamPayload);
@@ -1376,7 +1379,12 @@ router.post('/:id/register-team', authMiddleware, async (req, res) => {
     user.tournament.participatedCount = (user.tournament.participatedCount || 0) + 1;
     await user.save();
 
-    const entryLabel = isCustom ? 'Clash Squad' : 'Battle Royale';
+    const entryLabel =
+      structure.kind === 'lone_wolf'
+        ? 'Lone Wolf'
+        : isCustom
+          ? 'Clash Squad'
+          : 'Battle Royale';
     const sideLabel = side ? ` / Team ${side}` : '';
 
     await WalletTransaction.create({

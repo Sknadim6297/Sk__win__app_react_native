@@ -327,6 +327,8 @@ async function joinTeamFromPayment(claim, tournament, user) {
   const requiredPlayers = Math.max(1, Number(structure.playersPerTeam) || 1);
   const isCustom = lifecycle.isCustomMatch(tournament);
 
+  const needsTeamSide = Boolean(structure.usesTeamSides);
+
   if (!teamName) {
     return { ok: false, reason: 'MISSING_TEAM_NAME', message: 'Team name is required' };
   }
@@ -352,7 +354,7 @@ async function joinTeamFromPayment(claim, tournament, user) {
   }
 
   let side = null;
-  if (isCustom) {
+  if (needsTeamSide) {
     const sideRaw = String(meta.teamSide || meta.side || '')
       .trim()
       .toUpperCase()
@@ -372,10 +374,12 @@ async function joinTeamFromPayment(claim, tournament, user) {
   }
 
   const teamCount = await Team.countDocuments({ tournamentId: tournament._id, status: 'registered' });
-  const maxTeams = isCustom
-    ? tournament.maxTeams || 2
-    : tournament.maxTeams ||
-      Math.floor((tournament.maxParticipants || 50) / requiredPlayers);
+  const maxTeams = needsTeamSide
+    ? Number(tournament.maxTeams || structure.totalSlots || 2)
+    : isCustom
+      ? tournament.maxTeams || 2
+      : tournament.maxTeams ||
+        Math.floor((tournament.maxParticipants || 50) / requiredPlayers);
   if (teamCount >= maxTeams) {
     return { ok: false, reason: 'TOURNAMENT_FULL', message: 'All team slots are full' };
   }
@@ -389,8 +393,7 @@ async function joinTeamFromPayment(claim, tournament, user) {
   };
   if (side) teamPayload.side = side;
 
-  if (!isCustom) {
-    const structure = lifecycle.getMatchStructure(tournament);
+  if (!needsTeamSide && structure.usesTeamRegistration) {
     let slotNumber = Number(meta.slotNumber);
     if (!slotNumber || slotNumber < 1 || slotNumber > structure.totalSlots) {
       const taken = await Team.find({ tournamentId: tournament._id, status: 'registered' }).select('slotNumber');

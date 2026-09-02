@@ -37,9 +37,9 @@ function isPlayerComplete(player) {
 }
 
 /** Backend still needs a team name — auto from captain Game Name + side/slot (not shown in UI). */
-function buildAutoTeamName(players, { isCustom, side, slot }) {
+function buildAutoTeamName(players, { usesTeamSides, side, slot }) {
   const captain = String(players?.[0]?.name || '').trim() || 'Player';
-  const tag = isCustom ? `Team ${side || 'A'}` : `Slot ${slot || 1}`;
+  const tag = usesTeamSides ? `Team ${side || 'A'}` : `Slot ${slot || 1}`;
   return `${captain} · ${tag}`.slice(0, 60);
 }
 
@@ -146,16 +146,18 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
     }));
     const side = override?.teamSide || teamSide;
     const slot = override?.slotNumber || teamSlot;
+    const structure = getMatchStructure(tournament || {});
+    const usesTeamSides = Boolean(structure.usesTeamSides);
     const autoName = buildAutoTeamName(roster, {
-      isCustom: isCustomMatch(tournament),
+      usesTeamSides,
       side,
       slot,
     });
     return {
       kind: 'team',
       teamName: String(override?.teamName || teamName || autoName).trim() || autoName,
-      teamSide: side,
-      slotNumber: slot,
+      teamSide: usesTeamSides ? side : undefined,
+      slotNumber: usesTeamSides ? undefined : slot,
       players: roster,
     };
   };
@@ -168,14 +170,16 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
     }
 
     if (isPaymentEnabled() && Number(entryCharge.totalAmount) > 0) {
+      const structure = getMatchStructure(tournament || {});
+      const usesTeamSides = Boolean(structure.usesTeamSides);
       startTournamentZapUpiPayment(navigation, {
         tournamentId,
         tournamentName: tournament?.name,
         amount: entryCharge.totalAmount,
         joinKind: 'team',
         teamName: join.teamName,
-        teamSide: join.teamSide,
-        slotNumber: join.slotNumber,
+        teamSide: usesTeamSides ? join.teamSide : undefined,
+        slotNumber: usesTeamSides ? undefined : join.slotNumber,
         players: join.players,
       });
       return;
@@ -198,11 +202,10 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
 
     try {
       const structure = getMatchStructure(tournament);
-      const custom = isCustomMatch(tournament);
       await tournamentManagementService.registerTeam(tournamentId, {
         teamName: join.teamName,
         teamSide: structure.usesTeamSides ? join.teamSide : undefined,
-        slotNumber: custom ? undefined : join.slotNumber,
+        slotNumber: structure.usesTeamSides ? undefined : join.slotNumber,
         players: join.players,
       });
     } catch (e) {
@@ -299,7 +302,7 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
       gamingUID: String(p.gamingUID || '').trim(),
     }));
     const autoName = buildAutoTeamName(roster, {
-      isCustom: isCustomMatch(tournament),
+      usesTeamSides: joinStructure.usesTeamSides,
       side: teamSide,
       slot: teamSlot,
     });

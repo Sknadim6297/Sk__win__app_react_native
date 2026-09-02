@@ -23,11 +23,18 @@ const DEFAULT_MATCH_TYPES = [
     sortOrder: 1,
   },
   {
+    name: 'CS One Tap',
+    isTeamVsTeam: true,
+    hasKillRewards: false,
+    defaultSlots: 2,
+    sortOrder: 2,
+  },
+  {
     name: 'Lone Wolf',
     isTeamVsTeam: false,
     hasKillRewards: true,
-    defaultSlots: 48,
-    sortOrder: 2,
+    defaultSlots: 2,
+    sortOrder: 3,
   },
 ];
 
