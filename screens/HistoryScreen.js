@@ -15,6 +15,7 @@ import { PAGE, pageStyles } from '../styles/pageTheme';
 import ScreenHeader from '../components/navigation/ScreenHeader';
 import { tournamentService } from '../services/api';
 import { toPlayerMatchLabel } from '../utils/tournamentHelpers';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
 const formatAmount = (v) => Math.round(Number(v) || 0).toLocaleString('en-IN');
 
@@ -62,6 +63,8 @@ const HistoryScreen = ({ navigation }) => {
     }, [loadHistory])
   );
 
+  const { refreshControl } = usePullToRefresh(loadHistory);
+
   const filteredMatches = matchHistory.filter((match) => {
     if (selectedFilter === 'all') return true;
     if (selectedFilter === 'won') return match.status === 'won';
@@ -99,7 +102,11 @@ const HistoryScreen = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor={PAGE.bg} />
       <ScreenHeader title="My Matches" onBack={() => navigation.goBack()} />
 
-      <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={pageStyles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={refreshControl}
+      >
         <View style={pageStyles.card}>
           <View style={pageStyles.row}>
             <View style={styles.statLeft}>

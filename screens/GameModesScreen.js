@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS, TEXT } from '../styles/theme';
 import { gameService } from '../services/api';
@@ -16,6 +17,7 @@ import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import { sortBySortOrder } from '../utils/sortBySortOrder';
 import { getLayoutWidth } from '../utils/layout';
 import GameModePoster from '../components/home/GameModePoster';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
 const GRID_PADDING = 12;
 const GRID_GAP = 12;
@@ -44,7 +46,7 @@ export default function GameModesScreen({ navigation, route }) {
   const [gameModes, setGameModes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadGameModes = useCallback(async () => {
+  const loadGameModes = useCallback(async ({ silent } = {}) => {
     if (!gameId) {
       setGameModes([]);
       setLoading(false);
@@ -52,7 +54,7 @@ export default function GameModesScreen({ navigation, route }) {
     }
 
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const modesData = await gameService.getGameModes(gameId).catch(() => []);
       const list = sortBySortOrder(Array.isArray(modesData) ? modesData : []);
       setGameModes(list.map(mapMode));
@@ -64,9 +66,13 @@ export default function GameModesScreen({ navigation, route }) {
     }
   }, [gameId]);
 
-  useEffect(() => {
-    loadGameModes();
-  }, [loadGameModes]);
+  useFocusEffect(
+    useCallback(() => {
+      loadGameModes();
+    }, [loadGameModes])
+  );
+
+  const { refreshControl } = usePullToRefresh(loadGameModes);
 
   const handleModePress = (mode) => {
     navigation.navigate('GameDetails', {
@@ -129,6 +135,7 @@ export default function GameModesScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.gridContent}
           columnWrapperStyle={columnWrapperStyle}
+          refreshControl={refreshControl}
           renderItem={({ item }) => (
             <GameModePoster
               item={item}

@@ -26,9 +26,6 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,700;0,9..40,800&display=swap" rel="stylesheet" />
     <style>
       html,
       body,
@@ -67,10 +64,12 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/sw.js').catch(function () {});
+          navigator.serviceWorker.register('/sw.js').then(function (reg) {
+            try { reg.update(); } catch (e) {}
+          }).catch(function () {});
         });
       }
     </script>
-  <script src="/_expo/static/js/web/index-bb5d5d84cb2a026b3080e5d47477f44f.js" defer></script>
+  <script src="/_expo/static/js/web/index-b19f75a153343546f7593e647d90645d.js" defer></script>
 </body>
 </html>

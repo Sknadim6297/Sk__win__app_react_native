@@ -27,10 +27,13 @@ import {
 import HomeImageSlider from '../components/home/HomeImageSlider';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import { sortBySortOrder } from '../utils/sortBySortOrder';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
-const MODE_CARD_WIDTH = (getLayoutWidth() - 32 - 12) / 2;
-/** Compact portrait poster */
-const MODE_CARD_HEIGHT = Math.round(MODE_CARD_WIDTH * 1.12);
+const HORIZONTAL_PADDING = 16;
+const GRID_GAP = 10;
+/** Two-column grid — wide, low-height landscape banners */
+const MODE_CARD_WIDTH = (getLayoutWidth() - HORIZONTAL_PADDING * 2 - GRID_GAP) / 2;
+const MODE_CARD_HEIGHT = Math.round(MODE_CARD_WIDTH * 0.58);
 
 export default function HomeScreen({ navigation }) {
   const [esportsModes, setEsportsModes] = useState([]);
@@ -40,9 +43,9 @@ export default function HomeScreen({ navigation }) {
   const [homeSliders, setHomeSliders] = useState([]);
   const [slidersLoading, setSlidersLoading] = useState(true);
 
-  const loadHomeData = useCallback(async () => {
+  const loadHomeData = useCallback(async ({ silent } = {}) => {
     try {
-      setSlidersLoading(true);
+      if (!silent) setSlidersLoading(true);
       const [gamesData, homeConfig, slidersData] = await Promise.all([
         gameService.getGamesList().catch(() => []),
         configService.getHome().catch(() => ({})),
@@ -96,6 +99,8 @@ export default function HomeScreen({ navigation }) {
     }, [loadHomeData])
   );
 
+  const { refreshControl } = usePullToRefresh(loadHomeData);
+
   const openMode = (mode) => {
     if (!mode?.id || !esportsGameId) return;
     navigation.navigate('GameDetails', {
@@ -126,6 +131,7 @@ export default function HomeScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
         contentContainerStyle={styles.scroll}
+        refreshControl={refreshControl}
       >
 
         {latestNews?.isActive !== false && (
@@ -372,9 +378,9 @@ const styles = StyleSheet.create({
   gamesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: GRID_GAP,
     marginBottom: 26,
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
   },
   emptyGames: {
     ...TEXT.body,

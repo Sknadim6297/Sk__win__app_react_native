@@ -109,6 +109,67 @@ export function InfoCell({ label, value, coin, rupee, flex, inline, compact }) {
   );
 }
 
+export function JoinProgressBar({
+  joined,
+  capacity,
+  unit,
+  usesTeamRegistration,
+  playersPerTeam,
+  isFull,
+  hide,
+}) {
+  if (hide) return null;
+
+  const joinedN = Math.max(0, Number(joined) || 0);
+  const capN = Math.max(1, Number(capacity) || 1);
+  const left = Math.max(capN - joinedN, 0);
+  const full = Boolean(isFull) || left <= 0;
+  const pct = full ? 100 : Math.min(100, Math.round((joinedN / capN) * 100));
+
+  const teamMode = unit === 'teams' || Boolean(usesTeamRegistration);
+  const joinedLabel = teamMode
+    ? `${joinedN}/${capN} TEAMS JOINED`
+    : `${joinedN}/${capN} SLOTS BOOKED`;
+
+  const leftLabel = full
+    ? teamMode
+      ? 'TEAM FULL'
+      : 'SLOTS FULL'
+    : teamMode
+      ? `${left} TEAM${left === 1 ? '' : 'S'} LEFT`
+      : `${left} SLOT${left === 1 ? '' : 'S'} LEFT`;
+
+  const ppt = Math.max(1, Number(playersPerTeam) || 1);
+  const playersJoined = joinedN * (teamMode ? ppt : 1);
+  const playersCap = teamMode ? capN * ppt : capN;
+  const playersLeft = Math.max(playersCap - playersJoined, 0);
+  const playersLabel =
+    teamMode && ppt > 0
+      ? full
+        ? `${playersCap}/${playersCap} PLAYERS`
+        : `${playersJoined}/${playersCap} PLAYERS · ${playersLeft} LEFT`
+      : null;
+
+  return (
+    <View style={styles.joinProgress}>
+      <View style={styles.joinProgressHead}>
+        <Text style={styles.joinProgressJoined}>{joinedLabel}</Text>
+        <Text style={[styles.joinProgressLeft, full && styles.joinProgressFull]}>{leftLabel}</Text>
+      </View>
+      {playersLabel ? <Text style={styles.joinProgressPlayers}>{playersLabel}</Text> : null}
+      <View style={styles.joinProgressTrack}>
+        <View
+          style={[
+            styles.joinProgressFill,
+            { width: `${Math.max(pct, full ? 100 : 4)}%` },
+            full && styles.joinProgressFillFull,
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
+
 export function StatTriple({ items, compact }) {
   const list = (items || []).filter(Boolean);
   if (!list.length) return null;
@@ -268,5 +329,57 @@ const styles = StyleSheet.create({
     bottom: 8,
     width: 1,
     backgroundColor: PAGE.border,
+  },
+  joinProgress: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: PAGE.cardAlt,
+    borderWidth: 1,
+    borderColor: PAGE.border,
+  },
+  joinProgressHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 6,
+  },
+  joinProgressJoined: {
+    flex: 1,
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    color: COLORS.white,
+    letterSpacing: 0.3,
+  },
+  joinProgressLeft: {
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    color: '#5CFFF7',
+    letterSpacing: 0.3,
+  },
+  joinProgressFull: {
+    color: '#F87171',
+  },
+  joinProgressPlayers: {
+    fontFamily: FONTS.semiBold,
+    fontSize: 10,
+    color: PAGE.muted,
+    marginBottom: 8,
+    letterSpacing: 0.2,
+  },
+  joinProgressTrack: {
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  joinProgressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: PAGE.green,
+  },
+  joinProgressFillFull: {
+    backgroundColor: '#2563EB',
   },
 });

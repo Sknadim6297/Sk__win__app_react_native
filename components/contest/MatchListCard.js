@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS, FONTS } from '../../styles/theme';
 import { PAGE } from '../../styles/pageTheme';
-import { getMatchStructure, formatScheduleLine, getPlayerFormatLabel, resolveModeLabel } from '../../utils/tournamentHelpers';
-import { StatTriple } from './ContestShared';
+import { getMatchStructure, formatScheduleLine, getPlayerFormatLabel } from '../../utils/tournamentHelpers';
+import { StatTriple, JoinProgressBar } from './ContestShared';
 import TournamentBanner from './TournamentBanner';
 
 function getMatchNumber(item) {
@@ -28,10 +28,11 @@ function resolveMatchTypeLabel(item, structure) {
 
 export default function MatchListCard({ item, gameModeImage, onPress }) {
   const structure = getMatchStructure(item);
-  const current = item.participantCount ?? item.currentParticipants ?? 0;
-  const max = item.totalSlots || structure.totalSlots;
-  const spotsLeft = Math.max(max - current, 0);
-  const full = spotsLeft <= 0;
+  const joined =
+    item.joinedCount ?? item.participantCount ?? item.currentParticipants ?? 0;
+  const capacity = item.capacity ?? item.totalSlots ?? structure.totalSlots;
+  const spotsLeft = Math.max(capacity - joined, 0);
+  const full = item.isFull != null ? Boolean(item.isFull) : spotsLeft <= 0;
   const matchNo = getMatchNumber(item);
   const lifecycleStatus = item.lifecycleStatus || item.status;
   const isJoinOpen = lifecycleStatus === 'upcoming' || lifecycleStatus === 'incoming';
@@ -39,7 +40,6 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
   const scheduleLine = formatScheduleLine(item.startDate);
 
   const matchTypeName = resolveMatchTypeLabel(item, structure);
-  const gameModeLabel = resolveModeLabel(item);
   const playerFormatLabel =
     item.playerFormatLabel || structure.playerFormatLabel || getPlayerFormatLabel(item);
   const mapName = String(item.mapName || item.map || '—');
@@ -109,11 +109,18 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
         <StatTriple items={coinStats} />
         <StatTriple items={infoStats} />
 
+        <JoinProgressBar
+          joined={joined}
+          capacity={capacity}
+          unit={item.joinUnit}
+          usesTeamRegistration={structure.usesTeamRegistration}
+          playersPerTeam={structure.playersPerTeam}
+          isFull={full}
+          hide={isCompleted}
+        />
+
         <View style={styles.ctaRow}>
           <View style={styles.modeBlock}>
-            <Text style={styles.modeName} numberOfLines={1}>
-              {String(gameModeLabel || matchTypeName || '').toUpperCase()}
-            </Text>
             <Text style={styles.modeFormat} numberOfLines={1}>
               {String(playerFormatLabel || '').toUpperCase()}
             </Text>
@@ -184,21 +191,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
     minWidth: 0,
-  },
-  modeName: {
-    fontFamily: FONTS.bold,
-    fontSize: 16,
-    lineHeight: 20,
-    color: '#FFC53D',
-    letterSpacing: 0.6,
-    textShadowColor: 'rgba(255, 180, 40, 0.75)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
+    justifyContent: 'center',
   },
   modeFormat: {
-    marginTop: 2,
     fontFamily: FONTS.bold,
-    fontSize: 12,
+    fontSize: 14,
     color: '#5CFFF7',
     letterSpacing: 0.5,
   },

@@ -27,6 +27,7 @@
     "apk:sync": "node scripts/sync-latest-apk.js",
     "release:metadata": "node scripts/sync-release-metadata.js",
     "release:prepare": "node scripts/sync-release-metadata.js && node scripts/sync-latest-apk.js && npm run website:build",
+    "release:all": "node scripts/sync-release-metadata.js && npm run build:pwa && npm run website:build",
     "render:build": "npm install --prefix backend",
     "render:build:all": "npm install --prefix backend && npm install --prefix website && npm run website:build",
     "eas-build-post-install": "node scripts/prepare-android-icon.js && node scripts/strip-unused-icon-fonts.js",

@@ -9,6 +9,7 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AppIcon from '../components/ui/AppIcon';
 import ConfettiBurst from '../components/ConfettiBurst';
@@ -18,6 +19,7 @@ import { tournamentService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import { formatScheduleLine } from '../utils/tournamentHelpers';
 import TournamentBanner from '../components/contest/TournamentBanner';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
 const CYAN = '#00E5FF';
 const GOLD = '#FBBF24';
@@ -348,9 +350,9 @@ export default function TournamentResultsScreen({ navigation, route }) {
   const [error, setError] = useState(null);
   const [celebrate, setCelebrate] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ silent } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const res = await tournamentService.getResults(tournamentId);
       setData(res);
@@ -369,9 +371,13 @@ export default function TournamentResultsScreen({ navigation, route }) {
     }
   }, [tournamentId]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const { refreshControl } = usePullToRefresh(load);
 
   const mine = resolveMyResult(data, user);
   const mood = mine.outcome === 'loss' ? 'sad' : 'win';
@@ -434,7 +440,11 @@ export default function TournamentResultsScreen({ navigation, route }) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <ResultHeader title="Match Result" onBack={() => navigation.goBack()} />
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
+        >
           <MatchSummary
             tournament={tournament}
             entryFee={tournament?.entryFee}
@@ -479,7 +489,11 @@ export default function TournamentResultsScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ResultHeader title="Match Result" onBack={() => navigation.goBack()} />
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={refreshControl}
+      >
         <MatchSummary
           tournament={tournament}
           entryFee={tournament?.entryFee}

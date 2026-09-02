@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import AppIcon from '../components/ui/AppIcon';
 import { COLORS, FONTS } from '../styles/theme';
 import { PAGE, pageStyles } from '../styles/pageTheme';
@@ -19,6 +20,7 @@ import ScreenHeader from '../components/navigation/ScreenHeader';
 import MatchListCard from '../components/contest/MatchListCard';
 import { tournamentBelongsToGameMode } from '../utils/gameModeMatching';
 import { toPlayerMatchLabel } from '../utils/tournamentHelpers';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
 const STATUS_TABS = [
   { id: 'upcoming', label: 'UPCOMING' },
@@ -40,9 +42,9 @@ export default function GameDetailsScreen({ navigation, route }) {
   const [allGameModes, setAllGameModes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadTournaments = useCallback(async () => {
+  const loadTournaments = useCallback(async ({ silent } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [data, modes] = await Promise.all([
         tournamentService.getList().catch(() => []),
         gameId ? gameService.getGameModes(gameId).catch(() => []) : Promise.resolve([]),
@@ -92,9 +94,13 @@ export default function GameDetailsScreen({ navigation, route }) {
     }
   }, [modeId, gameMode?.name, gameId, selectedTab]);
 
-  useEffect(() => {
-    loadTournaments();
-  }, [loadTournaments]);
+  useFocusEffect(
+    useCallback(() => {
+      loadTournaments();
+    }, [loadTournaments])
+  );
+
+  const { refreshControl } = usePullToRefresh(loadTournaments);
 
   const handleJoin = (item) => {
     navigation.navigate('TournamentDetails', { tournamentId: item._id || item.id });
@@ -133,6 +139,7 @@ export default function GameDetailsScreen({ navigation, route }) {
           keyExtractor={(item) => String(item._id || item.id)}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
           ListEmptyComponent={
             <View style={pageStyles.emptyWrap}>
               <AppIcon name="trophy-outline" size={48} muted />

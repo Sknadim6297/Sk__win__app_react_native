@@ -29,6 +29,7 @@ import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
 import { copyToClipboard } from '../utils/copyToClipboard';
 import { TimeLeftBar, InfoCell } from '../components/contest/ContestShared';
 import TournamentBanner from '../components/contest/TournamentBanner';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
 function CredentialRow({ label, value, onCopy }) {
   if (!value) return null;
@@ -80,9 +81,9 @@ export default function TournamentDetailsScreen({ navigation, route }) {
   const hideToast = () => setToast({ visible: false, message: '', type: 'error' });
   const { showInsufficientBalance, InsufficientBalanceDialog } = useInsufficientBalance(navigation);
 
-  const loadDetails = useCallback(async () => {
+  const loadDetails = useCallback(async ({ silent } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       if (!tournamentId) {
         setError('Tournament ID not provided');
@@ -98,15 +99,13 @@ export default function TournamentDetailsScreen({ navigation, route }) {
     }
   }, [tournamentId]);
 
-  useEffect(() => {
-    loadDetails();
-  }, [loadDetails]);
-
   useFocusEffect(
     useCallback(() => {
       loadDetails();
     }, [loadDetails])
   );
+
+  const { refreshControl } = usePullToRefresh(loadDetails);
 
   useEffect(() => {
     if (walletRecharged) {
@@ -301,6 +300,7 @@ export default function TournamentDetailsScreen({ navigation, route }) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 + insets.bottom }}
+        refreshControl={refreshControl}
       >
         <TournamentBanner
           bannerImage={tournament.bannerImage || tournament.gameMode?.image || tournament.game?.image}

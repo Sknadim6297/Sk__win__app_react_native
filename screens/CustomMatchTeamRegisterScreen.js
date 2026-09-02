@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { isCustomMatch, getMatchStructure } from '../utils/tournamentHelpers';
 import { fetchWalletForEntry, startTournamentZapUpiPayment } from '../utils/walletFlow';
 import { isPaymentEnabled } from '../utils/paymentConfig';
 import { useInsufficientBalance } from '../hooks/useInsufficientBalance';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { CoinValue } from '../components/contest/ContestShared';
 
 const emptyPlayer = () => ({ name: '', gamingUID: '' });
@@ -111,25 +112,29 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
     };
   }, [tournament, route.params?.entryCharge]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const [data, wData] = await Promise.all([
-          tournamentService.getDetails(tournamentId),
-          walletService.getBalance().catch(() => null),
-        ]);
-        setTournament(data);
-        setBalance(wData?.balance ?? 0);
-        const count = Math.max(1, Number(getMatchStructure(data).playersPerTeam) || 1);
-        setPlayers(Array.from({ length: count }, () => emptyPlayer()));
-      } catch (e) {
-        showToast(e.message || 'Failed to load match');
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const loadTournament = useCallback(async ({ silent } = {}) => {
+    try {
+      if (!silent) setLoading(true);
+      const [data, wData] = await Promise.all([
+        tournamentService.getDetails(tournamentId),
+        walletService.getBalance().catch(() => null),
+      ]);
+      setTournament(data);
+      setBalance(wData?.balance ?? 0);
+      const count = Math.max(1, Number(getMatchStructure(data).playersPerTeam) || 1);
+      setPlayers(Array.from({ length: count }, () => emptyPlayer()));
+    } catch (e) {
+      showToast(e.message || 'Failed to load match');
+    } finally {
+      setLoading(false);
+    }
   }, [tournamentId]);
+
+  useEffect(() => {
+    loadTournament();
+  }, [loadTournament]);
+
+  const { refreshControl } = usePullToRefresh(loadTournament);
 
   useEffect(() => {
     if (!walletRecharged) return;
@@ -371,7 +376,11 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
 
       {step === 'confirm' && (
         <View style={styles.flex}>
-          <ScrollView contentContainerStyle={styles.confirmScroll} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={styles.confirmScroll}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={refreshControl}
+          >
             <BalanceBlock />
 
             {showTeamSides ? (
@@ -481,7 +490,11 @@ export default function CustomMatchTeamRegisterScreen({ navigation, route }) {
 
       {step === 'details' && (
         <View style={styles.flex}>
-          <ScrollView contentContainerStyle={styles.confirmScroll} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            contentContainerStyle={styles.confirmScroll}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={refreshControl}
+          >
             <BalanceBlock />
             <View style={styles.detailsCard}>
                     <View style={styles.detailsHead}>

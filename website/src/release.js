@@ -1,10 +1,10 @@
 /** Keep in sync with /release.config.cjs (generated from app.json) */
 export const APP_RELEASE = {
-  version: '1.0.5',
-  fileName: 'WAREZONE-v1.0.5.apk',
+  version: '1.0.6',
+  fileName: 'WAREZONE-v1.0.6.apk',
   title: "WAREZONE Tournament",
   androidMin: "Android 8.0 (API 26)+",
-  releaseNotes: "WAREZONE v1.0.5 — latest Android release. Uninstall any older WAREZONE app before installing.",
+  releaseNotes: "WAREZONE v1.0.6 — latest Android release. Uninstall any older WAREZONE app before installing.",
 };
 
 /** Expo Web PWA (same app screens). Override with VITE_PWA_URL on sk-win-web. */

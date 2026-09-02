@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { userService } from '../services/api';
 import BrandCoin from '../components/ui/BrandCoin';
 import { getApiOrigin } from '../utils/apiConfig';
 import { copyToClipboard } from '../utils/copyToClipboard';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
 const PWA_URL = String(process.env.EXPO_PUBLIC_PWA_URL || 'https://sk-win-pwa.onrender.com').replace(
   /\/$/,
@@ -54,25 +55,24 @@ const ShareAppScreen = ({ navigation, route }) => {
   const { user } = useContext(AuthContext);
   const [referralCode, setReferralCode] = useState(user?.referralCode || '…');
 
-  useEffect(() => {
-    let mounted = true;
-    const loadReferralCode = async () => {
-      try {
-        if (user?.referralCode) {
-          setReferralCode(user.referralCode);
-          return;
-        }
-        const profile = await userService.getProfile();
-        if (mounted) setReferralCode(profile?.referralCode || 'Not generated yet');
-      } catch {
-        if (mounted && !user?.referralCode) setReferralCode('Unavailable');
+  const loadReferralCode = useCallback(async () => {
+    try {
+      if (user?.referralCode) {
+        setReferralCode(user.referralCode);
+        return;
       }
-    };
-    loadReferralCode();
-    return () => {
-      mounted = false;
-    };
+      const profile = await userService.getProfile();
+      setReferralCode(profile?.referralCode || 'Not generated yet');
+    } catch {
+      if (!user?.referralCode) setReferralCode('Unavailable');
+    }
   }, [user?.referralCode]);
+
+  useEffect(() => {
+    loadReferralCode();
+  }, [loadReferralCode]);
+
+  const { refreshControl } = usePullToRefresh(loadReferralCode);
 
   const downloadUrl = getDownloadPageUrl();
   const shareUrl = getShareAppUrl();
@@ -115,7 +115,11 @@ const ShareAppScreen = ({ navigation, route }) => {
         <ScreenHeader title="Refer & Earn" onBack={() => navigation.goBack()} />
       )}
 
-      <ScrollView contentContainerStyle={pageStyles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={pageStyles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={refreshControl}
+      >
         <LinearGradient
           colors={['#1A2744', '#151D36', '#121B33']}
           start={{ x: 0.1, y: 0 }}
