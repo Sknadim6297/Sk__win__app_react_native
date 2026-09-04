@@ -27,8 +27,7 @@ function readExistingRelease() {
 function writeReleaseConfig({ version, versionCode, prev }) {
   const fileName = `WAREZONE-v${version}.apk`;
   const versionChanged = String(prev.version || '') !== version;
-  const external =
-    versionChanged || !prev.externalDownloadUrl ? '' : String(prev.externalDownloadUrl || '');
+  const external = String(prev.externalDownloadUrl || '').trim();
   const body = `/** Shared APK release metadata — auto-synced from app.json by scripts/sync-release-metadata.js */
 module.exports = {
   version: '${version}',
@@ -42,7 +41,7 @@ module.exports = {
       : prev.releaseNotes ||
           `WAREZONE v${version} — latest Android release. Uninstall any older WAREZONE app before installing.`
   )},
-  /** Only used when public/downloads/${fileName} is missing (e.g. before first deploy). */
+  /** Absolute APK URL preferred by the download API (GitHub raw / CDN). */
   externalDownloadUrl: ${JSON.stringify(external)},
 };
 `;
@@ -51,6 +50,10 @@ module.exports = {
 
 function writeWebsiteRelease({ version, prev }) {
   const fileName = `WAREZONE-v${version}.apk`;
+  const direct = String(prev.externalDownloadUrl || '').trim();
+  const directLine = direct
+    ? `\n  directDownloadUrl: ${JSON.stringify(direct)},`
+    : '';
   const body = `/** Keep in sync with /release.config.cjs (generated from app.json) */
 export const APP_RELEASE = {
   version: '${version}',
@@ -60,7 +63,7 @@ export const APP_RELEASE = {
   releaseNotes: ${JSON.stringify(
     prev.releaseNotes ||
       `WAREZONE v${version} — latest Android release.`
-  )},
+  )},${directLine}
 };
 
 /** Expo Web PWA (same app screens). Override with VITE_PWA_URL on sk-win-web. */

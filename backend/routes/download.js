@@ -176,11 +176,8 @@ function buildReleasePayload(req, release, stats) {
   const external = String(
     DEFAULT_RELEASE.externalDownloadUrl || RELEASE.externalDownloadUrl || ''
   ).trim();
-  const useExternal = Boolean(
-    external &&
-      /^https?:\/\//i.test(external) &&
-      !stats.exists
-  );
+  // Prefer configured external URL when set so phones never get a stale on-disk APK.
+  const useExternal = Boolean(external && /^https?:\/\//i.test(external));
   const downloadUrl = useExternal ? external : localAbsolute;
   const apkExists = Boolean(stats.exists || useExternal);
 

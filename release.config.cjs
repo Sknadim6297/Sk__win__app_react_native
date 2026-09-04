@@ -6,6 +6,6 @@ module.exports = {
   title: "WAREZONE Tournament",
   androidMin: "Android 8.0 (API 26)+",
   releaseNotes: "WAREZONE v1.0.6 — latest Android release. Uninstall any older WAREZONE app before installing.",
-  /** Only used when public/downloads/WAREZONE-v1.0.6.apk is missing (e.g. before first deploy). */
-  externalDownloadUrl: "",
+  /** Absolute APK URL preferred by the download API (GitHub raw / CDN). */
+  externalDownloadUrl: "https://raw.githubusercontent.com/Sknadim6297/Sk__win__app_react_native/main/public/downloads/WAREZONE-v1.0.6.apk",
 };

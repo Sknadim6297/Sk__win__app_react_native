@@ -131,6 +131,11 @@ export function apkHref(releaseInfo) {
   const version = releaseInfo?.version || APP_RELEASE.version || '1.0.0';
   const cache = `v=${encodeURIComponent(version)}`;
 
+  const direct = String(APP_RELEASE.directDownloadUrl || '').trim();
+  if (direct.startsWith('http://') || direct.startsWith('https://')) {
+    return direct.includes('?') ? `${direct}&${cache}` : `${direct}?${cache}`;
+  }
+
   const raw = releaseInfo?.downloadUrl ? String(releaseInfo.downloadUrl) : '';
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     return raw.includes('?') ? `${raw}&${cache}` : `${raw}?${cache}`;
