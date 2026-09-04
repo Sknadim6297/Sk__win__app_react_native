@@ -19,11 +19,15 @@ function detectPlatform() {
 export default function DownloadPage() {
   const { data, loading, error } = useFetch(() => api.downloadRelease(), []);
   const rel = data?.release;
-  const canDownload = Boolean(rel?.apkExists !== false && (rel?.downloadUrl || rel?.fileName));
+  // Always serve the shipped APP_RELEASE APK (never a stale API/old Render file).
   const href = apkHref(rel);
   const platform = useMemo(detectPlatform, []);
   const pwaHref = `${PWA_URL}/login`;
-  const version = rel?.version || APP_RELEASE.version;
+  const version = APP_RELEASE.version;
+  const sizeLabel = rel?.version === APP_RELEASE.version && rel?.sizeLabel ? rel.sizeLabel : '15.2 MB';
+  const updatedLabel =
+    rel?.version === APP_RELEASE.version && rel?.lastUpdatedLabel ? rel.lastUpdatedLabel : 'latest';
+  const notes = APP_RELEASE.releaseNotes || rel?.releaseNotes;
 
   return (
     <>
@@ -50,14 +54,14 @@ export default function DownloadPage() {
                   <span className="release-pill">Latest v{version}</span>
                 </div>
                 <h2>Download APK</h2>
-                <p className="muted">{rel?.androidMin || 'Android 8.0+'}</p>
+                <p className="muted">{APP_RELEASE.androidMin || rel?.androidMin || 'Android 8.0+'}</p>
                 <p className="muted">
-                  Size {rel?.apkExists ? rel.sizeLabel : '—'}
-                  {rel?.lastUpdatedLabel ? ` · Updated ${rel.lastUpdatedLabel}` : ''}
+                  Size {sizeLabel}
+                  {updatedLabel ? ` · Updated ${updatedLabel}` : ''}
                 </p>
-                {rel?.releaseNotes ? <p className="release-notes">{rel.releaseNotes}</p> : null}
-                <a className="btn btn-primary" href={canDownload ? href : '/download'} download={canDownload || undefined}>
-                  {rel?.downloadLabel || `Download WAREZONE v${version}`}
+                {notes ? <p className="release-notes">{notes}</p> : null}
+                <a className="btn btn-primary" href={href} download={APP_RELEASE.fileName}>
+                  Download WAREZONE v{version}
                 </a>
                 <p className="dim os-help">
                   Uninstall any old WAREZONE app first. Allow install from this source if Android

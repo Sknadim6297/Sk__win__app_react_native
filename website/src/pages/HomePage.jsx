@@ -139,7 +139,7 @@ export default function HomePage() {
   const ticker = data?.home?.latestAnnouncementTitle || data?.home?.latestNews?.text;
   const stats = data?.site?.stats || {};
   const apk = apkHref(data?.release);
-  const apkVersion = data?.release?.version || APP_RELEASE.version;
+  const apkVersion = APP_RELEASE.version;
   const leftFeatures = HOME_FEATURES.filter((_, i) => i % 2 === 0);
   const rightFeatures = HOME_FEATURES.filter((_, i) => i % 2 === 1);
 

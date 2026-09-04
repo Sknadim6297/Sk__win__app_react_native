@@ -50,10 +50,7 @@ module.exports = {
 
 function writeWebsiteRelease({ version, prev }) {
   const fileName = `WAREZONE-v${version}.apk`;
-  const direct = String(prev.externalDownloadUrl || '').trim();
-  const directLine = direct
-    ? `\n  directDownloadUrl: ${JSON.stringify(direct)},`
-    : '';
+  const direct = `/downloads/${fileName}`;
   const body = `/** Keep in sync with /release.config.cjs (generated from app.json) */
 export const APP_RELEASE = {
   version: '${version}',
@@ -63,7 +60,8 @@ export const APP_RELEASE = {
   releaseNotes: ${JSON.stringify(
     prev.releaseNotes ||
       `WAREZONE v${version} — latest Android release.`
-  )},${directLine}
+  )},
+  directDownloadUrl: ${JSON.stringify(direct)},
 };
 
 /** Expo Web PWA (same app screens). Override with VITE_PWA_URL on sk-win-web. */

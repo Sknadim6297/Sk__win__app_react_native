@@ -135,16 +135,23 @@ export function apkHref(releaseInfo) {
   if (direct.startsWith('http://') || direct.startsWith('https://')) {
     return direct.includes('?') ? `${direct}&${cache}` : `${direct}?${cache}`;
   }
+  // Same-origin website static file (website/public/downloads) — do not prefix API_BASE.
+  if (direct.startsWith('/')) {
+    return direct.includes('?') ? `${direct}&${cache}` : `${direct}?${cache}`;
+  }
+
+  // Prefer the versioned file shipped with the website build.
+  if (fileName) {
+    return `/downloads/${encodeURIComponent(fileName)}?${cache}`;
+  }
 
   const raw = releaseInfo?.downloadUrl ? String(releaseInfo.downloadUrl) : '';
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     return raw.includes('?') ? `${raw}&${cache}` : `${raw}?${cache}`;
   }
   if (raw.startsWith('/')) {
-    const path = raw.includes('?') ? `${raw}&${cache}` : `${raw}?${cache}`;
-    return API_BASE ? `${API_BASE}${path}` : path;
+    return raw.includes('?') ? `${raw}&${cache}` : `${raw}?${cache}`;
   }
 
-  const path = `/downloads/${encodeURIComponent(fileName)}?${cache}`;
-  return API_BASE ? `${API_BASE}${path}` : path;
+  return `/downloads/${encodeURIComponent(fileName)}?${cache}`;
 }

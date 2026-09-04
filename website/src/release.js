@@ -5,7 +5,7 @@ export const APP_RELEASE = {
   title: "WAREZONE Tournament",
   androidMin: "Android 8.0 (API 26)+",
   releaseNotes: "WAREZONE v1.0.6 — latest Android release. Uninstall any older WAREZONE app before installing.",
-  directDownloadUrl: "https://raw.githubusercontent.com/Sknadim6297/Sk__win__app_react_native/main/public/downloads/WAREZONE-v1.0.6.apk",
+  directDownloadUrl: "/downloads/WAREZONE-v1.0.6.apk",
 };
 
 /** Expo Web PWA (same app screens). Override with VITE_PWA_URL on sk-win-web. */
