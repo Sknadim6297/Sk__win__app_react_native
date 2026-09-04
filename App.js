@@ -26,8 +26,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
 import { createAppLinking } from './utils/webLinking';
 import {
-  DMSans_700Bold,
-} from '@expo-google-fonts/dm-sans';
+  Saira_400Regular,
+  Saira_500Medium,
+  Saira_600SemiBold,
+  Saira_700Bold,
+} from '@expo-google-fonts/saira';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { logApiConfig } from './utils/apiConfig';
 import { navigationRef } from './utils/navigationRef';
@@ -79,7 +82,10 @@ export default function App() {
     if (__DEV__) logApiConfig();
   }, []);
   const [fontsLoaded] = useFonts({
-    DMSans_700Bold,
+    Saira_400Regular,
+    Saira_500Medium,
+    Saira_600SemiBold,
+    Saira_700Bold,
   });
 
   useEffect(() => {

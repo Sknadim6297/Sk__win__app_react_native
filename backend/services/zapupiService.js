@@ -21,10 +21,16 @@ async function zapupiPost(url, body) {
     const err = new Error(data.message || data.error || `ZapUPI HTTP ${res.status}`);
     err.status = res.status >= 400 && res.status < 500 ? res.status : 502;
     err.code = 'ZAPUPI_API_ERROR';
-    err.payload = data;
+    err.payload = sanitizeZapPayload(data);
     throw err;
   }
   return data;
+}
+
+function sanitizeZapPayload(data) {
+  if (!data || typeof data !== 'object') return data;
+  const { zap_key, zapKey, ZAPUPI_KEY, ...rest } = data;
+  return rest;
 }
 
 function amountString(amount) {
@@ -73,7 +79,7 @@ async function createOrder({
     const err = new Error(data.message || data.error || 'ZapUPI create-order failed');
     err.status = 502;
     err.code = 'ZAPUPI_API_ERROR';
-    err.payload = { ...data, zap_key: undefined };
+    err.payload = sanitizeZapPayload(data);
     throw err;
   }
   if (!paymentUrl) {
@@ -93,6 +99,10 @@ async function createOrder({
 
 /**
  * POST https://pay.zapupi.com/api/order-status
+ *
+ * Note: ZapUPI test/sandbox often fires a Success webhook but later returns
+ * { status: "error", message: "Order not found" } from this endpoint.
+ * Callers must treat that as "status unavailable", not as a payment failure.
  */
 async function getOrderStatus(orderId) {
   const cfg = assertZapUpiReady();
@@ -100,17 +110,67 @@ async function getOrderStatus(orderId) {
     zap_key: cfg.zapKey,
     order_id: orderId,
   });
+
+  const topStatus = String(data.status || '').toLowerCase();
+  if (topStatus === 'error' || topStatus === 'failed') {
+    const msg = String(data.message || data.error || '');
+    const notFound = /not\s*found/i.test(msg);
+    console.warn('[ZapUPI] order-status unavailable', {
+      orderId: createdLogSafe(orderId),
+      message: msg.slice(0, 120),
+      notFound,
+    });
+    return {
+      ok: false,
+      notFound,
+      unavailable: true,
+      orderId,
+      status: '',
+      amount: undefined,
+      payAmount: undefined,
+      txnId: '',
+      utr: '',
+      environment: '',
+      raw: sanitizeZapPayload(data),
+      message: msg,
+    };
+  }
+
   const inner = data.data && typeof data.data === 'object' ? data.data : data;
+  const paymentStatus = inner.status || data.order_status || '';
   return {
-    ok: String(data.status || '').toLowerCase() === 'success' || Boolean(inner.status),
+    ok: topStatus === 'success' || Boolean(paymentStatus),
+    notFound: false,
+    unavailable: false,
     orderId: inner.order_id || orderId,
-    status: inner.status || data.order_status || '',
+    status: paymentStatus,
     amount: inner.amount,
-    payAmount: inner.pay_amount,
+    payAmount: inner.pay_amount ?? inner.payAmount,
     txnId: inner.txn_id || inner.txnId || '',
     utr: inner.utr || '',
     environment: inner.environment || '',
-    raw: data,
+    raw: sanitizeZapPayload(data),
+  };
+}
+
+/** Build a remote-status object from a stored ZapUPI webhook body. */
+function remoteFromWebhookPayload(payload, orderId) {
+  if (!payload || typeof payload !== 'object') return null;
+  const status = payload.status || payload.order_status || '';
+  if (!status) return null;
+  return {
+    ok: true,
+    notFound: false,
+    unavailable: false,
+    fromWebhookFallback: true,
+    orderId: payload.order_id || payload.orderId || orderId,
+    status,
+    amount: payload.amount,
+    payAmount: payload.pay_amount ?? payload.payAmount ?? payload.amount,
+    txnId: payload.txn_id || payload.txnId || '',
+    utr: payload.utr || '',
+    environment: payload.environment || '',
+    raw: sanitizeZapPayload(payload),
   };
 }
 
@@ -137,6 +197,7 @@ function isTestEnvironment(environment, txnId) {
 module.exports = {
   createOrder,
   getOrderStatus,
+  remoteFromWebhookPayload,
   mapZapStatusToLocal,
   isSuccessStatus,
   isTestEnvironment,

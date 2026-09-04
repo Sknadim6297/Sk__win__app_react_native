@@ -71,7 +71,10 @@
         "expo-font",
         {
           "fonts": [
-            "./node_modules/@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf"
+            "./node_modules/@expo-google-fonts/saira/400Regular/Saira_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/saira/500Medium/Saira_500Medium.ttf",
+            "./node_modules/@expo-google-fonts/saira/600SemiBold/Saira_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/saira/700Bold/Saira_700Bold.ttf"
           ]
         }
       ],

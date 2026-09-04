@@ -17,19 +17,19 @@ export const LINE_HEIGHT = {
 };
 
 /**
- * DM Sans — single weight for smaller APK (one .ttf instead of two).
+ * Saira — app-wide typeface (Google Fonts via @expo-google-fonts/saira).
  * Use named families instead of fontWeight on Android custom fonts.
  */
-export const FONT_FAMILY = 'DMSans_700Bold';
+export const FONT_FAMILY = 'Saira_400Regular';
 
 export const FONTS = {
-  regular: 'DMSans_700Bold',
-  medium: 'DMSans_700Bold',
-  semiBold: 'DMSans_700Bold',
-  bold: 'DMSans_700Bold',
-  display: 'DMSans_700Bold',
-  displayMedium: 'DMSans_700Bold',
-  displaySemiBold: 'DMSans_700Bold',
+  regular: 'Saira_400Regular',
+  medium: 'Saira_500Medium',
+  semiBold: 'Saira_600SemiBold',
+  bold: 'Saira_700Bold',
+  display: 'Saira_700Bold',
+  displayMedium: 'Saira_500Medium',
+  displaySemiBold: 'Saira_600SemiBold',
 };
 
 /** Icons8 display sizes — 24px default, 28px for important actions */

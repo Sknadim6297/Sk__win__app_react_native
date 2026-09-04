@@ -7,7 +7,7 @@ const TeamMember = require('../models/TeamMember');
 const PaymentOrder = require('../models/PaymentOrder');
 const PaymentLog = require('../models/PaymentLog');
 const { authMiddleware } = require('../middleware/auth');
-const { getZapUpiConfig, assertZapUpiReady } = require('../config/zapupi');
+const { getZapUpiConfig, assertZapUpiReady, assertValidTopupAmount } = require('../config/zapupi');
 const {
   isPaymentEnabled,
   requirePaymentsEnabled,
@@ -44,7 +44,8 @@ async function writeLog(entry) {
 }
 
 function uniqueOrderId() {
-  return `SKW${Date.now()}${crypto.randomBytes(3).toString('hex')}`.toUpperCase();
+  // ZapUPI rejects IDs with hyphens/special chars — keep alphanumeric only.
+  return `ORD${Date.now()}${crypto.randomBytes(4).toString('hex')}`.toUpperCase();
 }
 
 function userFacingError(code, fallback) {
@@ -88,8 +89,12 @@ async function settleSuccessfulPayment(paymentOrder, { source, txnId, utr } = {}
     }
     await paymentOrder.save();
     const fulfill = await fulfillTournamentEntryPayment(paymentOrder, { source });
-    const joined =
-      paymentOrder.tournamentJoined || fulfill.joined || fulfill.reason === 'ALREADY_JOINED';
+    const fresh = await PaymentOrder.findById(paymentOrder._id);
+    const joined = Boolean(fresh?.tournamentJoined) || fulfill.reason === 'ALREADY_JOINED';
+    if (fresh) {
+      paymentOrder.tournamentJoined = fresh.tournamentJoined;
+      paymentOrder.status = fresh.status;
+    }
     return {
       purpose,
       status: joined ? 'PAID' : 'SUCCESS',
@@ -99,17 +104,24 @@ async function settleSuccessfulPayment(paymentOrder, { source, txnId, utr } = {}
     };
   }
 
-  paymentOrder.status = 'SUCCESS';
+  if (!['SUCCESS', 'PAID'].includes(paymentOrder.status)) {
+    paymentOrder.status = 'SUCCESS';
+  }
   await paymentOrder.save();
   const credit = await creditWalletForPaymentOrder(paymentOrder, {
     source,
     txnId: paymentOrder.zapupiTxnId,
     utr: paymentOrder.zapupiUtr,
   });
+  const fresh = await PaymentOrder.findById(paymentOrder._id);
+  if (fresh) {
+    paymentOrder.walletCredited = fresh.walletCredited;
+    paymentOrder.status = fresh.status;
+  }
   return {
     purpose: 'wallet_topup',
     status: 'SUCCESS',
-    walletCredited: true,
+    walletCredited: Boolean(fresh?.walletCredited || credit.credited || credit.reason === 'ALREADY_CREDITED'),
     tournamentJoined: false,
     credit,
   };
@@ -129,13 +141,50 @@ function buildStatusPayload(paymentOrder, extra = {}) {
     tournamentId: paymentOrder.tournamentId || null,
     walletCredited: Boolean(paymentOrder.walletCredited),
     tournamentJoined: Boolean(paymentOrder.tournamentJoined),
+    txnId: paymentOrder.zapupiTxnId || null,
     utr: paymentOrder.zapupiUtr || null,
+    paidAt: paymentOrder.lastVerifiedAt || paymentOrder.updatedAt || null,
     ...extra,
   };
 }
 
-async function verifyAndSettle(paymentOrder, { source } = {}) {
-  const remote = await zapupi.getOrderStatus(paymentOrder.orderId);
+async function verifyAndSettle(paymentOrder, { source, webhookPayload } = {}) {
+  let remote = null;
+  let statusApiUnavailable = false;
+
+  try {
+    remote = await zapupi.getOrderStatus(paymentOrder.orderId);
+    if (remote?.unavailable || remote?.notFound || !remote?.status) {
+      statusApiUnavailable = true;
+    }
+  } catch (apiErr) {
+    statusApiUnavailable = true;
+    console.warn('[payments] order-status failed, will try webhook fallback:', apiErr.message);
+  }
+
+  // ZapUPI test/sandbox often returns "Order not found" even after a Success webhook.
+  // Fall back to the webhook body we already stored / just received.
+  if (statusApiUnavailable || !remote?.status) {
+    const wh =
+      webhookPayload ||
+      paymentOrder.lastWebhookPayload ||
+      null;
+    const fromWh = zapupi.remoteFromWebhookPayload(wh, paymentOrder.orderId);
+    if (fromWh && zapupi.isSuccessStatus(fromWh.status)) {
+      console.log('[payments] settling via webhook fallback', {
+        orderId: paymentOrder.orderId,
+        source,
+        reason: remote?.message || 'status_unavailable',
+      });
+      remote = fromWh;
+    } else if (!remote?.status) {
+      paymentOrder.lastStatusPayload = remote?.raw || paymentOrder.lastStatusPayload;
+      paymentOrder.lastVerifiedAt = new Date();
+      await paymentOrder.save();
+      return { localStatus: 'PENDING', remote, statusApiUnavailable: true };
+    }
+  }
+
   paymentOrder.lastStatusPayload = remote.raw;
   paymentOrder.lastVerifiedAt = new Date();
   if (remote.txnId) paymentOrder.zapupiTxnId = String(remote.txnId);
@@ -153,30 +202,70 @@ async function verifyAndSettle(paymentOrder, { source } = {}) {
   }
 
   const localStatus = zapupi.mapZapStatusToLocal(remote.status);
-  const paidAmount = Number(remote.payAmount ?? remote.amount ?? paymentOrder.amount);
 
-  if (localStatus === 'SUCCESS' && Math.abs(paidAmount - Number(paymentOrder.amount)) > 0.05) {
-    paymentOrder.status = 'FAILED';
-    paymentOrder.failureReason = 'AMOUNT_MISMATCH';
-    await paymentOrder.save();
-    await writeLog({
-      orderId: paymentOrder.orderId,
-      paymentOrderId: paymentOrder._id,
-      userId: paymentOrder.userId,
-      event: 'AMOUNT_MISMATCH',
-      source,
-      success: false,
-      responsePayload: { expected: paymentOrder.amount, paid: paidAmount },
-      errorCode: 'AMOUNT_MISMATCH',
-    });
-    return { localStatus: 'FAILED', mismatch: true, remote };
-  }
-
+  // Never fall back to our own expected amount — that would skip verification.
   if (localStatus === 'SUCCESS') {
+    const alreadyAmountOk =
+      ['SUCCESS', 'PAID'].includes(paymentOrder.status) &&
+      paymentOrder.failureReason !== 'AMOUNT_MISMATCH' &&
+      paymentOrder.failureReason !== 'REMOTE_AMOUNT_MISSING';
+
+    if (!alreadyAmountOk) {
+      const rawPaid = remote.payAmount ?? remote.amount;
+      const paidAmount = Number(rawPaid);
+      const expected = Number(paymentOrder.amount);
+
+      if (rawPaid === undefined || rawPaid === null || rawPaid === '' || !Number.isFinite(paidAmount)) {
+        paymentOrder.failureReason = 'REMOTE_AMOUNT_MISSING';
+        await paymentOrder.save();
+        await writeLog({
+          orderId: paymentOrder.orderId,
+          paymentOrderId: paymentOrder._id,
+          userId: paymentOrder.userId,
+          event: 'REMOTE_AMOUNT_MISSING',
+          source,
+          success: false,
+          responsePayload: {
+            remoteStatus: remote.status,
+            payAmount: remote.payAmount,
+            amount: remote.amount,
+            fromWebhookFallback: Boolean(remote.fromWebhookFallback),
+          },
+          errorCode: 'REMOTE_AMOUNT_MISSING',
+        });
+        // Keep pending so a later status poll can settle once ZapUPI returns amount.
+        return { localStatus: 'PENDING', missingAmount: true, remote };
+      }
+
+      if (!Number.isFinite(expected) || Math.abs(paidAmount - expected) > 0.05) {
+        paymentOrder.status = 'FAILED';
+        paymentOrder.failureReason = 'AMOUNT_MISMATCH';
+        await paymentOrder.save();
+        await writeLog({
+          orderId: paymentOrder.orderId,
+          paymentOrderId: paymentOrder._id,
+          userId: paymentOrder.userId,
+          event: 'AMOUNT_MISMATCH',
+          source,
+          success: false,
+          responsePayload: { expected, paid: paidAmount },
+          errorCode: 'AMOUNT_MISMATCH',
+        });
+        return { localStatus: 'FAILED', mismatch: true, remote };
+      }
+    }
+
+    // Revive orders that were wrongly cancelled after a successful pay.
+    if (['CANCELLED', 'EXPIRED', 'USER_DROPPED'].includes(paymentOrder.status)) {
+      paymentOrder.failureReason = undefined;
+    }
     paymentOrder.status = 'SUCCESS';
+    if (paymentOrder.failureReason === 'REMOTE_AMOUNT_MISSING') {
+      paymentOrder.failureReason = undefined;
+    }
     await paymentOrder.save();
     const settle = await settleSuccessfulPayment(paymentOrder, {
-      source,
+      source: remote.fromWebhookFallback ? `${source || 'api'}:webhook_fallback` : source,
       txnId: remote.txnId,
       utr: remote.utr,
     });
@@ -292,6 +381,7 @@ router.get('/config', authMiddleware, async (req, res) => {
     environment: cfg.env,
     minAmount: cfg.minAmount,
     maxAmount: cfg.maxAmount,
+    allowedTopupAmounts: cfg.allowedTopupAmounts,
     currency: cfg.currency,
     paymentMethod: 'zapupi',
     supportsTournamentPayJoin: true,
@@ -309,14 +399,15 @@ router.get('/config', authMiddleware, async (req, res) => {
  */
 async function handleCreateWalletOrder(req, res) {
   try {
-    const cfg = assertZapUpiReady();
-    const amountNum = parseFloat(req.body?.amount);
-
-    if (!amountNum || Number.isNaN(amountNum) || amountNum < cfg.minAmount || amountNum > cfg.maxAmount) {
-      return res.status(400).json({
+    assertZapUpiReady();
+    let amountNum;
+    try {
+      amountNum = assertValidTopupAmount(req.body?.amount);
+    } catch (amountErr) {
+      return res.status(amountErr.status || 400).json({
         success: false,
-        code: 'INVALID_AMOUNT',
-        message: `Enter an amount between ₹${cfg.minAmount} and ₹${cfg.maxAmount}.`,
+        code: amountErr.code || 'INVALID_AMOUNT',
+        message: amountErr.message,
       });
     }
 
@@ -613,7 +704,7 @@ async function handleStatus(req, res) {
       );
     }
 
-    if (purpose === 'wallet_topup' && (paymentOrder.walletCredited || paymentOrder.status === 'SUCCESS')) {
+    if (purpose === 'wallet_topup' && paymentOrder.walletCredited) {
       const user = await User.findById(req.userId);
       return res.json(
         buildStatusPayload(paymentOrder, {
@@ -621,6 +712,26 @@ async function handleStatus(req, res) {
           walletCredited: true,
           balance: user?.wallet?.balance,
           message: 'Payment successful. Wallet updated.',
+        })
+      );
+    }
+
+    if (
+      purpose === 'wallet_topup' &&
+      ['SUCCESS', 'PAID'].includes(paymentOrder.status) &&
+      !paymentOrder.walletCredited
+    ) {
+      const settle = await settleSuccessfulPayment(paymentOrder, { source: 'poll' });
+      const fresh = await PaymentOrder.findById(paymentOrder._id);
+      const user = await User.findById(req.userId);
+      return res.json(
+        buildStatusPayload(fresh, {
+          status: 'SUCCESS',
+          walletCredited: Boolean(fresh?.walletCredited),
+          balance: user?.wallet?.balance,
+          message: fresh?.walletCredited
+            ? 'Payment successful. Wallet updated.'
+            : settle.credit?.message || 'Payment verified. Crediting wallet…',
         })
       );
     }
@@ -660,7 +771,9 @@ async function handleStatus(req, res) {
                   ? fresh.tournamentJoined
                     ? 'Payment successful. You have joined the tournament.'
                     : 'Payment received. Completing join…'
-                  : 'Payment successful. Wallet updated.',
+                  : fresh.walletCredited
+                    ? 'Payment successful. Wallet updated.'
+                    : 'Payment verified. Crediting wallet…',
             })
           );
         }
@@ -722,10 +835,12 @@ async function handleStatus(req, res) {
       return res.json(
         buildStatusPayload(fresh, {
           status: 'SUCCESS',
-          walletCredited: true,
+          walletCredited: Boolean(fresh.walletCredited),
           newlyCredited: verified.settle?.credit?.credited,
           balance: user?.wallet?.balance,
-          message: 'Payment successful. Wallet updated.',
+          message: fresh.walletCredited
+            ? 'Payment successful. Wallet updated.'
+            : 'Payment verified. Crediting wallet…',
         })
       );
     }
@@ -787,23 +902,42 @@ async function handleCancel(req, res) {
         status: paymentOrder.tournamentJoined ? 'PAID' : 'SUCCESS',
         message: 'Payment already completed.',
         tournamentJoined: Boolean(paymentOrder.tournamentJoined),
+        walletCredited: Boolean(paymentOrder.walletCredited),
       });
     }
 
+    // Always re-verify before cancelling — user may have paid, then hit back.
+    // Especially important when ZapUPI status API is unavailable for test orders.
     try {
-      const verified = await verifyAndSettle(paymentOrder, { source: 'api' });
+      const verified = await verifyAndSettle(paymentOrder, {
+        source: 'api',
+        webhookPayload: paymentOrder.lastWebhookPayload,
+      });
       if (verified.localStatus === 'SUCCESS') {
         const fresh = await PaymentOrder.findById(paymentOrder._id);
+        const user = await User.findById(req.userId);
         return res.json({
           success: true,
           status: fresh.tournamentJoined ? 'PAID' : 'SUCCESS',
           message: 'Payment already completed.',
           tournamentJoined: Boolean(fresh.tournamentJoined),
           walletCredited: Boolean(fresh.walletCredited),
+          balance: user?.wallet?.balance,
         });
       }
     } catch (_) {
-      /* still allow local cancel */
+      /* still allow local cancel if not paid */
+    }
+
+    // If webhook already reported Success but settle hasn't finished, do NOT cancel.
+    const wh = paymentOrder.lastWebhookPayload;
+    if (wh && zapupi.isSuccessStatus(wh.status) && !paymentOrder.walletCredited && !paymentOrder.tournamentJoined) {
+      return res.json({
+        success: true,
+        status: 'PENDING',
+        message: 'Payment received — wallet is being updated. Please wait a moment.',
+        code: 'PAYMENT_PENDING',
+      });
     }
 
     if (!['FAILED', 'EXPIRED', 'CANCELLED', 'SUCCESS', 'PAID'].includes(paymentOrder.status)) {
@@ -834,8 +968,8 @@ async function handleCancel(req, res) {
 }
 
 /**
- * ZapUPI webhook. Always 200 + {status:'ok'}. Never trust this payload alone —
- * confirm with Order Status API before joining / crediting.
+ * ZapUPI webhook. Always 200 + {status:'ok'}. Prefer Order Status API confirmation,
+ * but fall back to this payload when status API returns "Order not found" (test/sandbox).
  */
 router.post('/zapupi/webhook', async (req, res) => {
   const ack = () => res.status(200).json({ status: 'ok' });
@@ -868,6 +1002,14 @@ router.post('/zapupi/webhook', async (req, res) => {
       return ack();
     }
 
+    // Always persist the webhook body — needed when order-status is unavailable.
+    paymentOrder.lastWebhookPayload = payload;
+    if (txnId) paymentOrder.zapupiTxnId = String(txnId);
+    if (utr) paymentOrder.zapupiUtr = String(utr);
+    if (environment) paymentOrder.zapupiEnvironment = String(environment);
+    paymentOrder.lastVerifiedAt = new Date();
+    await paymentOrder.save();
+
     if (paymentOrder.walletCredited || paymentOrder.tournamentJoined) {
       await writeLog({
         orderId,
@@ -880,12 +1022,6 @@ router.post('/zapupi/webhook', async (req, res) => {
       });
       return ack();
     }
-
-    if (txnId) paymentOrder.zapupiTxnId = String(txnId);
-    if (utr) paymentOrder.zapupiUtr = String(utr);
-    if (environment) paymentOrder.zapupiEnvironment = String(environment);
-    paymentOrder.lastVerifiedAt = new Date();
-    await paymentOrder.save();
 
     if (!isPaymentEnabled()) {
       await writeLog({
@@ -911,7 +1047,7 @@ router.post('/zapupi/webhook', async (req, res) => {
     }
 
     try {
-      await verifyAndSettle(paymentOrder, { source: 'webhook' });
+      await verifyAndSettle(paymentOrder, { source: 'webhook', webhookPayload: payload });
     } catch (verifyErr) {
       console.error('[payments] webhook verify error:', verifyErr.message);
     }

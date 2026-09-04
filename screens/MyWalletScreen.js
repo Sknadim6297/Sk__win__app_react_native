@@ -151,21 +151,8 @@ const MyWalletScreen = ({ navigation, route }) => {
       paymentInFlight.current = true;
       setProcessing(true);
 
-      // Testing (PAYMENT_ENABLED=false): credit dummy coins immediately — no ZapUPI.
-      if (!isPaymentEnabled()) {
-        const res = await walletService.topup({
-          amount: amountNum,
-          paymentMethod: 'testing',
-        });
-        setShowAddMoneyModal(false);
-        setAddAmount('');
-        await loadWalletData(true);
-        Alert.alert('Success', res?.message || `₹${amountNum} added to your wallet`);
-        return;
-      }
-
-      const cfg = await paymentService.getConfig();
-      if (cfg?.enabled) {
+      // Helper — navigate to ZapUPI payment screen and clean up modal state.
+      const goToZapUpi = () => {
         setShowAddMoneyModal(false);
         setAddAmount('');
         navigation.navigate('ZapUpiPayment', {
@@ -175,17 +162,49 @@ const MyWalletScreen = ({ navigation, route }) => {
           returnToTournamentId: returnTournamentRef.current,
           returnScreen: returnScreenRef.current,
         });
-        return;
+      };
+
+      // Step 1: Always ask the backend — it is the authoritative routing source.
+      // This avoids hitting the disabled /wallet/topup endpoint (and its 403) when
+      // ZapUPI is live, even if an older APK build has the client flag stale/false.
+      try {
+        const cfg = await paymentService.getConfig();
+        if (cfg?.enabled || cfg?.zapupiReady || cfg?.paymentEnabled) {
+          goToZapUpi();
+          return;
+        }
+        // Config OK but ZapUPI explicitly off → fall through to testing topup.
+      } catch {
+        // Network / auth error fetching config.
+        if (isPaymentEnabled()) {
+          goToZapUpi();
+          return;
+        }
+        // Otherwise fall through to testing topup.
       }
 
-      const res = await walletService.topup({
-        amount: amountNum,
-        paymentMethod: 'testing',
-      });
-      setShowAddMoneyModal(false);
-      setAddAmount('');
-      await loadWalletData(true);
-      Alert.alert('Success', res?.message || `₹${amountNum} added to your wallet`);
+      // Step 2: Testing / demo mode — credit directly.
+      try {
+        const res = await walletService.topup({
+          amount: amountNum,
+          paymentMethod: 'testing',
+        });
+        setShowAddMoneyModal(false);
+        setAddAmount('');
+        await loadWalletData(true);
+        Alert.alert('Success', res?.message || `₹${amountNum} added to your wallet`);
+        return;
+      } catch (topupErr) {
+        // Safety net: backend switched to ZapUPI while client config was cached.
+        if (
+          topupErr?.code === 'USE_ZAPUPI' ||
+          /ZapUPI|Direct top-up is disabled/i.test(String(topupErr?.message || ''))
+        ) {
+          goToZapUpi();
+          return;
+        }
+        throw topupErr;
+      }
     } catch (err) {
       Alert.alert('Could not add coins', err.message || 'Check your connection and try again.');
     } finally {

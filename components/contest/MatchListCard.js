@@ -59,17 +59,19 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
       ? Boolean(item.resultsPublished)
       : lifecycleStatus === 'result_published';
 
-  let ctaLabel = 'JOIN MATCH';
+  // Title-case CTAs to match the reference "Joining Full" style
+  let ctaLabel = 'Join Match';
   if (isCompleted) {
-    ctaLabel = resultsPublished ? 'VIEW RESULT' : 'RESULT PENDING';
+    ctaLabel = resultsPublished ? 'View Result' : 'Result Pending';
   } else if (lifecycleStatus === 'ongoing' || lifecycleStatus === 'live') {
-    ctaLabel = 'ONGOING';
+    ctaLabel = 'Ongoing';
   } else if (isJoined) {
-    ctaLabel = 'JOINED';
+    ctaLabel = 'Joined';
   } else if (!isJoinOpen) {
-    ctaLabel = String(lifecycleStatus || 'CLOSED').toUpperCase();
+    const raw = String(lifecycleStatus || 'Closed');
+    ctaLabel = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
   } else if (full) {
-    ctaLabel = 'JOINING FULL';
+    ctaLabel = 'Joining Full';
   }
 
   const showViewResult = isCompleted && resultsPublished;
@@ -109,22 +111,25 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
         <StatTriple items={coinStats} />
         <StatTriple items={infoStats} />
 
-        <JoinProgressBar
-          joined={joined}
-          capacity={capacity}
-          unit={item.joinUnit}
-          usesTeamRegistration={structure.usesTeamRegistration}
-          playersPerTeam={structure.playersPerTeam}
-          isFull={full}
-          hide={isCompleted}
-        />
+        {playerFormatLabel ? (
+          <Text style={styles.modeFormat} numberOfLines={1}>
+            {String(playerFormatLabel || '').toUpperCase()}
+          </Text>
+        ) : null}
 
+        {/* Screenshot layout: progress (bar + spots) | CTA button */}
         <View style={styles.ctaRow}>
-          <View style={styles.modeBlock}>
-            <Text style={styles.modeFormat} numberOfLines={1}>
-              {String(playerFormatLabel || '').toUpperCase()}
-            </Text>
-          </View>
+          <JoinProgressBar
+            joined={joined}
+            capacity={capacity}
+            unit={item.joinUnit}
+            usesTeamRegistration={structure.usesTeamRegistration}
+            playersPerTeam={structure.playersPerTeam}
+            isFull={full}
+            hide={isCompleted}
+            compact
+          />
+          {isCompleted ? <View style={styles.progressSpacer} /> : null}
           <TouchableOpacity
             style={[
               styles.joinBtn,
@@ -143,7 +148,7 @@ export default function MatchListCard({ item, gameModeImage, onPress }) {
                 showViewResult && styles.joinBtnTextDark,
               ]}
             >
-              {String(ctaLabel).toUpperCase()}
+              {ctaLabel}
             </Text>
           </TouchableOpacity>
         </View>
@@ -171,15 +176,23 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FONTS.bold,
-    fontSize: 14,
+    fontSize: 16,
     color: COLORS.white,
-    lineHeight: 20,
+    lineHeight: 22,
+    letterSpacing: 0.3,
   },
   timeLine: {
     marginTop: 4,
-    fontFamily: FONTS.bold,
-    fontSize: 12,
+    fontFamily: FONTS.semiBold,
+    fontSize: 11,
     color: PAGE.muted,
+  },
+  modeFormat: {
+    marginTop: 8,
+    fontFamily: FONTS.bold,
+    fontSize: 13,
+    color: '#5CFFF7',
+    letterSpacing: 0.5,
   },
   ctaRow: {
     flexDirection: 'row',
@@ -187,25 +200,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 12,
   },
-  modeBlock: {
+  progressSpacer: {
     flex: 1,
-    marginRight: 10,
-    minWidth: 0,
-    justifyContent: 'center',
-  },
-  modeFormat: {
-    fontFamily: FONTS.bold,
-    fontSize: 14,
-    color: '#5CFFF7',
-    letterSpacing: 0.5,
   },
   joinBtn: {
     backgroundColor: PAGE.green,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 10,
-    minWidth: 128,
+    borderRadius: 12,
+    minWidth: 118,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   joinBtnMuted: {
     backgroundColor: '#2B3348',
@@ -214,7 +219,7 @@ const styles = StyleSheet.create({
     backgroundColor: PAGE.purple,
   },
   joinBtnFull: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#5BA3E8',
   },
   joinBtnResult: {
     backgroundColor: PAGE.gold,

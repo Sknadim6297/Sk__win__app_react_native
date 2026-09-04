@@ -117,6 +117,8 @@ export function JoinProgressBar({
   playersPerTeam,
   isFull,
   hide,
+  /** When true: bar on top, "Only X Spot Left" + "n/n" below (screenshot layout). */
+  compact = false,
 }) {
   if (hide) return null;
 
@@ -127,6 +129,35 @@ export function JoinProgressBar({
   const pct = full ? 100 : Math.min(100, Math.round((joinedN / capN) * 100));
 
   const teamMode = unit === 'teams' || Boolean(usesTeamRegistration);
+  const unitWord = teamMode ? (left === 1 ? 'Team' : 'Teams') : left === 1 ? 'Spot' : 'Spots';
+  // Match reference copy for zero: "Only 0 Spot Left"
+  const spotWord =
+    left === 0 ? (teamMode ? 'Team' : 'Spot') : unitWord;
+
+  if (compact) {
+    const leftLabel = `Only ${left} ${spotWord} Left`;
+    const countLabel = `${joinedN}/${capN}`;
+    const accent = full ? '#EF4444' : PAGE.green;
+    return (
+      <View style={styles.joinCompact}>
+        <View style={styles.joinCompactTrack}>
+          <View
+            style={[
+              styles.joinCompactFill,
+              { width: `${Math.max(pct, full ? 100 : 4)}%`, backgroundColor: accent },
+            ]}
+          />
+        </View>
+        <View style={styles.joinCompactHead}>
+          <Text style={[styles.joinCompactLeft, { color: accent }]} numberOfLines={1}>
+            {leftLabel}
+          </Text>
+          <Text style={[styles.joinCompactCount, { color: accent }]}>{countLabel}</Text>
+        </View>
+      </View>
+    );
+  }
+
   const joinedLabel = teamMode
     ? `${joinedN}/${capN} TEAMS JOINED`
     : `${joinedN}/${capN} SLOTS BOOKED`;
@@ -381,5 +412,38 @@ const styles = StyleSheet.create({
   },
   joinProgressFillFull: {
     backgroundColor: '#2563EB',
+  },
+  joinCompact: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 12,
+    justifyContent: 'center',
+  },
+  joinCompactTrack: {
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+  },
+  joinCompactFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  joinCompactHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    gap: 8,
+  },
+  joinCompactLeft: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: FONTS.semiBold,
+    fontSize: 12,
+  },
+  joinCompactCount: {
+    fontFamily: FONTS.bold,
+    fontSize: 12,
   },
 });

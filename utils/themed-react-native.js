@@ -1,5 +1,5 @@
 /**
- * Themed react-native wrapper — DM Sans base + readable default size.
+ * Themed react-native wrapper — Saira base + readable default size.
  * Default font is applied first so style fontFamily (FONTS.bold, etc.) can override.
  *
  * Must proxy ALL react-native exports (ownKeys + descriptors). Otherwise Metro/Babel
@@ -8,7 +8,7 @@
 const RN = require('react-native');
 const React = require('react');
 
-const APP_FONT = 'DMSans_700Bold';
+const APP_FONT = 'Saira_400Regular';
 const BASE_TEXT = {
   fontFamily: APP_FONT,
   fontWeight: 'normal',

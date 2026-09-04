@@ -87,6 +87,8 @@ const paymentOrderSchema = new mongoose.Schema(
     failureReason: String,
     rawCreateResponse: mongoose.Schema.Types.Mixed,
     lastStatusPayload: mongoose.Schema.Types.Mixed,
+    /** Last ZapUPI webhook body — used when order-status API returns "Order not found" (common in test/sandbox). */
+    lastWebhookPayload: mongoose.Schema.Types.Mixed,
     lastVerifiedAt: Date,
     metadata: mongoose.Schema.Types.Mixed,
     /** Legacy Cashfree fields kept so old rows still load. */

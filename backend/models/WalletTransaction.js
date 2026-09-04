@@ -67,6 +67,12 @@ const walletTransactionSchema = new mongoose.Schema({
     index: true,
     sparse: true,
   },
+  /** True only after wallet $inc has been applied for this ledger row (ZapUPI deposits). */
+  balanceApplied: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
   cashfreePaymentId: {
     type: String,
     index: true,

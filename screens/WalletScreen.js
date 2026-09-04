@@ -24,16 +24,41 @@ import { clearWalletReturnParams, isWalletCredit } from '../utils/walletFlow';
 import { toPlayerMatchLabel } from '../utils/tournamentHelpers';
 import { isPaymentEnabled, WITHDRAW_DISABLED_MESSAGE, TESTING_ADD_HINT } from '../utils/paymentConfig';
 
-/** Testing: credit wallet directly. Live: ZapUPI QR when gateway is on. */
+/**
+ * Testing: credit wallet directly.  Live: ZapUPI QR when gateway is on.
+ *
+ * The backend is the authoritative source — we ALWAYS ask it first.
+ * This prevents old APK builds (where the client flag may be stale/false)
+ * from hitting the disabled /wallet/topup endpoint and generating noisy 403 logs.
+ */
 async function creditOrOpenGateway({ amount, balance, navigation, returnTournamentId, returnScreen }) {
-  if (!isPaymentEnabled()) {
-    return walletService.topup({ amount, paymentMethod: 'testing' });
+  const openZap = () => ({ openZapUpi: true, amount, balance, returnTournamentId, returnScreen });
+
+  // Step 1: Ask the backend whether ZapUPI is live.
+  try {
+    const cfg = await paymentService.getConfig();
+    // cfg.enabled  = paymentsOn && zapupiReady  (server-side authoritative)
+    // cfg.zapupiReady = zapKey is set
+    // cfg.paymentEnabled = PAYMENT_ENABLED env var
+    if (cfg?.enabled || cfg?.zapupiReady || cfg?.paymentEnabled) return openZap();
+    // Config returned OK but ZapUPI is explicitly off → fall through to testing topup.
+  } catch {
+    // Network / auth error fetching config.
+    // If the client flag says payments are on, prefer ZapUPI (its screen handles errors).
+    if (isPaymentEnabled()) return openZap();
+    // Otherwise fall through to testing topup.
   }
-  const cfg = await paymentService.getConfig();
-  if (cfg?.enabled) {
-    return { openZapUpi: true, amount, balance, returnTournamentId, returnScreen };
+
+  // Step 2: Testing / demo mode — credit directly.
+  try {
+    return await walletService.topup({ amount, paymentMethod: 'testing' });
+  } catch (err) {
+    // Safety net: backend flipped to ZapUPI while client config was cached/stale.
+    if (err?.code === 'USE_ZAPUPI' || /ZapUPI|Direct top-up is disabled/i.test(String(err?.message || ''))) {
+      return openZap();
+    }
+    throw err;
   }
-  return walletService.topup({ amount, paymentMethod: 'testing' });
 }
 
 const WalletScreen = ({ navigation, route }) => {
