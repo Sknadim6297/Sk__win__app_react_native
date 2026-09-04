@@ -61,6 +61,11 @@ const App = (() => {
     return !usesTeamJoinMatch(detail, t);
   }
 
+  /** Show Clash Squad instead of the old "Custom Match" wording. */
+  function toPlayerMatchLabel(text) {
+    if (text == null || text === '') return text;
+    return String(text).replace(/Custom Match/gi, 'Clash Squad');
+  }
 
   function bucketForModeLabel(label) {
     const key = String(label || '').toLowerCase().replace(/[^a-z0-9]/g, '');
