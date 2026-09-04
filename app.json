@@ -9,9 +9,10 @@
     "jsEngine": "hermes",
     "extra": {
       "eas": {
-        "projectId": "43e67fb1-94ec-48c2-8e78-fa94f3290cec"
+        "projectId": "66dfc3ce-3f0d-4479-bc3b-fa323a96b07d"
       },
-      "appName": "WAREZONE"
+      "appName": "WAREZONE",
+      "paymentEnabled": false
     },
     "splash": {
       "image": "./assets/logo/WAREZONE_LOGO.png",
@@ -117,6 +118,6 @@
       "androidMode": "default",
       "androidCollapsedTitle": "WAREZONE"
     },
-    "owner": "nadim123456"
+    "owner": "warzonesknadim"
   }
 }
